@@ -3,7 +3,6 @@ status: planning
 target_date:
 release_date:
 features:
-  - wallet-and-akahu-billing
   - player-dashboard
   - tax-invoices-and-exports
   - admin-reporting-dashboard
