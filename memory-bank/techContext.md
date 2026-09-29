@@ -104,7 +104,7 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `dev` | `docker compose up -d --wait postgres mailpit && pnpm run db:migrate && pnpm -r --parallel --filter "./apps/*" dev` | Start local stack (Postgres, Mailpit), run migrations, start Next.js dev server and API dev server in parallel |
 | `lint` | `eslint . --max-warnings 0 && prettier --check .` | Check code style, fail on any ESLint warning or format violation |
 | `typecheck` | `pnpm -r --include-workspace-root --workspace-concurrency=4 exec tsc --noEmit -p tsconfig.json` | Type-check all packages with strict mode, run in parallel (4 at a time) |
-| `test` | `vitest run --project unit --coverage` | Run unit tests (*.test.ts, no DB), report coverage for money/time/crypto/notifications/jobs modules, exit on first failure |
+| `test` | `vitest run --project unit --coverage` | Run unit tests (*.test.ts, no DB), report coverage for the foundation library modules |
 | `test:integration` | `vitest run --project integration` | Run integration tests (*.int.test.ts) against real PostgreSQL 17, 30-second timeout, fork pool isolation |
 | `db:migrate` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db migrate` | Apply pending migrations (node-pg-migrate), then install/upgrade pgboss schema |
 | `db:rollback` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db rollback` | Roll back one migration step (or `-- --count N` for multiple, `-- --all` to zero) |
@@ -114,7 +114,7 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `build` | `pnpm -r build` | Build all packages: Next.js standalone output (web), tsup bundle (api, outputs `dist/{main,worker,cli,instrumentation}.js`) |
 | `openapi` | `pnpm --filter @sgm/api exec tsx src/openapi.ts > apps/api/openapi.yaml` | Generate OpenAPI spec from Fastify router |
 | `jobs:trigger` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts jobs trigger <slot>` | Manually trigger a scheduled job (e.g., `jobs:trigger recurrence-materialisation`) |
-| `test:e2e` | `playwright test -c apps/web/playwright.config.ts` | Run end-to-end smoke tests (requires `dev` stack running) |
+| `test:e2e` | `playwright test -c apps/web/playwright.config.ts` | Run Playwright smoke tests (requires the Compose stack: `docker compose up -d --wait`); not part of `ci` |
 | `ci` | `pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:integration && pnpm run build` | Full CI pipeline: lint, type-check, unit tests, integration tests, build; must all pass |
 
 ## Test Strategy
@@ -129,7 +129,7 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 
 ### Unit Testing Specifics
 - **Naming**: `*.test.ts` (not `.spec.ts`); vitest discovers them automatically
-- **Isolation**: Each test runs in a fresh Node process (no shared state)
+- **Isolation**: unit tests share vitest's default worker pool, and state is kept per test via factories. Only the integration project sets `pool: 'forks'`, and each integration test file gets its own database cloned from a template.
 - **Scope**: Test logic, algorithms, validation rules, and error paths; no DB, no HTTP mocking
 - **Mocking**: Dependency injection via function parameters; test doubles for adapters (e.g., in-memory Notifier for email tests)
 - **Assertion style**: `expect(value).toBe(expected)`, `expect(fn).toThrow(Error)`, etc.
