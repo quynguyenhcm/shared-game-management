@@ -3,7 +3,6 @@ status: planning
 target_date:
 release_date:
 features:
-  - player-dashboard
   - tax-invoices-and-exports
   - admin-reporting-dashboard
 ---
