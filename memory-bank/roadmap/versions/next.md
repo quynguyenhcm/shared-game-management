@@ -10,6 +10,7 @@ features:
   - skill-levels-and-auto-enroll
   - session-scheduling-engine
   - registration-and-waitlist
+  - wallet-and-akahu-billing
 ---
 
 # next
