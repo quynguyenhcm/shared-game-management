@@ -530,7 +530,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - [ ] `memory-bank/techContext.md`, `memory-bank/systemPatterns.md` (extend): record the chosen stack, commands and conventions
 
 ### Phases
-- [ ] Phase 1: Workspace scaffold and quality gates (AC-VERIFY-1, AC-VERIFY-3, AC-VERIFY-17, AC-ERROR-1)
+- [x] Phase 1: Workspace scaffold and quality gates (AC-VERIFY-1, AC-VERIFY-3, AC-VERIFY-17, AC-ERROR-1)
   - Components: root `package.json` targets and `scripts/setup.ts`, apps/web placeholder, apps/api with `/health` plus `src/worker.ts` and `src/cli.ts` skeletons, packages/shared, lint/format/strict TS, Vitest unit + integration projects, config fail-fast, logger
   - Milestone: `lint`, `typecheck` and `test` pass locally; deliberate violations fail each gate
 - [ ] Phase 2: Local dev stack and CI (AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-2, AC-INTEGRATION-4)
@@ -573,12 +573,12 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 **Build Status**: RUNNING
 **Current Phase**: 1 of 6
 **Auto-Build Mode**: YES
-**Last Completed**: CREATIVE (2026-09-29)
+**Last Completed**: Phase 1 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 1
+**Resume From**: Phase 2
 **Notes**: Local-only run. Commit per phase, never push (spec owner, 2026-09-29; GitHub push blocked with a 403). Local services: Docker 29.5 on Colima, postgres:17 image, pnpm via Corepack (pin pnpm@10 through packageManager).
 
 ### Halt State
@@ -586,6 +586,11 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 
 ### Deviations
 <!-- Per entry: - Phase <N> | <file:line/artifact> | <rationale> -->
+- Phase 1 | package.json typecheck | added --include-workspace-root plus root tsconfig.json so scripts/ and vitest.config.ts are type-checked
+- Phase 1 | apps/api/src/lib/logger/logger.ts | formatter-based deep key redaction instead of wildcard pino redact paths (fast-redact lacks partial wildcards); pino.transport destination
+- Phase 1 | package.json versions | TypeScript pinned 5.9.3 (typescript-eslint peer range); eslint 9.39; zod 4; vitest 5; next 16
+- Phase 1 | apps/api/src/routes/health.ts, main.ts | /health takes injected checkDb (503 degraded when false); default true with TODO(Phase 2) until pool wired
+- Phase 1 | review advisories carried forward | A1 redact child-logger bindings; A2 redact DSN/url keys, set-cookie, x-api-key, Buffers (+tests); A4 URL-validate SMTP_URL/MAILPIT_API_URL/API_INTERNAL_URL; A3 optional HOST config; drop @fastify/swagger if Phase 2 does not use it; verify coverage globs match in Phases 3-5
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
@@ -600,3 +605,4 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - 2026-09-29 Decision (spec owner): target PostgreSQL 17 instead of 15; spec, plan, architecture doc, roadmap feature and techContext updated
 - 2026-09-29 Step 4.5: Codex adversarial critique — needs-attention, 5 findings (1 critical, 3 high, 1 medium)
 - 2026-09-29 Critique disposition (spec owner): all 5 findings applied; `fee_other` rate added for BY_SEX; AC wording changes from the design agents applied. Taxonomy CLEAN, 32 ACs (29 MUST / 3 SHOULD); target ~86 tests
+- 2026-09-29 Phase 1 build: COMPLETE - 36 unit tests (RED->GREEN), lint/typecheck/build/ci green, review APPROVED, AC-VERIFY-3 violation checks and AC-ERROR-1 exit check verified. Push skipped (local-only run).

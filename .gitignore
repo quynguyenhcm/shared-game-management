@@ -5,3 +5,22 @@ memory-bank/.local/
 .agent-logs/claude/
 .agent-logs/telemetry/
 .agent-logs/telemetry.jsonl
+
+# Dependencies and build output
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Agent logs, test output
+.agent-logs/
+test-results/
+playwright-report/
+.claude-logs/
