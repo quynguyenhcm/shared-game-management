@@ -6,6 +6,7 @@ features:
   - platform-foundation
   - auth-and-user-roles
   - team-management
+  - team-banking-and-gst
 ---
 
 # next
