@@ -602,6 +602,9 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 2 | build pipeline | phase implemented directly by the orchestrator (no separate TDD sub-agent dispatch) to save context; tests written alongside code; verifier and code-review agents still dispatched.
 - Phase 2 | carried advisories | A1 (child-binding redaction via wrapped `child`, since pino resets the bindings formatter for children), A2 (DSN/URL keys, userinfo in any string, set-cookie, x-api-key, proxy-authorization, res headers, Buffers/typed arrays), A4 (URL validation) done with tests; @fastify/swagger kept because the generated OpenAPI uses it; checkDb TODO replaced by the real pool check. A3 (optional HOST) still open, low priority.
 - Phase 2 | review (CHANGES_REQUIRED then fixed) | blocking ReDoS in URL_USERINFO regex bounded + timing test; `err` serializer now redacted; compose ports bound to 127.0.0.1. Open advisories: pin CI actions/actionlint tag, query-string secret masking in req.url, CI postgres cannot take `-c timezone=UTC` (pool forces UTC), vitest.config loadEnvFile also affects unit project.
+- Phase 2 | process | TDD sub-agent not dispatched; no RED→GREEN evidence. The reviewer confirmed the tests cover the ACs (health.int.test.ts:34-72). Accepted; Phase 3+ must dispatch the TDD sub-agent.
+- Phase 2 | apps/web/e2e/smoke.spec.ts | The Tailwind-class and "API: ok" checks are in Playwright, which `pnpm run ci` doesn't run. The "API: unavailable" state and the AC-ERROR-2 recovery without an API restart were verified manually only (phase review, accepted).
+- Phase 2 | .github/workflows/ci.yml | Actions are tag-pinned, not SHA-pinned; `rhysd/actionlint:latest` isn't reproducible; the postgres:17 service has no `-c timezone=UTC` (the pool forces UTC per connection). Advisory.
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
