@@ -5,6 +5,7 @@ release_date:
 features:
   - platform-foundation
   - auth-and-user-roles
+  - team-management
 ---
 
 # next
