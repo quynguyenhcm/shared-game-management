@@ -25,8 +25,8 @@ The foundation must give every downstream feature four things.
 
 1. An exact NZD money representation and one rounding rule, shared by browser and Node, with a DB column type that can't drift.
 2. A Pacific/Auckland wall-clock ↔ UTC-instant policy that resolves the DST gap and overlap explicitly, plus indexed session instants for the 5-minute billing sweep.
-3. A per-team invoice-number allocator that is correct under concurrency and callable inside the caller's Kysely transaction.
-4. A payment fee-snapshot and guest model. It must price FLAT, BY_SEX and BY_SKILL_LEVEL for a registrant and up to 2 guests, make replayed billing a no-op through natural unique keys, split GST per payment, and survive 7-year retention.
+3. A per-team invoice-number allocator, assigned per payment, that is correct under concurrency (including two issuers racing on the same payment) and callable inside the caller's Kysely transaction.
+4. A payment fee-snapshot and guest model. It must price FLAT, BY_SEX (including sex `OTHER`) and BY_SKILL_LEVEL for a registrant and up to 2 guests, make replayed billing a no-op through natural unique keys, split GST per payment, tie every payment to its registration's user and session's team in the DB, and survive 7-year retention.
 
 ## Inputs & Outputs
 
@@ -39,7 +39,7 @@ The foundation must give every downstream feature four things.
 | Local date | `'YYYY-MM-DD'` | 2000–2100 | DB `DATE` (string parser, C-4), UI |
 | Local time | `'HH:MM[:SS]'` | 00:00–24:00 | DB `TIME`, UI |
 | Instant | JS `Date` / ISO-8601 `…Z` | — | DB `timestamptz`, API |
-| Team ID for invoices | `uuid` | 1 team per call | caller's transaction |
+| Payment ID for invoices | `uuid` | 1 payment per call (team derived from the payment) | caller's transaction |
 | Registration + ≤ 2 guests + session fees | rows | ≤ ~60 registrations per session | billing job |
 
 ### Outputs
@@ -61,9 +61,12 @@ The foundation must give every downstream feature four things.
 6. A court ending at midnight (`end_time = '24:00'`) resolves to 00:00 on the next local day.
 7. Concurrent first-ever invoice allocation for a team (no counter row yet) → exactly one insert, and the rest update.
 8. A transaction that allocated an invoice number then rolled back → the number is reused (no gap).
+8a. Two issuers racing to assign an invoice number to the **same** payment → the second blocks on the payment row lock, then fails because the number is already set. The counter advances by exactly 1 (Q9, critique finding 3).
 9. A replayed `bill-session` job → no second payment, no second wallet deduction.
 10. A guest row count that disagrees with `guest_count` → `23514` at COMMIT (a deferred check).
-11. A BY_SEX session and a party of sex `OTHER` → no fee column exists in the draft (`fee_male`/`fee_female` only). This is an **open product question** and blocks writing such a line (see Q11).
+11. A BY_SEX session and a party of sex `OTHER` → billed at the session's `fee_other` with basis `SEX_OTHER` (spec-owner decision 2026-09-29; see Q11). A BY_SEX session without `fee_other` can't be saved.
+12. A payment or credit transaction whose user or team differs from its registration's → `23503` (composite FK; critique finding 1).
+13. Two concurrent waitlist enqueues computing the same `queue_position` → the second fails with `23505` (partial unique index; critique finding 2).
 
 ---
 
@@ -315,15 +318,21 @@ At the expected scale (10× growth: about 50k payments per year, 350k over 7 yea
 - Both implementations depend on host tzdata (browser/Node ICU and the PG server). NZ rules have been unchanged since 2007. The parity and vector tests run in CI against `postgres:17` and Node 24, so a tzdata divergence fails the build.
 - Courts may not cross midnight, except that `end_time = '24:00'` means midnight. A deviation is recorded. A later feature can add `end_day_offset` if overnight sessions appear.
 
-### Q9: **Chosen: 9A.** A gapless per-team counter row upserted by `allocate_invoice_number(team_id)` inside the caller's transaction, stored as `payments.invoice_number INTEGER`, with `UNIQUE(team_id, invoice_number)` and a set-once guard. Display `INV-000123`.
+### Q9: **Chosen: 9A, assigned per payment.** A gapless per-team counter row, upserted by `assign_invoice_number(payment_id)` inside the caller's transaction. The function locks the payment row first, refuses a payment that already has a number, derives `team_id` from the payment (never from the caller), bumps the counter, sets the number and verifies that exactly one row was updated. Stored as `payments.invoice_number INTEGER`, with `UNIQUE(team_id, invoice_number)` and a set-once guard. Display `INV-000123`. *(Revised 2026-09-29: the original team-keyed `allocate_invoice_number(team_id)` let two issuers of the same payment each bump the counter, leaking a number; critique finding 3.)*
 
 **Rationale**: it is the only option that is unique and gapless, transactional (C-7), declarative (a table the schema dump and conformance test can see), and needs no runtime DDL. `ON CONFLICT` handles the first-allocation race, which MERGE (9D) does not. The contention cost is irrelevant at our volume: one issuer per team at a time, holding the lock for milliseconds.
 
 **Display format**: `INV-` + the number zero-padded to 6 digits (`INV-000123`), never truncated (`INV-1234567` after 999,999). There is no team prefix in v1. Each team is a separate supplier, identified on the invoice by its legally required name and GST number, and a team prefix would add a mutable input to an immutable document. tax-invoices-and-exports may add an optional, frozen-after-first-use `teams.invoice_prefix` additively.
 
-**Trade-offs accepted**: allocations for the same team are serialised until commit. Mitigation: allocate as the **last** statement before COMMIT, set `SET LOCAL lock_timeout = '5s'` in issuing transactions, and never allocate for two teams in one transaction (lock-order deadlocks become impossible). Numbers are gapless only among committed transactions. An issued invoice is never deleted (RESTRICT and immutability triggers), so there are no gaps from deletes either. Voiding and credit notes belong to tax-invoices-and-exports and must not reuse numbers.
+**Trade-offs accepted**: allocations for the same team are serialised until commit. Mitigation: allocate as the **last** statement before COMMIT, set `SET LOCAL lock_timeout = '5s'` in issuing transactions, and never allocate for two teams in one transaction (lock-order deadlocks become impossible). Lock order inside the function is always payment row → team counter row, so two issuers can't deadlock each other. Numbers are gapless only among committed transactions. An issued invoice is never deleted (RESTRICT and immutability triggers), so there are no gaps from deletes either. Voiding and credit notes belong to tax-invoices-and-exports and must not reuse numbers.
 
 ### Q11: **Chosen: G1 + F2.** A `registration_guests` child table (position 1..2, sex, skill), with a deferred equality check against `registrations.guest_count`. A `payments` header carrying `team_id` and a GST snapshot, with GST and subtotal as **STORED generated columns**. `payment_line_items` holds one immutable row per party (position 0 = registrant) with the applied basis, attribute snapshot and unit fee. Idempotency keys: `UNIQUE(payments.registration_id)`, `UNIQUE(payment_line_items.payment_id, party_position)`, and a partial unique index on `credit_transactions(registration_id) WHERE transaction_type = 'AUTO_DEDUCTION'`, plus the guarded session transition.
+
+**Ownership chain (revised 2026-09-29, critique finding 1)**: PostgreSQL enforces that a payment's `user_id`/`team_id` equal its registration's user and its session's team. `game_sessions UNIQUE (id, team_id)`; `registrations.team_id NOT NULL` with composite FK `(session_id, team_id) → game_sessions(id, team_id)`; `registrations UNIQUE (id, user_id, team_id)`; `payments` and `credit_transactions` each carry composite FK `(registration_id, user_id, team_id) → registrations(id, user_id, team_id)`, `MATCH SIMPLE`, `ON DELETE RESTRICT`. `payments.registration_id` stays nullable, because out-of-scope subscription payments have no registration and MATCH SIMPLE skips the check when it is NULL. `credit_transactions.registration_id` is NULL for top-ups. `credit_transactions (user_id, team_id) → player_credits(user_id, team_id)` ties every wallet movement to the wallet it changes. A mismatch fails with `23503`.
+
+**Waitlist position safety (revised 2026-09-29, critique finding 2)**: `CREATE UNIQUE INDEX uq_registrations_waitlist_position ON registrations (session_id, queue_position) WHERE status = 'WAITLISTED'`, alongside the existing CHECK that `queue_position IS NOT NULL` iff `status = 'WAITLISTED'`. Foundation ships the index and the documented contract. The allocator belongs to registration-and-waitlist, which **must** follow this locking strategy: every enqueue, withdraw and promote first runs `SELECT … FROM game_sessions WHERE id = $1 FOR UPDATE`; enqueue then assigns `coalesce(max(queue_position), 0) + 1` over the session's WAITLISTED rows under that lock; promotion takes the lowest `queue_position`. A code path that skips the lock gets `23505` instead of a silent FIFO violation.
+
+**BY_SEX and sex `OTHER` (spec-owner decision 2026-09-29, critique finding 4)**: `fee_other NUMERIC(10,2)` is added to `game_sessions` and `recurring_session_rules`, and `SEX_OTHER` to `fee_basis`. When `pricing_structure = 'BY_SEX'`, `fee_male`, `fee_female` and `fee_other` must all be non-null (CHECK on both tables). The line-item CHECK maps sex `OTHER` → `SEX_OTHER`. The default value is `LEAST(fee_male, fee_female)`, applied by session-scheduling-engine's UI/service when an admin picks BY_SEX (a constraint handed to that feature), and admin-editable. The DB does not compute the default, so an explicit admin value is never overwritten.
 
 **Rationale**
 - The workflows doc bills per confirmed registration including guests. One line per party is the natural shape for FLAT, BY_SEX and BY_SKILL_LEVEL, prints directly on a tax invoice, and supports reports such as "revenue by skill tier" with a plain `GROUP BY`.
@@ -335,7 +344,8 @@ At the expected scale (10× growth: about 50k payments per year, 350k over 7 yea
 **Trade-offs accepted**
 - Two deferred constraint triggers (guest count, and line sum = amount) report at **COMMIT**, not at the statement. Tests that use rollback isolation must run `SET CONSTRAINTS ALL IMMEDIATE` (see Testing Strategy). Errors are raised with SQLSTATE `23514` and a named constraint, so callers see a normal check violation.
 - `guest_count` is denormalised to keep draft conformance. The deferred check makes drift impossible to commit.
-- **Open product question (blocks one case)**: under BY_SEX, a party of sex `OTHER` has no fee column (the draft has `fee_male`/`fee_female` only). The line CHECK deliberately has no valid basis for it, so it can't be billed silently at the wrong rate. registration-and-waitlist (or session-scheduling-engine) must decide a rule, for example `fee_flat` fallback via a new `SEX_OTHER_FLAT_FALLBACK` basis, or a new `fee_other` column. That goes in their own migration. Foundation adds nothing speculative.
+- ~~Open product question: BY_SEX + sex `OTHER`~~ **Resolved 2026-09-29** by the spec owner: `fee_other` column + `SEX_OTHER` basis, default `LEAST(fee_male, fee_female)` (see above). Recorded as a schema deviation from `database-design.md`.
+- `registrations.team_id` duplicates `game_sessions.team_id` so the composite FKs can reference it. The composite FK makes drift impossible, and the app sets it from the session on insert.
 
 ---
 
@@ -582,8 +592,13 @@ ALTER TABLE game_sessions                      -- (shown as ALTER for readabilit
   ADD CONSTRAINT game_sessions_deadline_before_start
       CHECK (starts_at IS NULL OR cancellation_deadline <= starts_at),
   ADD CONSTRAINT game_sessions_max_players_positive CHECK (max_players > 0),
-  ADD CONSTRAINT game_sessions_reserved_seats_range CHECK (reserved_seats BETWEEN 0 AND max_players);
+  ADD CONSTRAINT game_sessions_reserved_seats_range CHECK (reserved_seats BETWEEN 0 AND max_players),
+  ADD COLUMN fee_other numeric(10,2),          -- BY_SEX rate for sex OTHER (deviation; default LEAST(fee_male, fee_female) set by session-scheduling-engine)
+  ADD CONSTRAINT game_sessions_by_sex_fees_present
+      CHECK (pricing_structure <> 'BY_SEX' OR (fee_male IS NOT NULL AND fee_female IS NOT NULL AND fee_other IS NOT NULL)),
+  ADD CONSTRAINT uq_game_sessions_id_team UNIQUE (id, team_id);   -- target of registrations' composite FK (ownership chain)
 -- status: the draft's `status session_status DEFAULT 'DRAFT'` gains NOT NULL (deviation).
+-- team_id: gains NOT NULL (it is part of the ownership chain; deviation).
 
 ALTER TABLE session_courts
   ADD CONSTRAINT session_courts_time_order
@@ -632,6 +647,7 @@ DROP FUNCTION IF EXISTS nz_local_to_utc(date, time, text); DROP FUNCTION IF EXIS
 ```
 Notes:
 - The same time-order CHECK applies to `recurring_session_rules (default_start_time, default_end_time)`.
+- `recurring_session_rules` (migration 5) gets the same `fee_other numeric(10,2)` column and the same `…_by_sex_fees_present` CHECK, so a materialised session always inherits a complete BY_SEX fee set.
 - Kysely types `starts_at`/`ends_at` as `ColumnType<Date | null, never, never>`, so an insert or update from TS won't compile.
 - Deleting a session cascades its courts, and the court trigger's UPDATE then matches 0 rows, which is harmless.
 - Ordering rule for callers: insert courts *before* moving a session out of `DRAFT`.
@@ -646,13 +662,36 @@ CREATE TABLE team_invoice_counters (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- Call ONLY inside the transaction that stores the number; gapless because it rolls back with it.
-CREATE FUNCTION allocate_invoice_number(p_team_id uuid) RETURNS integer
-  LANGUAGE sql VOLATILE AS $$
-  INSERT INTO team_invoice_counters AS c (team_id, last_number) VALUES (p_team_id, 1)
+-- Call ONLY inside the transaction that issues the invoice; gapless because the counter bump
+-- rolls back with it. Keyed by PAYMENT: team_id is derived here, never passed by the caller.
+-- Lock order is always payment row → team counter row (no deadlock between issuers).
+CREATE FUNCTION assign_invoice_number(p_payment_id uuid) RETURNS integer
+  LANGUAGE plpgsql VOLATILE STRICT AS $$
+DECLARE v_team uuid; v_existing integer; v_n integer; v_rows integer;
+BEGIN
+  SELECT team_id, invoice_number INTO v_team, v_existing
+    FROM payments WHERE id = p_payment_id
+     FOR UPDATE;                                     -- serialises issuers of the same payment
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'payment % not found', p_payment_id USING ERRCODE = 'no_data_found';          -- P0002
+  END IF;
+  IF v_existing IS NOT NULL THEN                     -- the losing racer lands here after the winner commits
+    RAISE EXCEPTION 'payment % already has invoice number %', p_payment_id, v_existing
+      USING ERRCODE = 'integrity_constraint_violation', CONSTRAINT = 'payments_invoice_number_set_once';  -- 23000
+  END IF;
+  INSERT INTO team_invoice_counters AS c (team_id, last_number) VALUES (v_team, 1)
   ON CONFLICT (team_id) DO UPDATE SET last_number = c.last_number + 1, updated_at = now()
-  RETURNING c.last_number
-$$;                                    -- unknown team → 23503 (FK); NULL team → 23502
+  RETURNING c.last_number INTO v_n;                  -- row lock on the team counter until COMMIT/ROLLBACK
+  UPDATE payments
+     SET invoice_number = v_n, invoice_issued_at = now(), is_tax_invoice_issued = true
+   WHERE id = p_payment_id AND invoice_number IS NULL;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN                                -- defensive: raising aborts the txn, so the counter bump rolls back
+    RAISE EXCEPTION 'payment %: expected 1 row updated, got %', p_payment_id, v_rows
+      USING ERRCODE = 'integrity_constraint_violation', CONSTRAINT = 'payments_invoice_number_set_once';
+  END IF;
+  RETURN v_n;
+END $$;                                              -- NULL payment id → NULL (STRICT); caller treats as a bug
 
 -- On payments (full DDL in Q11):
 --   invoice_number integer, invoice_issued_at timestamptz,
@@ -662,7 +701,7 @@ $$;                                    -- unknown team → 23503 (FK); NULL team
 --   CONSTRAINT uq_payments_team_invoice_number UNIQUE (team_id, invoice_number)   -- NULLs distinct: many un-invoiced rows OK
 
 -- Down Migration
-DROP FUNCTION IF EXISTS allocate_invoice_number(uuid);
+DROP FUNCTION IF EXISTS assign_invoice_number(uuid);
 DROP TABLE IF EXISTS team_invoice_counters;
 ```
 
@@ -671,12 +710,11 @@ DROP TABLE IF EXISTS team_invoice_counters;
 await db.transaction().execute(async (trx) => {
   // ... all other work first ...
   await sql`SET LOCAL lock_timeout = '5s'`.execute(trx);
-  const { rows: [row] } = await sql<{ n: number }>`SELECT allocate_invoice_number(${teamId}) AS n`.execute(trx); // INT4 → number
-  await trx.updateTable('payments')
-    .set({ invoice_number: row!.n, invoice_issued_at: sql`now()`, is_tax_invoice_issued: true })
-    .where('id', '=', paymentId).where('invoice_number', 'is', null)   // set-once, guarded
-    .execute();
-});   // COMMIT releases the counter row lock
+  // One statement: locks the payment, derives its team, bumps the counter and sets the number.
+  // Throws (23000, payments_invoice_number_set_once) if the payment is already invoiced.
+  const { rows: [row] } = await sql<{ n: number }>`SELECT assign_invoice_number(${paymentId}) AS n`.execute(trx); // INT4 → number
+  return row!.n;
+});   // COMMIT releases the payment and counter row locks; any error rolls the counter back
 ```
 **Display**: `formatInvoiceNumber(n: number): string` in `@sgm/shared` → `'INV-' + String(n).padStart(6, '0')`. It requires a positive integer.
 
@@ -684,14 +722,15 @@ await db.transaction().execute(async (trx) => {
 
 New enum (in migration 1, with the others; mirrored in `enums.ts` in this order, C-10):
 ```sql
-CREATE TYPE fee_basis AS ENUM ('FLAT','SEX_MALE','SEX_FEMALE','SKILL_BEGINNER','SKILL_INTERMEDIATE','SKILL_ADVANCED');
+CREATE TYPE fee_basis AS ENUM ('FLAT','SEX_MALE','SEX_FEMALE','SEX_OTHER','SKILL_BEGINNER','SKILL_INTERMEDIATE','SKILL_ADVANCED');
 ```
 
 **Migration 7, `_registrations_and_guests.sql`**
 ```sql
 CREATE TABLE registrations (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id     uuid NOT NULL REFERENCES game_sessions(id) ON DELETE RESTRICT,   -- was CASCADE (retention; payments hang off it)
+  session_id     uuid NOT NULL,                                                    -- was CASCADE (retention; payments hang off it)
+  team_id        uuid NOT NULL,                                                    -- new: = the session's team (ownership chain)
   user_id        uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   guest_count    integer NOT NULL DEFAULT 0
                  CONSTRAINT registrations_guest_count_range CHECK (guest_count BETWEEN 0 AND 2),  -- AC-VERIFY-7 (-1, 3 → 23514)
@@ -700,9 +739,19 @@ CREATE TABLE registrations (
   registered_at  timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT uq_registrations_session_user UNIQUE (session_id, user_id),             -- AC-VERIFY-7
+  CONSTRAINT uq_registrations_id_user_team UNIQUE (id, user_id, team_id),           -- target of payments/credit_transactions composite FKs
+  CONSTRAINT fk_registrations_session_team FOREIGN KEY (session_id, team_id)
+      REFERENCES game_sessions (id, team_id) ON DELETE RESTRICT,                     -- registration team = session team (23503)
   CONSTRAINT registrations_queue_position_iff_waitlisted
       CHECK ((status = 'WAITLISTED') = (queue_position IS NOT NULL))
 );
+
+-- FIFO safety (critique finding 2). The allocator is registration-and-waitlist's and MUST, for every
+-- enqueue / withdraw / promote: SELECT … FROM game_sessions WHERE id = $1 FOR UPDATE; then
+-- enqueue = coalesce(max(queue_position), 0) + 1 over WAITLISTED rows; promote = lowest queue_position.
+-- This index turns any path that skips the lock into a 23505 instead of a duplicate position.
+CREATE UNIQUE INDEX uq_registrations_waitlist_position
+  ON registrations (session_id, queue_position) WHERE status = 'WAITLISTED';
 
 CREATE TABLE registration_guests (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -752,6 +801,12 @@ CREATE CONSTRAINT TRIGGER registration_guest_count_matches_g
 -- credit_transactions: user_id, team_id NOT NULL … ON DELETE RESTRICT;
 --   registration_id … ON DELETE RESTRICT (was SET NULL: a deduction must keep its link);
 --   CHECK (amount <> 0.00); resulting_balance CHECK (resulting_balance BETWEEN 0.00 AND 100.00)
+-- Ownership chain (critique finding 1):
+--   CONSTRAINT fk_credit_tx_registration_owner FOREIGN KEY (registration_id, user_id, team_id)
+--     REFERENCES registrations (id, user_id, team_id) MATCH SIMPLE ON DELETE RESTRICT,  -- replaces the single-column FK; NULL registration (top-up) skips it
+--   CONSTRAINT fk_credit_tx_wallet FOREIGN KEY (user_id, team_id)
+--     REFERENCES player_credits (user_id, team_id) ON DELETE RESTRICT                   -- every movement belongs to an existing wallet
+--   (wallet-and-akahu-billing must create the player_credits row, balance 0.00, before the first transaction)
 CREATE UNIQUE INDEX uq_credit_tx_auto_deduction_per_registration
   ON credit_transactions (registration_id) WHERE transaction_type = 'AUTO_DEDUCTION';  -- idempotent wallet deduction
 ```
@@ -762,7 +817,7 @@ CREATE TABLE payments (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               uuid NOT NULL REFERENCES users(id)         ON DELETE RESTRICT,   -- was CASCADE
   team_id               uuid NOT NULL REFERENCES teams(id)         ON DELETE RESTRICT,   -- gap fix (AC-VERIFY-8)
-  registration_id       uuid          REFERENCES registrations(id) ON DELETE RESTRICT,   -- was SET NULL; NULL only for subscriptions (out of scope)
+  registration_id       uuid,                                                            -- was SET NULL; NULL only for subscriptions (out of scope); FK below
   billing_type          billing_type   NOT NULL DEFAULT 'PER_GAME',
   -- fee snapshot (header)
   pricing_structure     pricing_type   NOT NULL,
@@ -790,7 +845,10 @@ CREATE TABLE payments (
       CHECK (is_tax_invoice_issued = (invoice_number IS NOT NULL)
              AND (invoice_number IS NULL) = (invoice_issued_at IS NULL)),
   CONSTRAINT uq_payments_team_invoice_number  UNIQUE (team_id, invoice_number),          -- AC-VERIFY-9
-  CONSTRAINT uq_payments_registration         UNIQUE (registration_id)                   -- idempotent billing key (C-8)
+  CONSTRAINT uq_payments_registration         UNIQUE (registration_id),                  -- idempotent billing key (C-8)
+  CONSTRAINT fk_payments_registration_owner   FOREIGN KEY (registration_id, user_id, team_id)
+      REFERENCES registrations (id, user_id, team_id) MATCH SIMPLE ON DELETE RESTRICT    -- payer = registrant, team = session team (23503);
+                                                                                        -- NULL registration (subscription) skips the check
 );
 CREATE INDEX idx_payments_team_paid_status ON payments (team_id, paid_at, status);        -- AC-VERIFY-8
 -- draft indexes idx_payments_user_status, idx_payments_paid_at_status kept
@@ -811,7 +869,8 @@ CREATE TABLE payment_line_items (
   CONSTRAINT payment_line_items_basis_matches CHECK (
        (pricing_structure = 'FLAT'           AND applied_basis = 'FLAT')
     OR (pricing_structure = 'BY_SEX'         AND ((party_sex = 'MALE'   AND applied_basis = 'SEX_MALE')
-                                               OR (party_sex = 'FEMALE' AND applied_basis = 'SEX_FEMALE')))  -- OTHER: open question
+                                               OR (party_sex = 'FEMALE' AND applied_basis = 'SEX_FEMALE')
+                                               OR (party_sex = 'OTHER'  AND applied_basis = 'SEX_OTHER')))  -- unit_fee = session fee_other
     OR (pricing_structure = 'BY_SKILL_LEVEL' AND ((party_skill_level = 'BEGINNER'     AND applied_basis = 'SKILL_BEGINNER')
                                                OR (party_skill_level = 'INTERMEDIATE' AND applied_basis = 'SKILL_INTERMEDIATE')
                                                OR (party_skill_level = 'ADVANCED'     AND applied_basis = 'SKILL_ADVANCED'))))
@@ -879,7 +938,8 @@ tx (one per session):
       total  = money.sum(lines.unit_fee)
       wallet = SELECT … FROM player_credits WHERE user_id=r.user_id AND team_id=s.team_id FOR UPDATE
       mode   = wallet.balance >= total ? PREPAID_CREDIT/PAID : PER_GAME/PENDING
-      p = INSERT INTO payments(…) ON CONFLICT (registration_id) DO NOTHING RETURNING id   -- guard 2
+      p = INSERT INTO payments(user_id=r.user_id, team_id=r.team_id, …)
+            ON CONFLICT (registration_id) DO NOTHING RETURNING id                    -- guard 2; ownership FK rejects any other user/team
       if p is null: continue
       INSERT payment_line_items (…)                                              -- guard 3: UNIQUE(payment_id, party_position)
       if PREPAID_CREDIT: UPDATE player_credits …; INSERT credit_transactions(AUTO_DEDUCTION)  -- guard 4: partial unique
@@ -895,6 +955,8 @@ commit   -- deferred checks run here
 | `team_invoice_counters` (PK B-tree) | per-team gapless counter | upsert O(log T), row lock |
 | Partial B-tree `game_sessions(ends_at) WHERE status='PUBLISHED'` | billing sweep | range scan O(log S + k) |
 | `UNIQUE(registration_id)`, `UNIQUE(payment_id, party_position)`, partial unique on credit tx | idempotency | index probe O(log P) |
+| Composite FKs `(registration_id, user_id, team_id)` and `(session_id, team_id)` | ownership chain | index probe O(log R) per insert |
+| Partial unique `registrations(session_id, queue_position) WHERE status='WAITLISTED'` | FIFO position safety | index probe O(log W) |
 | Deferred constraint triggers | cross-row invariants at COMMIT | O(g) and O(p), both ≤ 3 |
 
 ### Algorithm Steps (build order)
@@ -915,12 +977,16 @@ commit   -- deferred checks run here
 | Invalid zone name | `InvalidTimeZoneError` (`INVALID_TIME_ZONE`) |
 | `end_time = '24:00'` | resolves to next-day 00:00; `start_time` can't be 24:00 |
 | Session with no courts | instants NULL; can't be PUBLISHED or COMPLETED (CHECK) |
-| First invoice for a team, 20 concurrent callers | `ON CONFLICT` speculative insert: one inserts, 19 update in turn, giving {1..20} |
+| First invoice for a team, 20 concurrent callers (20 distinct payments) | `ON CONFLICT` speculative insert: one inserts, 19 update in turn, giving {1..20} |
+| Two issuers, same payment | the second waits on the payment row lock, then raises `23000` (`payments_invoice_number_set_once`); counter advanced by exactly 1 |
 | Allocating transaction rolls back | the counter increment rolls back too, so the number is reused |
+| Payment or credit transaction with another user's / team's registration | `23503` (composite FK) |
+| Registration whose `team_id` ≠ its session's team | `23503` (composite FK) |
+| Two concurrent enqueues with the same `queue_position` | one commits, the other gets `23505` (partial unique index) |
 | Replayed `bill-session` | the session guard returns 0 rows. The unique keys are a second line of defence |
 | Guest rows ≠ `guest_count` | `23514` `registration_guest_count_matches` at COMMIT (or at the statement with `SET CONSTRAINTS … IMMEDIATE`) |
 | Late-withdrawal fee then re-registration of the same `(session,user)` row | `UNIQUE(registration_id)` means post-game billing skips it (already charged). Flag to registration-and-waitlist |
-| BY_SEX + sex OTHER | line CHECK fails (`23514`), which is the open question for the pricing owner |
+| BY_SEX + sex OTHER | billed at `fee_other` with basis `SEX_OTHER`; a BY_SEX session or rule with NULL `fee_other` → `23514` |
 | Session fee edited after billing | the payment and lines are a snapshot, so they're unaffected (AC-VERIFY-8). Updating payment snapshot columns → `23000` |
 
 ### Error Handling
@@ -932,6 +998,10 @@ commit   -- deferred checks run here
 | Allocator lock wait > `lock_timeout` | SQLSTATE `55P03`; the job retries (at-least-once) or the API returns 503 with retry |
 | Deferred check failures | SQLSTATE `23514` with named constraint at COMMIT; the transaction rolls back |
 | Immutable-row edits | SQLSTATE `23000` |
+| `assign_invoice_number` on an already-invoiced payment | SQLSTATE `23000`, constraint `payments_invoice_number_set_once`; the caller's transaction rolls back (counter included) |
+| `assign_invoice_number` on an unknown payment | SQLSTATE `P0002` (no_data_found) |
+| Ownership mismatch (payment, credit transaction, registration) | SQLSTATE `23503` |
+| Duplicate waitlist position | SQLSTATE `23505` on `uq_registrations_waitlist_position` |
 
 ---
 
@@ -965,7 +1035,7 @@ Nothing in this document is PG-17-only except the optional `transaction_timeout`
 - Bottleneck: same-team invoice issuance during long transactions (the counter row lock). Mitigation: allocate last, `lock_timeout`, short issuing transactions.
 
 ### Optimization Opportunities
-- Batch invoice issuance: `allocate_invoice_numbers(team_id, k)` returning a contiguous range (`last_number + k`) for bulk issuance, as one lock acquisition.
+- Batch invoice issuance: `assign_invoice_numbers(payment_ids uuid[])` locking the payments in id order and taking a contiguous range (`last_number + k`) for bulk issuance, as one counter-lock acquisition.
 - If per-team issuance ever needs parallelism, switch that team's invoices to 9B-style sequences and accept gaps. IRD doesn't require gapless numbering (see Evidence).
 - Swap the 7A internals for native `Temporal` once all target browsers ship it. The public API already uses its vocabulary.
 
@@ -996,9 +1066,10 @@ Nothing in this document is PG-17-only except the optional `transaction_timeout`
 - `money-roundtrip`: insert and select `99999999.99`, `0.00`, `-0.01` (where allowed); `100000000.00` → `22003`.
 - `time-parity`: `SELECT nz_local_to_utc(d, t, p)` for vector rows 1–15 and 18–21 × {`compatible`, `reject`} equals TS; also all 96 quarter-hour slots on 2026-09-27 and 2027-04-04. A contrast assertion documents that plain `AT TIME ZONE` gives `14:30Z` for row 11.
 - `session-instants`: insert a session plus courts 19:00–21:00 and 20:00–22:00 → `starts_at`/`ends_at` are correct. Editing a court time, changing the date or deleting a court recomputes them. A direct `UPDATE … SET ends_at = …` is overwritten. A PUBLISHED session without courts → `23514`.
-- `invoice-number` (AC-VERIFY-9): 20 concurrent `BEGIN; SELECT allocate_invoice_number(A); pg_sleep(0.01); COMMIT` on 20 dedicated connections (pool max ≥ 21) gives exactly {1..20}; team B ×3 gives {1,2,3}. Rollback-reuse: allocate → ROLLBACK → allocate returns the same number. A duplicate `(team_id, invoice_number)` → `23505`, while the same number for another team is accepted. Changing an issued number → `23000`.
-- `registrations-guests` (AC-VERIFY-7): duplicate `(session,user)` → `23505`; `guest_count` −1 / 3 → `23514`; position 3 → `23514`; `guest_count=2` with 1 guest row → `23514` at COMMIT; `guest_count=1` with only position 2 → `23514`. Tests on a rolled-back transaction first run `SET CONSTRAINTS registration_guest_count_matches_r, registration_guest_count_matches_g IMMEDIATE`.
-- `payments-snapshot` (AC-VERIFY-8): insert without `team_id` → `23502`; generated GST for $17.00 at 1500 bps = 2.22 and subtotal 14.78; `gst_registered=false` with bps 1500 → `23514`; lines summing ≠ amount → `23514` at COMMIT; a BY_SEX line whose basis doesn't match the party's sex → `23514`; `UPDATE game_sessions SET fee_flat = …` → the payment re-reads unchanged; `UPDATE payments SET amount` → `23000`; `DELETE` line → `23000`; a second payment for the same registration → `23505` / `ON CONFLICT DO NOTHING` returns 0 rows.
+- `invoice-number` (AC-VERIFY-9): 20 concurrent `BEGIN; SELECT assign_invoice_number(<payment_i>); pg_sleep(0.01); COMMIT` for 20 distinct team-A payments on 20 dedicated connections (pool max ≥ 21) gives exactly {1..20}; team B ×3 gives {1,2,3}. Rollback-reuse: assign → ROLLBACK → assign returns the same number. **Same-payment race**: two connections call `assign_invoice_number(P)` concurrently → one commits a number, the other raises `23000` (`payments_invoice_number_set_once`), and `team_invoice_counters.last_number` has advanced by exactly 1 (the next payment gets the next number, no gap). A duplicate `(team_id, invoice_number)` → `23505`, while the same number for another team is accepted. Changing an issued number → `23000`.
+- `registrations-guests` (AC-VERIFY-7): duplicate `(session,user)` → `23505`; `guest_count` −1 / 3 → `23514`; position 3 → `23514`; `guest_count=2` with 1 guest row → `23514` at COMMIT; `guest_count=1` with only position 2 → `23514`. Tests on a rolled-back transaction first run `SET CONSTRAINTS registration_guest_count_matches_r, registration_guest_count_matches_g IMMEDIATE`. Registration `team_id` ≠ session team → `23503`.
+- `registrations-waitlist` (AC-VERIFY-19): two WAITLISTED rows with the same `(session_id, queue_position)` → `23505`; the same position for a CONFIRMED row is fine (partial index); WAITLISTED without a position, or CONFIRMED with one → `23514`. Multi-connection: two connections each `BEGIN; INSERT … queue_position = 1 …` for the same session, both COMMIT → exactly one `23505`.
+- `payments-snapshot` (AC-VERIFY-8): insert without `team_id` → `23502`; generated GST for $17.00 at 1500 bps = 2.22 and subtotal 14.78; `gst_registered=false` with bps 1500 → `23514`; lines summing ≠ amount → `23514` at COMMIT; a BY_SEX line whose basis doesn't match the party's sex → `23514`; `UPDATE game_sessions SET fee_flat = …` → the payment re-reads unchanged; `UPDATE payments SET amount` → `23000`; `DELETE` line → `23000`; a second payment for the same registration → `23505` / `ON CONFLICT DO NOTHING` returns 0 rows. **Ownership**: a payment whose `user_id` ≠ the registration's user → `23503`; whose `team_id` ≠ the registration's (session's) team → `23503`; same two checks on `credit_transactions` with a `registration_id` → `23503`. **BY_SEX + OTHER**: a BY_SEX session with `fee_other` NULL → `23514`; an OTHER registrant line (`SEX_OTHER`, `unit_fee = fee_other`) and an OTHER guest line both commit, and the payment amount equals their sum.
 - Retention (AC-VERIFY-11): deleting a user or team with payments, credit transactions or counters → `23503`.
 - Conformance additions: every `numeric` column in `public` is `numeric(10,2)`; there are no `float4`/`float8` columns; there are no `timestamp without time zone` columns.
 
@@ -1012,6 +1083,17 @@ Nothing in this document is PG-17-only except the optional `transaction_timeout`
 2. Phase 3: migrations 1 (`fee_basis`), 6, 7, 8 and 9 as specified; `db/schema-deviations.md` entries (listed below); codegen overrides; `enums.ts` `FeeBasis`.
 3. Phase 4: `money.ts`, `money/zod.ts`, `time.ts`, `invoice.ts` (`formatInvoiceNumber`), with tests.
 4. ADRs 0009 (money), 0010 (time/DST), 0011 (invoice numbering, including the IRD finding and the UNVERIFIED-LEGAL flag), 0012 (fee snapshot and guests).
-5. Hand the open product question (BY_SEX + `OTHER`) and the re-registration-after-late-fee edge to the registration-and-waitlist / session-scheduling-engine owners. Get accountant confirmation of the invoice numbering and GST presentation before tax-invoices-and-exports ships.
+5. Hand these constraints to downstream owners: **session-scheduling-engine** defaults `fee_other` to `LEAST(fee_male, fee_female)` when BY_SEX is chosen (admin-editable); **registration-and-waitlist** follows the session-row `FOR UPDATE` waitlist locking contract (Q11) and owns the re-registration-after-late-fee edge; **wallet-and-akahu-billing** creates the `player_credits` row before the first credit transaction. Get accountant confirmation of the invoice numbering and GST presentation before tax-invoices-and-exports ships.
 
-**Schema deviations to record** (each with its source): `fee_basis` enum (Q11); `registration_guests`, `payment_line_items`, `team_invoice_counters` tables (task gap list, Q9/Q11); `game_sessions.starts_at/ends_at` plus triggers, `nz_utc_offset`, `nz_local_to_utc` (Q7, arch C-5); `payments.team_id`, `pricing_structure`, `gst_registered`, `gst_rate_bps`, `invoice_number`, `invoice_issued_at`, and GST/subtotal becoming generated columns (AC-VERIFY-8/9, Q11); `UNIQUE(payments.registration_id)`, `UNIQUE(team_id, invoice_number)`, partial unique on `credit_transactions` (C-8); FKs CASCADE/SET NULL → RESTRICT on payments, credit_transactions, player_credits, registrations (AC-VERIFY-11); `guest_count` CHECK 0–2 plus NOT NULL, balance CHECK 0–100 (AC-VERIFY-7/10); time-order CHECKs on courts and rules, `max_players > 0`, `reserved_seats` range, `game_sessions.status NOT NULL`, `queue_position` iff WAITLISTED (Q7/Q11, P1); `idx_game_sessions_billing_due` (partial), `idx_payments_team_paid_status`, `idx_payment_line_items_payment` (AC-VERIFY-8, Q4 T3).
+**Schema deviations to record** (each with its source): `fee_basis` enum (Q11); `registration_guests`, `payment_line_items`, `team_invoice_counters` tables (task gap list, Q9/Q11); `game_sessions.starts_at/ends_at` plus triggers, `nz_utc_offset`, `nz_local_to_utc` (Q7, arch C-5); `payments.team_id`, `pricing_structure`, `gst_registered`, `gst_rate_bps`, `invoice_number`, `invoice_issued_at`, and GST/subtotal becoming generated columns (AC-VERIFY-8/9, Q11); `UNIQUE(payments.registration_id)`, `UNIQUE(team_id, invoice_number)`, partial unique on `credit_transactions` (C-8); FKs CASCADE/SET NULL → RESTRICT on payments, credit_transactions, player_credits, registrations (AC-VERIFY-11); `guest_count` CHECK 0–2 plus NOT NULL, balance CHECK 0–100 (AC-VERIFY-7/10); time-order CHECKs on courts and rules, `max_players > 0`, `reserved_seats` range, `game_sessions.status NOT NULL`, `queue_position` iff WAITLISTED (Q7/Q11, P1); `idx_game_sessions_billing_due` (partial), `idx_payments_team_paid_status`, `idx_payment_line_items_payment` (AC-VERIFY-8, Q4 T3); `assign_invoice_number(payment_id)` (Q9, critique finding 3); ownership chain: `game_sessions.team_id NOT NULL` + `UNIQUE(id, team_id)`, new `registrations.team_id NOT NULL` + composite FK to `game_sessions(id, team_id)` + `UNIQUE(id, user_id, team_id)`, composite FKs from `payments` and `credit_transactions` to `registrations(id, user_id, team_id)` (replacing their single-column `registration_id` FKs), `credit_transactions (user_id, team_id) → player_credits` (critique finding 1); `uq_registrations_waitlist_position` partial unique index (critique finding 2); `fee_other` on `game_sessions` and `recurring_session_rules`, `SEX_OTHER` in `fee_basis`, BY_SEX fees-present CHECKs (spec-owner decision 2026-09-29, critique finding 4).
+
+---
+
+## Revisions (2026-09-29)
+
+Spec-owner decisions on the Codex design critique (task file → Design Critique):
+- **Finding 1 (critical), ownership chain**: added `game_sessions UNIQUE(id, team_id)`, `registrations.team_id NOT NULL` with a composite FK to the session, `registrations UNIQUE(id, user_id, team_id)`, and composite `MATCH SIMPLE` FKs from `payments` and `credit_transactions`, plus `credit_transactions → player_credits`. `payments.registration_id` stays nullable for out-of-scope subscription rows. New negative tests (`23503`).
+- **Finding 2 (high), FIFO waitlist**: added `uq_registrations_waitlist_position` and the session-row `FOR UPDATE` locking contract for registration-and-waitlist. New multi-connection test (exactly one `23505`).
+- **Finding 3 (high), invoice race**: `allocate_invoice_number(team_id)` replaced by `assign_invoice_number(payment_id)`, which locks the payment, refuses a set number (`23000`), derives the team, bumps the counter and checks for exactly 1 updated row. Caller pattern, edge cases and tests updated.
+- **Finding 4 (high), BY_SEX + OTHER**: the open question is closed. `fee_other` on sessions and rules, `SEX_OTHER` basis, fees-present CHECK, default `LEAST(fee_male, fee_female)` handed to session-scheduling-engine.
+- **Finding 5 (medium), AC-ASYNC-3 wording**: no change here. The at-least-once and domain-idempotency design (Q11 guards) already matched; the AC was reworded in the task file.

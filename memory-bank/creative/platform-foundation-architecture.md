@@ -614,7 +614,7 @@ Invoke every target as **`pnpm run <target>`**. `pnpm setup` is a built-in pnpm 
 | `build` | `pnpm -r build` (web: `next build`; api: `tsup` producing `dist/{main,worker,cli,instrumentation}.js`; shared: no build) | No |
 | `ci` | `pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:integration && pnpm run build` | Yes |
 | *extra* `db:new` | `pnpm --filter @sgm/api exec node-pg-migrate create --migration-file-language sql -m ../../db/migrations <name>` | No |
-| *extra* `db:codegen` | `pnpm --filter @sgm/api exec kysely-codegen --out-file src/lib/db/types.generated.ts` (config maps `numeric` → Money type; see Algorithm constraints) | Yes |
+| *extra* `db:codegen` | `pnpm --filter @sgm/api exec kysely-codegen --out-file src/lib/db/types.generated.ts` (config maps `numeric` → branded `MoneyString`, `date` → `LocalDate`, `time` → `LocalTime`, and `game_sessions.starts_at/ends_at` → read-only; see Algorithm doc §Q6/§Q7) | Yes |
 | *extra* `openapi` | `pnpm --filter @sgm/api exec tsx src/openapi.ts > apps/api/openapi.yaml` | No |
 | *extra* `jobs:trigger` | `pnpm --filter @sgm/api exec tsx src/cli.ts jobs trigger <slot\|heartbeat> [json]` (AC-ASYNC-2 manual trigger) | Yes |
 | *extra* `test:e2e` | `playwright test -c apps/web/playwright.config.ts` against the running Compose stack (not in `ci`; AC-INTEGRATION-4) | Stack |
@@ -624,7 +624,7 @@ Invoke every target as **`pnpm run <target>`**. `pnpm setup` is a built-in pnpm 
 
 **Compose**: `postgres` (`postgres:17`, `command: postgres -c timezone=UTC`, `pg_isready` healthcheck), `mailpit`, `api` (runs `node dist/cli.js db migrate && node --import ./dist/instrumentation.js dist/main.js`; migrating at startup is a dev-Compose convenience only, and prod uses C3; healthcheck `node -e "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1))"`), `worker` (same image, `dist/worker.js`, `depends_on: api: service_healthy`, healthcheck on `WORKER_HEALTH_PORT` 4001), `web` (standalone Next, depends on api healthy, healthcheck on `/`).
 
-**Integration DB isolation (AC-VERIFY-17)**: `global-setup.ts` builds a template DB `sgm_tpl_<runId>` once per run (migrations plus pg-boss schema) under a Postgres advisory lock. Each Vitest fork clones `sgm_test_<runId>_<workerId>` from it with `CREATE DATABASE … TEMPLATE …`, which takes under a second, and drops it on teardown. Tests that can use transaction rollback do. Concurrency tests (invoice numbers, jobs) use their own cloned DB. Two concurrent `test:integration` runs don't collide because `runId` is unique per run.
+**Integration DB isolation (AC-VERIFY-17)**: `global-setup.ts` builds a template DB `sgm_tpl_<runId>` once per run (migrations plus pg-boss schema) under a Postgres advisory lock. Each Vitest fork clones `sgm_test_<runId>_<workerId>` from it with `CREATE DATABASE … TEMPLATE …`, which takes under a second, and drops it on teardown. Tests that can use transaction rollback do. Concurrency tests (invoice numbers, waitlist positions, jobs) use their own cloned DB. Two concurrent `test:integration` runs don't collide because `runId` is unique per run.
 
 **Worker restart test (AC-ASYNC-3)**: the test spawns `tsx src/worker.ts` as a child process, SIGKILLs it mid-job and respawns it. The test queue uses `expireInSeconds: 5`, so it runs the same way locally and in CI with no Docker-in-Docker. The Compose-level `docker compose kill worker` check is a manual verification step.
 
@@ -680,10 +680,10 @@ Legend: **=** confirmed as provisional; **R** re-pinned or renamed; **+** new; *
   3. `_teams.sql`: encrypted TEXT columns with envelope CHECKs, `bank_account_last4`
   4. `_team_members.sql`: plus `auto_enroll_assigned_at`
   5. `_recurring_session_rules.sql`
-  6. `_game_sessions_and_courts.sql`: plus `UNIQUE(recurring_rule_id, date)`, and session instants per Q7
-  7. `_registrations_and_guests.sql`: per Q11
-  8. `_wallet.sql`: `player_credits` (0–100 CHECK), `credit_transactions`; RESTRICT FKs
-  9. `_payments_and_invoicing.sql`: `team_id`, fee snapshot (Q11), invoice allocator (Q9); RESTRICT FKs
+  6. `_game_sessions_and_courts.sql`: plus `UNIQUE(recurring_rule_id, date)`, `UNIQUE(id, team_id)`, `fee_other`, and trigger-maintained session instants per Q7
+  7. `_registrations_and_guests.sql`: per Q11, including `registrations.team_id` + composite FK to the session, `UNIQUE(id, user_id, team_id)`, and the partial unique waitlist-position index
+  8. `_wallet.sql`: `player_credits` (0–100 CHECK), `credit_transactions` (ownership composite FKs); RESTRICT FKs
+  9. `_payments_and_invoicing.sql`: `team_id`, ownership composite FK, fee snapshot (Q11), `assign_invoice_number(payment_id)` (Q9); RESTRICT FKs
   10. `_indexes.sql`
 - = `db/schema-deviations.md`
 
@@ -729,12 +729,12 @@ Legend: **=** confirmed as provisional; **R** re-pinned or renamed; **+** new; *
 These are fixed by the architecture choices above. Q6, Q7, Q9 and Q11 must work within them, or explicitly re-open the named decision.
 
 1. **Driver representation (Q6)**: node-postgres returns `NUMERIC` and `INT8`/`BIGINT` as **strings**, and `pool.ts` keeps that. With `DECIMAL(10,2)`, the money module parses the string. With `BIGINT` cents, it parses to `bigint` or a validated safe integer, **never** `Number(str)` without a range check. Either way the conversion lives only in the money module and repositories.
-2. **Codegen typing (Q6)**: kysely-codegen maps `numeric` to `ColumnType<string, string | number, string | number>` by default, which would let a JS `number` into an insert. Its config must override money columns (or all `numeric`/money `int8`) to the shared branded Money type, and AC-VERIFY-14's "type-level guard" should be built on that brand. (Codegen option names to be confirmed against the pinned version.)
+2. **Codegen typing (Q6)**: kysely-codegen maps `numeric` to `ColumnType<string, string | number, string | number>` by default, which would let a JS `number` into an insert. Its config must override money columns (or all `numeric`/money `int8`) to the shared branded Money type, and AC-VERIFY-14's "type-level guard" should be built on that brand. (Codegen option names to be confirmed against the pinned version.) *Resolved by Algorithm §Q6/§Q7:* `numeric` → branded `MoneyString` (arithmetic type `Money` = branded bigint cents, converted in repositories), `date` → `LocalDate`, `time` → `LocalTime`.
 3. **Isomorphism (Q6, Q7)**: `money` and `time` live in `packages/shared` and run in the browser and in Node 24. No Node-only APIs and no native addons. `Intl` is available. Do not depend on native `Temporal` (availability across target browsers isn't guaranteed); a pure-JS library or polyfill is fine.
 4. **Dates and instants (Q7)**: `DATE` comes back as a `'YYYY-MM-DD'` string, `TIME` as `'HH:MM:SS'`, `TIMESTAMPTZ` as a JS `Date`. DB sessions run with `TimeZone=UTC`. `timestamp without time zone` is banned by the conformance test.
-5. **Session end instant (Q7 → Q4)**: the chosen T3 billing sweep needs an **indexed, queryable instant**, `game_sessions.ends_at timestamptz` (and probably `starts_at`), with an index on `(status, ends_at)`. If Q7 prefers to derive it in SQL (`(date + max(end_time)) AT TIME ZONE 'Pacific/Auckland'`), note that PostgreSQL's own resolution of nonexistent and ambiguous local times must then match the chosen DST policy exactly. Otherwise the app computes it with the time module and keeps it in sync on every court or date edit.
+5. **Session end instant (Q7 → Q4)**: the chosen T3 billing sweep needs an **indexed, queryable instant**, `game_sessions.ends_at timestamptz` (and probably `starts_at`), with an index on `(status, ends_at)`. If Q7 prefers to derive it in SQL (`(date + max(end_time)) AT TIME ZONE 'Pacific/Auckland'`), note that PostgreSQL's own resolution of nonexistent and ambiguous local times must then match the chosen DST policy exactly. Otherwise the app computes it with the time module and keeps it in sync on every court or date edit. *Resolved by Algorithm §Q7 (S3):* `starts_at/ends_at` are **trigger-maintained** through `nz_local_to_utc` (read-only in Kysely), and the index is the partial `(ends_at) WHERE status = 'PUBLISHED'`.
 6. **Migration capabilities (Q9, Q11)**: node-pg-migrate SQL files run as one transaction each. Supported: `CREATE FUNCTION … LANGUAGE plpgsql` with `$$` bodies, triggers (row and statement, `DEFERRABLE INITIALLY DEFERRED` constraint triggers), `INSERT … ON CONFLICT … DO UPDATE … RETURNING`, `STORED` generated columns, partial unique indexes, sequences. Not in the same file: `CREATE INDEX CONCURRENTLY`, or using an enum value added in the same transaction. Every object needs a down section.
-7. **Invoice allocation (Q9)**: the allocator must be callable as `sql\`select allocate_invoice_number(${teamId})\`` (or an equivalent single statement) **inside the caller's Kysely transaction**. If it is gapless, it is gapless only because it rolls back with that transaction. AC-VERIFY-9's 20-way test uses 20 separate pool connections, so `DATABASE_POOL_MAX` in the test config must allow at least 21.
+7. **Invoice allocation (Q9)**: the allocator must be callable as a single statement **inside the caller's Kysely transaction**. *Revised 2026-09-29:* `sql\`select assign_invoice_number(${paymentId})\``. It locks the payment row, derives the team from it and sets the number, so two issuers of the same payment can't both bump the counter (critique finding 3). If it is gapless, it is gapless only because it rolls back with that transaction. AC-VERIFY-9's 20-way test uses 20 separate pool connections, so `DATABASE_POOL_MAX` in the test config must allow at least 21.
 8. **Idempotent billing (Q11 → wallet-and-akahu-billing)**: jobs are at-least-once. The fee snapshot / payment model must have a natural unique key that makes a replayed `bill-session` job harmless (e.g. `UNIQUE(registration_id, billing_type)` on payments, or a unique line per registration and guest) and a guarded session status transition.
 9. **Financial rows (Q11)**: every new snapshot, line-item or guest table that holds money must use `ON DELETE RESTRICT` toward `users` and `teams` (AC-VERIFY-11), and each is recorded in `db/schema-deviations.md`.
 10. **Enums (Q6, Q11)**: any new enum (e.g. an applied-tier enum for the snapshot) must be added to `packages/shared/src/types/enums.ts` in DB order. The three parity guards (runtime, compile time, codegen drift) will enforce it.
@@ -793,3 +793,15 @@ These are fixed by the architecture choices above. Q6, Q7, Q9 and Q11 must work 
 4. Phase 2 build: Compose (no Redis), Dockerfiles (api image with two commands), CI workflow with actionlint and `pnpm run ci`.
 5. Phases 3 to 5 follow the task roadmap, using node-pg-migrate SQL, Kysely and codegen, AES-GCM crypto, pg-boss and Notifier as decided.
 6. Phase 6: write ADRs 0001 to 0008 from this document, and fill `techContext.md` and `systemPatterns.md` (P1–P7 as Guiding Principles, the module convention and the language pins).
+
+---
+
+## Revisions (2026-09-29)
+
+Applied after the spec owner's decisions on the Codex design critique and reconciliation with the Algorithm doc:
+- **C-2 codegen** (reconciled with Algorithm §Q6/§Q7): `numeric` → branded `MoneyString`, `date` → `LocalDate`, `time` → `LocalTime`; `db:codegen` note updated.
+- **C-5 session instants** (reconciled with Algorithm §Q7): `starts_at/ends_at` are trigger-maintained and read-only in Kysely; the billing-sweep index is partial `(ends_at) WHERE status = 'PUBLISHED'`, not `(status, ends_at)`.
+- **C-7 invoice allocator** (critique finding 3): `allocate_invoice_number(teamId)` → `assign_invoice_number(paymentId)`, locking the payment first.
+- **Migration list 6–9** (critique findings 1, 2, 4): ownership composite FKs (`game_sessions UNIQUE(id, team_id)`, `registrations.team_id`, composite FKs from payments and credit transactions), the partial unique waitlist-position index, and `fee_other`.
+- **Integration DB isolation**: waitlist-position concurrency tests also use their own cloned DB.
+- The **Suggested spec wording changes** above have been applied to the task file. AC-ASYNC-3 was also reworded for critique finding 5 (suppression while queued/active vs. at-least-once replay after completion).

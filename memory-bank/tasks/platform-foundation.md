@@ -2,13 +2,13 @@
 slug: platform-foundation
 legacy_id:            # only set by the v2 migration for pre-2.0 tasks (e.g., TASK-007)
 feature: platform-foundation
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # platform-foundation: Platform Foundation
 
 **Complexity**: Level 4 (inherited from platform-foundation)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: platform-foundation
 **Branch**: feature/platform-foundation
 **Worktree**: N/A (primary checkout)
@@ -36,7 +36,7 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 
 **Feature Type**: NFR/Infrastructure
 *Note: this is a greenfield scaffold. The "users" are developers and the ten downstream v1.0.0 features. The repo has no source files yet, so none of the paths below exist; every path is a target to be pinned in the plan.*
-**Creative Exploration Needed**: Yes: Architecture Design (backend framework, monorepo tooling, migrations tool, job runner, encryption and key management, hosting target, shared-types strategy) and Algorithm Design (money representation and rounding, DST policy for local times, invoice-number allocation). Level 4, so creative is mandatory. See `### Creative Exploration Needed`.
+**Creative Exploration Needed**: Resolved (2026-09-29) — see memory-bank/creative/platform-foundation-architecture.md and -algorithm.md
 
 **Spec interpretations honoured** (already decided, not re-opened here):
 - Cancellation: the workflows doc wins (`NOW <= cancellation_deadline` means free). Overview §6 has it inverted. Foundation ships no cancellation logic, but the schema must not encode the inverted rule.
@@ -45,30 +45,35 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 
 ### Verification Method
 
-- **Test method**: Every check runs from one root task-runner entry point. Creative picks the runner: root `package.json` scripts via pnpm, or a `Makefile`/`justfile` if the backend is Python. The required named targets are `setup`, `dev`, `lint`, `typecheck`, `test` (unit), `test:integration`, `db:migrate`, `db:rollback`, `db:reset`, `build` and `ci`. `ci` runs lint, typecheck, unit, integration and build, in that order.
-  The concrete commands behind those targets depend on the backend option (Creative Q1):
+- **Test method**: Every check runs from one root task-runner entry point: root `package.json` scripts via pnpm 10 workspaces. The required named targets are `setup`, `dev`, `lint`, `typecheck`, `test` (unit), `test:integration`, `db:migrate`, `db:rollback`, `db:reset`, `build` and `ci`. `ci` runs lint, typecheck, unit, integration and build, in that order. Every target is invoked as **`pnpm run <target>`**: `pnpm setup` is a pnpm built-in (it configures `PNPM_HOME`), and `pnpm ci` does not run the root script.
+  The chosen stack is Option A with **Fastify** (Node 24 LTS, TypeScript strict), node-pg-migrate SQL migrations + Kysely, pg-boss (Postgres-backed, no Redis). FastAPI (the former Option B) was evaluated and rejected; see the architecture doc §Q1. The concrete commands (architecture doc → Root Commands):
 
-  | Concern | Option A: Node (NestJS or Express, TypeScript) | Option B: Python (FastAPI) |
-  |---|---|---|
-  | Workspace / install | `pnpm install` (pnpm workspaces, optionally Turborepo) | `pnpm install` (web + shared TS) **and** `uv sync` (api + worker) |
-  | Lint + format | `eslint . --max-warnings 0` + `prettier --check .` | web: same as A; api: `ruff check .` + `ruff format --check .` |
-  | Type check | `tsc --noEmit` (`strict: true`) in every package | web: `tsc --noEmit`; api: `mypy --strict` or `pyright` (strict) |
-  | Unit tests | `vitest run` (or Jest) | web: `vitest run`; api: `pytest -m "not integration"` |
-  | Integration tests | `vitest run --project integration` against real Postgres 17 | `pytest -m integration` against real Postgres 17 |
-  | Migrations | node-pg-migrate, Drizzle Kit, Prisma Migrate or Knex, **or** tool-neutral `dbmate` (raw SQL) | Alembic **or** tool-neutral `dbmate` (raw SQL) |
-  | Shared types | `packages/shared` TS package imported by web and api directly | TS types generated from the API's OpenAPI schema (e.g. `openapi-typescript`); CI fails if regeneration produces a diff |
-  | Job runner candidates | pg-boss or Graphile Worker (Postgres-backed); BullMQ (needs Redis) | Procrastinate (Postgres-backed); Celery or arq (need Redis); APScheduler (scheduling only) |
+  | Target | Command |
+  |---|---|
+  | `setup` | `corepack enable && pnpm install --frozen-lockfile && tsx scripts/setup.ts` (copies `.env.example` → `.env`, generates dev `ENCRYPTION_KEYS`) |
+  | `dev` | `docker compose up -d --wait postgres mailpit && pnpm run db:migrate && pnpm -r --parallel --filter "./apps/*" dev` |
+  | `lint` | `eslint . --max-warnings 0 && prettier --check .` |
+  | `typecheck` | `pnpm -r --workspace-concurrency=4 exec tsc --noEmit -p tsconfig.json` (`strict: true` everywhere) |
+  | `test` | `vitest run --project unit` (no DB, no network) |
+  | `test:integration` | `vitest run --project integration` against real PostgreSQL 17 |
+  | `db:migrate` | `pnpm --filter @sgm/api exec tsx src/cli.ts db migrate` (node-pg-migrate up, then pg-boss schema install) |
+  | `db:rollback` | `pnpm --filter @sgm/api exec tsx src/cli.ts db rollback` (one step; `-- --count N` or `-- --all` to zero) |
+  | `db:reset` | `pnpm --filter @sgm/api exec tsx src/cli.ts db reset` (drops `public` + `pgboss`, migrates; refuses in production) |
+  | `build` | `pnpm -r build` (web `next build`; api `tsup` → `dist/{main,worker,cli,instrumentation}.js`) |
+  | `ci` | `pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:integration && pnpm run build` |
+
+  Shared types: `packages/shared` (`@sgm/shared`) is imported by web and api directly; kysely-codegen output is drift-checked. Extra targets (`db:new`, `db:codegen`, `openapi`, `jobs:trigger`, `test:e2e`, `lint:actions`) are listed in the architecture doc.
 
   The local stack is `docker compose up -d --wait`, followed by `curl -fsS http://localhost:<API_PORT>/health` and a browser or `curl` check of `http://localhost:3000`. CI is `.github/workflows/ci.yml` on GitHub Actions (the repo remote is GitHub), and `actionlint` validates the workflow file.
 - **Success metrics**:
   - `ci` exits 0 with **0 lint errors, 0 lint warnings, 0 type errors, 0 failing tests**. Injecting one deliberate violation of each kind makes it exit non-zero.
   - With images cached, `docker compose up -d --wait` reports every service healthy within **120 s** on a developer laptop.
-  - `db:migrate` from an empty Postgres 17 database finishes in **30 s or less**. `db:rollback` to zero followed by `db:migrate` again also succeeds (a full down/up round trip).
+  - `db:migrate` from an empty Postgres 17 database finishes in **30 s or less**. `pnpm run db:rollback -- --all` (to zero) followed by `db:migrate` again also succeeds (a full down/up round trip).
   - The GitHub Actions `ci` job finishes in **10 min or less** wall-clock (proposed target; the plan may revise it with justification).
   - Line coverage is **80% or more** for the foundation library modules: money, time, crypto, notifications and job-runner wrapper. Proposed threshold; SHOULD.
   - Schema conformance: **100%** of tables, enum types and values, and indexes in `database-design.md` are present in the migrated database. The only exceptions are entries in the schema deviations record, and each of those cites its source requirement (AC-INTEGRATION-1).
   - **0** plaintext occurrences of the test bank account number or Akahu token in the raw column bytes of encrypted fields (AC-VERIFY-13).
-- **Observable at**: terminal exit codes and test-runner output; the GitHub Actions run page for the PR; `docker compose ps` (health column); `GET /health` JSON on the API; the Mailpit web UI at `http://localhost:8025` and its REST API `GET http://localhost:8025/api/v1/messages`; the job runner's persisted job table or queue (e.g. `pgboss.job`, `graphile_worker.jobs` or `procrastinate_jobs`, depending on Creative Q4); and structured stdout logs from `api` and `worker`.
+- **Observable at**: terminal exit codes and test-runner output; the GitHub Actions run page for the PR; `docker compose ps` (health column); `GET /health` JSON on the API; the Mailpit web UI at `http://localhost:8025` and its REST API `GET http://localhost:8025/api/v1/messages`; the pg-boss job store `pgboss.job` (and `pgboss.archive` if the pinned version archives); and structured stdout logs from `api` and `worker`.
 - **Verification frequency**: continuous. `ci` runs on every push and every PR targeting `main`. Developers run it locally before PR. The Compose health check runs on every `docker compose up`.
 
 ### Acceptance Criteria
@@ -76,20 +81,20 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 #### AC-VERIFY-1: Monorepo layout exposes web, API, worker and shared-types units behind one root command set
 **Priority**: MUST
 **Given** a fresh clone of the repository
-**When** a developer lists the top-level layout and runs the root task runner's help or list command
-**Then** there is a Next.js + Tailwind web app, an API service, a background worker entry point (it may share the API's codebase but runs as a separate process), and a shared-types unit. All of the named targets `setup`, `dev`, `lint`, `typecheck`, `test`, `test:integration`, `db:migrate`, `db:rollback`, `db:reset`, `build` and `ci` exist and run without "command not found". The chosen directory names are pinned in the plan and recorded in `memory-bank/techContext.md` → Component Structure and Development Commands.
+**When** a developer lists the top-level layout and runs `pnpm run` (which lists the root scripts)
+**Then** there is a Next.js + Tailwind web app (`apps/web`), an API service (`apps/api`), a background worker entry point `apps/api/src/worker.ts` (same codebase and image as the API, started with a different command, running as a separate process; there is no `apps/worker`), and a shared-types unit (`packages/shared`). All of the named targets `setup`, `dev`, `lint`, `typecheck`, `test`, `test:integration`, `db:migrate`, `db:rollback`, `db:reset`, `build` and `ci` exist and run as `pnpm run <target>` without "command not found". The directory names are recorded in `memory-bank/techContext.md` → Component Structure and Development Commands.
 
 #### AC-VERIFY-2: Local dev stack starts healthy via Docker Compose on PostgreSQL 17 with UTC database time
 **Priority**: MUST
 **Given** Docker is running and `.env` has been created from the committed `.env.example`
 **When** the developer runs `docker compose up -d --wait`
-**Then** all services report healthy within 120 s (images cached): `postgres`, `api`, `worker`, `web`, `mailpit`, plus `redis` only if Creative Q4 picks a Redis-backed runner. `SELECT version()` returns a string that starts with `PostgreSQL 17.` and `SHOW timezone` returns `UTC`. `GET /health` on the API returns HTTP 200 with a body that reports database connectivity as ok. `http://localhost:3000` returns HTTP 200 and renders a page styled by Tailwind: the served CSS contains at least one Tailwind utility class that the page uses.
+**Then** all services report healthy within 120 s (images cached): `postgres`, `api`, `worker`, `web`, `mailpit` (no Redis). `SELECT version()` returns a string that starts with `PostgreSQL 17.` and `SHOW timezone` returns `UTC`. `GET /health` on the API returns HTTP 200 with a body that reports database connectivity as ok. `http://localhost:3000` returns HTTP 200 and renders a page styled by Tailwind: the served CSS contains at least one Tailwind utility class that the page uses.
 
 #### AC-VERIFY-3: Lint, format and type-check gates are strict and actually fail on violations
 **Priority**: MUST
 **Given** the scaffolded repo with no code violations
 **When** `lint` and `typecheck` are run, and then run again after each of three deliberate violations is introduced separately: an unused variable, a mis-formatted file, and a type error (e.g. assigning a string to a numeric field)
-**Then** the clean run exits 0 with 0 errors and 0 warnings. Each violation run exits non-zero and names the offending file. TypeScript runs with `strict: true`. If Option B is chosen, Python type checking runs in strict mode.
+**Then** the clean run exits 0 with 0 errors and 0 warnings. Each violation run exits non-zero and names the offending file. TypeScript runs with `strict: true` in every package.
 
 #### AC-VERIFY-4: CI pipeline runs the same gates as local `ci` against a real Postgres 17 service
 **Priority**: MUST
@@ -100,8 +105,8 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 #### AC-VERIFY-5: Migrations apply cleanly from empty and are reversible on PostgreSQL 17
 **Priority**: MUST
 **Given** an empty PostgreSQL 17 database
-**When** `db:migrate`, then `db:rollback` to version zero, then `db:migrate` are run in sequence
-**Then** every step exits 0. After the final step the schema is identical to the one after the first step: a `pg_dump --schema-only` diff, ignoring ownership and comments, is empty. The first migrate finishes in 30 s or less. The migrations use core `gen_random_uuid()` and do not depend on `uuid-ossp`, which `database-design.md` creates but never uses. If the chosen tool is forward-only, the plan must justify that, and the check becomes `db:reset` + `db:migrate` producing the identical dump.
+**When** `pnpm run db:migrate`, then `pnpm run db:rollback -- --all` (to version zero), then `pnpm run db:migrate` are run in sequence
+**Then** every step exits 0. After the final step the schema is identical to the one after the first step: a `pg_dump --schema-only --schema=public` diff, ignoring ownership and comments, is empty (the `pgboss` schema is owned by the job runner and excluded). The first migrate finishes in 30 s or less. The migrations use core `gen_random_uuid()` and do not depend on `uuid-ossp`, which `database-design.md` creates but never uses. node-pg-migrate supports real down migrations, so no forward-only fallback is needed.
 
 #### AC-VERIFY-6: Auth identities table supports password, Google and Facebook sign-in for one user
 **Priority**: MUST
@@ -116,9 +121,11 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 **Then**:
 - A second registration for the same `(session_id, user_id)` fails with `23505`.
 - `guest_count` values of `-1` and `3` fail with `23514` (the draft's `CHECK (guest_count <= 2)` allowed negatives).
-- Each guest is stored with a sex (`user_sex`) and a skill level (`skill_tier`), so `BY_SEX` and `BY_SKILL_LEVEL` pricing can resolve a per-guest fee.
-- A registration cannot have more than 2 guest records. Whether this is enforced by a CHECK on a positional column (1 or 2) or by a trigger is decided in the plan.
-- The stored guest count and the number of guest records cannot drift apart. The plan either derives the count or enforces equality.
+- Each guest is a row in `registration_guests` with `position` 1..2 and a `NOT NULL` sex (`user_sex`) and skill level (`skill_tier`), so `BY_SEX` and `BY_SKILL_LEVEL` pricing can resolve a per-guest fee. Position 3 fails with `23514`, and a duplicate `(registration_id, position)` fails with `23505`.
+- The stored `guest_count` and the guest rows cannot drift apart: a deferred constraint trigger fails with `23514` at COMMIT when the count differs from the number of rows or the positions are not contiguous. Tests that roll back use `SET CONSTRAINTS … IMMEDIATE` to see the error at the statement.
+- `guest_count = 1` with only a position-2 guest (position 2 without position 1) fails with `23514`.
+- A registration whose `team_id` differs from its session's team fails with `23503` (composite FK, part of the ownership chain in AC-VERIFY-8).
+- Waitlist position uniqueness is covered by AC-VERIFY-19.
 
 #### AC-VERIFY-8: Payments carry team routing and an immutable per-payment fee snapshot
 **Priority**: MUST
@@ -127,14 +134,24 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 **Then**:
 - `payments.team_id` is `NOT NULL` with an FK to `teams`, and an insert without it fails with `23502`.
 - An index supports team-scoped export and report queries by paid date and status (e.g. `(team_id, paid_at, status)`).
-- The payment row, or its child rows, stores a snapshot of what was charged at charge time: pricing structure, applied tier (flat, sex or skill), the unit fee for the registrant and each guest, whether the team was GST-registered, and the GST amount.
-- A later change to the session's fee columns does not change any existing payment's stored amounts. The test updates `game_sessions.fee_flat` and re-reads the payment.
+- The `payments` header and its `payment_line_items` (one per party, position 0 = registrant) store a snapshot of what was charged at charge time: pricing structure, applied basis (`fee_basis`: flat, sex or skill), the unit fee for the registrant and each guest, whether the team was GST-registered, and the GST rate. `gst_amount` and `subtotal_amount` are STORED generated columns (GST on $17.00 at 1500 bps = 2.22, subtotal 14.78).
+- A later change to the session's fee columns does not change any existing payment's stored amounts. The test updates `game_sessions.fee_flat` and re-reads the payment. Updating a snapshot column of a payment fails with `23000` (`integrity_constraint_violation`, raised by the immutability trigger), and updating or deleting a line item fails with `23000`.
+- A second payment for the same registration fails with `23505` (`UNIQUE(registration_id)`, the idempotent billing key).
+- **Ownership chain**: a payment whose `user_id` differs from its registration's user fails with `23503`, and one whose `team_id` differs from its registration's (and so its session's) team fails with `23503` (composite FK `(registration_id, user_id, team_id)`). The same two checks apply to a `credit_transactions` row that references a registration.
+- **BY_SEX and sex `OTHER`**: a BY_SEX session (or recurring rule) with any of `fee_male`, `fee_female` or `fee_other` NULL fails with `23514`. An OTHER registrant and an OTHER guest are each billed `fee_other` with basis `SEX_OTHER`. The default `fee_other = LEAST(fee_male, fee_female)` is applied by session-scheduling-engine, not by the DB.
 
 #### AC-VERIFY-9: Per-team sequential invoice numbers are unique and concurrency-safe
 **Priority**: MUST
 **Given** two teams A and B in the migrated schema
-**When** 20 invoice numbers are allocated concurrently for team A (20 parallel connections) and 3 are allocated for team B
-**Then** team A receives exactly the set {1..20} with no duplicates and team B receives {1, 2, 3}. `UNIQUE(team_id, invoice_number)` exists, so inserting a duplicate for the same team fails with `23505`, while the same number for a different team is accepted. Only the allocation mechanism (a DB function or sequence-per-team table) is in scope. When invoices are issued, and their PDF output, belong to tax-invoices-and-exports. Whether numbering must be gapless is Creative Q9.
+**When** `assign_invoice_number(payment_id)` is called concurrently for 20 distinct team-A payments (20 parallel connections) and for 3 team-B payments, and separately two connections call it concurrently for the **same** payment
+**Then**:
+- Team A receives exactly the set {1..20} with no duplicates and team B receives {1, 2, 3}.
+- Numbering is gapless: a transaction that assigns a number and rolls back returns it, so the next assignment reuses it.
+- In the same-payment race, one call succeeds and the other raises an error (`23000`, `payments_invoice_number_set_once`), the team's counter advances by exactly 1, and the next payment gets the next number (no gap).
+- `UNIQUE(team_id, invoice_number)` exists, so inserting a duplicate for the same team fails with `23505`, while the same number for a different team is accepted.
+- The display form is `INV-000001` (zero-padded to 6 digits, never truncated).
+- IRD requires neither gapless numbering nor any invoice number (checked 2026-09-29 on ird.govt.nz). Gapless is our choice. Accountant confirmation is pending before tax-invoices-and-exports ships.
+Only the assignment mechanism is in scope. When invoices are issued, and their PDF output, belong to tax-invoices-and-exports.
 
 #### AC-VERIFY-10: Wallet balance is constrained to 0.00–100.00 NZD at the database level
 **Priority**: MUST
@@ -163,20 +180,24 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 - Decrypting through the helper returns both values exactly.
 - Encrypting the same plaintext twice produces different ciphertexts (random nonce/IV).
 - Each ciphertext carries a key identifier so rotation can re-encrypt row by row.
-- At minimum `bank_account_number` and `akahu_app_token` are encrypted. Whether to also encrypt `bank_account_name`, `akahu_merchant_id` and `ird_number` is decided in Creative Q5.
+- The encrypted columns are `bank_account_number`, `akahu_app_token`, `bank_account_name` and `ird_number`. `akahu_merchant_id` and `gst_number` stay plaintext. A new `bank_account_last4 CHAR(4)` holds the display projection.
 - The encryption key is never stored in the database, in the repo or in logs.
+- *(Optional, COULD)* A ciphertext copied into another row or column fails to decrypt, because the AAD binds table, column and row.
+- *(Optional, COULD)* A plaintext write into an encrypted column fails with `23514` (envelope-format CHECK).
 
 #### AC-VERIFY-14: Money primitives are exact and never pass through binary floating point
 **Priority**: MUST
 **Given** the foundation money module
 **When** its unit tests run
 **Then**:
+- Storage is `NUMERIC(10,2)` for every money column. In TS, money is `Money`, a branded `bigint` of cents. The DB and JSON form is `MoneyString`, a 2-dp string (`"17.50"`).
 - Parsing `"17.50"` and formatting it back yields `$17.50`.
 - Summing `0.10` three times equals exactly `0.30`.
-- `99999999.99`, the maximum for `DECIMAL(10,2)`, round-trips through an insert and select against real Postgres with no loss. The DB driver is configured to return numerics as string or Decimal, not float.
-- Multiplying by a ratio (e.g. `3/23`) needs an explicit rounding mode and gives a deterministic 2-dp result.
-- A lint rule or type-level guard stops a raw `number`/`float` being passed where a money value is expected.
-- The storage representation, `DECIMAL(10,2)` as in the draft or `BIGINT` cents, is Creative Q6. The chosen one is applied consistently to every money column. GST calculation itself belongs to team-banking-and-gst and tax-invoices-and-exports.
+- `99999999.99`, the maximum for `NUMERIC(10,2)`, round-trips through an insert and select against real Postgres with no loss. The DB driver returns numerics as strings, never floats.
+- Every ratio operation takes a required rounding mode: `HALF_UP` (half away from zero), `CEIL` or `FLOOR`. Vectors: GST on $17.00 → `2.22` (subtotal `14.78`); GST on $16.00 → `2.09` (subtotal `13.91`); rate suggestion ($120 + $12) / 12 players → `$11.00` (`CEIL`, whole dollars); `-0.025` with `HALF_UP` → `-0.03` (matches PostgreSQL `round`).
+- `JSON.stringify` of a `Money` value throws, so money can only leave TS as a `MoneyString`. A lint rule and the type brand stop a raw `number` being passed where money is expected.
+- Conformance: every `numeric` column in `public` is `numeric(10,2)`, and no `real`/`double precision` column exists.
+- GST calculation itself belongs to team-banking-and-gst and tax-invoices-and-exports.
 
 #### AC-VERIFY-15: Timezone helpers convert Pacific/Auckland local time correctly across DST, independent of host timezone
 **Priority**: MUST
@@ -185,17 +206,19 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 **Then** both runs produce identical results:
 - `2026-07-01 19:00` (NZST) → `2026-07-01T07:00:00Z`
 - `2026-10-07 19:00` (NZDT) → `2026-10-07T06:00:00Z`
-- `2026-09-27 02:30` (does not exist; DST starts at 02:00) is resolved by the explicit policy chosen in Creative Q7 (shift forward to `2026-09-26T14:30:00Z`, or reject). It is never silently mapped to an arbitrary offset.
-- `2027-04-04 02:30` (ambiguous; DST ends at 03:00 NZDT) is resolved by the explicit policy chosen in Creative Q7 (`2027-04-03T13:30:00Z` if the earlier instant is chosen, or `2027-04-03T14:30:00Z` if the later).
-- "48 hours before" `2027-04-05 19:00` NZST (`2027-04-05T07:00:00Z`), computed as an absolute duration, is `2027-04-03T07:00:00Z`, which displays as `03/04/2027 8:00 pm` NZDT.
+- The disambiguation policy is explicit per call: `reject` for user input (typed `NonexistentLocalTimeError` / `AmbiguousLocalTimeError`) and `compatible` for derived times.
+- `2026-09-27 02:30` (does not exist; DST starts at 02:00): `compatible` → `2026-09-26T14:30:00Z`; `reject` → `NonexistentLocalTimeError`. It is never silently mapped to an arbitrary offset.
+- `2027-04-04 02:30` (ambiguous; DST ends at 03:00 NZDT): `compatible` → `2027-04-03T13:30:00Z` (the earlier instant); `reject` → `AmbiguousLocalTimeError`.
+- The default cancellation deadline is an absolute 48 h: 48 hours before `2027-04-05 19:00` NZST (`2027-04-05T07:00:00Z`) is `2027-04-03T07:00:00Z`, which displays as `03/04/2027 8:00 pm` NZDT. The same-wall-clock-2-days-earlier primitive gives `2027-04-03T06:00:00Z` for the same input.
 - Display dates use NZ format `DD/MM/YYYY`.
-All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens only in this module and in the UI.
+- A TS↔SQL parity test shows `nz_local_to_utc` in PostgreSQL 17 returns the same instants as the TS module for the vector table (`compatible` and `reject`).
+All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens only in this module, its SQL mirror `nz_local_to_utc` (parity-tested) and the UI.
 
 #### AC-VERIFY-16: Notification service is an abstraction with swappable dev and test adapters
 **Priority**: MUST
 **Given** the foundation notification module
-**When** it is configured once with the dev adapter (SMTP to Mailpit) and once with the in-memory test adapter, and `send({ to, subject, text, html? })` is called
-**Then** the calling code is identical under both configurations. The adapter is selected only by configuration (env var). The in-memory adapter exposes the sent messages to tests. Adding a production provider (Creative Q8) means adding an adapter, with no change to callers. No domain templates (low credit, overdue reminder) ship in foundation.
+**When** it is configured once with the `smtp` adapter (Mailpit in dev) and once with the `memory` test adapter, and `send({ to, subject, text, html?, from?, replyTo?, tags?, idempotencyKey })` is called with a single recipient in `to`
+**Then** the calling code is identical under both configurations, and `send` resolves to `{ providerMessageId, acceptedAt, deduplicated }`. Failures are typed as `TransientDeliveryError`, `PermanentDeliveryError` or `NotifierConfigurationError`. The adapter is selected only by configuration (`NOTIFIER_ADAPTER=smtp|memory`). The memory adapter exposes the sent messages to tests. Adding a production provider (likely Postmark) means adding an adapter, with no change to callers. No domain templates (low credit, overdue reminder) ship in foundation.
 
 #### AC-VERIFY-17: Test harness separates unit and integration suites and isolates the integration database
 **Priority**: MUST
@@ -212,6 +235,16 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 - `techContext.md` lists the actual stack, Component Structure, Development Commands and Test Strategy. No `[To be added]` placeholders remain.
 - `systemPatterns.md` → Code Organization Patterns pins the source language and file extension for each directory, and Testing Patterns describes the harness.
 
+#### AC-VERIFY-19: Waitlist queue positions are unique per session and FIFO-safe under concurrency
+**Priority**: MUST
+**Given** the migrated schema with one session and several users
+**When** the integration test inserts WAITLISTED registrations, including two separate connections that each insert a WAITLISTED registration with the same `queue_position` for the same session and then both COMMIT
+**Then**:
+- A partial unique index `UNIQUE (session_id, queue_position) WHERE status = 'WAITLISTED'` exists. A second WAITLISTED row with the same position fails with `23505`, while non-WAITLISTED rows are not constrained by it.
+- A WAITLISTED row without a `queue_position`, or a non-WAITLISTED row with one, fails with `23514`.
+- In the two-connection race, exactly one insert commits and the other fails with `23505`.
+- The locking contract that registration-and-waitlist must follow is documented in the algorithm doc (§Q11) and `db/schema-deviations.md`: every enqueue, withdraw and promote first locks the `game_sessions` row `FOR UPDATE`; enqueue assigns `max(queue_position) + 1` under that lock; promotion takes the lowest position. Foundation ships only the index and the documented constraint. The allocator belongs to registration-and-waitlist.
+
 #### AC-INTEGRATION-1: Migrated schema is grounded in `database-design.md`, with every deviation traced to a source requirement
 **Priority**: MUST
 **Given** the migrated database and the repo's schema deviations record (location pinned in the plan)
@@ -227,7 +260,7 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 **Priority**: MUST
 **Given** the migrated database and the shared-types package
 **When** a parity test reads each enum's values from `pg_enum` and compares them with the corresponding exported enum or union in shared types
-**Then** every DB enum used by the app has a shared-type counterpart with the identical value set, including the enums added by gap fixes such as the auth provider. The test fails if a value is added to either side only. If Q12 picks generated types (always the case under Option B), CI also fails when regenerating the types produces a diff.
+**Then** every DB enum used by the app has a shared-type counterpart with the identical value set, including the enums added by gap fixes such as the auth provider. The test fails if a value is added to either side only. A compile-time check compares the shared enums with the kysely-codegen output, and `test:integration` also fails when regenerating the kysely-codegen types produces a diff (Q12, option 12A).
 
 #### AC-INTEGRATION-3: A notification sent through the dev adapter actually arrives in Mailpit
 **Priority**: MUST
@@ -253,16 +286,20 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 **When** the test asks the scheduler (or its cron library) for the next fire times of a daily `04:00` `Pacific/Auckland` schedule starting from `2026-09-25T16:00:01Z`, and separately from `2027-04-02T15:00:01Z`
 **Then** the next fire times are `2026-09-26T15:00:00Z` (04:00 NZDT on the day DST starts) and `2027-04-03T16:00:00Z` (04:00 NZST on the day DST ends). All three slots are registered and visible in the runner's schedule list, and each placeholder's invocation can be triggered manually and observed. Domain behaviour (materialising sessions, billing, marking overdue) is out of scope. The post-game-billing trigger shape (a periodic sweep or a per-session delayed job) is Creative Q4.
 
-#### AC-ASYNC-3: Jobs are deduplicated by key and survive a worker restart (at-least-once)
+#### AC-ASYNC-3: Concurrent duplicates are suppressed, delivery is at-least-once, and jobs survive a worker kill
 **Priority**: MUST
 **Given** the worker is running
-**When** the same job is enqueued twice with the same idempotency or singleton key, and separately a long-running test job is enqueued and the worker container is killed mid-execution and restarted
-**Then** the deduplicated job runs exactly once. The interrupted job is picked up again after the restart and reaches completed, so jobs are not lost. The runner's delivery guarantee (at-least-once) is documented so downstream handlers know they must be idempotent.
+**When** (i) a job is enqueued twice with the same `singletonKey` while the first is still queued or active; (ii) a job is enqueued again with the same key after the first has completed; and (iii) a long-running test job is enqueued and the worker process is SIGKILLed mid-execution (container or child process) and restarted
+**Then**:
+- (i) The duplicate enqueued while a job with the same `singletonKey` is queued or active is suppressed, and the handler runs once.
+- (ii) The replay after completion **does** reach the handler (at-least-once). The test handler neutralises it with a durable domain idempotency key (a unique row) or a guarded status transition, so the side effect happens exactly once.
+- (iii) The interrupted job is recovered within the queue's expiry window (test config `expireInSeconds: 5`) and reaches completed within 30 s of the kill, so jobs are not lost.
+- The delivery guarantee (at-least-once; `singletonKey` suppresses only concurrent duplicates) is documented so downstream handlers know they must be idempotent.
 
 #### AC-ERROR-1: Missing or invalid required configuration fails fast and names the problem
 **Priority**: MUST
 **Given** the API or worker starting up
-**When** `DATABASE_URL` is unset, or the encryption key is missing or the wrong length
+**When** `DATABASE_URL` is unset, or `ENCRYPTION_KEYS` is missing or holds a key that does not decode to 32 bytes, or `ENCRYPTION_ACTIVE_KEY_ID` is missing or names a key not in `ENCRYPTION_KEYS`
 **Then** the process exits non-zero within 5 s, before it listens on a port or takes jobs. The error names the offending variable and never prints any secret value. `.env.example` lists every required variable with a non-secret placeholder, and `.env` is git-ignored.
 
 #### AC-ERROR-2: API health reports a database outage instead of reporting healthy
@@ -295,16 +332,16 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 **When** `send(...)` is called directly, and separately from inside a job
 **Then** the direct call surfaces a typed delivery error (thrown or returned as a failed result, never reported as success). The job-wrapped call is retried and ends in a failed state per AC-ERROR-3.
 
-**AC summary**: 18 × AC-VERIFY, 4 × AC-INTEGRATION, 3 × AC-ASYNC, 6 × AC-ERROR (31 total; 28 MUST, 3 SHOULD).
+**AC summary**: 19 × AC-VERIFY, 4 × AC-INTEGRATION, 3 × AC-ASYNC, 6 × AC-ERROR (32 total; 29 MUST, 3 SHOULD).
 
 ### Scope Boundaries
 
 - **In scope**:
   - The monorepo scaffold: the Next.js + Tailwind web app with one placeholder page, the API service with `/health`, a worker process and shared types.
-  - The root task runner, ESLint/Prettier (plus Ruff and mypy/pyright if Option B) and strict type checking.
-  - The unit and integration test harness, GitHub Actions CI, Docker Compose local dev (postgres:17, api, worker, web, Mailpit, and Redis only if required), `.env.example`, and Dockerfiles for api, worker and web.
-  - PostgreSQL 17 migrations for the **full domain model** in `database-design.md`, plus these gap fixes: auth identities; `payments.team_id` and the fee snapshot; guest sex and skill; `UNIQUE(session_id, user_id)`; `guest_count` range 0–2; per-team invoice-number allocation; encrypted bank details and Akahu credentials; balance range 0–100.00; FK changes that preserve financial records; `UNIQUE(recurring_rule_id, date)`; the auto-enrol assignment timestamp. A schema deviations record traces each one.
-  - Library modules with no domain rules: money, Pacific/Auckland time, crypto (encrypt/decrypt, key ID), the notification abstraction (Mailpit and in-memory adapters), and the job-runner wrapper (enqueue, schedule, retry, dedupe) with three named no-op schedule slots and a `heartbeat` job.
+  - The root task runner, ESLint/Prettier and strict type checking.
+  - The unit and integration test harness, GitHub Actions CI, Docker Compose local dev (postgres:17, api, worker, web, Mailpit; no Redis), `.env.example`, and Dockerfiles for api (one image, also runs the worker) and web.
+  - PostgreSQL 17 migrations for the **full domain model** in `database-design.md`, plus these gap fixes: auth identities; `payments.team_id` and the fee snapshot; guest sex and skill; `UNIQUE(session_id, user_id)`; `guest_count` range 0–2; per-team invoice-number assignment keyed by payment; encrypted bank details and Akahu credentials; balance range 0–100.00; FK changes that preserve financial records; `UNIQUE(recurring_rule_id, date)`; the auto-enrol assignment timestamp; the payment ownership chain (composite FKs); the partial unique waitlist-position index; `fee_other` and the `SEX_OTHER` basis for BY_SEX pricing. A schema deviations record traces each one.
+  - Library modules with no domain rules: money, Pacific/Auckland time, crypto (encrypt/decrypt, key ID), the notification abstraction (`smtp`/Mailpit and `memory` adapters), and the job-runner wrapper (enqueue, schedule, retry, dedupe) with three named no-op schedule slots and a `heartbeat` job.
   - Architecture decision records, and updates to `techContext.md` and `systemPatterns.md`.
 - **Out of scope**:
   - Every domain behaviour owned by later features:
@@ -325,8 +362,8 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
   - Native mobile.
 - **Dependencies**:
   - Docker and Docker Compose v2 on developer machines.
-  - Node.js LTS and pnpm. With Option B, also Python 3.12+ and uv.
-  - The `postgres:17` and `axllent/mailpit` images, plus `redis:7` only if a Redis-backed runner is chosen.
+  - Node.js 24 LTS and pnpm 10.
+  - The `postgres:17` and `axllent/mailpit` images.
   - GitHub Actions on `github.com/quynguyenhcm/shared-game-management` (the remote exists; nothing is pushed yet).
   - No other roadmap features. All ten other v1.0.0 features depend on this one.
 - **NFR implications**:
@@ -337,27 +374,27 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
   - Data retention: 7-year financial retention (AC-VERIFY-11).
   - NZ Privacy Act 2020: minimises plaintext PII in logs (AC-ERROR-4).
   - Localisation: NZD, `DD/MM/YYYY`, Pacific/Auckland (AC-VERIFY-14, AC-VERIFY-15).
-  - Correctness under concurrency: invoice numbers (AC-VERIFY-9) and job dedupe (AC-ASYNC-3).
+  - Correctness under concurrency: invoice numbers (AC-VERIFY-9), waitlist positions (AC-VERIFY-19) and job dedupe (AC-ASYNC-3).
 
 ### Creative Exploration Needed
 
 Level 4, so creative is mandatory. Each question lists the options and the ACs it unblocks. The tag in brackets is the creative agent that owns it. The numbers are referenced from the ACs above.
 
-1. **[Architecture] Backend framework**: Node (NestJS vs Express, TypeScript) or Python (FastAPI). Criteria: shared types with the Next.js web app (Node shares TS directly; FastAPI needs OpenAPI codegen), the job-runner ecosystem, Decimal/money ergonomics, team familiarity and hosting fit. This drives the command column used in Verification Method and AC-VERIFY-3, AC-VERIFY-17 and AC-INTEGRATION-2. Confidence: LOW (genuinely open in productBrief).
-2. **[Architecture] Monorepo tooling and layout**: pnpm workspaces alone, pnpm + Turborepo, or Nx. If Option B: pnpm + uv with a Makefile/justfile as the root runner. This settles the directory names (`apps/web`, `apps/api`, `apps/worker`, `packages/shared`, or similar) and whether the worker is a separate app or a second entry point of the API. Unblocks AC-VERIFY-1.
-3. **[Architecture] Migrations tool and data-access layer**: an ORM-coupled tool (Prisma, Drizzle, Alembic) vs raw-SQL, stack-neutral tooling (dbmate, node-pg-migrate). Trade-offs: expressiveness for enums, CHECK constraints, triggers and per-team sequence functions; down-migration support (AC-VERIFY-5); and whether an ORM, a query builder (e.g. Kysely, SQLAlchemy Core) or raw SQL is used for data access.
-4. **[Architecture] Job runner and scheduler**: Postgres-backed (pg-boss, Graphile Worker, Procrastinate) vs Redis-backed (BullMQ, Celery, arq), or host-platform cron triggering HTTP endpoints. Criteria: timezone-aware cron (AC-ASYNC-2), dedupe keys and at-least-once delivery (AC-ASYNC-3), retry and failed-state visibility (AC-ERROR-3), and one fewer service to run if Postgres-backed. Also decide the **post-game-billing trigger shape**: a periodic sweep (e.g. every 5 min for sessions whose max court `end_time` has passed) or a delayed job scheduled per session at publish time.
-5. **[Architecture] Encryption at rest and key management**: application-level AEAD (e.g. AES-256-GCM or libsodium secretbox) with a key-ID prefix and env-supplied key in dev and KMS in prod, vs `pgcrypto` `pgp_sym_encrypt`, where the key travels through SQL and risks appearing in logs, vs relying on disk or volume encryption only (does not meet the column-level requirement). Also decide which columns beyond `bank_account_number` and `akahu_app_token` to encrypt (`bank_account_name`, `akahu_merchant_id`, `ird_number`), and whether to store a non-sensitive display projection (e.g. last 2–4 digits of the account) for UI masking. Unblocks AC-VERIFY-13 and AC-ERROR-4.
-6. **[Algorithm] Money representation and rounding**: keep `DECIMAL(10,2)` (matches the draft; needs Decimal types end-to-end and string-returning drivers) or switch to `BIGINT` integer cents (simpler arithmetic; diverges from the draft and is recorded as a deviation). Also choose the rounding mode for ratio operations (half-up vs banker's rounding) to be used later for the GST 3/23 split and `ceil` rate suggestion. Unblocks AC-VERIFY-14 and AC-ERROR-5.
-7. **[Algorithm] DST policy for local wall-clock times**: how a nonexistent local time (`2026-09-27 02:30`) and an ambiguous one (`2027-04-04 02:30`) resolve: shift forward or reject, earlier or later instant. Also whether "cancellation deadline defaults to 48 h prior" means absolute hours (the AC-VERIFY-15 vector) or the same local wall-clock time two days earlier; the two differ by 1 h across a DST change. Foundation provides both primitives, and session-scheduling-engine applies the chosen rule. Also decide whether sessions should store a computed `starts_at`/`ends_at timestamptz`, because the draft has only `date` + per-court `TIME` with no zone, and post-game billing needs an instant. Unblocks AC-VERIFY-15.
-8. **[Architecture] Production email provider and adapter contract**: productBrief lists the provider as "TBD". Options include Postmark, SendGrid, AWS SES and Resend. Only the adapter interface and the dev (Mailpit) and test adapters are built here. The choice matters now only so the `send()` contract (fields, error types, idempotency key) fits the likely provider. Unblocks AC-VERIFY-16 and AC-ERROR-6.
-9. **[Algorithm] Invoice-number allocation**: a gapless counter table (`SELECT ... FOR UPDATE`, serialises per team) vs a per-team sequence that allows gaps. IRD requires unique, identifiable invoices, not strictly gapless ones, so confirm. Also the display format (e.g. `<TEAM-PREFIX>-000123`). Unblocks AC-VERIFY-9.
-10. **[Architecture] Hosting target**, only as far as it constrains foundation: for example Fly.io, Render, Railway, AWS ECS + RDS, or Vercel for web plus a separate API and worker host. This affects whether the scheduler runs in-process or uses platform cron, where encryption keys live (KMS vs platform secrets), TLS termination, and the managed Postgres 17 choice. Deployment itself is out of scope.
-11. **[Algorithm] Fee snapshot and guest model shape**: snapshot columns on `payments` vs a `payment_line_items` child table (one line per registrant and guest) vs JSONB; a `registration_guests` child table vs positional columns on `registrations`. The workflows doc bills per confirmed registration including guests, so line items are likely, but that is not decided here. Unblocks AC-VERIFY-7 and AC-VERIFY-8.
-12. **[Architecture] Shared-types strategy**: hand-written TS enums in a shared package vs types generated from the DB schema (e.g. Kysely codegen, Drizzle inference) vs types generated from OpenAPI. This is tightly coupled to Q1 and Q3, and determines how AC-INTEGRATION-2 parity is enforced.
+1. **[Architecture] Backend framework**: Node (NestJS vs Express, TypeScript) or Python (FastAPI). Criteria: shared types with the Next.js web app (Node shares TS directly; FastAPI needs OpenAPI codegen), the job-runner ecosystem, Decimal/money ergonomics, team familiarity and hosting fit. This drives the command column used in Verification Method and AC-VERIFY-3, AC-VERIFY-17 and AC-INTEGRATION-2. Confidence: LOW (genuinely open in productBrief). → Resolved: Node 24 + TypeScript strict + Fastify 5; NestJS and FastAPI rejected (`memory-bank/creative/platform-foundation-architecture.md` §Q1).
+2. **[Architecture] Monorepo tooling and layout**: pnpm workspaces alone, pnpm + Turborepo, or Nx. If Option B: pnpm + uv with a Makefile/justfile as the root runner. This settles the directory names (`apps/web`, `apps/api`, `apps/worker`, `packages/shared`, or similar) and whether the worker is a separate app or a second entry point of the API. Unblocks AC-VERIFY-1. → Resolved: pnpm 10 workspaces only; `apps/web`, `apps/api` (worker = `src/worker.ts`, same image), `packages/shared` (`memory-bank/creative/platform-foundation-architecture.md` §Q2).
+3. **[Architecture] Migrations tool and data-access layer**: an ORM-coupled tool (Prisma, Drizzle, Alembic) vs raw-SQL, stack-neutral tooling (dbmate, node-pg-migrate). Trade-offs: expressiveness for enums, CHECK constraints, triggers and per-team sequence functions; down-migration support (AC-VERIFY-5); and whether an ORM, a query builder (e.g. Kysely, SQLAlchemy Core) or raw SQL is used for data access. → Resolved: node-pg-migrate plain-SQL migrations with real downs + Kysely over `pg` + kysely-codegen (`memory-bank/creative/platform-foundation-architecture.md` §Q3).
+4. **[Architecture] Job runner and scheduler**: Postgres-backed (pg-boss, Graphile Worker, Procrastinate) vs Redis-backed (BullMQ, Celery, arq), or host-platform cron triggering HTTP endpoints. Criteria: timezone-aware cron (AC-ASYNC-2), dedupe keys and at-least-once delivery (AC-ASYNC-3), retry and failed-state visibility (AC-ERROR-3), and one fewer service to run if Postgres-backed. Also decide the **post-game-billing trigger shape**: a periodic sweep (e.g. every 5 min for sessions whose max court `end_time` has passed) or a delayed job scheduled per session at publish time. → Resolved: pg-boss with `tz: 'Pacific/Auckland'` schedules; billing trigger T3 (5-min sweep → per-session `bill-session` job) (`memory-bank/creative/platform-foundation-architecture.md` §Q4).
+5. **[Architecture] Encryption at rest and key management**: application-level AEAD (e.g. AES-256-GCM or libsodium secretbox) with a key-ID prefix and env-supplied key in dev and KMS in prod, vs `pgcrypto` `pgp_sym_encrypt`, where the key travels through SQL and risks appearing in logs, vs relying on disk or volume encryption only (does not meet the column-level requirement). Also decide which columns beyond `bank_account_number` and `akahu_app_token` to encrypt (`bank_account_name`, `akahu_merchant_id`, `ird_number`), and whether to store a non-sensitive display projection (e.g. last 2–4 digits of the account) for UI masking. Unblocks AC-VERIFY-13 and AC-ERROR-4. → Resolved: app-level AES-256-GCM, env keyring with key-ID envelope and AAD; also encrypt `bank_account_name`, `ird_number`; add `bank_account_last4` (`memory-bank/creative/platform-foundation-architecture.md` §Q5).
+6. **[Algorithm] Money representation and rounding**: keep `DECIMAL(10,2)` (matches the draft; needs Decimal types end-to-end and string-returning drivers) or switch to `BIGINT` integer cents (simpler arithmetic; diverges from the draft and is recorded as a deviation). Also choose the rounding mode for ratio operations (half-up vs banker's rounding) to be used later for the GST 3/23 split and `ceil` rate suggestion. Unblocks AC-VERIFY-14 and AC-ERROR-5. → Resolved: `NUMERIC(10,2)` in DB, `MoneyString` on the wire, branded bigint cents in TS; HALF_UP / CEIL / FLOOR explicit per call (`memory-bank/creative/platform-foundation-algorithm.md` §Q6).
+7. **[Algorithm] DST policy for local wall-clock times**: how a nonexistent local time (`2026-09-27 02:30`) and an ambiguous one (`2027-04-04 02:30`) resolve: shift forward or reject, earlier or later instant. Also whether "cancellation deadline defaults to 48 h prior" means absolute hours (the AC-VERIFY-15 vector) or the same local wall-clock time two days earlier; the two differ by 1 h across a DST change. Foundation provides both primitives, and session-scheduling-engine applies the chosen rule. Also decide whether sessions should store a computed `starts_at`/`ends_at timestamptz`, because the draft has only `date` + per-court `TIME` with no zone, and post-game billing needs an instant. Unblocks AC-VERIFY-15. → Resolved: `reject` for user input, `compatible` for derived times; absolute 48 h; trigger-maintained `starts_at/ends_at` via `nz_local_to_utc` (`memory-bank/creative/platform-foundation-algorithm.md` §Q7).
+8. **[Architecture] Production email provider and adapter contract**: productBrief lists the provider as "TBD". Options include Postmark, SendGrid, AWS SES and Resend. Only the adapter interface and the dev (Mailpit) and test adapters are built here. The choice matters now only so the `send()` contract (fields, error types, idempotency key) fits the likely provider. Unblocks AC-VERIFY-16 and AC-ERROR-6. → Resolved: Postmark likely (not built); single-recipient `send()` with required `idempotencyKey` and three typed errors (`memory-bank/creative/platform-foundation-architecture.md` §Q8).
+9. **[Algorithm] Invoice-number allocation**: a gapless counter table (`SELECT ... FOR UPDATE`, serialises per team) vs a per-team sequence that allows gaps. IRD requires unique, identifiable invoices, not strictly gapless ones, so confirm. Also the display format (e.g. `<TEAM-PREFIX>-000123`). Unblocks AC-VERIFY-9. → Resolved: gapless per-team counter via `assign_invoice_number(payment_id)` (payment-locked); display `INV-000123`; IRD requires no numbering (`memory-bank/creative/platform-foundation-algorithm.md` §Q9).
+10. **[Architecture] Hosting target**, only as far as it constrains foundation: for example Fly.io, Render, Railway, AWS ECS + RDS, or Vercel for web plus a separate API and worker host. This affects whether the scheduler runs in-process or uses platform cron, where encryption keys live (KMS vs platform secrets), TLS termination, and the managed Postgres 17 choice. Deployment itself is out of scope. → Resolved: binding constraints C1–C6; DigitalOcean App Platform (Sydney) + managed PG 17 as provisional vendor (`memory-bank/creative/platform-foundation-architecture.md` §Q10).
+11. **[Algorithm] Fee snapshot and guest model shape**: snapshot columns on `payments` vs a `payment_line_items` child table (one line per registrant and guest) vs JSONB; a `registration_guests` child table vs positional columns on `registrations`. The workflows doc bills per confirmed registration including guests, so line items are likely, but that is not decided here. Unblocks AC-VERIFY-7 and AC-VERIFY-8. → Resolved: `registration_guests` child table + `payments` header with `payment_line_items`, generated GST, ownership composite FKs, `fee_other` (`memory-bank/creative/platform-foundation-algorithm.md` §Q11).
+12. **[Architecture] Shared-types strategy**: hand-written TS enums in a shared package vs types generated from the DB schema (e.g. Kysely codegen, Drizzle inference) vs types generated from OpenAPI. This is tightly coupled to Q1 and Q3, and determines how AC-INTEGRATION-2 parity is enforced. → Resolved: 12A, hand-written `as const` enums + zod in `@sgm/shared`, with runtime `pg_enum` parity, compile-time codegen equality and a codegen drift check (`memory-bank/creative/platform-foundation-architecture.md` §Q12).
 
 **Confidence by section**:
-- Verification Method: MEDIUM. Metrics and observation points are concrete, and the commands are concrete for each option but are pending Q1–Q3.
+- Verification Method: HIGH. Metrics, observation points and commands are concrete (Option A with Fastify, resolved 2026-09-29).
 - Schema gap ACs (AC-VERIFY-6 to AC-VERIFY-12, AC-INTEGRATION-1): HIGH. They are taken directly from `database-design.md`, the task gap list, the workflows doc and productBrief. The column and table shape is pending Q11.
 - Library ACs (money, time, crypto, notifications, jobs): HIGH for behaviour and test vectors, and LOW for the representation and policy choices (Q4–Q9), which are flagged above rather than guessed.
 - CI/local dev: HIGH for GitHub Actions and Compose. The 120 s, 30 s and 10 min thresholds are proposed and have not been measured, since no code exists yet.
@@ -369,23 +406,32 @@ Yes. Downstream developers need a short `README` or `docs/` "Getting started" co
 
 ### Approach
 - **Emphasis**: balanced. Library modules (money, time, crypto, config, notifications) are unit-heavy. Schema, jobs and health checks are integration tests against a real Postgres 17, because the ACs are mostly about DB constraints and job-store behaviour that mocks cannot prove. One smoke E2E test covers web → API.
-- **Target test count**: about 62 in total. This is above the 20 guideline because the task covers 31 ACs across 5 library modules, a full domain schema with 11 gap fixes, and a job runner. The count averages about 2 tests per AC. Each module stays within the 6–12 per-module guideline.
+- **Target test count**: about 86 in total (was about 62). This is above the 20 guideline because the task covers 32 ACs across 6 library modules (money, time, crypto, config, logger, notifications) plus the job wrapper, a full domain schema with 11 gap fixes, and a job runner. The 2026-09-29 revisions add about 24 tests: the architecture's drift and wrapper tests (codegen, OpenAPI, jobs, logger), and negative tests for the critique fixes (ownership chain, waitlist race, same-payment invoice race, BY_SEX + OTHER, AC-ASYNC-3 replay), each of which a mock can't prove. The count averages under 3 tests per AC. The schema tests are split across several files so each stays near the 6–12 per-module guideline.
 - **Coverage gate**: 80% or more line coverage on `packages/shared/src/{money,time}` and `apps/api/src/lib/{crypto,config,notifications,jobs}` (SHOULD, per Success metrics).
 
 ### File Organization
-- **New test files** (paths are provisional under Option A; if creative picks FastAPI, re-pin the api/worker files as `apps/api/tests/test_<module>.py`):
+- **New test files** (confirmed by the architecture doc):
   - `packages/shared/src/money/money.test.ts`: exact arithmetic, parse/format, rounding, invalid input
   - `packages/shared/src/time/time.test.ts`: Pacific/Auckland conversions, DST gap and overlap vectors, host-timezone independence
   - `apps/api/src/lib/config/config.test.ts`: fail-fast on missing or invalid env
   - `apps/api/src/lib/crypto/crypto.test.ts`: round trip, key-ID prefix, rotation, tamper and wrong-key errors, no plaintext in errors
   - `apps/api/src/lib/notifications/notifications.test.ts`: adapter contract, in-memory adapter, typed delivery errors
+  - `apps/api/src/lib/logger/logger.test.ts`: redaction, camelCase trace fields, level and format config
+  - `apps/api/src/lib/jobs/jobs.test.ts`: wrapper unit tests (`_meta` trace injection, option mapping, lifecycle logs)
+  - `apps/api/src/openapi.test.ts`: generated OpenAPI equals the committed `apps/api/openapi.yaml`
   - `apps/api/test/integration/health.int.test.ts`: `/health` returns 200 with the DB up and 503 with the DB down
-  - `apps/api/test/integration/schema.int.test.ts`: migrate up/down/up, conformance to `database-design.md` plus the deviations record, all constraint and gap-fix checks
-  - `apps/api/test/integration/invoice-number.int.test.ts`: concurrent allocation is unique per team
+  - `apps/api/test/integration/schema.int.test.ts`: migrate up/down/up, conformance to `database-design.md` plus the deviations record, auth identities, balance range, retention, recurrence uniqueness
+  - `apps/api/test/integration/db-codegen.int.test.ts`: regenerated kysely-codegen output equals the committed `types.generated.ts`
+  - `apps/api/test/integration/registrations-guests.int.test.ts`: `UNIQUE(session_id, user_id)`, guest count and positions, registration team = session team, waitlist position uniqueness and the two-connection race (AC-VERIFY-19)
+  - `apps/api/test/integration/payments-snapshot.int.test.ts`: fee snapshot, generated GST, immutability, idempotency key, ownership chain negatives, BY_SEX + OTHER billing
+  - `apps/api/test/integration/invoice-number.int.test.ts`: concurrent assignment is unique and gapless per team; same-payment race
+  - `apps/api/test/integration/money-roundtrip.int.test.ts`: `99999999.99` round trip, overflow `22003`
+  - `apps/api/test/integration/time-parity.int.test.ts`: `nz_local_to_utc` equals the TS module on the DST vector table
+  - `apps/api/test/integration/session-instants.int.test.ts`: trigger-maintained `starts_at/ends_at`
   - `apps/api/test/integration/crypto-columns.int.test.ts`: raw column bytes contain no plaintext
   - `apps/api/test/integration/enum-parity.int.test.ts`: shared TS enums equal `pg_enum` values
   - `apps/api/test/integration/mailpit.int.test.ts`: a message sent via the dev adapter appears in the Mailpit API
-  - `apps/worker/test/integration/jobs.int.test.ts`: enqueue → complete lifecycle, dedupe, restart survival, retry → failed, Pacific/Auckland cron registration
+  - `apps/api/test/integration/jobs.int.test.ts`: enqueue → complete lifecycle, concurrent dedupe vs replay after completion, SIGKILL restart survival, retry → failed, Pacific/Auckland cron registration
   - `apps/web/e2e/smoke.spec.ts`: the page renders data from the live API `/health` (Playwright)
 - **Extend existing**: none. This is a greenfield repo.
 
@@ -397,11 +443,11 @@ Yes. Downstream developers need a short `README` or `docs/` "Getting started" co
 - Docker Compose and CI YAML themselves: verified by running them (`docker compose up --wait`, `actionlint`, a green CI run), not by unit tests
 
 ### Per-Phase Test Guidance
-- Phase 1: 6 tests. Config fail-fast (4); API `/health` unit happy path (1); each root target runs (1 script-level check). A deliberate lint, type or test violation makes `ci` fail (verified manually and recorded in the phase notes).
-- Phase 2: 3 tests. `/health` 200 vs 503 with the DB stopped (2); web smoke E2E (1). `actionlint` is clean, and a CI run on a local `act`-free dry run is replaced by the first real run when pushing is re-enabled.
-- Phase 3: 20 tests. Migrate up, down and up again with identical schema dumps (1); conformance to the design doc and deviations record (1); auth identities, one user with 3 providers (2); `UNIQUE(session_id, user_id)` and `guest_count` 0–2 (3); guest sex and skill attributes (1); `payments.team_id` NOT NULL and the fee snapshot is immutable (2); invoice numbers unique under concurrency (2); balance CHECK 0.00–100.00 (2); financial FKs RESTRICT deletes (3); `UNIQUE(recurring_rule_id, date)` and the auto-enrol timestamp (2); enum parity (1).
-- Phase 4: 20 tests. Money (8): add/sub/multiply-ratio exact, 0.1+0.2, parse `"17.50"`, NZD format, rounding mode, reject floats, NaN and over-precision. Time (7): the 2026-09-27 gap, the 2027-04-04 overlap, 48 h absolute vs same wall-clock, host `TZ=UTC` vs `TZ=America/New_York` give the same result, `DD/MM/YYYY` format, reject a nonexistent time under the strict policy. Crypto (5): round trip, key-ID prefix plus rotation-read of an old key, tampered ciphertext throws, wrong key throws without plaintext in the message, raw column bytes contain no plaintext (integration).
-- Phase 5: 10 tests. Notifications (4): contract, in-memory capture, typed failure, arrives in Mailpit. Jobs (6): lifecycle states observable, dedupe key, survives a worker restart, retry with backoff ends in the failed state, cron registered in Pacific/Auckland fires at the right UTC instant across DST, `heartbeat` job completes.
+- Phase 1: 9 tests. Config fail-fast, including `ENCRYPTION_KEYS`/`ENCRYPTION_ACTIVE_KEY_ID` (4); API `/health` unit happy path (1); each root target runs (1 script-level check); logger redaction, camelCase trace fields and level/format config (3). A deliberate lint, type or test violation makes `ci` fail (verified manually and recorded in the phase notes).
+- Phase 2: 4 tests. `/health` 200 vs 503 with the DB stopped (2); web smoke E2E (1); OpenAPI drift (1). `actionlint` is clean, and a CI run on a local `act`-free dry run is replaced by the first real run when pushing is re-enabled.
+- Phase 3: 34 tests. Migrate up, down and up again with identical schema dumps (1); conformance to the design doc and deviations record, including numeric(10,2)-only and no float columns (1); auth identities, one user with 3 providers (2); `UNIQUE(session_id, user_id)` and `guest_count` 0–2 (3); guest sex and skill attributes (1); position 2 without position 1 (1); `payments.team_id` NOT NULL and the fee snapshot is immutable (2); invoice numbers unique and gapless under concurrency (2); same-payment invoice race and already-invoiced payment → `23000` (2); balance CHECK 0.00–100.00 (2); financial FKs RESTRICT deletes (3); `UNIQUE(recurring_rule_id, date)` and the auto-enrol timestamp (2); enum parity (1); codegen drift (1); ownership chain: payment user mismatch, payment team mismatch, registration team ≠ session team, credit transaction mismatch → `23503` (4); waitlist: duplicate position `23505`, position iff WAITLISTED, two-connection race (3); BY_SEX + OTHER: missing `fee_other` → `23514`, OTHER registrant billed `fee_other`, OTHER guest billed `fee_other` (3).
+- Phase 4: 26 tests. Money (10): add/sub/multiply-ratio exact, 0.1+0.2, parse `"17.50"`, NZD format, GST and CEIL rate vectors, HALF_UP negative tie, reject floats, NaN and over-precision, `JSON.stringify(Money)` throws, `99999999.99` DB round trip. Time (9): the 2026-09-27 gap, the 2027-04-04 overlap, 48 h absolute vs same wall-clock, host `TZ=UTC` vs `TZ=America/New_York` give the same result, `DD/MM/YYYY` format, reject a nonexistent time under the strict policy, TS↔SQL `nz_local_to_utc` parity (integration), trigger-maintained session instants (integration). Crypto (7): round trip, key-ID prefix plus rotation-read of an old key, tampered ciphertext throws, wrong key throws without plaintext in the message, raw column bytes contain no plaintext (integration), ciphertext copied to another row fails (AAD), plaintext write → `23514` (integration).
+- Phase 5: 13 tests. Notifications (4): contract, in-memory capture, typed failure, arrives in Mailpit. Jobs (9): lifecycle states observable, concurrent duplicate suppressed by `singletonKey`, replay after completion reaches the handler and is neutralised by a domain idempotency key, survives a SIGKILL (recovered within the 5 s expiry, completes within 30 s), retry with backoff ends in the failed state, cron registered in Pacific/Auckland fires at the right UTC instant across DST, `heartbeat` job completes, wrapper `_meta` trace injection and option mapping (2, unit).
 - Phase 6: 3 checks. Full `ci` is green from a fresh clone; `docker compose up -d --wait` finishes in 120 s or less; Getting Started steps are followed verbatim on a clean checkout. Coverage gate reported.
 
 ## Architectural Plan
@@ -412,23 +458,23 @@ This task builds the monorepo, local stack, CI, full PostgreSQL 17 domain schema
 ### Architectural Principles
 1. **Postgres is the system of record.** Constraints (CHECK, UNIQUE, FK RESTRICT) enforce invariants in the database, not only in app code.
 2. **Money never touches binary floating point.** One money module is used everywhere.
-3. **Store instants in UTC (`timestamptz`) and convert to Pacific/Auckland only at the edges.** DST policy lives in one time module.
+3. **Store instants in UTC (`timestamptz`) and convert to Pacific/Auckland only at the edges.** DST policy lives in one algorithm: it exists once in TS (`@sgm/shared/time`) and once as its SQL mirror `nz_local_to_utc`, and the two are parity-tested.
 4. **Secrets and sensitive columns are encrypted at the application level with a key-ID prefix,** so keys can be rotated. Plaintext never appears in logs or errors.
 5. **Every async side effect goes through the job runner** (idempotent, deduplicated, retried, observable).
 6. **One root command set and the same gates locally and in CI.**
 7. **12-factor config:** env only, validated at boot, fail fast.
 
 ### Architecture Alternatives
-Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Creative Exploration Needed` list the options for each decision, with Q1 (backend), Q3 (migrations/data access), Q4 (job runner) and Q5 (encryption) the most important. The selection, weighted evaluation and justification are recorded in `memory-bank/creative/platform-foundation-architecture.md` and `memory-bank/creative/platform-foundation-algorithm.md`. Suggested weights: maintainability 0.25, correctness/safety 0.25, time to market 0.2, operational simplicity 0.15, cost 0.1, performance 0.05.
+Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all-Postgres: Fastify + node-pg-migrate + Kysely + pg-boss). The 12 questions in `### Creative Exploration Needed` list the options for each decision, with Q1 (backend), Q3 (migrations/data access), Q4 (job runner) and Q5 (encryption) the most important. The selection, weighted evaluation and justification are recorded in `memory-bank/creative/platform-foundation-architecture.md` and `memory-bank/creative/platform-foundation-algorithm.md`. Suggested weights: maintainability 0.25, correctness/safety 0.25, time to market 0.2, operational simplicity 0.15, cost 0.1, performance 0.05.
 
 ### Observability Requirements
-- **Logging**: structured JSON to stdout from `api` and `worker` (pino under Option A, structlog under Option B). Fields: `ts`, `level`, `msg`, `service`, `trace_id`, `span_id`, `request_id`, `job_id`. Configured by `LOG_LEVEL` and `LOG_FORMAT` (json|pretty). Redacted: `authorization`, `cookie`, `password*`, `*_token`, `bank_account_*`, `ird_number`, `akahu_*`.
+- **Logging**: structured JSON to stdout from `api` and `worker` (pino). Fields (camelCase): `timestamp`, `level`, `message`, `service`, `traceId`, `spanId`, `requestId`, `jobId`. Configured by `LOG_LEVEL` and `LOG_FORMAT` (`json|text`). Redacted: `authorization`, `cookie`, `password*`, `*_token`, `bank_account_*`, `ird_number`, `akahu_*`.
 - **Tracing**: OpenTelemetry SDK wired but exporting to console or no-op by default (`OTEL_EXPORTER_OTLP_ENDPOINT` optional). W3C `traceparent` is propagated from web → API, and from API → job payloads (trace context stored in job metadata).
 - **Metrics**: `/metrics` is deferred. The foundation logs job lifecycle events (`job.enqueued|started|completed|failed`, with duration). A metrics backend is decided with hosting (Q10).
 - **Infrastructure**: none in foundation beyond stdout. The collector and backends come with hosting.
 
 ### API Requirements
-- **REST API**: yes, minimal. `GET /health` returns `{status, db, version}` with 200, or 503 when the DB is unreachable. OpenAPI spec at `apps/api/openapi.yaml` (created here; later features extend it). Build agents MUST load `context/api-rest-requirements.md`.
+- **REST API**: yes, minimal. `GET /health` returns `{status, db, version}` with 200, or 503 when the DB is unreachable. OpenAPI spec at `apps/api/openapi.yaml` (generated from the routes by `pnpm run openapi` and drift-checked; later features extend it). Build agents MUST load `context/api-rest-requirements.md`.
 - **GraphQL**: no.
 - **Auth**: none in foundation (arrives with auth-and-user-roles).
 - **API testing**: integration tests for `/health` (Phase 2).
@@ -436,7 +482,7 @@ Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Cre
 ### Risk Assessment
 | Risk | Likelihood | Impact | Mitigation |
 | --- | --- | --- | --- |
-| Backend choice (Q1) flips file pins and commands | Medium | Medium | Pins are provisional under Option A. Creative re-pins them before `/yay:build`. |
+| Version-specific API drift in pinned libraries (pg-boss, kysely-codegen, `@fastify/otel`) vs the creative docs | Medium | Medium | Backend choice (Q1) is resolved and pins are confirmed. All access goes through the foundation wrappers, and tests assert behaviour, not internals (architecture doc → Risk Assessment). |
 | The schema gets locked in before domain features learn their needs | Medium | High | The deviations record plus reversible migrations. Later features add additive migrations only. |
 | DST and money bugs surface late, in billing | Medium | High | Test vectors are fixed in Phase 4 (2026-09-27 gap, 2027-04-04 overlap). One module owns each concern. |
 | Encryption key handling leaks plaintext | Low | High | Encryption is AEAD at the app level, and tests check raw bytes and error messages (AC-ERROR-4). |
@@ -445,56 +491,62 @@ Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Cre
 ## Implementation Roadmap
 
 ### New Source Files (pin path + extension)
-<!-- Provisional under Option A (Node/TypeScript backend) — /yay:creative MUST confirm or re-pin before /yay:build.
-     If Option B (FastAPI) is chosen: apps/api/src/**.ts -> apps/api/src/app/**.py, apps/worker -> apps/api/src/app/worker/*.py,
-     migrations stay raw SQL if dbmate (else apps/api/alembic/versions/*.py). Web and packages/shared pins are unaffected. -->
-- [ ] `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc.json`, `.editorconfig`: root workspace, strict TS, lint and format config
+<!-- Confirmed / re-pinned by memory-bank/creative/platform-foundation-architecture.md → New Source Files, plus the algorithm doc's files. -->
+- [ ] `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc.json`, `.prettierignore`, `.editorconfig`, `.nvmrc`, `.dockerignore`, `vitest.config.ts`: root workspace, strict TS, lint, format and Vitest projects (unit | integration)
+- [ ] `scripts/setup.ts`: copies `.env.example` → `.env` if missing and generates dev `ENCRYPTION_KEYS`
 - [ ] `.env.example`, `.gitignore` (extend): documented env vars, with no secrets
-- [ ] `docker-compose.yml`: postgres:17, api, worker, web, mailpit (plus redis only if Q4 requires it), with health checks
-- [ ] `apps/api/Dockerfile`, `apps/worker/Dockerfile`, `apps/web/Dockerfile`
-- [ ] `.github/workflows/ci.yml`: lint → typecheck → unit → integration (postgres:17 service) → build
-- [ ] `apps/web/package.json`, `apps/web/next.config.ts`, `apps/web/tailwind.config.ts`, `apps/web/postcss.config.mjs`, `apps/web/tsconfig.json`
-- [ ] `apps/web/src/app/layout.tsx`, `apps/web/src/app/page.tsx`: placeholder page that shows API health
-- [ ] `apps/web/src/lib/api-client.ts`: typed fetch wrapper
+- [ ] `docker-compose.yml`: postgres:17, mailpit, api, worker, web (no Redis), with health checks
+- [ ] `apps/api/Dockerfile` (one image for api and worker), `apps/web/Dockerfile`
+- [ ] `.github/workflows/ci.yml`: actionlint + `pnpm run ci` with postgres:17 and Mailpit service containers
+- [ ] `apps/web/package.json`, `apps/web/next.config.ts`, `apps/web/postcss.config.mjs`, `apps/web/tsconfig.json` (Tailwind v4 CSS-first; no `tailwind.config`)
+- [ ] `apps/web/src/app/layout.tsx`, `apps/web/src/app/page.tsx`, `apps/web/src/app/globals.css`: placeholder page that shows API health
+- [ ] `apps/web/src/lib/api-client.ts`: typed fetch wrapper (injects `traceparent`)
+- [ ] `apps/web/src/instrumentation.ts`: Next.js OTel registration
 - [ ] `apps/web/playwright.config.ts`, `apps/web/e2e/smoke.spec.ts`
-- [ ] `apps/api/package.json`, `apps/api/tsconfig.json`, `apps/api/src/main.ts`, `apps/api/src/app.ts`: server bootstrap
+- [ ] `apps/api/package.json`, `apps/api/tsconfig.json`, `apps/api/tsup.config.ts`, `apps/api/src/main.ts`, `apps/api/src/app.ts`: HTTP entrypoint and `buildApp(deps)` Fastify factory
+- [ ] `apps/api/src/worker.ts`: worker entrypoint (pg-boss) with internal `/health` on `WORKER_HEALTH_PORT`
+- [ ] `apps/api/src/cli.ts`: `db migrate|rollback|reset`, `jobs trigger|schedules`
+- [ ] `apps/api/src/instrumentation.ts`: OTel NodeSDK
 - [ ] `apps/api/src/routes/health.ts`: `GET /health`
-- [ ] `apps/api/openapi.yaml`
-- [ ] `apps/api/src/lib/config/config.ts`: env schema plus fail-fast validation
-- [ ] `apps/api/src/lib/db/pool.ts`: Postgres pool, with NUMERIC parsed as a string
-- [ ] `apps/api/src/lib/logger/logger.ts`: structured logger with redaction
-- [ ] `apps/api/src/lib/crypto/crypto.ts`: AEAD encrypt/decrypt with key ID and rotation
-- [ ] `apps/api/src/lib/notifications/notifier.ts`, `apps/api/src/lib/notifications/adapters/mailpit.ts`, `apps/api/src/lib/notifications/adapters/in-memory.ts`
-- [ ] `apps/api/src/lib/jobs/jobs.ts`: enqueue, schedule (Pacific/Auckland cron), dedupe and retry wrapper
-- [ ] `apps/worker/package.json`, `apps/worker/tsconfig.json`, `apps/worker/src/main.ts`: worker bootstrap
-- [ ] `apps/worker/src/jobs/heartbeat.ts`, `apps/worker/src/schedules.ts`: heartbeat job plus 3 named no-op schedule slots (`recurrence-materialise`, `post-game-billing`, `overdue-sweep`)
-- [ ] `db/migrations/0001_enums.sql` … `db/migrations/0010_indexes.sql`: full domain schema plus gap fixes (raw SQL, with the file split finalised in creative Q3)
+- [ ] `apps/api/openapi.yaml` (generated, drift-checked), `apps/api/src/openapi.ts`
+- [ ] `apps/api/src/lib/config/config.ts`: zod env schema plus fail-fast validation
+- [ ] `apps/api/src/lib/db/pool.ts`: pg Pool (NUMERIC/INT8/DATE/TIME as strings, `TimeZone=UTC` per connection)
+- [ ] `apps/api/src/lib/db/kysely.ts`, `apps/api/src/lib/db/types.generated.ts`, `apps/api/src/lib/db/enum-parity.ts`, `apps/api/src/lib/db/migrate.ts`: Kysely, committed codegen output, compile-time enum parity, node-pg-migrate runner + pg-boss schema install
+- [ ] `apps/api/src/lib/logger/logger.ts`: pino with redaction and camelCase trace fields
+- [ ] `apps/api/src/lib/crypto/crypto.ts`, `apps/api/src/lib/crypto/keyring.ts`: AES-256-GCM with key ID, AAD and rotation
+- [ ] `apps/api/src/lib/notifications/notifier.ts`, `apps/api/src/lib/notifications/errors.ts`, `apps/api/src/lib/notifications/adapters/smtp.ts`, `apps/api/src/lib/notifications/adapters/in-memory.ts`
+- [ ] `apps/api/src/lib/jobs/jobs.ts`: createJobRunner, defineQueue, enqueue (transactional), schedule (Pacific/Auckland), work; trace `_meta`; lifecycle logs
+- [ ] `apps/api/src/jobs/heartbeat.ts`, `apps/api/src/jobs/schedules.ts`, `apps/api/src/jobs/registry.ts`: heartbeat job, 3 named no-op schedule slots (`recurrence-materialisation`, `post-game-billing`, `daily-overdue`) and the queue registry
+- [ ] `apps/api/test/global-setup.ts`, `apps/api/test/helpers/test-db.ts`, `apps/api/test/fixtures/expected-schema.ts`: template-DB isolation and the hand-written expected schema
+- [ ] `db/migrations/<utc-ts>_<name>.sql` (node-pg-migrate SQL format, order preserved): 1 `_enums` (13 draft enums + `auth_provider` + `fee_basis` incl. `SEX_OTHER`); 2 `_users_and_auth_identities`; 3 `_teams` (encrypted TEXT columns with envelope CHECKs, `bank_account_last4`); 4 `_team_members` (`auto_enroll_assigned_at`); 5 `_recurring_session_rules` (`fee_other`, BY_SEX fees CHECK); 6 `_game_sessions_and_courts` (`UNIQUE(recurring_rule_id, date)`, `UNIQUE(id, team_id)`, `fee_other`, `nz_local_to_utc`, trigger-maintained instants); 7 `_registrations_and_guests` (`registrations.team_id` + composite FK, `UNIQUE(id, user_id, team_id)`, waitlist partial unique index, `registration_guests`); 8 `_wallet` (ownership composite FKs); 9 `_payments_and_invoicing` (ownership composite FK, fee snapshot + line items, `assign_invoice_number`); 10 `_indexes`
 - [ ] `db/schema-deviations.md`: every deviation from `database-design.md`, with its source requirement
-- [ ] `packages/shared/package.json`, `packages/shared/tsconfig.json`, `packages/shared/src/index.ts`
-- [ ] `packages/shared/src/types/enums.ts`: domain enums mirrored from the DB
-- [ ] `packages/shared/src/money/money.ts`: exact NZD money
+- [ ] `packages/shared/package.json`, `packages/shared/tsconfig.json`, `packages/shared/src/index.ts` (JIT package; `exports` → `src/index.ts`)
+- [ ] `packages/shared/src/types/enums.ts`: domain enums mirrored from the DB (`as const` tuples)
+- [ ] `packages/shared/src/api/health.ts`: zod `HealthResponse`
+- [ ] `packages/shared/src/money/money.ts`, `packages/shared/src/money/zod.ts`: exact NZD money and wire schemas
 - [ ] `packages/shared/src/time/time.ts`: Pacific/Auckland conversion and DST policy
-- [ ] `docs/getting-started.md`, `docs/adr/0001-backend-framework.md` … `docs/adr/00NN-*.md`: implementation guide and decision records
+- [ ] `packages/shared/src/invoice/invoice.ts`: `formatInvoiceNumber` (`INV-000123`)
+- [ ] `docs/getting-started.md`; `docs/adr/0001-backend-framework.md` … `docs/adr/0008-shared-types.md` (architecture Q1, Q2, Q3, Q4, Q5, Q8, Q10, Q12); `docs/adr/0009-money.md`, `docs/adr/0010-time-dst.md`, `docs/adr/0011-invoice-numbering.md`, `docs/adr/0012-fee-snapshot-and-guests.md` (algorithm Q6, Q7, Q9, Q11)
 - [ ] `memory-bank/techContext.md`, `memory-bank/systemPatterns.md` (extend): record the chosen stack, commands and conventions
 
 ### Phases
 - [ ] Phase 1: Workspace scaffold and quality gates (AC-VERIFY-1, AC-VERIFY-3, AC-VERIFY-17, AC-ERROR-1)
-  - Components: root runner and targets, apps/web placeholder, apps/api with `/health`, apps/worker bootstrap, packages/shared, lint/format/strict TS, unit + integration harness, config fail-fast
+  - Components: root `package.json` targets and `scripts/setup.ts`, apps/web placeholder, apps/api with `/health` plus `src/worker.ts` and `src/cli.ts` skeletons, packages/shared, lint/format/strict TS, Vitest unit + integration projects, config fail-fast, logger
   - Milestone: `lint`, `typecheck` and `test` pass locally; deliberate violations fail each gate
 - [ ] Phase 2: Local dev stack and CI (AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-2, AC-INTEGRATION-4)
-  - Components: `docker-compose.yml`, Dockerfiles, `.env.example`, `.github/workflows/ci.yml`, DB-aware `/health`, web → API smoke E2E
+  - Components: `docker-compose.yml` (no Redis), Dockerfiles (one api image with two commands, plus web), `.env.example`, `.github/workflows/ci.yml`, DB-aware `/health`, generated OpenAPI, web → API smoke E2E
   - Milestone: `docker compose up -d --wait` is healthy in 120 s or less; `/health` gives 503 with the DB stopped; the web page shows live API data; `actionlint` is clean
-- [ ] Phase 3: Domain schema and migrations (AC-VERIFY-5 to AC-VERIFY-12, AC-INTEGRATION-1, AC-INTEGRATION-2)
-  - Components: the migration tool (Q3), full schema from `database-design.md` plus all gap fixes, `db/schema-deviations.md`, shared enums with a parity test
+- [ ] Phase 3: Domain schema and migrations (AC-VERIFY-5 to AC-VERIFY-12, AC-VERIFY-19, AC-INTEGRATION-1, AC-INTEGRATION-2)
+  - Components: node-pg-migrate SQL migrations 1–10, Kysely + kysely-codegen, full schema from `database-design.md` plus all gap fixes (including the ownership composite FKs, waitlist partial unique index, `fee_other`/`SEX_OTHER` and `assign_invoice_number`), `db/schema-deviations.md`, shared enums with parity tests
   - Milestone: migrate, rollback and migrate again from empty in 30 s or less with identical dumps; conformance plus the deviations record is at 100%
 - [ ] Phase 4: Money, time and crypto libraries (AC-VERIFY-13, AC-VERIFY-14, AC-VERIFY-15, AC-ERROR-4, AC-ERROR-5)
-  - Components: `packages/shared` money and time, `apps/api` crypto, encrypted columns wired to the crypto module
+  - Components: `packages/shared` money (+ zod), time and invoice format, `nz_local_to_utc` parity tests, `apps/api` crypto and keyring, encrypted columns wired to the crypto module
   - Milestone: all DST and money test vectors pass; no plaintext in the raw bytes of encrypted columns
 - [ ] Phase 5: Job runner and notifications (AC-VERIFY-16, AC-ASYNC-1, AC-ASYNC-2, AC-ASYNC-3, AC-ERROR-3, AC-ERROR-6, AC-INTEGRATION-3)
-  - Components: job wrapper (Q4), worker with `heartbeat` plus 3 schedule slots, notifier with Mailpit and in-memory adapters
+  - Components: pg-boss wrapper `apps/api/src/lib/jobs/jobs.ts`, `apps/api/src/jobs/` (`heartbeat`, 3 schedule slots, registry), notifier with `smtp` (Mailpit) and `memory` adapters
   - Milestone: job lifecycle is observable in the job store; a Mailpit message is received; retry ends in the failed state
 - [ ] Phase 6: Documentation, decision records and full-gate verification (AC-VERIFY-18; end-to-end verification of all ACs)
-  - Components: `docs/getting-started.md`, ADRs for Q1–Q12, updated `techContext.md` and `systemPatterns.md`
+  - Components: `docs/getting-started.md`, ADRs `docs/adr/0001`–`0012` (architecture Q1–Q5, Q8, Q10, Q12; algorithm Q6, Q7, Q9, Q11), updated `techContext.md` and `systemPatterns.md`
   - Milestone: **a fresh clone → `setup` → `docker compose up -d --wait` → `ci` runs green with 0 errors or warnings**, following Getting Started verbatim. The GitHub Actions run (AC-VERIFY-4) is confirmed once pushing is re-enabled.
 
 ## Creative Phases
@@ -502,16 +554,28 @@ Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Cre
 - [x] Architecture design → COMPLETE (`memory-bank/creative/platform-foundation-architecture.md`) (Q1 backend, Q2 monorepo, Q3 migrations/data access, Q4 job runner and billing trigger, Q5 encryption/keys, Q8 email contract, Q10 hosting constraints, Q12 shared types; also re-pin files if Option B)
 - [x] Algorithm design → COMPLETE (`memory-bank/creative/platform-foundation-algorithm.md`) (Q6 money representation and rounding, Q7 DST policy and session instants, Q9 invoice-number allocation, Q11 fee snapshot and guest model)
 
+## Design Critique (advisory)
+
+- **Backend**: codex (`CREATIVE CRITIQUE: codex — usable`), 2026-09-29
+- **Verdict**: needs-attention. Codex's summary: the foundation plan allows cross-team financial corruption, leaves FIFO ordering unsafe under concurrency, makes some valid users unbillable, and overstates the async and invoice-number guarantees.
+- **Findings**:
+  1. critical · Payment ownership is not tied to the registration's user or team (algorithm doc §Q11 payments DDL). Enforce the chain in the DB with composite FKs or a deferred trigger, and add negative tests.
+  2. high · FIFO waitlist order is not guaranteed under concurrency. Needs a partial `UNIQUE(session_id, queue_position) WHERE status='WAITLISTED'` plus a per-session allocator or lock.
+  3. high · Gapless invoice allocation leaks a number when two issuers race on the same payment. Lock the payment first, require exactly 1 affected row, and roll back otherwise.
+  4. high · BY_SEX pricing makes `OTHER` users unbillable (the `fee_basis` enum only has MALE and FEMALE). Needs a product rule.
+  5. medium · AC-ASYNC-3 promises exactly-once, but pg-boss `singletonKey` only suppresses concurrent duplicates. Reword it as concurrent dedupe plus at-least-once delivery with domain idempotency.
+- **Disposition (spec owner, 2026-09-29)**: all 5 applied — 1 ownership composite FKs; 2 waitlist partial unique index + session-row lock contract; 3 payment-locked invoice assignment; 4 `fee_other` rate + `SEX_OTHER` basis (default LEAST(male,female)); 5 AC-ASYNC-3 reworded.
+
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Step 4.5 - Adversarial design critique
-**Step Started**: 2026-09-29
-**Last Completed**: PLAN (2026-09-29)
-**Can Resume**: YES
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete. Next: /yay:build platform-foundation (Phase 1)
+**Last Completed**: CREATIVE (2026-09-29)
+**Can Resume**: NO
+**Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
@@ -524,3 +588,5 @@ Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Cre
 - 2026-09-29 Architecture Creative Design: COMPLETE - Output: memory-bank/creative/platform-foundation-architecture.md
 - 2026-09-29 Algorithm Creative Design: COMPLETE - Output: memory-bank/creative/platform-foundation-algorithm.md
 - 2026-09-29 Decision (spec owner): target PostgreSQL 17 instead of 15; spec, plan, architecture doc, roadmap feature and techContext updated
+- 2026-09-29 Step 4.5: Codex adversarial critique — needs-attention, 5 findings (1 critical, 3 high, 1 medium)
+- 2026-09-29 Critique disposition (spec owner): all 5 findings applied; `fee_other` rate added for BY_SEX; AC wording changes from the design agents applied. Taxonomy CLEAN, 32 ACs (29 MUST / 3 SHOULD); target ~86 tests
