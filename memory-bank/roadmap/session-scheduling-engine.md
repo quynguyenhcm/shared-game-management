@@ -1,5 +1,5 @@
 ---
-version: next
+version: v1.0.0
 status: planned
 priority: high
 complexity: 4
