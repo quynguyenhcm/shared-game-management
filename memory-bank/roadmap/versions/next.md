@@ -12,6 +12,7 @@ features:
   - registration-and-waitlist
   - wallet-and-akahu-billing
   - player-dashboard
+  - tax-invoices-and-exports
 ---
 
 # next
