@@ -630,6 +630,8 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 4 | codegen | Ciphertext | null override for the 4 encrypted teams columns; regenerated against scratch DB sgm_codegen_tmp (dropped); drift test green.
 - Phase 4 | review advisories | A1 AAD delimiter ambiguity for '.'/':' in table/column; A2 non-canonical base64url accepted; A3 moneyFromCents lacks runtime bigint guard; A4 addHours overflow gives Invalid Date; A5 T24:00:00Z accepted; A6 ms lost in sameWallClockDaysBefore; A7 lint selectors Identifier-only.
 - Phase 4 | documentation agent | not dispatched; techContext/systemPatterns deferred to Phase 6.
+- Phase 4 | apps/api/src/lib/crypto/crypto.ts:55 | The AAD `sgm:v1:<table>.<column>:<rowId>` has delimiter ambiguity if an identifier contains '.' or ':'. Identifiers are code constants and the copy-to-another-row/column test passes. Hardening (length-prefix or validate) deferred (phase review, accepted).
+- Phase 4 | eslint.config.mjs | The money and time lint selectors match Identifier arguments only, so `Math.round(row.amount)` evades them. Hardening gap; the type brand still guards (phase review, accepted).
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
