@@ -571,7 +571,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 1 of 6
+**Current Phase**: 2 of 6
 **Auto-Build Mode**: YES
 **Last Completed**: Phase 1 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
@@ -591,6 +591,9 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 1 | package.json versions | TypeScript pinned 5.9.3 (typescript-eslint peer range); eslint 9.39; zod 4; vitest 5; next 16
 - Phase 1 | apps/api/src/routes/health.ts, main.ts | /health takes injected checkDb (503 degraded when false); default true with TODO(Phase 2) until pool wired
 - Phase 1 | review advisories carried forward | A1 redact child-logger bindings; A2 redact DSN/url keys, set-cookie, x-api-key, Buffers (+tests); A4 URL-validate SMTP_URL/MAILPIT_API_URL/API_INTERNAL_URL; A3 optional HOST config; drop @fastify/swagger if Phase 2 does not use it; verify coverage globs match in Phases 3-5
+- Phase 1 | apps/api/src/cli.ts:25 | `db migrate|rollback|reset` validate config then exit 1 "not implemented until Phase 3". The targets exist; `pnpm run ci` and `db:migrate` fail until Phase 3 (phase review, accepted).
+- Phase 1 | package.json:17 | `test:integration` uses `--passWithNoTests`; there is no example integration test until Phase 2/3 (phase review, accepted).
+- Phase 1 | vitest.config.ts:29 | Coverage `include` lists money/time/crypto/notifications/jobs, which don't exist yet; the 80% gate only covers `lib/config` for now (phase review, accepted).
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
