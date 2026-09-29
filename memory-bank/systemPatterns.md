@@ -4,124 +4,113 @@ This file documents the architectural patterns, design patterns, and system stru
 
 ## Guiding Principles
 
-<!--
-  These principles govern ALL architectural and implementation decisions.
-  Agents MUST validate their work against these principles.
-  Deviations require explicit justification in a creative/architecture decision document
-  with a trade-off analysis referencing the specific principle being overridden.
--->
+These principles govern ALL architectural and implementation decisions. Agents MUST validate their work against these principles. Deviations require explicit justification in a creative/architecture decision document with a trade-off analysis referencing the specific principle being overridden.
 
 | Principle | Description |
 |-----------|-------------|
-| [e.g., Hub-and-Spoke Networking] | [e.g., All cross-account traffic flows through centralized transit VPCs; no local VPC endpoints] |
-| [e.g., Compliance: HIPAA/SOC2] | [e.g., All data encrypted at rest and in transit; audit logging on all data access] |
-| [e.g., API-First Design] | [e.g., All service interfaces defined as versioned APIs before implementation begins] |
+| **P1: System of Record** | Postgres is the system of record, with all invariants enforced by DB constraints (CHECK, UNIQUE, FOREIGN KEY, triggers). App code reads from the DB and trusts its guarantees. |
+| **P2: Money is Exact** | Money never touches binary floating point. All amounts are `bigint` (cents NZD) or `Money` (branded type), never `number` or `parseFloat()`. Rounding is via integer arithmetic (multiplyByRatio, divideByInteger), never Math.round/ceil/floor. |
+| **P3: Temporal Boundaries** | All internal timestamps are UTC `timestamptz`, enforced by DB `SET TimeZone=UTC`. Pacific/Auckland timezone conversion happens ONLY at application boundaries (API response, job scheduling, UI display). No host-TZ-dependent code in the runtime. |
+| **P4: Encryption with Key ID** | Banking and credential columns are encrypted at rest with AES-256-GCM, keyed from the environment. Each ciphertext is prefixed with a key ID, enabling rotation without breaking old data. Plaintext is never logged, even on error. |
+| **P5: Async via Job Queue** | Every async side effect (email, billing, recurrence) goes through the job runner (pg-boss). Domain writes and job enqueues share one transaction (pg-boss `db` adapter), so a job row exists only if its trigger committed. No background tasks outside the queue. |
+| **P6: One Root Command Set** | All development, CI, and operations use the same named root scripts: `setup`, `dev`, `lint`, `typecheck`, `test`, `test:integration`, `db:migrate`, `db:rollback`, `db:reset`, `build`, `ci`. These run on every developer machine and in CI with the same gates, versions, and behavior. |
+| **P7: 12-Factor Config, Fail-Fast** | All configuration comes from environment variables, validated by zod at application boot. Invalid or missing required values cause immediate process exit with a clear error message. No defaults that mask misconfig; no lazy validation. |
 
 ## System Architecture
 
 ### High-Level Architecture
 ```
-[ASCII or Mermaid diagram showing major components]
-
-Example:
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Client    │────▶│     API     │────▶│  Database   │
-└─────────────┘     └─────────────┘     └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │   Service   │
-                    └─────────────┘
+Browser -> apps/web (Next.js) -> apps/api (Fastify HTTP) -> PostgreSQL 17
+                                  apps/api/src/worker.ts (pg-boss worker) -> PostgreSQL 17 (pgboss schema)
+                                                                          -> Notifier (smtp/Mailpit, memory)
+packages/shared (@sgm/shared): enums, zod DTOs, money, time, invoice - used by web and api
 ```
 
 ### Component Responsibilities
-- **[Component Name]**: [Primary responsibility, dependencies]
-- **[Component Name]**: [Primary responsibility, dependencies]
+- **apps/web**: Next.js App Router UI; talks to the API only through `src/lib/api-client.ts` and `API_INTERNAL_URL`.
+- **apps/api (HTTP)**: Fastify, built by `buildApp(deps)`; routes in `src/routes` and `src/modules/<feature>/{routes,service,repo}.ts`.
+- **apps/api (worker)**: `src/worker.ts`; the only process that supervises, schedules and works pg-boss queues. The HTTP process is a producer only.
+- **packages/shared**: isomorphic primitives (`money`, `time`, `invoice`, `types/enums`, `api/*` zod schemas); consumed as source (JIT package).
+- **db/**: hand-written reversible SQL migrations plus `schema-deviations.md`, the ledger of every difference from `database-design.md`.
 
 ### Data Flow Patterns
 
-#### [Pattern Name]
+#### Async side effect (email, billing, recurrence)
 ```
-[Diagram showing data flow]
-
-Example:
-User Input → Validation → Service → Database → Response
+Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Notifier / DB
 ```
-- **Trigger**: [What initiates this flow]
-- **Steps**: [Key processing steps]
-- **Output**: [Result or side effects]
+- **Trigger**: a domain change or a cron slot in `apps/api/src/jobs/schedules.ts` (Pacific/Auckland).
+- **Guarantee**: at-least-once; handlers are idempotent through a unique constraint or guarded status transition.
+- **Output**: job state visible in `pgboss.job` (failed jobs stay visible after 3 retries with backoff).
 
 ## Design Patterns Used
 
-### [Pattern Name] - [Context]
-- **Problem**: [What problem does this solve]
-- **Implementation**: [Where/how it's implemented]
-- **Trade-offs**: [Benefits and drawbacks]
-- **Example**: `path/to/file.ts:123`
+### Database-enforced invariants (P1)
+- **Implementation**: CHECK, UNIQUE, composite FKs, deferred constraint triggers, generated GST columns, `assign_invoice_number()`, session-instant triggers in `db/migrations/`.
+- **Trade-offs**: SQL is hand-written and every deviation is ledgered; constraint errors surface as SQLSTATE codes (23505, 23514, 23503).
+
+### Branded primitives (P2, P3)
+- **Implementation**: `Money` (bigint cents) and `MoneyString` in `packages/shared/src/money/money.ts`; `LocalDate`/`LocalTime` and explicit DST disambiguation in `packages/shared/src/time/time.ts`; `Ciphertext` brand for encrypted columns.
+
+### Adapter behind an interface
+- **Implementation**: `Notifier` (`apps/api/src/lib/notifications/notifier.ts`) with `smtp` and `memory` adapters chosen only by `NOTIFIER_ADAPTER`; `KeyProvider` for encryption keys.
+
+### Keyed envelope encryption (P4)
+- **Implementation**: `apps/api/src/lib/crypto/crypto.ts`, AES-256-GCM, AAD = `sgm:v1:<table>.<column>:<rowId>`, envelope CHECK on each encrypted column.
 
 ## Integration Patterns
 
-### [Integration Name]
-- **Type**: [API, Event-driven, Batch, etc.]
-- **Protocol**: [HTTP, gRPC, Message Queue, etc.]
-- **Direction**: [Inbound, Outbound, Bidirectional]
-- **Contract**: [Schema location or documentation]
+### Email
+- **Type**: outbound, via the `send-email` job. **Protocol**: SMTP (Mailpit in dev and CI; provider TBD, likely Postmark). **Contract**: `EmailMessage` with a required `idempotencyKey`.
+
+### Web to API
+- **Type**: HTTP/JSON, zod contracts in `packages/shared/src/api/`; OpenAPI at `apps/api/openapi.yaml` (drift-checked).
 
 ## Code Organization Patterns
 
-<!--
-  This section records SOURCE-file conventions so an agent never has to *infer*
-  a new file's language or extension at build time. It is the authoritative
-  anchor: when a new file is created, its extension is resolved from the table
-  below, NOT from whichever file happens to sit next to it.
-  Resolve "what extension?" CATEGORICALLY (dominant extension of the target
-  directory / file role), never SPATIALLY (an adjacent file of a different role).
--->
-
 ### Source Language & Default Extensions
-- **Primary language**: [e.g., TypeScript — `.ts` for logic, `.tsx` for React components]
-- **`.js`/`.jsx` permitted?**: [e.g., No — TS-only; or: legacy `.js` exists but new files MUST be `.ts`/`.tsx`]
-- **Type-checking enforced**: [e.g., `tsc --noEmit` in CI — untyped files fail the gate]
+- **Primary language**: TypeScript only. `.ts` for logic, `.tsx` only for React components in `apps/web/src/app/**` and `apps/web/src/components/**`.
+- **`.js`/`.jsx` permitted?**: No. `.mjs` only for tool configs that require it (`eslint.config.mjs`, `postcss.config.mjs`).
+- **Type-checking enforced**: `pnpm run typecheck` (`strict: true` in every package), part of `ci`.
 
 ### File Extension by Directory / Role
-<!-- One row per source directory or file role. The extension here is binding for NEW files. -->
 
 | Directory / Role | Extension | Notes |
 |------------------|-----------|-------|
-| [e.g., `src/hooks/`] | [e.g., `.ts`] | [e.g., React Query hooks — untyped is a convention violation] |
-| [e.g., React components] | [e.g., `.tsx`] | [e.g., any file rendering JSX] |
-| [e.g., `src/lib/`, schemas, utils] | [e.g., `.ts`] | [e.g., no JSX → `.ts`] |
-
-> If a directory has a mixed history, the binding extension is the **dominant
-> extension of that directory** (`git ls-files <dir> | extension-mode`), regardless
-> of any single adjacent file. Pin new files explicitly in the plan/creative
-> file-tree so this is never a build-time guess.
+| `apps/api/src/**`, `packages/shared/src/**`, `scripts/` | `.ts` | Server and shared logic |
+| `apps/web/src/app/**`, `apps/web/src/components/**` | `.tsx` | Any file rendering JSX |
+| `apps/web/src/lib/**` | `.ts` | No JSX |
+| `db/migrations/` | `.sql` | `<utc-timestamp>_<name>.sql`, `-- Up Migration` / `-- Down Migration` |
+| Unit tests | `.test.ts` | Co-located with source |
+| Integration tests | `.int.test.ts` | `apps/api/test/integration/` |
+| E2E tests | `.spec.ts` | `apps/web/e2e/` (Playwright) |
+| Docs | `.md` | `docs/getting-started.md`, `docs/adr/NNNN-*.md` |
 
 ### Module Structure
-- **New feature module shape**: [e.g., flat `lib/<feature>.ts` | module dir `<feature>/{service.ts,types.ts}` — match the dominant pattern]
-- **Where new hooks/utilities/types live**: [e.g., hooks → `src/hooks/`, types → `src/types/` or co-located]
+- **New feature module shape**: `apps/api/src/modules/<feature>/{routes.ts,service.ts,repo.ts}`, registered explicitly in `buildApp(deps)`.
+- **Where shared code lives**: cross-app types, DTO schemas and primitives in `packages/shared/src/`; server platform code in `apps/api/src/lib/<area>/`.
+- **Jobs**: queue in `apps/api/src/jobs/registry.ts`, handler in `apps/api/src/jobs/`, wiring in `bootstrap.ts`, cron in `schedules.ts`.
 
 ## Testing Patterns
 
 ### Test Organization
-- **Test location**: [co-located with source (`*.test.ts` next to `*.ts`) | separate directory (`tests/`, `__tests__/`) | both]
-- **File mapping**: [one test file per module/component | one test file per source file | feature-based test files]
-- **Naming convention**: [e.g., `*.test.ts`, `*.spec.ts`, `test_*.py`, `*_test.go`]
+- **Test location**: unit tests co-located (`*.test.ts` next to source); integration tests in `apps/api/test/integration/*.int.test.ts`; helpers in `apps/api/test/helpers/`.
+- **File mapping**: one test file per module.
+- **Naming convention**: `*.test.ts`, `*.int.test.ts`, `*.spec.ts` (Playwright only).
 
 ### Test Grouping
-- **Within-file structure**: [group by behavior/scenario | group by method/function | flat list]
-- **Describe/context nesting**: [shallow (1 level) | deep (nested describes) | none]
-- **Setup sharing**: [shared fixtures | per-test setup | factory functions]
+- **Within-file structure**: group by behavior; shallow `describe` nesting.
+- **Setup sharing**: factory functions (`test/helpers/factories.ts`); each integration file clones a migrated template database (`createTestDatabase()`), so tests may COMMIT freely. Deferred-constraint tests use `SET CONSTRAINTS ALL IMMEDIATE`.
 
 ### Test Framework & Style
-- **Framework**: [Jest | Vitest | pytest | Go testing | etc.]
-- **Assertion style**: [expect/toBe | assert | should | etc.]
-- **Mocking approach**: [jest.mock | dependency injection | test doubles | etc.]
+- **Framework**: Vitest 5 (projects `unit` and `integration`, forks pool for integration), Playwright for the web smoke test.
+- **Assertion style**: `expect(...)`.
+- **Mocking approach**: dependency injection and test doubles (the `memory` notifier); no DB mocking, integration tests use real PostgreSQL 17.
 
 ### Test Scope Preferences
-- **Emphasis**: [unit-heavy | integration-heavy | balanced | E2E-first]
-- **Typical test-to-source ratio**: [e.g., ~1:1 files, ~3-8 tests per function]
-- **What is NOT typically tested**: [e.g., pure type definitions, framework boilerplate, simple getters/setters]
+- **Emphasis**: balanced; DB constraints are proven against a real database.
+- **Coverage gate**: 80% lines/functions/branches/statements on `packages/shared/src/{money,time,invoice}` and `apps/api/src/lib/{crypto,config,notifications,jobs}`.
+- **Not tested**: generated types (`types.generated.ts`, checked by tsc and drift tests), framework boilerplate, real external providers (Postmark, Akahu) until their features land.
 
 <!-- AUTO-MANAGED: c4-architecture-start -->
 ## C4 Architecture
@@ -142,11 +131,11 @@ To populate this section, run `/yay:c4`. The command builds a complete bottom-up
 
 ## Recent Architecture Changes
 
-### [Date] - [Change Description]
-- **What Changed**: [Architectural modification]
-- **Reason**: [Why this pattern was chosen]
-- **Trade-offs**: [What was gained vs lost]
-- **Affected Components**: [List of components]
+### 2026-09-29 - Platform foundation established
+- **What Changed**: Greenfield monorepo built: pnpm workspaces (`apps/web`, `apps/api` with worker entrypoint, `packages/shared`), Fastify + Kysely + node-pg-migrate + pg-boss on PostgreSQL 17, AES-256-GCM field encryption, exact money and DST-safe time primitives, notifier abstraction, Docker Compose stack and CI gates.
+- **Reason**: One lean, all-Postgres TypeScript stack that a single developer can run and that enforces invariants in the database (see `docs/adr/0001` to `0012`).
+- **Trade-offs**: hand-written SQL and no framework-imposed structure, in exchange for exact constraints, real down migrations and one fewer service (no Redis).
+- **Affected Components**: all; every downstream v1.0.0 feature builds on it.
 
 ---
 
@@ -154,7 +143,4 @@ To populate this section, run `/yay:c4`. The command builds a complete bottom-up
 
 - Keep this file updated during the BUILD phase when architectural changes occur
 - Document patterns and trade-offs to help future developers understand design decisions
-- Link to specific code locations where patterns are implemented
-- Update diagrams to reflect current architecture
-- Keep Guiding Principles current — add new principles when foundational patterns emerge
-- When a new pattern appears to contradict an existing Guiding Principle, flag this explicitly
+- Keep Guiding Principles current; flag any pattern that appears to contradict one
