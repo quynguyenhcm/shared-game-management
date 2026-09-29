@@ -656,6 +656,8 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 6 | metrics | only METRICS_* config variables exist; no Prometheus exporter or custom metrics are implemented (techContext states this).
 - Phase 6 | fresh-clone verification | clone of feature/platform-foundation at d384995 in the session scratchpad: `pnpm run setup` 4.5 s; compose up healthy; `pnpm run ci` green in 67.6 s: lint 0 errors/0 warnings, typecheck 0 errors, unit 130/130 (16 files), integration 63/63 (13 files), build ok; coverage lines 99.41%, statements 99.28%, branches 93.69%, functions 99.32%. Postgres reports 17.x and timezone UTC. The clone's containers were stopped afterwards (the compose project name `sgm` and its `pgdata` volume are shared with the main worktree; the volume was kept).
 - Phase 6 | curl checks | `curl` of /health and :3000 was blocked by the sandbox in the verification shell; health and web are covered by compose healthchecks (which call /health) and by health.int.test.ts.
+- Phase 6 | docs/adr/0005, 0006, 0008, 0010, 0012 | These ADRs name the chosen option without listing the alternatives. The alternatives are in the linked creative docs (phase review, accepted).
+- Phase 6 | memory-bank/techContext.md (Unit Testing Specifics) | The text overstates some test facts: "fresh Node process per test" and "exit on first failure" aren't configured, and test:e2e needs the compose stack rather than `dev`. Minor, to fix in a later pass (phase review, accepted).
 
 ### AC Walk (32 ACs, 2026-09-29, after Phase 6)
 - AC-VERIFY-1 met (layout, root targets, techContext Component Structure lists the directories)
