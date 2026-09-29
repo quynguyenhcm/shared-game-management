@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@sgm/shared": "workspace:*",
     "next": "^16.3.6",
     "react": "^19.3.0",

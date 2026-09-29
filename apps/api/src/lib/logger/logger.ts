@@ -7,6 +7,7 @@ import {
   type TransportTargetOptions,
 } from 'pino';
 import type { Config } from '../config/config.ts';
+import { currentTrace } from '../telemetry/trace-context.ts';
 
 export type { Logger } from 'pino';
 
@@ -166,6 +167,13 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     messageKey: 'message',
     base: { service: options.service, version: options.version, environment: options.environment },
     timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
+    // Every line logged inside a request or job carries its trace ids, unless a child logger already
+    // bound them (withTraceContext, the Fastify request logger).
+    mixin: (_object: object, _level: number, instance: Logger) => {
+      const active = currentTrace();
+      if (!active || 'traceId' in instance.bindings()) return {};
+      return { traceId: active.traceId, spanId: active.spanId };
+    },
     formatters: {
       level: (label: string) => ({ level: label }),
       // `req`/`res`/`err` are class instances that their serializers flatten later; they are

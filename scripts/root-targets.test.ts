@@ -40,3 +40,26 @@ describe('root package.json targets (AC-VERIFY-1)', () => {
     );
   });
 });
+
+describe('root dev target (runs web, api and worker)', () => {
+  const apiPkg = JSON.parse(
+    readFileSync(new URL('../apps/api/package.json', import.meta.url), 'utf8'),
+  ) as { scripts: Record<string, string> };
+
+  it('runs every app dev script in parallel', () => {
+    expect(pkg.scripts.dev).toContain('pnpm -r --parallel --filter "./apps/*" dev');
+  });
+
+  it("@sgm/api's dev starts both the API and the worker (cron slots and queued jobs run)", () => {
+    const selector = /pnpm run "\/(.+)\/"/.exec(apiPkg.scripts.dev ?? '')?.[1];
+    expect(selector, 'api dev must run a script regex').toBeDefined();
+    const pattern = new RegExp(selector ?? '$^');
+    const selected = Object.keys(apiPkg.scripts).filter((name) => pattern.test(name));
+    expect(selected.sort()).toEqual(['dev:api', 'dev:worker']);
+    expect(apiPkg.scripts['dev:api']).toContain('src/main.ts');
+    expect(apiPkg.scripts['dev:worker']).toContain('src/worker.ts');
+    for (const name of selected) {
+      expect(apiPkg.scripts[name], name).toContain('--import ./src/instrumentation.ts');
+    }
+  });
+});

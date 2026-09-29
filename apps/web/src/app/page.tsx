@@ -1,9 +1,11 @@
+import { headers } from 'next/headers';
 import { apiClient } from '@/lib/api-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const health = await apiClient.health();
+  // Forward the browser/proxy trace context so the API request joins the same trace.
+  const health = await apiClient.health(await headers());
   const label = health?.status === 'ok' ? 'API: ok' : 'API: unavailable';
 
   return (

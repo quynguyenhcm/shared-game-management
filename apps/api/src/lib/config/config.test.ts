@@ -177,6 +177,33 @@ describe('configuration edge cases', () => {
   });
 });
 
+describe('tracing configuration', () => {
+  it('exports no traces by default and switches to OTLP when only the endpoint is set', () => {
+    expect(loadConfig(validEnv()).otel).toMatchObject({
+      tracesExporter: 'none',
+      otlpEndpoint: undefined,
+    });
+    expect(
+      loadConfig(validEnv({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318' })).otel,
+    ).toMatchObject({ tracesExporter: 'otlp', otlpEndpoint: 'http://collector:4318' });
+  });
+
+  it('rejects a non-http OTLP endpoint and an otlp exporter without an endpoint, by name', () => {
+    expect(issuesFor(validEnv({ OTEL_EXPORTER_OTLP_ENDPOINT: 'not a url' }))).toEqual([
+      expect.stringContaining('OTEL_EXPORTER_OTLP_ENDPOINT'),
+    ]);
+    expect(issuesFor(validEnv({ OTEL_EXPORTER_OTLP_ENDPOINT: 'ftp://collector' }))).toEqual([
+      expect.stringContaining('OTEL_EXPORTER_OTLP_ENDPOINT'),
+    ]);
+    expect(issuesFor(validEnv({ OTEL_TRACES_EXPORTER: 'otlp' }))).toEqual([
+      expect.stringContaining('OTEL_EXPORTER_OTLP_ENDPOINT — is required when'),
+    ]);
+    expect(issuesFor(validEnv({ OTEL_TRACES_SAMPLER: 'sometimes' }))).toEqual([
+      expect.stringContaining('OTEL_TRACES_SAMPLER'),
+    ]);
+  });
+});
+
 describe('job runner tuning', () => {
   it('defaults to production-safe values with no expiry override', () => {
     const { jobs } = loadConfig(validEnv());

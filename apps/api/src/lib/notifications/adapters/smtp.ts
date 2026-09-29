@@ -111,16 +111,25 @@ export interface SmtpNotifierOptions {
   readonly transport?: SmtpTransport;
 }
 
+/**
+ * nodemailer transport options. File and URL access are disabled so a message field can never make
+ * the transport read a local file or fetch a remote URL (e.g. `html: { path: '/etc/passwd' }`).
+ */
+export function smtpTransportOptions(smtpUrl: string) {
+  return {
+    url: smtpUrl,
+    connectionTimeout: CONNECT_TIMEOUT_MS,
+    greetingTimeout: CONNECT_TIMEOUT_MS,
+    socketTimeout: IO_TIMEOUT_MS,
+    disableFileAccess: true,
+    disableUrlAccess: true,
+  } as const;
+}
+
 /** SMTP adapter (Mailpit in dev and CI; also works against a provider's SMTP relay). */
 export function createSmtpNotifier(options: SmtpNotifierOptions): Notifier {
   const transport: SmtpTransport =
-    options.transport ??
-    createTransport({
-      url: options.smtpUrl,
-      connectionTimeout: CONNECT_TIMEOUT_MS,
-      greetingTimeout: CONNECT_TIMEOUT_MS,
-      socketTimeout: IO_TIMEOUT_MS,
-    });
+    options.transport ?? createTransport(smtpTransportOptions(options.smtpUrl));
 
   return {
     async send(message: EmailMessage): Promise<SendResult> {

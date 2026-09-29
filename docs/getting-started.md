@@ -30,14 +30,16 @@ Once the stack is up:
 | PostgreSQL 17 | `localhost:5432` (`sgm`/`sgm`) |
 
 Integration tests need the compose `postgres` service (they create isolated databases on it). For hot-reload
-development use `pnpm run dev` (starts `postgres` and `mailpit`, migrates, then runs the apps).
+development use `pnpm run dev` (starts `postgres` and `mailpit`, migrates, then runs web, api and worker in watch
+mode; the worker registers the cron slots and works queued jobs). Do not run it alongside the compose `api`/`worker`/`web`
+services: both bind the same ports and would share the job queues.
 
 ## Root targets
 
 | Target                                    | What it does                                                                   |
 | ----------------------------------------- | ------------------------------------------------------------------------------ |
 | `setup`                                   | One-time bootstrap (see above)                                                 |
-| `dev`                                     | Postgres + Mailpit, migrate, run web and api in watch mode                     |
+| `dev`                                     | Postgres + Mailpit, migrate, run web, api and worker in watch mode             |
 | `lint`                                    | ESLint (0 warnings allowed) and Prettier check                                 |
 | `typecheck`                               | `tsc --noEmit` in every package (`strict: true`)                               |
 | `test`                                    | Unit project with coverage gate                                                |
@@ -116,6 +118,15 @@ values, and do not put secrets, bank details or tokens in a job payload.
   nonexistent and ambiguous local times; derived times use `compatible`. Display dates as `DD/MM/YYYY` (`formatNz*`).
   `game_sessions.starts_at` and `ends_at` are written only by database triggers.
 - Invoice numbers come from `assign_invoice_number(payment_id)` inside the issuing transaction (gapless per team, `INV-000123`).
+
+## Tracing
+
+The api and worker start OpenTelemetry from `apps/api/src/instrumentation.ts` (loaded with `--import`). By default no
+exporter runs: spans stay in-process, but their trace ids appear in every request and job log line (`traceId`,
+`spanId`). Set `OTEL_EXPORTER_OTLP_ENDPOINT` (an http(s) collector base URL) to export over OTLP/HTTP, or
+`OTEL_TRACES_EXPORTER=console` to print spans. `OTEL_SDK_DISABLED=true` turns the SDK off. The web app sends a
+`traceparent` on every server-side API call, the API continues it, and jobs enqueued during a request carry it in
+`_meta.traceparent` to the worker's `"{queue} process"` span.
 
 ## Decisions
 

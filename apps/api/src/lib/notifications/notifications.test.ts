@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInMemoryNotifier } from './adapters/in-memory.ts';
-import { createSmtpNotifier, mapSmtpError, type SmtpTransport } from './adapters/smtp.ts';
+import {
+  createSmtpNotifier,
+  mapSmtpError,
+  smtpTransportOptions,
+  type SmtpTransport,
+} from './adapters/smtp.ts';
 import {
   NotificationError,
   NotifierConfigurationError,
@@ -98,6 +103,8 @@ describe('message validation (both adapters)', () => {
       { replyTo: 'nope' },
       { tags: { 'bad key': 'v' } },
       { tags: { template: 'line\nbreak' } },
+      { html: { path: '/etc/passwd' } as unknown as string },
+      { html: 42 as unknown as string },
     ];
     for (const override of invalid) {
       const error = await notifier.send({ ...baseMessage, ...override }).catch((e: unknown) => e);
@@ -196,6 +203,14 @@ describe('typed errors', () => {
 });
 
 describe('smtp adapter', () => {
+  it('builds a transport that can never read local files or fetch URLs for content', () => {
+    expect(smtpTransportOptions('smtp://localhost:1025')).toMatchObject({
+      url: 'smtp://localhost:1025',
+      disableFileAccess: true,
+      disableUrlAccess: true,
+    });
+  });
+
   it('sends one recipient with X-Idempotency-Key, tag headers and the default sender', async () => {
     const transport = okTransport();
     const notifier = createSmtpNotifier({ ...config, transport });

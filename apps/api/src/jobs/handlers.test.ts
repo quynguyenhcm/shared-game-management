@@ -76,6 +76,25 @@ describe('send-email handler', () => {
     },
   );
 
+  it.each([
+    ['a non-object payload', 'nope'],
+    ['a missing recipient', { subject: 'Hi', text: 'Body', idempotencyKey: 'k' }],
+    ['a non-string html body', { ...message, html: { path: '/etc/passwd' } }],
+    ['an unknown field', { ...message, attachments: [{ path: '/etc/passwd' }] }],
+  ])('fails %s at once without retry and never calls the notifier', async (_label, payload) => {
+    const notifier = createInMemoryNotifier();
+    const send = vi.spyOn(notifier, 'send');
+    const { ctx, logs } = context();
+    const error = await createSendEmailHandler(notifier)(payload as never, ctx).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(NonRetryableJobError);
+    expect(send).not.toHaveBeenCalled();
+    expect(logs.find((entry) => entry.level === 'error')?.fields).toMatchObject({
+      event: 'notification.invalid_payload',
+    });
+  });
+
   it('enqueueEmail files the job under singletonKey notify:<idempotencyKey>', async () => {
     const enqueue = vi.fn().mockResolvedValue('id-1');
     await expect(enqueueEmail({ enqueue }, message)).resolves.toBe('id-1');

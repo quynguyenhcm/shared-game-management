@@ -1,4 +1,5 @@
 // Console output is allowed here (see eslint.config.mjs): the CLI talks to a terminal, not the logger.
+import { resetRefusal, rollbackRefusal } from './cli-guards.ts';
 import { loadConfigOrExit, type Config } from './lib/config/config.ts';
 import { QUEUE_NAMES } from './jobs/registry.ts';
 import { SCHEDULES } from './jobs/schedules.ts';
@@ -11,14 +12,12 @@ const COMMANDS: Record<string, { subcommands: readonly string[] }> = {
   jobs: { subcommands: ['trigger', 'schedules'] },
 };
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', 'postgres']);
-
 function usage(): string {
   return [
     ...Object.entries(COMMANDS).map(
       ([name, { subcommands }]) => `  ${name} ${subcommands.join('|')}`,
     ),
-    '  db rollback [--count N | --all]   (default: one step)',
+    '  db rollback [--count N | --all]   (default: one step; refused in production)',
     '  db reset [--force]                (refused in production or on a non-local host)',
     '  jobs trigger <slot|heartbeat> [json]   (manually enqueue a slot or the heartbeat job)',
     '  jobs schedules                         (list registered cron schedules)',
@@ -42,14 +41,6 @@ function rollbackCount(flags: readonly string[]): number {
   return count;
 }
 
-function assertResettable(config: Config, flags: readonly string[]): void {
-  if (config.nodeEnv === 'production') fail('db reset is refused when NODE_ENV=production', 1);
-  const host = new URL(config.databaseUrl).hostname;
-  if (!LOCAL_HOSTS.has(host) && !flags.includes('--force')) {
-    fail(`db reset is refused for non-local host "${host}" without --force`, 1);
-  }
-}
-
 async function runDb(subcommand: string, flags: readonly string[], config: Config): Promise<void> {
   const log = (message: string): void => {
     console.log(message);
@@ -59,10 +50,13 @@ async function runDb(subcommand: string, flags: readonly string[], config: Confi
     const applied = await migrateToLatest(options);
     console.log(`db migrate: ${applied.length} migration(s) applied; pg-boss schema up to date`);
   } else if (subcommand === 'rollback') {
+    const refusal = rollbackRefusal(config);
+    if (refusal) fail(refusal, 1);
     const reverted = await rollbackMigrations({ ...options, count: rollbackCount(flags) });
     console.log(`db rollback: ${reverted.length} migration(s) reverted`);
   } else {
-    assertResettable(config, flags);
+    const refusal = resetRefusal(config, flags);
+    if (refusal) fail(refusal, 1);
     const applied = await resetDatabase(options);
     console.log(`db reset: schemas dropped; ${applied.length} migration(s) applied`);
   }

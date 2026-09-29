@@ -39,6 +39,9 @@ export function validateEmailMessage(message: EmailMessage, adapter: string): vo
   }
   if (CONTROL.test(message.subject)) throw invalid(adapter, 'subject must not contain CR or LF');
   if (typeof message.text !== 'string') throw invalid(adapter, 'text body is required');
+  if (message.html !== undefined && typeof message.html !== 'string') {
+    throw invalid(adapter, 'html body must be a string');
+  }
   const key = message.idempotencyKey;
   if (typeof key !== 'string' || key.length === 0)
     throw invalid(adapter, 'idempotencyKey is required');

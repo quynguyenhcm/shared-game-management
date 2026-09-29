@@ -84,9 +84,26 @@ const envSchema = z.object({
   LOG_FILE_PATH: z.string().min(1).optional(),
   LOG_REDACT_PATTERNS: z.string().default('password,secret,token,apiKey'),
   OTEL_SDK_DISABLED: booleanFlag.default(false),
-  OTEL_TRACES_EXPORTER: z.enum(['none', 'console', 'otlp']).default('none'),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().min(1).optional(),
-  OTEL_TRACES_SAMPLER: z.string().default('parentbased_traceidratio'),
+  OTEL_SERVICE_NAME: z.string().min(1).optional(),
+  // Unset: `otlp` when an endpoint is configured, otherwise `none` (no exporter, spans stay in-process).
+  OTEL_TRACES_EXPORTER: z.enum(['none', 'console', 'otlp']).optional(),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z
+    .string()
+    .refine(
+      (value) => URL.canParse(value) && /^https?:$/.test(new URL(value).protocol),
+      'must be an http(s) URL',
+    )
+    .optional(),
+  OTEL_TRACES_SAMPLER: z
+    .enum([
+      'always_on',
+      'always_off',
+      'traceidratio',
+      'parentbased_always_on',
+      'parentbased_always_off',
+      'parentbased_traceidratio',
+    ])
+    .default('parentbased_traceidratio'),
   OTEL_TRACES_SAMPLER_ARG: z.coerce.number().min(0).max(1).default(1),
   METRICS_ENABLED: booleanFlag.default(false),
   METRICS_PORT: port.default(9090),
@@ -96,6 +113,8 @@ const envSchema = z.object({
   JOBS_SUPERVISE_INTERVAL_SECONDS: z.coerce.number().int().min(1).default(60),
   JOBS_POLL_INTERVAL_SECONDS: z.coerce.number().min(0.5).default(2),
 });
+
+export type OtelSampler = z.infer<typeof envSchema>['OTEL_TRACES_SAMPLER'];
 
 export interface Config {
   readonly nodeEnv: 'development' | 'test' | 'production';
@@ -120,9 +139,12 @@ export interface Config {
   };
   readonly otel: {
     readonly disabled: boolean;
+    /** Unset in the env: set per process by `instrumentation.ts` (`sgm-api` / `sgm-worker`). */
+    readonly serviceName: string | undefined;
+    /** Effective exporter: `otlp` only ever runs with an endpoint. */
     readonly tracesExporter: 'none' | 'console' | 'otlp';
     readonly otlpEndpoint: string | undefined;
-    readonly sampler: string;
+    readonly sampler: OtelSampler;
     readonly samplerArg: number;
   };
   readonly metrics: {
@@ -194,6 +216,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       const sslIssue = databaseSslIssue(data.DATABASE_URL);
       if (sslIssue) issues.push(formatIssue('DATABASE_URL', sslIssue));
     }
+    if (data.OTEL_TRACES_EXPORTER === 'otlp' && data.OTEL_EXPORTER_OTLP_ENDPOINT === undefined) {
+      issues.push(
+        formatIssue('OTEL_EXPORTER_OTLP_ENDPOINT', 'is required when OTEL_TRACES_EXPORTER=otlp'),
+      );
+    }
     if ((data.LOG_OUTPUT === 'file' || data.LOG_OUTPUT === 'both') && !data.LOG_FILE_PATH) {
       issues.push(formatIssue('LOG_FILE_PATH', 'is required when LOG_OUTPUT includes file'));
     }
@@ -228,7 +255,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     },
     otel: {
       disabled: data.OTEL_SDK_DISABLED,
-      tracesExporter: data.OTEL_TRACES_EXPORTER,
+      serviceName: data.OTEL_SERVICE_NAME,
+      tracesExporter:
+        data.OTEL_TRACES_EXPORTER ??
+        (data.OTEL_EXPORTER_OTLP_ENDPOINT === undefined ? 'none' : 'otlp'),
       otlpEndpoint: data.OTEL_EXPORTER_OTLP_ENDPOINT,
       sampler: data.OTEL_TRACES_SAMPLER,
       samplerArg: data.OTEL_TRACES_SAMPLER_ARG,

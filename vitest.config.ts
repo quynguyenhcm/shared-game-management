@@ -37,11 +37,10 @@ export default defineConfig({
       reportsDirectory: 'coverage',
       include: [
         'packages/shared/src/{money,time,invoice}/**/*.ts',
-        'apps/api/src/lib/{crypto,config,notifications,jobs}/**/*.ts',
+        'apps/api/src/lib/{crypto,config,notifications,jobs,logger,telemetry}/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.int.test.ts'],
-      // Thresholds apply to files matched by `include`; modules that do not exist yet
-      // (money, time, crypto, notifications, jobs land in Phases 3-5) are not required.
+      // Thresholds apply to every file matched by `include` (the platform library modules above).
       thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
     },
   },

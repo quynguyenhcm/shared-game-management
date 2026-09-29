@@ -15,11 +15,12 @@
  * runs the cron scheduler and works queues. Neither role runs DDL: `db:migrate` owns the
  * `pgboss` schema, so pg-boss starts with `migrate: false, createSchema: false`.
  *
- * Trace context travels in the job payload under the reserved `_meta` key (W3C `traceparent`) and is
- * restored around the handler, so logs and follow-up enqueues share the originating trace.
+ * Trace context travels in the job payload under the reserved `_meta` key (W3C `traceparent`, taken
+ * from the active OTel span, e.g. the API request). The worker restores it as the parent of a
+ * `"{queue} process"` consumer span around the handler, so logs and follow-up enqueues share the
+ * originating trace.
  */
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { randomBytes } from 'node:crypto';
+import { ROOT_CONTEXT, SpanKind, SpanStatusCode, trace as otelTrace } from '@opentelemetry/api';
 import { CompiledQuery, type Kysely } from 'kysely';
 import {
   PgBoss,
@@ -33,11 +34,22 @@ import {
   type UpdateQueueOptions,
 } from 'pg-boss';
 import type { Logger } from '../logger/logger.ts';
+import {
+  childOf,
+  currentTrace,
+  fromSpanContext,
+  newTraceContext,
+  parseTraceparent,
+  runWithTrace,
+  toSpanContext,
+  type TraceContext,
+} from '../telemetry/trace-context.ts';
 
 /** Completed jobs are kept at least this long so failures stay debuggable. */
 export const MIN_RETENTION_DAYS = 7;
 const SECONDS_PER_DAY = 24 * 60 * 60;
 const STOP_TIMEOUT_MS = 10_000;
+const TRACER_NAME = '@sgm/api/jobs';
 
 export type JobRole = 'producer' | 'worker';
 
@@ -59,42 +71,13 @@ export interface QueueDefinition {
 // Trace context
 // ---------------------------------------------------------------------------------------------
 
-export interface TraceContext {
-  readonly traceId: string;
-  readonly spanId: string;
-  readonly flags: string;
-  /** W3C header value: `00-<traceId>-<spanId>-<flags>`. */
-  readonly traceparent: string;
-}
-
-const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/;
-const traceStorage = new AsyncLocalStorage<TraceContext>();
-
-function buildTrace(traceId: string, spanId: string, flags: string): TraceContext {
-  return { traceId, spanId, flags, traceparent: `00-${traceId}-${spanId}-${flags}` };
-}
-
-export function newTraceContext(): TraceContext {
-  return buildTrace(randomBytes(16).toString('hex'), randomBytes(8).toString('hex'), '01');
-}
-
-/** Same trace, fresh span: what a handler runs under. */
-function childOf(parent: TraceContext): TraceContext {
-  return buildTrace(parent.traceId, randomBytes(8).toString('hex'), parent.flags);
-}
-
-export function parseTraceparent(value: unknown): TraceContext | undefined {
-  if (typeof value !== 'string') return undefined;
-  const match = TRACEPARENT.exec(value);
-  if (!match) return undefined;
-  const [, traceId, spanId, flags] = match as unknown as [string, string, string, string];
-  if (/^0+$/.test(traceId) || /^0+$/.test(spanId)) return undefined;
-  return buildTrace(traceId, spanId, flags);
-}
-
-export const currentTrace = (): TraceContext | undefined => traceStorage.getStore();
-
-export const runWithTrace = <T>(trace: TraceContext, fn: () => T): T => traceStorage.run(trace, fn);
+export {
+  currentTrace,
+  newTraceContext,
+  parseTraceparent,
+  runWithTrace,
+  type TraceContext,
+} from '../telemetry/trace-context.ts';
 
 /** Adds `_meta.traceparent` (ambient trace, else a new root trace) to a job payload. */
 export function injectTraceMeta<T extends object>(
@@ -363,67 +346,102 @@ export function createJobRunner(options: JobRunnerOptions): JobRunner {
     return id;
   }
 
+  /** A consumer span under the payload's trace; ids fall back to `childOf` when the SDK is off. */
+  function startJobSpan(queue: string, jobId: string, parent: TraceContext | undefined) {
+    const parentContext = parent
+      ? otelTrace.setSpanContext(ROOT_CONTEXT, toSpanContext(parent))
+      : ROOT_CONTEXT;
+    const span = otelTrace.getTracer(TRACER_NAME).startSpan(
+      `${queue} process`,
+      {
+        kind: SpanKind.CONSUMER,
+        attributes: {
+          'messaging.system': 'pg-boss',
+          'messaging.operation.type': 'process',
+          'messaging.destination.name': queue,
+          'messaging.message.id': jobId,
+        },
+      },
+      parentContext,
+    );
+    const spanContext = span.spanContext();
+    // The no-op tracer (SDK disabled) hands back the parent's own ids; only a new span id is real.
+    const isNewSpan =
+      otelTrace.isSpanContextValid(spanContext) && spanContext.spanId !== parent?.spanId;
+    const traceContext = isNewSpan
+      ? fromSpanContext(spanContext)
+      : parent
+        ? childOf(parent)
+        : newTraceContext();
+    return { span: isNewSpan ? span : undefined, trace: traceContext };
+  }
+
   function wrap<T extends object>(queue: string, handler: JobHandler<T>) {
     return async (jobs: JobWithMetadata<object>[]): Promise<JobResult[]> => {
       const results: JobResult[] = [];
       for (const job of jobs) {
         const { data, trace: parent } = extractTraceMeta(job.data);
-        const trace = parent ? childOf(parent) : newTraceContext();
-        const jobLogger = logger.child({
-          jobId: job.id,
-          queue,
-          traceId: trace.traceId,
-          spanId: trace.spanId,
-        });
+        const { span, trace } = startJobSpan(queue, job.id, parent);
+        // traceId/spanId come from the active trace via the logger mixin.
+        const jobLogger = logger.child({ jobId: job.id, queue });
         const attempt = job.retryCount + 1;
         const startedAt = performance.now();
-        jobLogger.info({ event: 'job.started', attempt }, 'job.started');
-        try {
-          await runWithTrace(trace, () =>
-            handler(data as T, {
-              logger: jobLogger,
-              jobId: job.id,
-              queue,
-              retryCount: job.retryCount,
-              retryLimit: job.retryLimit,
-              trace,
-              signal: job.signal,
-            }),
-          );
-          jobLogger.info(
-            {
-              event: 'job.completed',
-              attempt,
-              durationMs: Math.round(performance.now() - startedAt),
-            },
-            'job.completed',
-          );
-          results.push({ id: job.id, status: 'completed' });
-        } catch (error) {
-          const nonRetryable = error instanceof NonRetryableJobError;
-          const willRetry = !nonRetryable && job.retryCount < job.retryLimit;
-          jobLogger[willRetry ? 'warn' : 'error'](
-            {
-              event: 'job.failed',
-              attempt,
-              retryLimit: job.retryLimit,
-              willRetry,
-              durationMs: Math.round(performance.now() - startedAt),
-              err: error,
-            },
-            'job.failed',
-          );
-          results.push({
-            id: job.id,
-            // `deadletter` ends the job terminally without retries (no dead-letter queue configured).
-            status: nonRetryable ? 'deadletter' : 'failed',
-            output: {
-              message: errorMessage(error),
-              name: error instanceof Error ? error.name : 'Error',
-              attempt,
-            },
-          });
-        }
+        const result = await runWithTrace(
+          trace,
+          async (): Promise<JobResult> => {
+            jobLogger.info({ event: 'job.started', attempt }, 'job.started');
+            try {
+              await handler(data as T, {
+                logger: jobLogger,
+                jobId: job.id,
+                queue,
+                retryCount: job.retryCount,
+                retryLimit: job.retryLimit,
+                trace,
+                signal: job.signal,
+              });
+              jobLogger.info(
+                {
+                  event: 'job.completed',
+                  attempt,
+                  durationMs: Math.round(performance.now() - startedAt),
+                },
+                'job.completed',
+              );
+              return { id: job.id, status: 'completed' };
+            } catch (error) {
+              const nonRetryable = error instanceof NonRetryableJobError;
+              const willRetry = !nonRetryable && job.retryCount < job.retryLimit;
+              span?.recordException(error instanceof Error ? error : String(error));
+              span?.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage(error) });
+              jobLogger[willRetry ? 'warn' : 'error'](
+                {
+                  event: 'job.failed',
+                  attempt,
+                  retryLimit: job.retryLimit,
+                  willRetry,
+                  durationMs: Math.round(performance.now() - startedAt),
+                  err: error,
+                },
+                'job.failed',
+              );
+              return {
+                id: job.id,
+                // `deadletter` ends the job terminally without retries (no dead-letter queue configured).
+                status: nonRetryable ? 'deadletter' : 'failed',
+                output: {
+                  message: errorMessage(error),
+                  name: error instanceof Error ? error.name : 'Error',
+                  attempt,
+                },
+              };
+            } finally {
+              span?.end();
+            }
+          },
+          span,
+        );
+        results.push(result);
       }
       return results;
     };

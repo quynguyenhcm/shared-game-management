@@ -50,11 +50,13 @@
   - **Integration**: Fastify uses the same pino instance via `createLogger` wrapper
   - **Format**: camelCase JSON with `timestamp`, `level`, `message`, `service` (`api` | `worker`), `traceId`, `spanId`, `jobId`, `queue`
   - **Configuration**: `LOG_LEVEL` (default `info`), `LOG_FORMAT` (`json` | `text` for pretty printing in dev), `LOG_OUTPUT` (`stdout` | `file` | `both`), `LOG_FILE_PATH`
-- **Distributed Tracing**: OpenTelemetry (via `@fastify/otel`, `@opentelemetry/instrumentation-pg`, etc.)
-  - Loader: `node --import ./dist/instrumentation.js` (no decorator metadata required)
-  - **Default exporter**: none (`OTEL_TRACES_EXPORTER=none`); optional `otlp` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set
-  - **Sampler**: `parentbased_traceidratio` with ratio 1.0 (dev) or 0.1 (prod)
-  - Service boundaries: browser → web → api → PostgreSQL; worker pulls from pgboss with `traceparent` extraction
+- **Distributed Tracing**: OpenTelemetry tracing SDK (`@opentelemetry/sdk-trace-node` `NodeTracerProvider`, AsyncLocalStorage context manager, W3C TraceContext propagator from `@opentelemetry/core`) started by `apps/api/src/lib/telemetry/telemetry.ts`
+  - Loader: `node --import ./dist/instrumentation.js` (compose) / `tsx watch --import ./src/instrumentation.ts` (`pnpm run dev`) for both api and worker; service name `sgm-api` / `sgm-worker` unless `OTEL_SERVICE_NAME` is set
+  - **Instrumentation wired**: `@fastify/otel` only (request + handler spans, `instrumentHooks: false`, continues an incoming `traceparent`). **Not wired**: `@opentelemetry/instrumentation-pg`, http/undici (they need ESM loader hooks); the web app registers no SDK
+  - **Default exporter**: none (spans are created, never exported); `console` via `OTEL_TRACES_EXPORTER=console`; OTLP/HTTP (`@opentelemetry/exporter-trace-otlp-http`) only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (validated as an http(s) URL; `OTEL_TRACES_EXPORTER=otlp` without it is a config error). `OTEL_SDK_DISABLED=true` registers nothing
+  - **Sampler**: `OTEL_TRACES_SAMPLER` (validated enum, default `parentbased_traceidratio`) with `OTEL_TRACES_SAMPLER_ARG` (1.0 default; 0.1 in prod at deployment)
+  - **Propagation**: web `api-client.ts` sends `traceparent` on every server-side API call (active span, else the incoming request's trace, else a new root); Fastify request logs bind `traceId`/`spanId`; `jobs.enqueue` writes the active trace to `payload._meta.traceparent`; the worker restores it as the parent of a `"{queue} process"` CONSUMER span, and a pino mixin adds `traceId`/`spanId` to every log line inside it
+  - Spans buffered by the OTLP batch processor are not flushed on SIGTERM (known gap)
 - **Metrics**: configuration variables only (`METRICS_ENABLED`, `METRICS_PORT`, `METRICS_PATH`, default off); no exporter or custom metrics are implemented in the foundation
 
 ### External Services
