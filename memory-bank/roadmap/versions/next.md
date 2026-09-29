@@ -2,8 +2,7 @@
 status: planning
 target_date:
 release_date:
-features:
-  - admin-reporting-dashboard
+features: []
 ---
 
 # next
