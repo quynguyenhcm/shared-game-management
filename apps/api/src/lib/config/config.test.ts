@@ -74,6 +74,22 @@ describe('loadConfig', () => {
     expect(text).not.toContain('supersecretpw');
   });
 
+  it('rejects non-URL SMTP_URL, MAILPIT_API_URL and API_INTERNAL_URL without echoing the values', () => {
+    const issues = issuesFor(
+      validEnv({
+        SMTP_URL: 'not a url smtp-secret',
+        MAILPIT_API_URL: 'mailpit-garbage',
+        API_INTERNAL_URL: 'api-garbage',
+      }),
+    );
+    for (const variable of ['SMTP_URL', 'MAILPIT_API_URL', 'API_INTERNAL_URL']) {
+      expect(issues.some((issue) => issue.includes(variable) && issue.includes('valid URL'))).toBe(
+        true,
+      );
+    }
+    expect(issues.join('\n')).not.toMatch(/smtp-secret|mailpit-garbage|api-garbage/);
+  });
+
   it('requires LOG_FILE_PATH when LOG_OUTPUT includes file', () => {
     const issues = issuesFor(validEnv({ LOG_OUTPUT: 'both' }));
     expect(issues.join('\n')).toContain('Invalid configuration: LOG_FILE_PATH');

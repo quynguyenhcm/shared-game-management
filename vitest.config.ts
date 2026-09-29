@@ -1,5 +1,12 @@
 import { defineConfig } from 'vitest/config';
 
+// Local runs pick up the developer's .env (CI provides real environment variables, which win).
+try {
+  process.loadEnvFile('.env');
+} catch {
+  // No .env file: rely on the process environment.
+}
+
 export default defineConfig({
   test: {
     projects: [

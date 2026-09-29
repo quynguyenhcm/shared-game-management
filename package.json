@@ -13,7 +13,7 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "typecheck": "pnpm -r --include-workspace-root --workspace-concurrency=4 exec tsc --noEmit -p tsconfig.json",
     "test": "vitest run --project unit --coverage",
-    "test:integration": "vitest run --project integration --passWithNoTests",
+    "test:integration": "vitest run --project integration",
     "db:migrate": "pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db migrate",
     "db:rollback": "pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db rollback",
     "db:reset": "pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db reset",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@next/eslint-plugin-next": "^16.3.6",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.19.0",
     "@vitest/coverage-v8": "^5.0.2",
     "eslint": "^9.39.5",

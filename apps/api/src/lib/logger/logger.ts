@@ -30,13 +30,23 @@ const REDACT_PATHS = ['req.headers.authorization', 'req.headers.cookie'];
 const BASE_KEY_PATTERNS: readonly RegExp[] = [
   /^authorization$/i,
   /^cookie$/i,
+  /^set-cookie$/i,
+  /^x-api-key$/i,
+  /^proxy-authorization$/i,
   /password/i,
   /_token$/i,
   /^bank_account_/i,
   /^ird_number$/i,
   /^akahu_/i,
   /^encryptionKeys$/i,
+  // Connection strings: DATABASE_URL / smtpUrl / dsn / connection_string and the like.
+  /(database|db|smtp|redis|amqp)_?url$/i,
+  /^dsn$/i,
+  /connection_?string/i,
 ];
+
+/** `scheme://user:pass@host` credentials inside any string value (e.g. a URL logged under another key). */
+const URL_USERINFO = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]{0,31}:\/\/)[^/\s@]{0,512}@/gi;
 
 const MAX_DEPTH = 8;
 
@@ -67,9 +77,12 @@ function redactDeep(
   depth: number,
   seen: WeakSet<object>,
 ): unknown {
+  if (typeof value === 'string') return value.replace(URL_USERINFO, `$1${REDACTED}@`);
   if (value === null || typeof value !== 'object' || depth > MAX_DEPTH) return value;
+  // Raw bytes are almost always key material or ciphertext; never log them.
+  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return REDACTED;
   if (seen.has(value)) return '[Circular]';
-  if (value instanceof Error || value instanceof Date || Buffer.isBuffer(value)) return value;
+  if (value instanceof Error || value instanceof Date) return value;
   seen.add(value);
   if (Array.isArray(value)) {
     return value.map((item) => redactDeep(item, patterns, depth + 1, seen));
@@ -147,13 +160,31 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     serializers: {
       req: (request: RequestLike) =>
         redactDeep(serializeRequest(request), patterns, 0, new WeakSet()),
-      res: stdSerializers.res,
-      err: stdSerializers.err,
+      res: (response: Parameters<typeof stdSerializers.res>[0]) =>
+        redactDeep(stdSerializers.res(response), patterns, 0, new WeakSet()),
+      err: (error: Parameters<typeof stdSerializers.err>[0]) =>
+        redactDeep(stdSerializers.err(error), patterns, 0, new WeakSet()),
     },
     redact: { paths: REDACT_PATHS, censor: REDACTED },
   };
   // A transport stream (not the `transport` option) is used so the level formatter stays allowed.
-  return pino(settings, destination ?? transport({ targets: buildTransportTargets(options) }));
+  const logger = pino(
+    settings,
+    destination ?? transport({ targets: buildTransportTargets(options) }),
+  );
+  // pino resets the `bindings` formatter for children, so redact child bindings by wrapping `child`.
+  // Children are created with Object.create(parent), so grandchildren inherit this override.
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound via `.call(this, ...)` below
+  const originalChild = logger.child;
+  logger.child = function child(
+    this: Logger,
+    bindings: Record<string, unknown>,
+    childOptions?: Parameters<Logger['child']>[1],
+  ) {
+    const redacted = redactDeep(bindings, patterns, 0, new WeakSet()) as Record<string, unknown>;
+    return originalChild.call(this, redacted, childOptions);
+  } as Logger['child'];
+  return logger;
 }
 
 export function loggerOptionsFromConfig(config: Config, service: 'api' | 'worker'): LoggerOptions {

@@ -533,7 +533,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - [x] Phase 1: Workspace scaffold and quality gates (AC-VERIFY-1, AC-VERIFY-3, AC-VERIFY-17, AC-ERROR-1)
   - Components: root `package.json` targets and `scripts/setup.ts`, apps/web placeholder, apps/api with `/health` plus `src/worker.ts` and `src/cli.ts` skeletons, packages/shared, lint/format/strict TS, Vitest unit + integration projects, config fail-fast, logger
   - Milestone: `lint`, `typecheck` and `test` pass locally; deliberate violations fail each gate
-- [ ] Phase 2: Local dev stack and CI (AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-2, AC-INTEGRATION-4)
+- [x] Phase 2: Local dev stack and CI (AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-2, AC-INTEGRATION-4)
   - Components: `docker-compose.yml` (no Redis), Dockerfiles (one api image with two commands, plus web), `.env.example`, `.github/workflows/ci.yml`, DB-aware `/health`, generated OpenAPI, web → API smoke E2E
   - Milestone: `docker compose up -d --wait` is healthy in 120 s or less; `/health` gives 503 with the DB stopped; the web page shows live API data; `actionlint` is clean
 - [ ] Phase 3: Domain schema and migrations (AC-VERIFY-5 to AC-VERIFY-12, AC-VERIFY-19, AC-INTEGRATION-1, AC-INTEGRATION-2)
@@ -571,14 +571,14 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 2 of 6
+**Current Phase**: 3 of 6
 **Auto-Build Mode**: YES
-**Last Completed**: Phase 1 (2026-09-29)
+**Last Completed**: Phase 2 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 2
+**Resume From**: Phase 3
 **Notes**: Local-only run. Commit per phase, never push (spec owner, 2026-09-29; GitHub push blocked with a 403). Local services: Docker 29.5 on Colima, postgres:17 image, pnpm via Corepack (pin pnpm@10 through packageManager).
 
 ### Halt State
@@ -594,6 +594,14 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 1 | apps/api/src/cli.ts:25 | `db migrate|rollback|reset` validate config then exit 1 "not implemented until Phase 3". The targets exist; `pnpm run ci` and `db:migrate` fail until Phase 3 (phase review, accepted).
 - Phase 1 | package.json:17 | `test:integration` uses `--passWithNoTests`; there is no example integration test until Phase 2/3 (phase review, accepted).
 - Phase 1 | vitest.config.ts:29 | Coverage `include` lists money/time/crypto/notifications/jobs, which don't exist yet; the 80% gate only covers `lib/config` for now (phase review, accepted).
+- Phase 2 | .github/workflows/ci.yml | AC-VERIFY-4 partially verified: actionlint (rhysd/actionlint:latest via docker) reports 0 findings and the local `pnpm run ci` is green, but the real GitHub Actions run stays open until pushing is re-enabled (403). Deviation, not failure. actionlint runs in CI as a `docker://rhysd/actionlint:latest` step.
+- Phase 2 | docker-compose.yml api command | api runs `node --import ./dist/instrumentation.js dist/main.js` without the design's `db migrate &&` prefix, because `cli db migrate` is a Phase 3 stub that exits 1. TODO(Phase 3): restore `node dist/cli.js db migrate && ...`.
+- Phase 2 | apps/*/Dockerfile | no BuildKit `--mount=type=cache` (Colima docker has no buildx); portable classic-builder Dockerfiles. `pnpm deploy --legacy` for the api runtime image.
+- Phase 2 | package.json test:integration | dropped `--passWithNoTests` now that `health.int.test.ts` exists; vitest.config.ts loads `.env` via process.loadEnvFile so local integration runs see DATABASE_URL.
+- Phase 2 | AC-ERROR-2 test | `health.int.test.ts` simulates the outage with a pool pointed at a closed port (503 in under 3 s); the real `docker compose stop postgres` / start recovery was verified manually (503 in 267 ms, 200 again without restarting the api).
+- Phase 2 | build pipeline | phase implemented directly by the orchestrator (no separate TDD sub-agent dispatch) to save context; tests written alongside code; verifier and code-review agents still dispatched.
+- Phase 2 | carried advisories | A1 (child-binding redaction via wrapped `child`, since pino resets the bindings formatter for children), A2 (DSN/URL keys, userinfo in any string, set-cookie, x-api-key, proxy-authorization, res headers, Buffers/typed arrays), A4 (URL validation) done with tests; @fastify/swagger kept because the generated OpenAPI uses it; checkDb TODO replaced by the real pool check. A3 (optional HOST) still open, low priority.
+- Phase 2 | review (CHANGES_REQUIRED then fixed) | blocking ReDoS in URL_USERINFO regex bounded + timing test; `err` serializer now redacted; compose ports bound to 127.0.0.1. Open advisories: pin CI actions/actionlint tag, query-string secret masking in req.url, CI postgres cannot take `-c timezone=UTC` (pool forces UTC), vitest.config loadEnvFile also affects unit project.
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
@@ -609,3 +617,4 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - 2026-09-29 Step 4.5: Codex adversarial critique — needs-attention, 5 findings (1 critical, 3 high, 1 medium)
 - 2026-09-29 Critique disposition (spec owner): all 5 findings applied; `fee_other` rate added for BY_SEX; AC wording changes from the design agents applied. Taxonomy CLEAN, 32 ACs (29 MUST / 3 SHOULD); target ~86 tests
 - 2026-09-29 Phase 1 build: COMPLETE - 36 unit tests (RED->GREEN), lint/typecheck/build/ci green, review APPROVED, AC-VERIFY-3 violation checks and AC-ERROR-1 exit check verified. Push skipped (local-only run).
+- 2026-09-29 Phase 2 build: COMPLETE - compose stack healthy in 17 s (cached), /health 200/503/200 verified, web shows live API status and Tailwind CSS, Playwright smoke green, actionlint clean, local ci green. Push skipped (local-only run).

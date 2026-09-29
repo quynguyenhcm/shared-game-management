@@ -14,3 +14,4 @@ db/migrations
 memory-bank
 /*.md
 CLAUDE.md
+apps/api/openapi.yaml

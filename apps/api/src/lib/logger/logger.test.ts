@@ -111,4 +111,63 @@ describe('logger', () => {
       /LOG_FILE_PATH/,
     );
   });
+
+  it('redacts child-logger bindings, connection strings, URL userinfo, extra headers and Buffers', () => {
+    const sink = capture();
+    const logger = createLogger(baseOptions, sink.stream);
+    logger
+      .child({
+        databaseUrl: 'postgres://sgm:dbpass-123@db:5432/sgm',
+        smtpUrl: 'smtp://mailer:smtppass-456@mail:1025',
+        apiKey: 'binding-api-key',
+        tenant: 'acme',
+      })
+      .info(
+        {
+          target: 'postgres://user:inline-pass-789@host/db',
+          harmless: 'http://localhost:4000/health',
+          headers: {
+            'set-cookie': 'sid=setcookie-value',
+            'x-api-key': 'xkey-value',
+            'proxy-authorization': 'Basic proxy-value',
+          },
+          rawKey: Buffer.from('buffer-secret-bytes'),
+          typed: new Uint8Array([1, 2, 3]),
+        },
+        'binding redaction',
+      );
+    const [line] = sink.lines();
+    const serialised = JSON.stringify(line);
+    for (const secret of [
+      'dbpass-123',
+      'smtppass-456',
+      'binding-api-key',
+      'inline-pass-789',
+      'setcookie-value',
+      'xkey-value',
+      'proxy-value',
+      'buffer-secret-bytes',
+    ]) {
+      expect(serialised).not.toContain(secret);
+    }
+    expect(line).toMatchObject({
+      tenant: 'acme',
+      harmless: 'http://localhost:4000/health',
+      target: 'postgres://[REDACTED]@host/db',
+      rawKey: '[REDACTED]',
+      typed: '[REDACTED]',
+    });
+  });
+
+  it('redacts quickly on adversarial 20 KB header values and scrubs credentials inside errors', () => {
+    const sink = capture();
+    const logger = createLogger(baseOptions, sink.stream);
+    const hostile = 'a.'.repeat(10_000);
+    const startedAt = Date.now();
+    logger.info({ req: { method: 'GET', url: '/', headers: { 'user-agent': hostile } } }, 'ua');
+    expect(Date.now() - startedAt).toBeLessThan(200);
+    logger.error({ err: new Error('connect failed postgres://u:err-pass-1@h/db') }, 'boom');
+    const lines = sink.lines();
+    expect(JSON.stringify(lines[1])).not.toContain('err-pass-1');
+  });
 });

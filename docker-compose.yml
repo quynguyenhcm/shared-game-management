@@ -1,0 +1,124 @@
+# Local development stack. `docker compose up -d --wait` (after `pnpm run setup`) starts every service
+# and returns once all are healthy. No Redis: pg-boss keeps jobs in PostgreSQL.
+name: sgm
+
+x-app-env: &app-env # Container-network hostnames override the host-oriented values in .env.
+  DATABASE_URL: postgres://sgm:sgm@postgres:5432/sgm
+  SMTP_URL: smtp://mailpit:1025
+  MAILPIT_API_URL: http://mailpit:8025
+  API_INTERNAL_URL: http://api:4000
+  NODE_ENV: development
+  LOG_FORMAT: json
+  LOG_OUTPUT: stdout
+
+services:
+  postgres:
+    image: postgres:17
+    command: postgres -c timezone=UTC
+    environment:
+      POSTGRES_USER: sgm
+      POSTGRES_PASSWORD: sgm
+      POSTGRES_DB: sgm
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sgm -d sgm']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: sgm-api:dev
+    env_file: .env
+    environment:
+      <<: *app-env
+      OTEL_SERVICE_NAME: sgm-api
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  worker:
+    # Same image as the API with a different entrypoint (no public port; internal /health only).
+    image: sgm-api:dev
+    pull_policy: never
+    command: ['node', '--import', './dist/instrumentation.js', 'dist/worker.js']
+    env_file: .env
+    environment:
+      <<: *app-env
+      OTEL_SERVICE_NAME: sgm-worker
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4001/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: sgm-web:dev
+    environment:
+      API_INTERNAL_URL: http://api:4000
+    ports:
+      - '3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  pgdata:

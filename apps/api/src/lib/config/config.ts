@@ -56,6 +56,8 @@ export function parseEncryptionKeys(raw: string): { keys: KeyringEntry[]; issues
   return { keys, issues };
 }
 
+const urlString = z.string().refine((value) => URL.canParse(value), 'must be a valid URL');
+
 const port = z.coerce.number().int().min(1).max(65535);
 const booleanFlag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -72,10 +74,10 @@ const envSchema = z.object({
   ENCRYPTION_KEYS: z.string().min(1, 'is required'),
   ENCRYPTION_ACTIVE_KEY_ID: z.string().min(1, 'is required'),
   NOTIFIER_ADAPTER: z.enum(['smtp', 'memory']).default('smtp'),
-  SMTP_URL: z.string().default('smtp://localhost:1025'),
+  SMTP_URL: urlString.default('smtp://localhost:1025'),
   EMAIL_FROM: z.string().default('Shared Game Management <no-reply@localhost>'),
-  MAILPIT_API_URL: z.string().default('http://localhost:8025'),
-  API_INTERNAL_URL: z.string().default('http://localhost:4000'),
+  MAILPIT_API_URL: urlString.default('http://localhost:8025'),
+  API_INTERNAL_URL: urlString.default('http://localhost:4000'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   LOG_FORMAT: z.enum(['json', 'text']).default('json'),
   LOG_OUTPUT: z.enum(['stdout', 'file', 'both']).default('stdout'),

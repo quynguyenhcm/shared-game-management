@@ -41,7 +41,7 @@ export default tseslint.config(
   },
   {
     files: ['apps/api/src/**/*.ts'],
-    ignores: ['apps/api/src/cli.ts'],
+    ignores: ['apps/api/src/cli.ts', 'apps/api/src/openapi.ts'],
     rules: { 'no-console': 'error' },
   },
   {
