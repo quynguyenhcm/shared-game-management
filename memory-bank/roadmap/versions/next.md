@@ -4,6 +4,7 @@ target_date:
 release_date:
 features:
   - platform-foundation
+  - auth-and-user-roles
 ---
 
 # next
