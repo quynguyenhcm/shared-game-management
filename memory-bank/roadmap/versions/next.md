@@ -3,7 +3,6 @@ status: planning
 target_date:
 release_date:
 features:
-  - tax-invoices-and-exports
   - admin-reporting-dashboard
 ---
 
