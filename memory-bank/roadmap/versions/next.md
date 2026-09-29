@@ -7,6 +7,7 @@ features:
   - auth-and-user-roles
   - team-management
   - team-banking-and-gst
+  - skill-levels-and-auto-enroll
 ---
 
 # next
