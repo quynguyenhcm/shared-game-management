@@ -2,7 +2,7 @@
 slug: platform-foundation
 legacy_id:            # only set by the v2 migration for pre-2.0 tasks (e.g., TASK-007)
 feature: platform-foundation
-status: CREATIVE_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # platform-foundation: Platform Foundation
@@ -571,6 +571,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 ## Execution State
 
 **Build Status**: COMPLETE
+**Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (base: local main; verdict: Ready to merge with fixes — 0 Critical, 4 Important, 5 Minor)
 **Current Phase**: 6 of 6
 **Auto-Build Mode**: YES
 **Last Completed**: Phase 6 (2026-09-29)
@@ -658,6 +659,8 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 6 | curl checks | `curl` of /health and :3000 was blocked by the sandbox in the verification shell; health and web are covered by compose healthchecks (which call /health) and by health.int.test.ts.
 - Phase 6 | docs/adr/0005, 0006, 0008, 0010, 0012 | These ADRs name the chosen option without listing the alternatives. The alternatives are in the linked creative docs (phase review, accepted).
 - Phase 6 | memory-bank/techContext.md (Unit Testing Specifics) | The text overstates some test facts: "fresh Node process per test" and "exit on first failure" aren't configured, and test:e2e needs the compose stack rather than `dev`. Minor, to fix in a later pass (phase review, accepted).
+- Final review | Important (unaddressed, needs human review) | 1 `pnpm run dev` never starts the worker (package.json:12). 2 OTel tracing from the plan was not delivered, but techContext.md:53-57 says it was. 3 nodemailer file/URL access is still allowed, and `html` is not type-checked (smtp.ts:118). 4 `db rollback` has no production guard (cli.ts:61-63).
+- Final review | Minor (deferred) | credit_transactions isn't append-only; redaction key patterns are snake_case only; coverage leaves out lib/logger and lib/db; api/web ports are published on all interfaces; SMTP error text in pgboss.job.output isn't redacted.
 
 ### AC Walk (32 ACs, 2026-09-29, after Phase 6)
 - AC-VERIFY-1 met (layout, root targets, techContext Component Structure lists the directories)
