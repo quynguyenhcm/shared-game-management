@@ -3,7 +3,6 @@ status: planning
 target_date:
 release_date:
 features:
-  - skill-levels-and-auto-enroll
   - session-scheduling-engine
   - registration-and-waitlist
   - wallet-and-akahu-billing
