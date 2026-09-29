@@ -3,7 +3,6 @@ status: planning
 target_date:
 release_date:
 features:
-  - team-management
   - team-banking-and-gst
   - skill-levels-and-auto-enroll
   - session-scheduling-engine
