@@ -8,7 +8,7 @@ status: CREATIVE_COMPLETE
 # platform-foundation: Platform Foundation
 
 **Complexity**: Level 4 (inherited from platform-foundation)
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: platform-foundation
 **Branch**: feature/platform-foundation
 **Worktree**: N/A (primary checkout)
@@ -545,7 +545,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - [x] Phase 5: Job runner and notifications (AC-VERIFY-16, AC-ASYNC-1, AC-ASYNC-2, AC-ASYNC-3, AC-ERROR-3, AC-ERROR-6, AC-INTEGRATION-3)
   - Components: pg-boss wrapper `apps/api/src/lib/jobs/jobs.ts`, `apps/api/src/jobs/` (`heartbeat`, 3 schedule slots, registry), notifier with `smtp` (Mailpit) and `memory` adapters
   - Milestone: job lifecycle is observable in the job store; a Mailpit message is received; retry ends in the failed state
-- [ ] Phase 6: Documentation, decision records and full-gate verification (AC-VERIFY-18; end-to-end verification of all ACs)
+- [x] Phase 6: Documentation, decision records and full-gate verification (AC-VERIFY-18; end-to-end verification of all ACs)
   - Components: `docs/getting-started.md`, ADRs `docs/adr/0001`–`0012` (architecture Q1–Q5, Q8, Q10, Q12; algorithm Q6, Q7, Q9, Q11), updated `techContext.md` and `systemPatterns.md`
   - Milestone: **a fresh clone → `setup` → `docker compose up -d --wait` → `ci` runs green with 0 errors or warnings**, following Getting Started verbatim. The GitHub Actions run (AC-VERIFY-4) is confirmed once pushing is re-enabled.
 
@@ -570,19 +570,19 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 
 ## Execution State
 
-**Build Status**: RUNNING
+**Build Status**: COMPLETE
 **Current Phase**: 6 of 6
 **Auto-Build Mode**: YES
-**Last Completed**: Phase 5 (2026-09-29)
+**Last Completed**: Phase 6 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Resumption Notes
-**Can Resume**: YES
-**Resume From**: Phase 6
+**Can Resume**: NO
+**Resume From**: (build complete; run /yay:reflect platform-foundation)
 **Notes**: Local-only run. Commit per phase, never push (spec owner, 2026-09-29; GitHub push blocked with a 403). Local services: Docker 29.5 on Colima, postgres:17 image, pnpm via Corepack (pin pnpm@10 through packageManager).
 
 ### Current Build Step
-**Step**: Step 11 - Git completion (Phase 5)
+**Step**: Step 11 - Git completion (Phase 6)
 **Status**: COMPLETE
 **Completed**: 2026-09-29
 
@@ -648,6 +648,48 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 5 | apps/api/src/jobs/send-email.ts, lib/jobs/jobs.ts:404 | Permanent and configuration notifier errors fail the job with 0 retries (NonRetryableJobError). Transient errors retry per AC-ERROR-3. This is a literal-reading departure from AC-ERROR-6's "is retried" (phase review, accepted).
 - Phase 5 | apps/api/test/integration/jobs.int.test.ts:352 | The unreachable-SMTP case is asserted on a direct `send` only; the job-wrapped failure uses the memory adapter (phase review, accepted).
 - Phase 5 | pgboss.job.data | Job payloads may carry PII (email addresses) for pg-boss's 7-day retention. Document this in Phase 6 (hand-off).
+- Phase 6 | push | local-only run; nothing pushed.
+- Phase 6 | git worktree | the worktree had been on a detached HEAD since Phase 4, so `feature/platform-foundation` still pointed at 169e868 while Phases 4-6 were committed on the detached head. Fixed by fast-forwarding the branch to HEAD (`git checkout -B`); the branch now carries every phase commit.
+- Phase 6 | docker-compose.yml / docs | a stale local `sgm-api:dev` image (Phase 2, with the `db migrate` stub) made plain `docker compose up -d --wait` fail on the fresh clone; compose does not rebuild an existing image. getting-started now says to use `--build` after pulling changes. With `--build` (layers partly cached) up took 106.7 s; a plain cached `up` took 17.2 s.
+- Phase 6 | AC-VERIFY-2 wording | the AC says `docker compose up -d --wait`; on a machine with no image it builds first (uncached build time not measured; the 120 s budget is stated for cached images).
+- Phase 6 | documentation agent | Haiku agent dispatched; it produced inaccuracies (static export, per-test transactions, a telemetry dir, custom metrics) that were corrected by hand, and it later overwrote systemPatterns.md with a second version after the commit; that version was discarded in favour of the verified committed one.
+- Phase 6 | metrics | only METRICS_* config variables exist; no Prometheus exporter or custom metrics are implemented (techContext states this).
+- Phase 6 | fresh-clone verification | clone of feature/platform-foundation at d384995 in the session scratchpad: `pnpm run setup` 4.5 s; compose up healthy; `pnpm run ci` green in 67.6 s: lint 0 errors/0 warnings, typecheck 0 errors, unit 130/130 (16 files), integration 63/63 (13 files), build ok; coverage lines 99.41%, statements 99.28%, branches 93.69%, functions 99.32%. Postgres reports 17.x and timezone UTC. The clone's containers were stopped afterwards (the compose project name `sgm` and its `pgdata` volume are shared with the main worktree; the volume was kept).
+- Phase 6 | curl checks | `curl` of /health and :3000 was blocked by the sandbox in the verification shell; health and web are covered by compose healthchecks (which call /health) and by health.int.test.ts.
+
+### AC Walk (32 ACs, 2026-09-29, after Phase 6)
+- AC-VERIFY-1 met (layout, root targets, techContext Component Structure lists the directories)
+- AC-VERIFY-2 met-with-deviation (Phase 2/6 ledger: Playwright checks outside `ci`; --build note)
+- AC-VERIFY-3 met (Phase 1 violation checks)
+- AC-VERIFY-4 open until push is re-enabled (actionlint clean, local ci green; no real Actions run)
+- AC-VERIFY-5 met-with-deviation (Phase 3: pg_dump compared only when compose postgres is reachable; catalog snapshot always)
+- AC-VERIFY-6 met
+- AC-VERIFY-7 met
+- AC-VERIFY-8 met
+- AC-VERIFY-9 met (advisory: assign_invoice_number does not require PAID; hand-off to tax-invoices-and-exports)
+- AC-VERIFY-10 met
+- AC-VERIFY-11 met
+- AC-VERIFY-12 met
+- AC-VERIFY-13 met (advisory: AAD delimiter ambiguity, Phase 4)
+- AC-VERIFY-14 met (advisory: lint guard matches Identifier arguments only)
+- AC-VERIFY-15 met
+- AC-VERIFY-16 met
+- AC-VERIFY-17 met
+- AC-VERIFY-18 met (ADRs 0001-0012, techContext, systemPatterns, getting-started)
+- AC-VERIFY-19 met
+- AC-INTEGRATION-1 met (D-01..D-26 in db/schema-deviations.md)
+- AC-INTEGRATION-2 met
+- AC-INTEGRATION-3 met
+- AC-INTEGRATION-4 met-with-deviation (Phase 2: Tailwind and "API: ok" checks in Playwright, outside `ci`)
+- AC-ASYNC-1 met
+- AC-ASYNC-2 met-with-deviation (Phase 5: `intervalSweep` exemption for post-game-billing in hour 02)
+- AC-ASYNC-3 met (recovery after SIGKILL measured 9-13 s)
+- AC-ERROR-1 met
+- AC-ERROR-2 met-with-deviation (Phase 2: outage simulated with a closed-port pool; real stop/start verified manually)
+- AC-ERROR-3 met
+- AC-ERROR-4 met
+- AC-ERROR-5 met
+- AC-ERROR-6 met-with-deviation (Phase 5: permanent and configuration errors fail with 0 retries; job-wrapped unreachable-SMTP asserted with the memory adapter)
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
@@ -666,3 +708,4 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - 2026-09-29 Phase 2 build: COMPLETE - compose stack healthy in 17 s (cached), /health 200/503/200 verified, web shows live API status and Tailwind CSS, Playwright smoke green, actionlint clean, local ci green. Push skipped (local-only run).
 - 2026-09-29 Phase 3 build: COMPLETE - TDD RED 38 failing -> GREEN 38/38; integration 42/42, unit 40/40, ci green; review APPROVED (0 blocking, 8 advisory). Push skipped (local-only run).
 - 2026-09-29 Phase 4 build: COMPLETE - TDD RED (5 unit + 2 int files failed on missing modules) -> GREEN unit 80/80, integration 50/50; coverage 94-100%; lint/typecheck/build green; review APPROVED (0 blocking, 7 advisory). Push skipped (local-only run).
+- 2026-09-29 Phase 6 build: COMPLETE - getting-started, ADRs 0001-0012, techContext/systemPatterns; fresh-clone setup -> compose up -> ci green (130 unit, 63 integration, coverage 99.4% lines). Push skipped (local-only run). BUILD_COMPLETE.

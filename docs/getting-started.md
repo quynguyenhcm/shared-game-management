@@ -125,4 +125,5 @@ See [`docs/adr/`](adr/) for the recorded stack and algorithm decisions.
 
 - Port already in use on 3000, 4000, 5432, 8025 or 1025: stop the other stack (`docker compose down`) first.
 - `docker compose up` slow on first run: images are built once; later runs use the cache.
+- After pulling code changes run `docker compose up -d --wait --build`. Plain `up` reuses an existing `sgm-api:dev` / `sgm-web:dev` image, so a stale image from an older checkout can crash on start (for example an old `db migrate` stub).
 - Integration tests cannot connect: check `docker compose ps` shows `postgres` healthy.
