@@ -644,6 +644,10 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 5 | coverage | lib/jobs + lib/notifications covered by unit tests (overall 99% lines/93% branches); src/jobs/* outside coverage include.
 - Phase 5 | review APPROVED, advisories | A1 nodemailer disableFileAccess/disableUrlAccess + html string check; A2 validate raw (untrimmed) address; A3 intervalSweep flag could exempt any cron; A4 non-notification error text unredacted in job output; A5 no production guard on JOBS_EXPIRE_SECONDS_OVERRIDE; A6 payload casts/zod parse in send-email; A8 SIGTERM during startup; A9 PII in pgboss.job.data for 7 days (document in Phase 6); A11 friendlier bad-JSON error in `jobs trigger`.
 - Phase 5 | RED evidence | 5 new unit files failed to load (module missing) + 3 assertion failures (config jobs x2, logger query masking); both integration files failed to load. GREEN: 130 unit, 63 integration, lint/typecheck/build clean.
+- Phase 5 | apps/api/src/jobs/schedules.ts:29-31 | The `intervalSweep` flag exempts post-game-billing (`*/5 * * * *`) from the 02:00–02:59 no-fire rule, since a fixed interval isn't affected by DST. The daily slots are still guarded. The alternative `*/5 0-1,3-23 * * *` is left to the spec owner (phase review, accepted).
+- Phase 5 | apps/api/src/jobs/send-email.ts, lib/jobs/jobs.ts:404 | Permanent and configuration notifier errors fail the job with 0 retries (NonRetryableJobError). Transient errors retry per AC-ERROR-3. This is a literal-reading departure from AC-ERROR-6's "is retried" (phase review, accepted).
+- Phase 5 | apps/api/test/integration/jobs.int.test.ts:352 | The unreachable-SMTP case is asserted on a direct `send` only; the job-wrapped failure uses the memory adapter (phase review, accepted).
+- Phase 5 | pgboss.job.data | Job payloads may carry PII (email addresses) for pg-boss's 7-day retention. Document this in Phase 6 (hand-off).
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
