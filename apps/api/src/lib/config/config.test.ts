@@ -176,3 +176,34 @@ describe('configuration edge cases', () => {
     }
   });
 });
+
+describe('job runner tuning', () => {
+  it('defaults to production-safe values with no expiry override', () => {
+    const { jobs } = loadConfig(validEnv());
+    expect(jobs).toEqual({
+      expireSecondsOverride: undefined,
+      superviseIntervalSeconds: 60,
+      pollIntervalSeconds: 2,
+    });
+  });
+
+  it('parses the test-only overrides and rejects invalid values by name', () => {
+    const { jobs } = loadConfig(
+      validEnv({
+        JOBS_EXPIRE_SECONDS_OVERRIDE: '5',
+        JOBS_SUPERVISE_INTERVAL_SECONDS: '2',
+        JOBS_POLL_INTERVAL_SECONDS: '0.5',
+      }),
+    );
+    expect(jobs).toEqual({
+      expireSecondsOverride: 5,
+      superviseIntervalSeconds: 2,
+      pollIntervalSeconds: 0.5,
+    });
+    const issues = issuesFor(
+      validEnv({ JOBS_EXPIRE_SECONDS_OVERRIDE: '0', JOBS_POLL_INTERVAL_SECONDS: '0.1' }),
+    ).join('\n');
+    expect(issues).toContain('JOBS_EXPIRE_SECONDS_OVERRIDE');
+    expect(issues).toContain('JOBS_POLL_INTERVAL_SECONDS');
+  });
+});

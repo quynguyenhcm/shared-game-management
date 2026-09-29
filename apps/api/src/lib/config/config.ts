@@ -91,6 +91,10 @@ const envSchema = z.object({
   METRICS_ENABLED: booleanFlag.default(false),
   METRICS_PORT: port.default(9090),
   METRICS_PATH: z.string().startsWith('/').default('/metrics'),
+  // Job runner tuning. The overrides exist so integration tests can shorten expiry (SIGKILL recovery).
+  JOBS_EXPIRE_SECONDS_OVERRIDE: z.coerce.number().int().min(1).optional(),
+  JOBS_SUPERVISE_INTERVAL_SECONDS: z.coerce.number().int().min(1).default(60),
+  JOBS_POLL_INTERVAL_SECONDS: z.coerce.number().min(0.5).default(2),
 });
 
 export interface Config {
@@ -125,6 +129,13 @@ export interface Config {
     readonly enabled: boolean;
     readonly port: number;
     readonly path: string;
+  };
+  readonly jobs: {
+    /** When set, replaces every queue's expireInSeconds (test-only; production leaves it unset). */
+    readonly expireSecondsOverride: number | undefined;
+    /** How often pg-boss reclaims expired active jobs; bounds crash recovery (default 60 s). */
+    readonly superviseIntervalSeconds: number;
+    readonly pollIntervalSeconds: number;
   };
 }
 
@@ -223,6 +234,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       samplerArg: data.OTEL_TRACES_SAMPLER_ARG,
     },
     metrics: { enabled: data.METRICS_ENABLED, port: data.METRICS_PORT, path: data.METRICS_PATH },
+    jobs: {
+      expireSecondsOverride: data.JOBS_EXPIRE_SECONDS_OVERRIDE,
+      superviseIntervalSeconds: data.JOBS_SUPERVISE_INTERVAL_SECONDS,
+      pollIntervalSeconds: data.JOBS_POLL_INTERVAL_SECONDS,
+    },
   };
 }
 

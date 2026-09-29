@@ -57,11 +57,35 @@ interface RequestLike {
   ip?: string;
 }
 
+const QUERY_PARAM = /([?&])([^=&#]+)=([^&#]*)/g;
+
+/** Masks the value of every query parameter whose (decoded) name matches a redaction pattern. */
+function maskQuerySecrets(
+  url: string | undefined,
+  patterns: readonly RegExp[],
+): string | undefined {
+  if (url === undefined || !url.includes('?')) return url;
+  return url.replace(QUERY_PARAM, (whole, separator: string, name: string) => {
+    let decoded = name;
+    try {
+      decoded = decodeURIComponent(name);
+    } catch {
+      // Keep the raw name when it is not valid percent-encoding.
+    }
+    return patterns.some((pattern) => pattern.test(decoded))
+      ? `${separator}${name}=${REDACTED}`
+      : whole;
+  });
+}
+
 /** Fastify request shape (also passes raw Node requests through); headers stay so `redact` can mask secrets. */
-function serializeRequest(request: RequestLike): Record<string, unknown> {
+function serializeRequest(
+  request: RequestLike,
+  patterns: readonly RegExp[],
+): Record<string, unknown> {
   return {
     method: request.method,
-    url: request.url,
+    url: maskQuerySecrets(request.url, patterns),
     headers: request.headers,
     remoteAddress: request.ip,
   };
@@ -159,7 +183,7 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     },
     serializers: {
       req: (request: RequestLike) =>
-        redactDeep(serializeRequest(request), patterns, 0, new WeakSet()),
+        redactDeep(serializeRequest(request, patterns), patterns, 0, new WeakSet()),
       res: (response: Parameters<typeof stdSerializers.res>[0]) =>
         redactDeep(stdSerializers.res(response), patterns, 0, new WeakSet()),
       err: (error: Parameters<typeof stdSerializers.err>[0]) =>

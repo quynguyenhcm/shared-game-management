@@ -542,7 +542,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - [x] Phase 4: Money, time and crypto libraries (AC-VERIFY-13, AC-VERIFY-14, AC-VERIFY-15, AC-ERROR-4, AC-ERROR-5)
   - Components: `packages/shared` money (+ zod), time and invoice format, `nz_local_to_utc` parity tests, `apps/api` crypto and keyring, encrypted columns wired to the crypto module
   - Milestone: all DST and money test vectors pass; no plaintext in the raw bytes of encrypted columns
-- [ ] Phase 5: Job runner and notifications (AC-VERIFY-16, AC-ASYNC-1, AC-ASYNC-2, AC-ASYNC-3, AC-ERROR-3, AC-ERROR-6, AC-INTEGRATION-3)
+- [x] Phase 5: Job runner and notifications (AC-VERIFY-16, AC-ASYNC-1, AC-ASYNC-2, AC-ASYNC-3, AC-ERROR-3, AC-ERROR-6, AC-INTEGRATION-3)
   - Components: pg-boss wrapper `apps/api/src/lib/jobs/jobs.ts`, `apps/api/src/jobs/` (`heartbeat`, 3 schedule slots, registry), notifier with `smtp` (Mailpit) and `memory` adapters
   - Milestone: job lifecycle is observable in the job store; a Mailpit message is received; retry ends in the failed state
 - [ ] Phase 6: Documentation, decision records and full-gate verification (AC-VERIFY-18; end-to-end verification of all ACs)
@@ -571,18 +571,18 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 5 of 6
+**Current Phase**: 6 of 6
 **Auto-Build Mode**: YES
-**Last Completed**: Phase 4 (2026-09-29)
+**Last Completed**: Phase 5 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 5
+**Resume From**: Phase 6
 **Notes**: Local-only run. Commit per phase, never push (spec owner, 2026-09-29; GitHub push blocked with a 403). Local services: Docker 29.5 on Colima, postgres:17 image, pnpm via Corepack (pin pnpm@10 through packageManager).
 
 ### Current Build Step
-**Step**: Step 11 - Git completion (Phase 4)
+**Step**: Step 11 - Git completion (Phase 5)
 **Status**: COMPLETE
 **Completed**: 2026-09-29
 
@@ -632,6 +632,18 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 4 | documentation agent | not dispatched; techContext/systemPatterns deferred to Phase 6.
 - Phase 4 | apps/api/src/lib/crypto/crypto.ts:55 | The AAD `sgm:v1:<table>.<column>:<rowId>` has delimiter ambiguity if an identifier contains '.' or ':'. Identifiers are code constants and the copy-to-another-row/column test passes. Hardening (length-prefix or validate) deferred (phase review, accepted).
 - Phase 4 | eslint.config.mjs | The money and time lint selectors match Identifier arguments only, so `Math.round(row.amount)` evades them. Hardening gap; the type brand still guards (phase review, accepted).
+- Phase 5 | push | local-only run; nothing pushed.
+- Phase 5 | 02:00-02:59 rule vs `post-game-billing` `*/5 * * * *` | the sweep necessarily fires in hour 02; kept as specified with an `intervalSweep` flag exempting only that idempotent slot; the two daily slots are guarded (tested). Spec owner may prefer `*/5 0-1,3-23 * * *`.
+- Phase 5 | pg-boss 12.35 facts | `singletonKey` dedupes only on `exclusive`-policy queues; crash recovery needs both superviseIntervalSeconds and monitorIntervalSeconds (set together from JOBS_SUPERVISE_INTERVAL_SECONDS); backoff = retryDelay * 2^(n+1)/2 * (1+rand). Permanent/config notifier errors fail the job with zero retries via NonRetryableJobError -> deadletter disposition.
+- Phase 5 | env knobs | JOBS_EXPIRE_SECONDS_OVERRIDE, JOBS_SUPERVISE_INTERVAL_SECONDS, JOBS_POLL_INTERVAL_SECONDS added to config and .env.example.
+- Phase 5 | tracing | no OTel API dependency yet; trace context carried in `_meta.traceparent` via AsyncLocalStorage helpers in jobs.ts.
+- Phase 5 | cron-parser | not imported directly; DST fire times asserted through the runner's `previewSchedule` (pg-boss's cron-parser wrapper).
+- Phase 5 | notifier | subject/recipient validation failures throw PermanentDeliveryError (providerCode invalid_message); queue named `send-email`.
+- Phase 5 | logger | carried Phase 2 advisory done: query-string secret masking in req.url (+2 tests).
+- Phase 5 | env clock skew | postgres container clock ~7-8 s behind host; tests use performance.now() and DB-clock startAfter. Recovery after SIGKILL measured 9-13 s (limit 30 s).
+- Phase 5 | coverage | lib/jobs + lib/notifications covered by unit tests (overall 99% lines/93% branches); src/jobs/* outside coverage include.
+- Phase 5 | review APPROVED, advisories | A1 nodemailer disableFileAccess/disableUrlAccess + html string check; A2 validate raw (untrimmed) address; A3 intervalSweep flag could exempt any cron; A4 non-notification error text unredacted in job output; A5 no production guard on JOBS_EXPIRE_SECONDS_OVERRIDE; A6 payload casts/zod parse in send-email; A8 SIGTERM during startup; A9 PII in pgboss.job.data for 7 days (document in Phase 6); A11 friendlier bad-JSON error in `jobs trigger`.
+- Phase 5 | RED evidence | 5 new unit files failed to load (module missing) + 3 assertion failures (config jobs x2, logger query masking); both integration files failed to load. GREEN: 130 unit, 63 integration, lint/typecheck/build clean.
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE

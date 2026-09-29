@@ -171,3 +171,34 @@ describe('logger', () => {
     expect(JSON.stringify(lines[1])).not.toContain('err-pass-1');
   });
 });
+
+describe('request url query-string masking', () => {
+  it('masks secret query parameters in logged req.url and keeps the rest', () => {
+    const sink = capture();
+    const logger = createLogger(baseOptions, sink.stream);
+    logger.info(
+      {
+        req: {
+          method: 'GET',
+          url: '/reset?token=abc123&page=2&apiKey=k-9&password=hunter2',
+          headers: {},
+        },
+      },
+      'request',
+    );
+    const url = (sink.lines()[0]?.req as { url: string }).url;
+    expect(url).toBe('/reset?token=[REDACTED]&page=2&apiKey=[REDACTED]&password=[REDACTED]');
+    expect(url).not.toContain('abc123');
+    expect(url).not.toContain('hunter2');
+  });
+
+  it('leaves urls without a query string, or with an unparseable one, untouched', () => {
+    const sink = capture();
+    const logger = createLogger(baseOptions, sink.stream);
+    logger.info({ req: { method: 'GET', url: '/health', headers: {} } }, 'plain');
+    logger.info({ req: { method: 'GET', url: '/x?a=1', headers: {} } }, 'harmless');
+    const [plain, harmless] = sink.lines();
+    expect((plain?.req as { url: string }).url).toBe('/health');
+    expect((harmless?.req as { url: string }).url).toBe('/x?a=1');
+  });
+});
