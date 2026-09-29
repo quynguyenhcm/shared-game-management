@@ -13,7 +13,7 @@ Scaffold the repo and shared infrastructure every other feature builds on.
 
 - Monorepo layout: Next.js + Tailwind web app, API service, shared types
 - **Decide backend**: Node (Express/NestJS) or Python (FastAPI)
-- PostgreSQL 15 migrations based on `database-design.md`, fixing the gaps it has against the spec:
+- PostgreSQL 17 migrations based on `database-design.md`, fixing the gaps it has against the spec:
   - auth identities table (password hash, Google/Facebook provider IDs)
   - `payments.team_id` (routing, GST, exports) and a per-payment fee snapshot
   - guest attributes (sex, skill level) so BY_SEX and BY_SKILL_LEVEL pricing can apply to guests

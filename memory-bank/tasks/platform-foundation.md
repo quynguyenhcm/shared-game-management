@@ -19,7 +19,7 @@ Scaffold the repo and shared infrastructure every other feature builds on.
 
 - Monorepo layout: Next.js + Tailwind web app, API service, shared types
 - **Decide backend**: Node (Express/NestJS) or Python (FastAPI)
-- PostgreSQL 15 migrations based on `database-design.md`, fixing the gaps it has against the spec:
+- PostgreSQL 17 migrations based on `database-design.md`, fixing the gaps it has against the spec:
   - auth identities table (password hash, Google/Facebook provider IDs)
   - `payments.team_id` (routing, GST, exports) and a per-payment fee snapshot
   - guest attributes (sex, skill level) so BY_SEX and BY_SKILL_LEVEL pricing can apply to guests
@@ -54,7 +54,7 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
   | Lint + format | `eslint . --max-warnings 0` + `prettier --check .` | web: same as A; api: `ruff check .` + `ruff format --check .` |
   | Type check | `tsc --noEmit` (`strict: true`) in every package | web: `tsc --noEmit`; api: `mypy --strict` or `pyright` (strict) |
   | Unit tests | `vitest run` (or Jest) | web: `vitest run`; api: `pytest -m "not integration"` |
-  | Integration tests | `vitest run --project integration` against real Postgres 15 | `pytest -m integration` against real Postgres 15 |
+  | Integration tests | `vitest run --project integration` against real Postgres 17 | `pytest -m integration` against real Postgres 17 |
   | Migrations | node-pg-migrate, Drizzle Kit, Prisma Migrate or Knex, **or** tool-neutral `dbmate` (raw SQL) | Alembic **or** tool-neutral `dbmate` (raw SQL) |
   | Shared types | `packages/shared` TS package imported by web and api directly | TS types generated from the API's OpenAPI schema (e.g. `openapi-typescript`); CI fails if regeneration produces a diff |
   | Job runner candidates | pg-boss or Graphile Worker (Postgres-backed); BullMQ (needs Redis) | Procrastinate (Postgres-backed); Celery or arq (need Redis); APScheduler (scheduling only) |
@@ -63,7 +63,7 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 - **Success metrics**:
   - `ci` exits 0 with **0 lint errors, 0 lint warnings, 0 type errors, 0 failing tests**. Injecting one deliberate violation of each kind makes it exit non-zero.
   - With images cached, `docker compose up -d --wait` reports every service healthy within **120 s** on a developer laptop.
-  - `db:migrate` from an empty Postgres 15 database finishes in **30 s or less**. `db:rollback` to zero followed by `db:migrate` again also succeeds (a full down/up round trip).
+  - `db:migrate` from an empty Postgres 17 database finishes in **30 s or less**. `db:rollback` to zero followed by `db:migrate` again also succeeds (a full down/up round trip).
   - The GitHub Actions `ci` job finishes in **10 min or less** wall-clock (proposed target; the plan may revise it with justification).
   - Line coverage is **80% or more** for the foundation library modules: money, time, crypto, notifications and job-runner wrapper. Proposed threshold; SHOULD.
   - Schema conformance: **100%** of tables, enum types and values, and indexes in `database-design.md` are present in the migrated database. The only exceptions are entries in the schema deviations record, and each of those cites its source requirement (AC-INTEGRATION-1).
@@ -79,11 +79,11 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 **When** a developer lists the top-level layout and runs the root task runner's help or list command
 **Then** there is a Next.js + Tailwind web app, an API service, a background worker entry point (it may share the API's codebase but runs as a separate process), and a shared-types unit. All of the named targets `setup`, `dev`, `lint`, `typecheck`, `test`, `test:integration`, `db:migrate`, `db:rollback`, `db:reset`, `build` and `ci` exist and run without "command not found". The chosen directory names are pinned in the plan and recorded in `memory-bank/techContext.md` → Component Structure and Development Commands.
 
-#### AC-VERIFY-2: Local dev stack starts healthy via Docker Compose on PostgreSQL 15 with UTC database time
+#### AC-VERIFY-2: Local dev stack starts healthy via Docker Compose on PostgreSQL 17 with UTC database time
 **Priority**: MUST
 **Given** Docker is running and `.env` has been created from the committed `.env.example`
 **When** the developer runs `docker compose up -d --wait`
-**Then** all services report healthy within 120 s (images cached): `postgres`, `api`, `worker`, `web`, `mailpit`, plus `redis` only if Creative Q4 picks a Redis-backed runner. `SELECT version()` returns a string that starts with `PostgreSQL 15.` and `SHOW timezone` returns `UTC`. `GET /health` on the API returns HTTP 200 with a body that reports database connectivity as ok. `http://localhost:3000` returns HTTP 200 and renders a page styled by Tailwind: the served CSS contains at least one Tailwind utility class that the page uses.
+**Then** all services report healthy within 120 s (images cached): `postgres`, `api`, `worker`, `web`, `mailpit`, plus `redis` only if Creative Q4 picks a Redis-backed runner. `SELECT version()` returns a string that starts with `PostgreSQL 17.` and `SHOW timezone` returns `UTC`. `GET /health` on the API returns HTTP 200 with a body that reports database connectivity as ok. `http://localhost:3000` returns HTTP 200 and renders a page styled by Tailwind: the served CSS contains at least one Tailwind utility class that the page uses.
 
 #### AC-VERIFY-3: Lint, format and type-check gates are strict and actually fail on violations
 **Priority**: MUST
@@ -91,15 +91,15 @@ Source specs: `PRODDUCT-OVERVIEW.md`, `database-design.md`, `workflows_state_mac
 **When** `lint` and `typecheck` are run, and then run again after each of three deliberate violations is introduced separately: an unused variable, a mis-formatted file, and a type error (e.g. assigning a string to a numeric field)
 **Then** the clean run exits 0 with 0 errors and 0 warnings. Each violation run exits non-zero and names the offending file. TypeScript runs with `strict: true`. If Option B is chosen, Python type checking runs in strict mode.
 
-#### AC-VERIFY-4: CI pipeline runs the same gates as local `ci` against a real Postgres 15 service
+#### AC-VERIFY-4: CI pipeline runs the same gates as local `ci` against a real Postgres 17 service
 **Priority**: MUST
 **Given** `.github/workflows/ci.yml` is committed
 **When** `actionlint` runs on the workflow, and later the branch is pushed or a PR to `main` is opened
-**Then** `actionlint` reports 0 findings. The workflow triggers on `push` to `main` and on `pull_request` targeting `main`. It uses a `postgres:15` service container, runs the same `ci` target that developers run locally rather than a divergent step list, caches dependencies, and completes in 10 min or less. A failing test or lint violation marks the run failed. *Note: nothing has been pushed to `origin` yet, so the first real CI run happens at archive or push time. Until then, AC-VERIFY-4 is verified by `actionlint` plus a local `ci` run.*
+**Then** `actionlint` reports 0 findings. The workflow triggers on `push` to `main` and on `pull_request` targeting `main`. It uses a `postgres:17` service container, runs the same `ci` target that developers run locally rather than a divergent step list, caches dependencies, and completes in 10 min or less. A failing test or lint violation marks the run failed. *Note: nothing has been pushed to `origin` yet, so the first real CI run happens at archive or push time. Until then, AC-VERIFY-4 is verified by `actionlint` plus a local `ci` run.*
 
-#### AC-VERIFY-5: Migrations apply cleanly from empty and are reversible on PostgreSQL 15
+#### AC-VERIFY-5: Migrations apply cleanly from empty and are reversible on PostgreSQL 17
 **Priority**: MUST
-**Given** an empty PostgreSQL 15 database
+**Given** an empty PostgreSQL 17 database
 **When** `db:migrate`, then `db:rollback` to version zero, then `db:migrate` are run in sequence
 **Then** every step exits 0. After the final step the schema is identical to the one after the first step: a `pg_dump --schema-only` diff, ignoring ownership and comments, is empty. The first migrate finishes in 30 s or less. The migrations use core `gen_random_uuid()` and do not depend on `uuid-ossp`, which `database-design.md` creates but never uses. If the chosen tool is forward-only, the plan must justify that, and the check becomes `db:reset` + `db:migrate` producing the identical dump.
 
@@ -201,7 +201,7 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 **Priority**: MUST
 **Given** the scaffolded harness
 **When** `test` and `test:integration` are run, including two integration suites in parallel
-**Then** `test` needs no running database and finishes without network access. `test:integration` runs against real PostgreSQL 15 (the Compose service or Testcontainers) with migrations applied. Each test or suite is isolated, by transaction rollback or a per-suite database/template, so parallel runs do not see each other's rows. At least one example test of each kind exists, so downstream features have a pattern to follow. Coverage is reported for the foundation library modules, with a target of 80% or more (see Success metrics).
+**Then** `test` needs no running database and finishes without network access. `test:integration` runs against real PostgreSQL 17 (the Compose service or Testcontainers) with migrations applied. Each test or suite is isolated, by transaction rollback or a per-suite database/template, so parallel runs do not see each other's rows. At least one example test of each kind exists, so downstream features have a pattern to follow. Coverage is reported for the foundation library modules, with a target of 80% or more (see Success metrics).
 
 #### AC-VERIFY-18: Stack decisions are recorded and the memory bank reflects the built foundation
 **Priority**: MUST
@@ -302,8 +302,8 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 - **In scope**:
   - The monorepo scaffold: the Next.js + Tailwind web app with one placeholder page, the API service with `/health`, a worker process and shared types.
   - The root task runner, ESLint/Prettier (plus Ruff and mypy/pyright if Option B) and strict type checking.
-  - The unit and integration test harness, GitHub Actions CI, Docker Compose local dev (postgres:15, api, worker, web, Mailpit, and Redis only if required), `.env.example`, and Dockerfiles for api, worker and web.
-  - PostgreSQL 15 migrations for the **full domain model** in `database-design.md`, plus these gap fixes: auth identities; `payments.team_id` and the fee snapshot; guest sex and skill; `UNIQUE(session_id, user_id)`; `guest_count` range 0–2; per-team invoice-number allocation; encrypted bank details and Akahu credentials; balance range 0–100.00; FK changes that preserve financial records; `UNIQUE(recurring_rule_id, date)`; the auto-enrol assignment timestamp. A schema deviations record traces each one.
+  - The unit and integration test harness, GitHub Actions CI, Docker Compose local dev (postgres:17, api, worker, web, Mailpit, and Redis only if required), `.env.example`, and Dockerfiles for api, worker and web.
+  - PostgreSQL 17 migrations for the **full domain model** in `database-design.md`, plus these gap fixes: auth identities; `payments.team_id` and the fee snapshot; guest sex and skill; `UNIQUE(session_id, user_id)`; `guest_count` range 0–2; per-team invoice-number allocation; encrypted bank details and Akahu credentials; balance range 0–100.00; FK changes that preserve financial records; `UNIQUE(recurring_rule_id, date)`; the auto-enrol assignment timestamp. A schema deviations record traces each one.
   - Library modules with no domain rules: money, Pacific/Auckland time, crypto (encrypt/decrypt, key ID), the notification abstraction (Mailpit and in-memory adapters), and the job-runner wrapper (enqueue, schedule, retry, dedupe) with three named no-op schedule slots and a `heartbeat` job.
   - Architecture decision records, and updates to `techContext.md` and `systemPatterns.md`.
 - **Out of scope**:
@@ -326,7 +326,7 @@ All persisted instants are `TIMESTAMP WITH TIME ZONE`. Local conversion happens 
 - **Dependencies**:
   - Docker and Docker Compose v2 on developer machines.
   - Node.js LTS and pnpm. With Option B, also Python 3.12+ and uv.
-  - The `postgres:15` and `axllent/mailpit` images, plus `redis:7` only if a Redis-backed runner is chosen.
+  - The `postgres:17` and `axllent/mailpit` images, plus `redis:7` only if a Redis-backed runner is chosen.
   - GitHub Actions on `github.com/quynguyenhcm/shared-game-management` (the remote exists; nothing is pushed yet).
   - No other roadmap features. All ten other v1.0.0 features depend on this one.
 - **NFR implications**:
@@ -352,7 +352,7 @@ Level 4, so creative is mandatory. Each question lists the options and the ACs i
 7. **[Algorithm] DST policy for local wall-clock times**: how a nonexistent local time (`2026-09-27 02:30`) and an ambiguous one (`2027-04-04 02:30`) resolve: shift forward or reject, earlier or later instant. Also whether "cancellation deadline defaults to 48 h prior" means absolute hours (the AC-VERIFY-15 vector) or the same local wall-clock time two days earlier; the two differ by 1 h across a DST change. Foundation provides both primitives, and session-scheduling-engine applies the chosen rule. Also decide whether sessions should store a computed `starts_at`/`ends_at timestamptz`, because the draft has only `date` + per-court `TIME` with no zone, and post-game billing needs an instant. Unblocks AC-VERIFY-15.
 8. **[Architecture] Production email provider and adapter contract**: productBrief lists the provider as "TBD". Options include Postmark, SendGrid, AWS SES and Resend. Only the adapter interface and the dev (Mailpit) and test adapters are built here. The choice matters now only so the `send()` contract (fields, error types, idempotency key) fits the likely provider. Unblocks AC-VERIFY-16 and AC-ERROR-6.
 9. **[Algorithm] Invoice-number allocation**: a gapless counter table (`SELECT ... FOR UPDATE`, serialises per team) vs a per-team sequence that allows gaps. IRD requires unique, identifiable invoices, not strictly gapless ones, so confirm. Also the display format (e.g. `<TEAM-PREFIX>-000123`). Unblocks AC-VERIFY-9.
-10. **[Architecture] Hosting target**, only as far as it constrains foundation: for example Fly.io, Render, Railway, AWS ECS + RDS, or Vercel for web plus a separate API and worker host. This affects whether the scheduler runs in-process or uses platform cron, where encryption keys live (KMS vs platform secrets), TLS termination, and the managed Postgres 15 choice. Deployment itself is out of scope.
+10. **[Architecture] Hosting target**, only as far as it constrains foundation: for example Fly.io, Render, Railway, AWS ECS + RDS, or Vercel for web plus a separate API and worker host. This affects whether the scheduler runs in-process or uses platform cron, where encryption keys live (KMS vs platform secrets), TLS termination, and the managed Postgres 17 choice. Deployment itself is out of scope.
 11. **[Algorithm] Fee snapshot and guest model shape**: snapshot columns on `payments` vs a `payment_line_items` child table (one line per registrant and guest) vs JSONB; a `registration_guests` child table vs positional columns on `registrations`. The workflows doc bills per confirmed registration including guests, so line items are likely, but that is not decided here. Unblocks AC-VERIFY-7 and AC-VERIFY-8.
 12. **[Architecture] Shared-types strategy**: hand-written TS enums in a shared package vs types generated from the DB schema (e.g. Kysely codegen, Drizzle inference) vs types generated from OpenAPI. This is tightly coupled to Q1 and Q3, and determines how AC-INTEGRATION-2 parity is enforced.
 
@@ -368,7 +368,7 @@ Yes. Downstream developers need a short `README` or `docs/` "Getting started" co
 ## Test Strategy
 
 ### Approach
-- **Emphasis**: balanced. Library modules (money, time, crypto, config, notifications) are unit-heavy. Schema, jobs and health checks are integration tests against a real Postgres 15, because the ACs are mostly about DB constraints and job-store behaviour that mocks cannot prove. One smoke E2E test covers web → API.
+- **Emphasis**: balanced. Library modules (money, time, crypto, config, notifications) are unit-heavy. Schema, jobs and health checks are integration tests against a real Postgres 17, because the ACs are mostly about DB constraints and job-store behaviour that mocks cannot prove. One smoke E2E test covers web → API.
 - **Target test count**: about 62 in total. This is above the 20 guideline because the task covers 31 ACs across 5 library modules, a full domain schema with 11 gap fixes, and a job runner. The count averages about 2 tests per AC. Each module stays within the 6–12 per-module guideline.
 - **Coverage gate**: 80% or more line coverage on `packages/shared/src/{money,time}` and `apps/api/src/lib/{crypto,config,notifications,jobs}` (SHOULD, per Success metrics).
 
@@ -407,7 +407,7 @@ Yes. Downstream developers need a short `README` or `docs/` "Getting started" co
 ## Architectural Plan
 
 ### Executive Summary
-This task builds the monorepo, local stack, CI, full PostgreSQL 15 domain schema (with the 11 gap fixes) and the stateless library modules that all ten later v1.0.0 features depend on. It contains no domain logic.
+This task builds the monorepo, local stack, CI, full PostgreSQL 17 domain schema (with the 11 gap fixes) and the stateless library modules that all ten later v1.0.0 features depend on. It contains no domain logic.
 
 ### Architectural Principles
 1. **Postgres is the system of record.** Constraints (CHECK, UNIQUE, FK RESTRICT) enforce invariants in the database, not only in app code.
@@ -450,9 +450,9 @@ Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Cre
      migrations stay raw SQL if dbmate (else apps/api/alembic/versions/*.py). Web and packages/shared pins are unaffected. -->
 - [ ] `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc.json`, `.editorconfig`: root workspace, strict TS, lint and format config
 - [ ] `.env.example`, `.gitignore` (extend): documented env vars, with no secrets
-- [ ] `docker-compose.yml`: postgres:15, api, worker, web, mailpit (plus redis only if Q4 requires it), with health checks
+- [ ] `docker-compose.yml`: postgres:17, api, worker, web, mailpit (plus redis only if Q4 requires it), with health checks
 - [ ] `apps/api/Dockerfile`, `apps/worker/Dockerfile`, `apps/web/Dockerfile`
-- [ ] `.github/workflows/ci.yml`: lint → typecheck → unit → integration (postgres:15 service) → build
+- [ ] `.github/workflows/ci.yml`: lint → typecheck → unit → integration (postgres:17 service) → build
 - [ ] `apps/web/package.json`, `apps/web/next.config.ts`, `apps/web/tailwind.config.ts`, `apps/web/postcss.config.mjs`, `apps/web/tsconfig.json`
 - [ ] `apps/web/src/app/layout.tsx`, `apps/web/src/app/page.tsx`: placeholder page that shows API health
 - [ ] `apps/web/src/lib/api-client.ts`: typed fetch wrapper
@@ -499,23 +499,28 @@ Deferred to `/yay:creative` (mandatory at Level 4). The 12 questions in `### Cre
 
 ## Creative Phases
 
-- [ ] Architecture design → pending (Q1 backend, Q2 monorepo, Q3 migrations/data access, Q4 job runner and billing trigger, Q5 encryption/keys, Q8 email contract, Q10 hosting constraints, Q12 shared types; also re-pin files if Option B)
-- [ ] Algorithm design → pending (Q6 money representation and rounding, Q7 DST policy and session instants, Q9 invoice-number allocation, Q11 fee snapshot and guest model)
+- [x] Architecture design → COMPLETE (`memory-bank/creative/platform-foundation-architecture.md`) (Q1 backend, Q2 monorepo, Q3 migrations/data access, Q4 job runner and billing trigger, Q5 encryption/keys, Q8 email contract, Q10 hosting constraints, Q12 shared types; also re-pin files if Option B)
+- [x] Algorithm design → COMPLETE (`memory-bank/creative/platform-foundation-algorithm.md`) (Q6 money representation and rounding, Q7 DST policy and session instants, Q9 invoice-number allocation, Q11 fee snapshot and guest model)
 
 ---
 
 ## Execution State
 
-**Build Status**: IDLE
+**Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Current Step**: Planning complete. Next: /yay:creative platform-foundation
+**Current Step**: Step 4.5 - Adversarial design critique
+**Step Started**: 2026-09-29
 **Last Completed**: PLAN (2026-09-29)
-**Can Resume**: NO
+**Can Resume**: YES
 
 ### Active Sub-Agents
-(none)
+- Architecture Design: COMPLETE
+- Algorithm Design: COMPLETE
 
 ### Completed Steps
 - 2026-09-29 Step 0.1: task provisioned and linked to roadmap feature
 - 2026-09-29 Step 3: spec written (Opus Spec Writer). Taxonomy CLEAN, 31 ACs. Human approved, with the 3 extra schema fixes kept.
 - 2026-09-29 Step 5: test strategy (~62 tests), architectural plan and 6-phase roadmap written
+- 2026-09-29 Architecture Creative Design: COMPLETE - Output: memory-bank/creative/platform-foundation-architecture.md
+- 2026-09-29 Algorithm Creative Design: COMPLETE - Output: memory-bank/creative/platform-foundation-algorithm.md
+- 2026-09-29 Decision (spec owner): target PostgreSQL 17 instead of 15; spec, plan, architecture doc, roadmap feature and techContext updated
