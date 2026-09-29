@@ -539,7 +539,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - [x] Phase 3: Domain schema and migrations (AC-VERIFY-5 to AC-VERIFY-12, AC-VERIFY-19, AC-INTEGRATION-1, AC-INTEGRATION-2)
   - Components: node-pg-migrate SQL migrations 1–10, Kysely + kysely-codegen, full schema from `database-design.md` plus all gap fixes (including the ownership composite FKs, waitlist partial unique index, `fee_other`/`SEX_OTHER` and `assign_invoice_number`), `db/schema-deviations.md`, shared enums with parity tests
   - Milestone: migrate, rollback and migrate again from empty in 30 s or less with identical dumps; conformance plus the deviations record is at 100%
-- [ ] Phase 4: Money, time and crypto libraries (AC-VERIFY-13, AC-VERIFY-14, AC-VERIFY-15, AC-ERROR-4, AC-ERROR-5)
+- [x] Phase 4: Money, time and crypto libraries (AC-VERIFY-13, AC-VERIFY-14, AC-VERIFY-15, AC-ERROR-4, AC-ERROR-5)
   - Components: `packages/shared` money (+ zod), time and invoice format, `nz_local_to_utc` parity tests, `apps/api` crypto and keyring, encrypted columns wired to the crypto module
   - Milestone: all DST and money test vectors pass; no plaintext in the raw bytes of encrypted columns
 - [ ] Phase 5: Job runner and notifications (AC-VERIFY-16, AC-ASYNC-1, AC-ASYNC-2, AC-ASYNC-3, AC-ERROR-3, AC-ERROR-6, AC-INTEGRATION-3)
@@ -571,18 +571,18 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 4 of 6
+**Current Phase**: 5 of 6
 **Auto-Build Mode**: YES
-**Last Completed**: Phase 3 (2026-09-29)
+**Last Completed**: Phase 4 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 4
+**Resume From**: Phase 5
 **Notes**: Local-only run. Commit per phase, never push (spec owner, 2026-09-29; GitHub push blocked with a 403). Local services: Docker 29.5 on Colima, postgres:17 image, pnpm via Corepack (pin pnpm@10 through packageManager).
 
 ### Current Build Step
-**Step**: Step 11 - Git completion (Phase 3)
+**Step**: Step 11 - Git completion (Phase 4)
 **Status**: COMPLETE
 **Completed**: 2026-09-29
 
@@ -622,6 +622,14 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 3 | apps/api/test/integration/schema.int.test.ts:52-66 | The AC-VERIFY-5 identical-dump check always compares a catalog snapshot, and runs `pg_dump --schema-only` only when compose postgres is reachable (phase review, accepted).
 - Phase 3 | db/migrations/…payments_and_invoicing.sql:136-159 | `assign_invoice_number` doesn't require PAID, and invoice_number can be set directly from NULL; tax-invoices-and-exports must enforce both (hand-off, accepted).
 - Phase 3 | db/migrations/…game_sessions_and_courts.sql | Sessions must be inserted as DRAFT and published after their courts, because the starts_at/ends_at triggers need the courts (hand-off to session-scheduling-engine).
+- Phase 4 | push | local-only run; nothing pushed.
+- Phase 4 | TDD | RED: 5 unit files failed on missing modules (40 tests defined) plus 2 integration files (8 tests); GREEN: unit 80/80, integration 50/50; coverage money/time/crypto 94-100% (overall lines 99.4%); review APPROVED (0 blocking, 7 advisory).
+- Phase 4 | packages/shared/package.json | exports map extended (./money, ./money/zod, ./time, ./time/dst-vectors, ./invoice); dst-vectors.ts is a test fixture exposed through the exports map for the apps/api parity test.
+- Phase 4 | error codes | divideByInteger: INVALID_RATIO for negative divisor, DIVISION_BY_ZERO for zero; TimeValidationError INVALID_INSTANT for non-integer hours/days; isMoneyString('-0.00') true (design regex verbatim), parseMoney gives 0.
+- Phase 4 | eslint.config.mjs | added money no-restricted-syntax guard (Identifier args only; Math.round(row.amount) evades it) and a time/** ban on local-zone Date accessors.
+- Phase 4 | codegen | Ciphertext | null override for the 4 encrypted teams columns; regenerated against scratch DB sgm_codegen_tmp (dropped); drift test green.
+- Phase 4 | review advisories | A1 AAD delimiter ambiguity for '.'/':' in table/column; A2 non-canonical base64url accepted; A3 moneyFromCents lacks runtime bigint guard; A4 addHours overflow gives Invalid Date; A5 T24:00:00Z accepted; A6 ms lost in sameWallClockDaysBefore; A7 lint selectors Identifier-only.
+- Phase 4 | documentation agent | not dispatched; techContext/systemPatterns deferred to Phase 6.
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
@@ -639,3 +647,4 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - 2026-09-29 Phase 1 build: COMPLETE - 36 unit tests (RED->GREEN), lint/typecheck/build/ci green, review APPROVED, AC-VERIFY-3 violation checks and AC-ERROR-1 exit check verified. Push skipped (local-only run).
 - 2026-09-29 Phase 2 build: COMPLETE - compose stack healthy in 17 s (cached), /health 200/503/200 verified, web shows live API status and Tailwind CSS, Playwright smoke green, actionlint clean, local ci green. Push skipped (local-only run).
 - 2026-09-29 Phase 3 build: COMPLETE - TDD RED 38 failing -> GREEN 38/38; integration 42/42, unit 40/40, ci green; review APPROVED (0 blocking, 8 advisory). Push skipped (local-only run).
+- 2026-09-29 Phase 4 build: COMPLETE - TDD RED (5 unit + 2 int files failed on missing modules) -> GREEN unit 80/80, integration 50/50; coverage 94-100%; lint/typecheck/build green; review APPROVED (0 blocking, 7 advisory). Push skipped (local-only run).

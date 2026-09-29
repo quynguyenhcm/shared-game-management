@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { LocalDate, LocalTime, MoneyString } from "@sgm/shared";
+import type { Ciphertext, LocalDate, LocalTime, MoneyString } from "@sgm/shared";
 import type { ColumnType } from "kysely";
 
 export type AuthProvider = "FACEBOOK" | "GOOGLE" | "PASSWORD";
@@ -223,11 +223,11 @@ export interface TeamMembers {
 }
 
 export interface Teams {
-  akahu_app_token: string | null;
+  akahu_app_token: Ciphertext | null;
   akahu_merchant_id: string | null;
   bank_account_last4: string | null;
-  bank_account_name: string | null;
-  bank_account_number: string | null;
+  bank_account_name: Ciphertext | null;
+  bank_account_number: Ciphertext | null;
   created_at: Generated<Timestamp>;
   created_by: string | null;
   description: string | null;
@@ -235,7 +235,7 @@ export interface Teams {
   gst_registered: Generated<boolean>;
   id: Generated<string>;
   invite_code: string;
-  ird_number: string | null;
+  ird_number: Ciphertext | null;
   is_payout_configured: Generated<boolean>;
   name: string;
   visibility: Generated<TeamVisibility>;

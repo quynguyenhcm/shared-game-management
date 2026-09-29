@@ -47,5 +47,6 @@ describe('kysely-codegen drift', () => {
     expect(committed).toMatch(/import type \{ .*MoneyString.* \} from "@sgm\/shared"/);
     expect(committed).toMatch(/amount: MoneyString;/);
     expect(committed).toMatch(/date: LocalDate;/);
+    expect(committed).toMatch(/bank_account_number: Ciphertext \| null;/);
   });
 });

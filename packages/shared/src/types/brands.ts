@@ -1,16 +1,16 @@
 /**
- * Branded string types for DB values that must not be confused with plain strings (algorithm Q6/Q7).
- * kysely-codegen maps `numeric` → MoneyString, `date` → LocalDate and `time` → LocalTime, so a JS
- * `number` or an unchecked string cannot be written to those columns without the helper that
- * produces the brand. The money and time modules (Phase 4) own construction and re-export these.
+ * Branded string types for DB values that must not be confused with plain strings (algorithm Q6/Q7,
+ * architecture Q5). kysely-codegen maps `numeric` → MoneyString, `date` → LocalDate and `time` → LocalTime,
+ * and overrides the encrypted teams columns to Ciphertext, so a JS `number` or an unchecked string cannot be
+ * written to those columns without the helper that produces the brand.
+ *
+ * MoneyString is owned by the money module and LocalDate/LocalTime by the time module (one definition
+ * each); they are re-exported here so the codegen `customImports` (`@sgm/shared#MoneyString`) keep working.
  */
-declare const moneyStringBrand: unique symbol;
-declare const localDateBrand: unique symbol;
-declare const localTimeBrand: unique symbol;
+export type { MoneyString } from '../money/money.ts';
+export type { LocalDate, LocalTime } from '../time/time.ts';
 
-/** Canonical DB/wire money form, 2 dp: /^-?(0|[1-9]\d{0,7})\.\d{2}$/ e.g. '17.50'. */
-export type MoneyString = string & { readonly [moneyStringBrand]: 'NZD_2DP' };
-/** Calendar date 'YYYY-MM-DD' (Pacific/Auckland wall-clock date). */
-export type LocalDate = string & { readonly [localDateBrand]: true };
-/** Wall-clock time 'HH:MM[:SS]'; '24:00' only as an end-of-day marker. */
-export type LocalTime = string & { readonly [localTimeBrand]: true };
+declare const ciphertextBrand: unique symbol;
+
+/** AES-256-GCM envelope `v1.<keyId>.<iv>.<ct>.<tag>` produced by the api crypto module. */
+export type Ciphertext = string & { readonly [ciphertextBrand]: 'ENVELOPE_V1' };

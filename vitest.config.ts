@@ -36,7 +36,7 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
       include: [
-        'packages/shared/src/{money,time}/**/*.ts',
+        'packages/shared/src/{money,time,invoice}/**/*.ts',
         'apps/api/src/lib/{crypto,config,notifications,jobs}/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.int.test.ts'],
