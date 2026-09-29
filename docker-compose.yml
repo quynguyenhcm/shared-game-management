@@ -46,6 +46,13 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     image: sgm-api:dev
+    # Migrating at startup is a dev-Compose convenience only (production runs `db migrate` as a release step).
+    command:
+      [
+        'sh',
+        '-c',
+        'node dist/cli.js db migrate && exec node --import ./dist/instrumentation.js dist/main.js',
+      ]
     env_file: .env
     environment:
       <<: *app-env

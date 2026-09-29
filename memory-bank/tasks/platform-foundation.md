@@ -536,7 +536,7 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - [x] Phase 2: Local dev stack and CI (AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-2, AC-INTEGRATION-4)
   - Components: `docker-compose.yml` (no Redis), Dockerfiles (one api image with two commands, plus web), `.env.example`, `.github/workflows/ci.yml`, DB-aware `/health`, generated OpenAPI, web → API smoke E2E
   - Milestone: `docker compose up -d --wait` is healthy in 120 s or less; `/health` gives 503 with the DB stopped; the web page shows live API data; `actionlint` is clean
-- [ ] Phase 3: Domain schema and migrations (AC-VERIFY-5 to AC-VERIFY-12, AC-VERIFY-19, AC-INTEGRATION-1, AC-INTEGRATION-2)
+- [x] Phase 3: Domain schema and migrations (AC-VERIFY-5 to AC-VERIFY-12, AC-VERIFY-19, AC-INTEGRATION-1, AC-INTEGRATION-2)
   - Components: node-pg-migrate SQL migrations 1–10, Kysely + kysely-codegen, full schema from `database-design.md` plus all gap fixes (including the ownership composite FKs, waitlist partial unique index, `fee_other`/`SEX_OTHER` and `assign_invoice_number`), `db/schema-deviations.md`, shared enums with parity tests
   - Milestone: migrate, rollback and migrate again from empty in 30 s or less with identical dumps; conformance plus the deviations record is at 100%
 - [ ] Phase 4: Money, time and crypto libraries (AC-VERIFY-13, AC-VERIFY-14, AC-VERIFY-15, AC-ERROR-4, AC-ERROR-5)
@@ -571,15 +571,20 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 3 of 6
+**Current Phase**: 4 of 6
 **Auto-Build Mode**: YES
-**Last Completed**: Phase 2 (2026-09-29)
+**Last Completed**: Phase 3 (2026-09-29)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 5 findings, all applied)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 3
+**Resume From**: Phase 4
 **Notes**: Local-only run. Commit per phase, never push (spec owner, 2026-09-29; GitHub push blocked with a 403). Local services: Docker 29.5 on Colima, postgres:17 image, pnpm via Corepack (pin pnpm@10 through packageManager).
+
+### Current Build Step
+**Step**: Step 11 - Git completion (Phase 3)
+**Status**: COMPLETE
+**Completed**: 2026-09-29
 
 ### Halt State
 (none)
@@ -605,6 +610,15 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 2 | process | TDD sub-agent not dispatched; no RED→GREEN evidence. The reviewer confirmed the tests cover the ACs (health.int.test.ts:34-72). Accepted; Phase 3+ must dispatch the TDD sub-agent.
 - Phase 2 | apps/web/e2e/smoke.spec.ts | The Tailwind-class and "API: ok" checks are in Playwright, which `pnpm run ci` doesn't run. The "API: unavailable" state and the AC-ERROR-2 recovery without an API restart were verified manually only (phase review, accepted).
 - Phase 2 | .github/workflows/ci.yml | Actions are tag-pinned, not SHA-pinned; `rhysd/actionlint:latest` isn't reproducible; the postgres:17 service has no `-c timezone=UTC` (the pool forces UTC per connection). Advisory.
+- Phase 3 | push | local-only run; nothing pushed.
+- Phase 3 | AC-VERIFY-5 dumps | identical-dump check compares a catalog snapshot always, plus the server's pg_dump via `docker compose exec` only when compose postgres is reachable (CI service container has no matching pg_dump client).
+- Phase 3 | test isolation | one cloned DB per test file from template `sgm_tpl_<runId>` (stronger than one per worker); concurrency tests get their own DB.
+- Phase 3 | payments.gst_amount/subtotal_amount | NOT NULL GENERATED STORED, typed read-only in codegen rather than GeneratedAlways.
+- Phase 3 | extra constraints | owner-column NOT NULLs, audit timestamps, team_members_auto_enroll_assigned, credit_transactions amount<>0 and balance 0-100, registration_guests move guard, billing_type in payment immutability set; all in db/schema-deviations.md (D-01..D-26).
+- Phase 3 | brands | MoneyString/LocalDate/LocalTime live as brand-only types in packages/shared/src/types/brands.ts; Phase 4 must re-export them. Ciphertext brand override for encrypted columns deferred to Phase 4.
+- Phase 3 | docker-compose.yml api command | `db migrate &&` restored (Phase 2 deviation closed); `pnpm run ci` fully green (Phase 1 stub deviation closed). Running api container not recreated.
+- Phase 3 | review APPROVED, advisories | A1 no production guard on `db rollback`; A2 reset host check bypass via `?host=` and `postgres` hostname; A3 MIGRATIONS_DIR unvalidated; A4 invoice_number can be set directly NULL->n and assign_invoice_number does not require PAID (tax-invoices feature to enforce); A5 sessions must be inserted DRAFT then published after courts; A6 template DB leaks if migrate fails in global-setup, no stale sweeper; A7 template1 lock-key mismatch flake; A8 dev-only esbuild advisory via tsup.
+- Phase 3 | documentation agent | not dispatched; techContext/systemPatterns not updated this phase (deferred to Phase 6 docs).
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
@@ -621,3 +635,4 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - 2026-09-29 Critique disposition (spec owner): all 5 findings applied; `fee_other` rate added for BY_SEX; AC wording changes from the design agents applied. Taxonomy CLEAN, 32 ACs (29 MUST / 3 SHOULD); target ~86 tests
 - 2026-09-29 Phase 1 build: COMPLETE - 36 unit tests (RED->GREEN), lint/typecheck/build/ci green, review APPROVED, AC-VERIFY-3 violation checks and AC-ERROR-1 exit check verified. Push skipped (local-only run).
 - 2026-09-29 Phase 2 build: COMPLETE - compose stack healthy in 17 s (cached), /health 200/503/200 verified, web shows live API status and Tailwind CSS, Playwright smoke green, actionlint clean, local ci green. Push skipped (local-only run).
+- 2026-09-29 Phase 3 build: COMPLETE - TDD RED 38 failing -> GREEN 38/38; integration 42/42, unit 40/40, ci green; review APPROVED (0 blocking, 8 advisory). Push skipped (local-only run).
