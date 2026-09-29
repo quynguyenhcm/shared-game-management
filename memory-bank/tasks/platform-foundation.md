@@ -619,6 +619,9 @@ Resolved by `/yay:creative` on 2026-09-29 (chosen: Option I, lean TypeScript all
 - Phase 3 | docker-compose.yml api command | `db migrate &&` restored (Phase 2 deviation closed); `pnpm run ci` fully green (Phase 1 stub deviation closed). Running api container not recreated.
 - Phase 3 | review APPROVED, advisories | A1 no production guard on `db rollback`; A2 reset host check bypass via `?host=` and `postgres` hostname; A3 MIGRATIONS_DIR unvalidated; A4 invoice_number can be set directly NULL->n and assign_invoice_number does not require PAID (tax-invoices feature to enforce); A5 sessions must be inserted DRAFT then published after courts; A6 template DB leaks if migrate fails in global-setup, no stale sweeper; A7 template1 lock-key mismatch flake; A8 dev-only esbuild advisory via tsup.
 - Phase 3 | documentation agent | not dispatched; techContext/systemPatterns not updated this phase (deferred to Phase 6 docs).
+- Phase 3 | apps/api/test/integration/schema.int.test.ts:52-66 | The AC-VERIFY-5 identical-dump check always compares a catalog snapshot, and runs `pg_dump --schema-only` only when compose postgres is reachable (phase review, accepted).
+- Phase 3 | db/migrations/…payments_and_invoicing.sql:136-159 | `assign_invoice_number` doesn't require PAID, and invoice_number can be set directly from NULL; tax-invoices-and-exports must enforce both (hand-off, accepted).
+- Phase 3 | db/migrations/…game_sessions_and_courts.sql | Sessions must be inserted as DRAFT and published after their courts, because the starts_at/ends_at triggers need the courts (hand-off to session-scheduling-engine).
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
