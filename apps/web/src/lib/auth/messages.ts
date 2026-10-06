@@ -195,7 +195,7 @@ export function errorMessage(
       return [GENERIC];
     default:
       // Unknown codes from a form action are reported as the generic banner; query-string callers
-      // filter with `isKnownErrorCode` first so unknown codes in a URL render nothing.
+      // go through `urlErrorMessage`, so unknown codes in a URL render nothing.
       return typeof code === 'string' && code !== '' ? [GENERIC] : null;
   }
 }
@@ -213,14 +213,30 @@ const URL_ERROR_CODES: ReadonlySet<string> = new Set([
   'identity_in_use',
   'provider_already_connected',
   'last_sign_in_method',
+  // Outage on a link or unlink redirect: the generic banner, fixed text.
+  'internal_error',
+  'service_unavailable',
 ]);
+
+/** Whether a code may travel in a `?error=` query string. */
+export function isUrlErrorCode(code: string | null | undefined): code is string {
+  return typeof code === 'string' && URL_ERROR_CODES.has(code);
+}
 
 /** Error codes that may arrive in a `?error=` query string; anything else is ignored. */
 export function urlErrorMessage(
   code: string | null | undefined,
   context: ErrorContext,
 ): string[] | null {
-  return typeof code === 'string' && URL_ERROR_CODES.has(code) ? errorMessage(code, context) : null;
+  return isUrlErrorCode(code) ? errorMessage(code, context) : null;
 }
+
+/** N-INAPP: shown directly above "Continue with Google" inside the Facebook, Messenger or Instagram app. */
+export const IN_APP_BROWSER_HINT =
+  'Google sign-in doesn\'t work inside the Facebook or Instagram app. Open this page in your browser (use the app\'s menu, then "Open in browser"), or use another sign-in method.';
+
+/** N-UNAVAILABLE: `GET /auth/providers` failed, so the OAuth buttons are hidden. */
+export const PROVIDERS_UNAVAILABLE_MESSAGE =
+  'Sign-in is having trouble right now. Google and Facebook buttons will be back shortly. You can still try email and password.';
 
 export const PAGE_ERROR_MESSAGE = 'Something went wrong on our side. Try again in a minute.';

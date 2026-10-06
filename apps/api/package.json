@@ -21,6 +21,7 @@
     "@sgm/shared": "workspace:*",
     "fastify": "^5.12.5",
     "fastify-type-provider-zod": "^7.0.0",
+    "jose": "^6.2.12",
     "kysely": "^0.29.6",
     "node-pg-migrate": "^9.0.0",
     "nodemailer": "^10.0.12",

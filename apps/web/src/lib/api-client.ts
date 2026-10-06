@@ -4,11 +4,19 @@ import {
   ErrorResponse,
   ForgotPasswordResponse,
   HealthResponse,
+  IdentitiesResponse,
   MeResponse,
+  OAuthAuthorizeResponse,
+  OAuthCallbackResponse,
+  OAuthCompleteResponse,
+  OAuthPendingResponse,
   ProvidersResponse,
   ResetPasswordResponse,
   type ForgotPasswordRequest,
   type LoginRequest,
+  type OAuthAuthorizeRequest,
+  type OAuthCallbackRequest,
+  type OAuthCompleteRequest,
   type RegisterRequest,
   type ResetPasswordRequest,
 } from '@sgm/shared';
@@ -88,7 +96,12 @@ interface ApiRequest<T> extends ApiCallOptions {
   method: 'GET' | 'POST' | 'DELETE';
   body?: unknown;
   schema?: z.ZodType<T>;
+  /** Extra request headers (an allowlisted few, set by `apiClient` only; never copied from the browser). */
+  extraHeaders?: Record<string, string>;
 }
+
+/** The lower-case path spelling of an OAuth provider (`/auth/oauth/:provider/*`). */
+export type OAuthProviderPath = 'google' | 'facebook';
 
 function failure<T>(
   status: number,
@@ -118,6 +131,7 @@ export async function apiFetch<T>(request: ApiRequest<T>): Promise<ApiResult<T>>
     );
     if (clientAddress !== null) headers['x-sgm-client-ip'] = clientAddress;
     if (request.session) headers.authorization = `Bearer ${request.session}`;
+    Object.assign(headers, request.extraHeaders);
     if (request.body !== undefined) headers['content-type'] = 'application/json';
 
     const response = await fetch(`${config.apiInternalUrl}${request.path}`, {
@@ -221,5 +235,85 @@ export const apiClient = {
       method: 'POST',
       body,
       schema: ResetPasswordResponse,
+    }),
+
+  oauthAuthorize: (
+    provider: OAuthProviderPath,
+    body: OAuthAuthorizeRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/auth/oauth/${provider}/authorize`,
+      method: 'POST',
+      body,
+      schema: OAuthAuthorizeResponse,
+    }),
+
+  /** Forward the session (when there is one) so a connect flow can prove it is the same user. */
+  oauthCallback: (
+    provider: OAuthProviderPath,
+    body: OAuthCallbackRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/auth/oauth/${provider}/callback`,
+      method: 'POST',
+      body,
+      schema: OAuthCallbackResponse,
+    }),
+
+  /** The pending sign-up handle travels in a header, never in the URL. */
+  oauthPending: (pendingToken: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/oauth/pending',
+      method: 'GET',
+      extraHeaders: { 'x-pending-signup': pendingToken },
+      schema: OAuthPendingResponse,
+    }),
+
+  oauthComplete: (body: OAuthCompleteRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/oauth/complete',
+      method: 'POST',
+      body,
+      schema: OAuthCompleteResponse,
+    }),
+
+  identities: (session: string, options: Omit<ApiCallOptions, 'session'> = {}) =>
+    apiFetch({
+      ...options,
+      session,
+      path: '/auth/identities',
+      method: 'GET',
+      schema: IdentitiesResponse,
+    }),
+
+  startLink: (
+    provider: OAuthProviderPath,
+    session: string,
+    options: Omit<ApiCallOptions, 'session'> = {},
+  ) =>
+    apiFetch({
+      ...options,
+      session,
+      path: `/auth/identities/${provider}/link`,
+      method: 'POST',
+      schema: OAuthAuthorizeResponse,
+    }),
+
+  unlink: (
+    provider: OAuthProviderPath,
+    session: string,
+    options: Omit<ApiCallOptions, 'session'> = {},
+  ) =>
+    apiFetch<undefined>({
+      ...options,
+      session,
+      path: `/auth/identities/${provider}`,
+      method: 'DELETE',
     }),
 };

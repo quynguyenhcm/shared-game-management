@@ -19,6 +19,7 @@ import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
 import { createAddressMissingWarning } from './address-warning.ts';
 import type { PasswordHasher } from './password.ts';
+import type { OAuthProviderRegistry } from './providers/provider.ts';
 import { checkPasswordForSet, type PasswordBlocklist } from './password-policy.ts';
 import {
   findPasswordIdentity,
@@ -67,6 +68,8 @@ export interface AuthServiceDeps {
   readonly hasher: PasswordHasher;
   readonly throttle: LoginThrottle;
   readonly blocklist: PasswordBlocklist;
+  /** Which providers are enabled (credentials, or the fakes in E2E mode). */
+  readonly providers: Pick<OAuthProviderRegistry, 'enabled'>;
   /** Shared with the reset service so both log one "no trusted address" warning per minute together. */
   readonly warnAddressMissing?: ReturnType<typeof createAddressMissingWarning>;
 }
@@ -79,7 +82,7 @@ function toSessionInfo(session: IssuedSession): SessionInfo {
 }
 
 export function createAuthService(deps: AuthServiceDeps): AuthService {
-  const { db, clock, config, sessions, hasher, throttle, blocklist } = deps;
+  const { db, clock, sessions, hasher, throttle, blocklist } = deps;
   const warnAddressMissing = deps.warnAddressMissing ?? createAddressMissingWarning(clock);
 
   /** Per-address registration limit, spent before any hashing; a missing address skips the dimension. */
@@ -227,11 +230,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     },
 
     providers() {
-      // The fake provider stands in for both when enabled (E2E only; the config refuses it in production).
-      return {
-        google: config.fakeOAuth || config.google !== null,
-        facebook: config.fakeOAuth || config.facebook !== null,
-      };
+      return deps.providers.enabled();
     },
   };
 }

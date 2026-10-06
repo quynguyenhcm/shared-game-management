@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   errorMessage,
+  isUrlErrorCode,
   minutesLabel,
   noticeMessage,
   parseProvider,
   parseRemoved,
+  urlErrorMessage,
 } from './messages.ts';
 
 const NONE = { google: false, facebook: false };
@@ -125,5 +127,17 @@ describe('messages.ts: copy deck (codes in, fixed text out)', () => {
     expect(errorMessage('oauth_account_exists', { provider: 'facebook' })?.[0]).toBe(
       'An account already exists for the email address on your Facebook account. Sign in with your existing method, then connect Facebook from your Account page.',
     );
+  });
+});
+
+describe('messages.ts: codes allowed in a URL (Phase 5)', () => {
+  it('renders generic outage codes from /account redirects and still ignores unknown ones', () => {
+    expect(isUrlErrorCode('service_unavailable')).toBe(true);
+    expect(isUrlErrorCode('identity_in_use')).toBe(true);
+    expect(isUrlErrorCode('<script>')).toBe(false);
+    expect(urlErrorMessage('service_unavailable', { intent: 'link' })?.[0]).toMatch(
+      /^Something went wrong on our side/,
+    );
+    expect(urlErrorMessage('made_up_code', {})).toBeNull();
   });
 });

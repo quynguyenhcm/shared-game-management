@@ -8,6 +8,7 @@ import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { createPool } from './lib/db/pool.ts';
 import { createLogger } from './lib/logger/logger.ts';
+import { buildOAuthProviders } from './modules/auth/providers/registry.ts';
 import { createPasswordHasher } from './modules/auth/password.ts';
 import { createLoginThrottle } from './modules/auth/throttle.ts';
 
@@ -45,6 +46,7 @@ export async function generateOpenApiYaml(): Promise<string> {
     // Cheapest legal cost: the document does not depend on it and the hasher self-tests on creation.
     passwordHasher: createPasswordHasher({ memoryKiB: 19_456, passes: 2 }),
     loginThrottle: createLoginThrottle({ db, keys, config: config.auth }),
+    oauthProviders: buildOAuthProviders({ auth: config.auth }),
   });
   try {
     return app.swagger({ yaml: true });

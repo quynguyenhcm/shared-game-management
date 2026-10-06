@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateEmailMessage } from '../../lib/notifications/notifier.ts';
-import { buildPasswordResetEmail } from './emails.ts';
+import { buildIdentityLinkedEmail, buildPasswordResetEmail } from './emails.ts';
 
 const input = {
   to: 'aroha.ngata@example.com',
@@ -39,5 +39,29 @@ describe('password-reset email (AC-INTEGRATION-1 copy, AC-ASYNC-1 key)', () => {
     const message = buildPasswordResetEmail({ ...input, expiryMinutes: 15, token: 'a b&c' });
     expect(message.text).toContain('expires in 15 minutes');
     expect(message.text).toContain('/reset-password?token=a%20b%26c');
+  });
+});
+
+describe('identity-linked email (AC-ASYNC-5)', () => {
+  const linked = {
+    to: 'aroha.ngata@example.com',
+    fullName: 'Aroha\nNgata',
+    provider: 'GOOGLE',
+    identityId: '5d2f4e0a-3b1c-4d6e-8f70-1a2b3c4d5e6f',
+  } as const;
+
+  it('uses the copy-deck subject and sentence, keys the job by identity id and passes message validation', () => {
+    const message = buildIdentityLinkedEmail(linked);
+    expect(message.subject).toBe('Google sign-in connected to your Shared Game Management account');
+    expect(message.text).toContain("If this wasn't you, reset your password now");
+    expect(message.text).toContain('Hi Aroha Ngata,'); // a line break in the name cannot forge body lines
+    expect(message.idempotencyKey).toBe(`identity-linked:${linked.identityId}`);
+    expect(message.tags).toEqual({ template: 'identity-linked' });
+    expect(buildIdentityLinkedEmail({ ...linked, provider: 'FACEBOOK' }).subject).toMatch(
+      /^Facebook sign-in/,
+    );
+    expect(() => {
+      validateEmailMessage(message, 'test');
+    }).not.toThrow();
   });
 });

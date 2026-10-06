@@ -3,18 +3,31 @@
 import {
   ForgotPasswordRequest,
   LoginRequest,
+  OAuthCompleteRequest,
   RegisterRequest,
   ResetPasswordRequest,
+  encodeOAuthBinding,
   safeReturnTo,
 } from '@sgm/shared';
 import { headers } from 'next/headers';
 import { RedirectType, redirect } from 'next/navigation';
-import { apiClient, type ApiResult } from '../api-client.ts';
+import { apiClient, type ApiResult, type OAuthProviderPath } from '../api-client.ts';
 import { log } from '../log.ts';
 import { clearCookie, readCookie, setCookie } from './cookies.ts';
 import type { FormState } from './form-state.ts';
-import { SIGNED_OUT_URL, passwordResetLanding, withWelcome } from './landing.ts';
 import {
+  SIGNED_OUT_URL,
+  buildUrl,
+  loginUrl,
+  oauthErrorLanding,
+  passwordResetLanding,
+  sessionExpiredUrl,
+  withWelcome,
+} from './landing.ts';
+import { isUrlErrorCode } from './messages.ts';
+import { getSessionState } from './session.ts';
+import {
+  validateCompleteSignup,
   validateForgotPassword,
   validateLogin,
   validateRegister,
@@ -148,4 +161,153 @@ export async function signOutAction(_formData?: FormData): Promise<void> {
   }
   await clearCookie('session');
   return redirect(SIGNED_OUT_URL, RedirectType.replace);
+}
+
+// ---------------------------------------------------------------------------------------------
+// OAuth sign-in, sign-up completion and identity linking (Phase 5)
+// ---------------------------------------------------------------------------------------------
+
+function providerPath(raw: string | undefined): OAuthProviderPath | null {
+  return raw === 'google' || raw === 'facebook' ? raw : null;
+}
+
+/** Stores the browser-binding cookie, then sends the browser to the provider's consent screen. */
+async function beginProviderFlow(
+  authorize: { authorizationUrl: string; state: string },
+  context: { returnTo: string; intent: 'signin' | 'link' },
+): Promise<never> {
+  await setCookie('oauth', encodeOAuthBinding(authorize.state, context));
+  return redirect(authorize.authorizationUrl);
+}
+
+/** "Continue with Google/Facebook" and "Try Facebook again" (`rerequest`). Failures stay on the page. */
+export async function startOAuthAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const provider = providerPath(field(formData, 'provider'));
+  if (provider === null) return { error: { code: 'provider_not_enabled' } };
+  const values = { provider };
+  const returnTo = safeReturnTo(field(formData, 'returnTo'));
+  const rerequest = provider === 'facebook' && field(formData, 'rerequest') === 'true';
+
+  const result = await apiClient.oauthAuthorize(
+    provider,
+    { returnTo, ...(rerequest ? { rerequest: true } : {}) },
+    { incoming: await headers() },
+  );
+  if (!result.ok) return failed('oauth_authorize', result, values);
+  try {
+    return await beginProviderFlow(result.data, { returnTo, intent: 'signin' });
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    log.error('web.auth.oauth_binding_rejected', { provider });
+    return { error: { code: 'internal_error' }, values };
+  }
+}
+
+/** A link or unlink failure lands on `/account` as a code the page knows how to word. */
+function accountFailure(
+  result: Extract<ApiResult<unknown>, { ok: false }>,
+  provider: OAuthProviderPath,
+): never {
+  if (result.status === 401) return redirect(sessionExpiredUrl('/account'), RedirectType.replace);
+  const code = isUrlErrorCode(result.error.code) ? result.error.code : 'service_unavailable';
+  return redirect(
+    buildUrl('/account', {
+      error: code,
+      provider: code === 'last_sign_in_method' ? null : provider,
+    }),
+    RedirectType.replace,
+  );
+}
+
+/** "Connect Google/Facebook" on /account: the same flow with intent `link`; always returns to /account. */
+export async function connectProviderAction(formData: FormData): Promise<void> {
+  const provider = providerPath(field(formData, 'provider'));
+  if (provider === null) {
+    return redirect(buildUrl('/account', { error: 'provider_not_enabled' }), RedirectType.replace);
+  }
+  const session = await readCookie('session');
+  if (session === null) return redirect(loginUrl({ returnTo: '/account' }), RedirectType.replace);
+
+  const result = await apiClient.startLink(provider, session, { incoming: await headers() });
+  if (!result.ok) return accountFailure(result, provider);
+  return beginProviderFlow(result.data, { returnTo: '/account', intent: 'link' });
+}
+
+/** "Disconnect" on /account. The API refuses the last sign-in method (409), whatever the button looked like. */
+export async function disconnectProviderAction(formData: FormData): Promise<void> {
+  const provider = providerPath(field(formData, 'provider'));
+  if (provider === null) {
+    return redirect(buildUrl('/account', { error: 'provider_not_enabled' }), RedirectType.replace);
+  }
+  const session = await readCookie('session');
+  if (session === null) return redirect(loginUrl({ returnTo: '/account' }), RedirectType.replace);
+
+  const result = await apiClient.unlink(provider, session, { incoming: await headers() });
+  if (!result.ok) return accountFailure(result, provider);
+  return redirect(buildUrl('/account', { notice: 'unlinked', provider }), RedirectType.replace);
+}
+
+/** The pending sign-up is gone: a live session means it finished in another tab (AC-ENTRY-8). */
+async function signupExpired(returnTo: string): Promise<never> {
+  const session = await getSessionState();
+  if (session.kind === 'signed_in') return redirect(returnTo, RedirectType.replace);
+  return redirect(loginUrl({ error: 'signup_expired' }), RedirectType.replace);
+}
+
+/** "Finish sign-up" on /register/complete: the account is created only here, with the chosen sex. */
+export async function completeSignupAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const returnTo = safeReturnTo(field(formData, 'returnTo'));
+  const pendingToken = await readCookie('pending');
+  if (pendingToken === null) return signupExpired(returnTo);
+
+  const raw = { fullName: field(formData, 'fullName'), sex: field(formData, 'sex') };
+  const values: Record<string, string> = {
+    fullName: raw.fullName ?? '',
+    ...(raw.sex ? { sex: raw.sex } : {}),
+  };
+  const fieldErrors = validateCompleteSignup(raw);
+  if (hasErrors(fieldErrors)) return { fieldErrors, values };
+
+  const result = await apiClient.oauthComplete(
+    OAuthCompleteRequest.parse({ pendingToken, fullName: raw.fullName, sex: raw.sex }),
+    { incoming: await headers() },
+  );
+  if (result.ok) {
+    await clearCookie('pending');
+    await establishSession(result.data.session.token, result.data.session.expiresAt);
+    const target = safeReturnTo(result.data.returnTo);
+    // 201 is a new account; 200 means the identity already existed (no welcome for an old account).
+    return redirect(result.status === 201 ? withWelcome(target) : target, RedirectType.replace);
+  }
+  if (result.error.code === 'signup_expired') {
+    await clearCookie('pending');
+    return signupExpired(returnTo);
+  }
+  if (result.error.code === 'oauth_account_exists') {
+    await clearCookie('pending');
+    if (result.error.email) await setCookie('flash', result.error.email);
+    return redirect(
+      oauthErrorLanding({
+        code: 'oauth_account_exists',
+        provider: providerPath(field(formData, 'provider')) ?? '',
+        intent: 'signin',
+        returnTo,
+      }),
+      RedirectType.replace,
+    );
+  }
+  return failed('complete_signup', result, values);
+}
+
+/** "Use a different account": forget the pending sign-up and go back to sign-in. No API call (the row expires). */
+export async function chooseDifferentAccountAction(formData?: FormData): Promise<void> {
+  await clearCookie('pending');
+  const returnTo = formData === undefined ? undefined : field(formData, 'returnTo');
+  return redirect(loginUrl({ returnTo }), RedirectType.replace);
 }

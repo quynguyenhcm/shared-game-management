@@ -11,6 +11,7 @@ import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
+import { buildOAuthProviders } from '../../src/modules/auth/providers/registry.ts';
 import { createPasswordHasher } from '../../src/modules/auth/password.ts';
 import { createLoginThrottle } from '../../src/modules/auth/throttle.ts';
 
@@ -49,6 +50,7 @@ export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): 
       keys: keyProviderFromConfig(config),
       config: config.auth,
     }),
+    oauthProviders: buildOAuthProviders({ auth: config.auth }),
     ...overrides,
   };
 }

@@ -334,3 +334,325 @@ export async function setUserRole(
     .executeTakeFirst();
   return row === undefined ? null : { id: row.id, role: toRole(row.role) };
 }
+
+// ---------------------------------------------------------------------------------------------
+// OAuth: state, pending sign-ups and identities. The single-use rows are consumed with one guarded UPDATE.
+// ---------------------------------------------------------------------------------------------
+
+export type OAuthIdentityProvider = 'GOOGLE' | 'FACEBOOK';
+
+export interface NewOAuthState {
+  readonly id: string;
+  readonly stateHash: Buffer;
+  readonly provider: OAuthIdentityProvider;
+  readonly intent: 'signin' | 'link';
+  readonly linkUserId: string | null;
+  readonly nonce: string | null;
+  readonly codeVerifierEnc: string | null;
+  readonly returnTo: string;
+  readonly createdAt: Date;
+  readonly expiresAt: Date;
+}
+
+export async function insertOAuthState(db: Database, input: NewOAuthState): Promise<void> {
+  await db
+    .insertInto('oauth_states')
+    .values({
+      id: input.id,
+      state_hash: input.stateHash,
+      provider: input.provider,
+      intent: input.intent,
+      link_user_id: input.linkUserId,
+      nonce: input.nonce,
+      code_verifier_enc: input.codeVerifierEnc as never,
+      return_to: input.returnTo,
+      created_at: input.createdAt,
+      expires_at: input.expiresAt,
+    })
+    .execute();
+}
+
+export interface ConsumedOAuthState {
+  readonly id: string;
+  readonly intent: 'signin' | 'link';
+  readonly linkUserId: string | null;
+  readonly nonce: string | null;
+  readonly codeVerifierEnc: string | null;
+  readonly returnTo: string;
+}
+
+/**
+ * The single-use guard for `state`: `used_at` is set only for an unused, unexpired row of this provider.
+ * Replays, unknown, expired and other-provider states update zero rows and return `undefined`.
+ */
+export async function consumeOAuthState(
+  db: Database,
+  input: { stateHash: Buffer; provider: OAuthIdentityProvider; now: Date },
+): Promise<ConsumedOAuthState | undefined> {
+  const row = await db
+    .updateTable('oauth_states')
+    .set({ used_at: sql<Date>`GREATEST(created_at, ${input.now}::timestamptz)` })
+    .where('state_hash', '=', input.stateHash)
+    .where('provider', '=', input.provider)
+    .where('used_at', 'is', null)
+    .where('expires_at', '>', input.now)
+    .returning(['id', 'intent', 'link_user_id', 'nonce', 'code_verifier_enc', 'return_to'])
+    .executeTakeFirst();
+  if (row === undefined) return undefined;
+  return {
+    id: row.id,
+    intent: row.intent === 'link' ? 'link' : 'signin',
+    linkUserId: row.link_user_id,
+    nonce: row.nonce,
+    codeVerifierEnc: row.code_verifier_enc,
+    returnTo: row.return_to ?? '/',
+  };
+}
+
+export async function findIdentityOwner(
+  db: Database,
+  provider: OAuthIdentityProvider,
+  subject: string,
+): Promise<{ identityId: string; userId: string } | undefined> {
+  const row = await db
+    .selectFrom('auth_identities')
+    .select(['id', 'user_id'])
+    .where('provider', '=', provider)
+    .where('provider_subject', '=', subject)
+    .executeTakeFirst();
+  return row === undefined ? undefined : { identityId: row.id, userId: row.user_id };
+}
+
+export async function userHasIdentity(
+  db: Database,
+  userId: string,
+  provider: OAuthIdentityProvider,
+): Promise<boolean> {
+  const row = await db
+    .selectFrom('auth_identities')
+    .select('id')
+    .where('user_id', '=', userId)
+    .where('provider', '=', provider)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+export async function recordOAuthLogin(db: Database, identityId: string, now: Date): Promise<void> {
+  await db
+    .updateTable('auth_identities')
+    .set({ last_used_at: now })
+    .where('id', '=', identityId)
+    .execute();
+}
+
+export interface NewPendingSignup {
+  readonly tokenHash: Buffer;
+  readonly provider: OAuthIdentityProvider;
+  readonly subject: string;
+  readonly email: string;
+  readonly emailVerified: boolean;
+  readonly fullName: string | null;
+  readonly returnTo: string;
+  readonly createdAt: Date;
+  readonly expiresAt: Date;
+}
+
+export async function insertPendingSignup(db: Database, input: NewPendingSignup): Promise<void> {
+  await db
+    .insertInto('oauth_pending_signups')
+    .values({
+      token_hash: input.tokenHash,
+      provider: input.provider,
+      provider_subject: input.subject,
+      email: input.email,
+      email_verified: input.emailVerified,
+      full_name: input.fullName,
+      return_to: input.returnTo,
+      created_at: input.createdAt,
+      expires_at: input.expiresAt,
+    })
+    .execute();
+}
+
+export interface PendingSignup {
+  readonly id: string;
+  readonly provider: OAuthIdentityProvider;
+  readonly subject: string;
+  readonly email: string;
+  readonly emailVerified: boolean;
+  readonly fullName: string | null;
+  readonly returnTo: string;
+  readonly expiresAt: Date;
+}
+
+function toPending(row: {
+  id: string;
+  provider: string;
+  provider_subject: string;
+  email: string;
+  email_verified: boolean;
+  full_name: string | null;
+  return_to: string | null;
+  expires_at: Date;
+}): PendingSignup {
+  return {
+    id: row.id,
+    provider: row.provider === 'FACEBOOK' ? 'FACEBOOK' : 'GOOGLE',
+    subject: row.provider_subject,
+    email: row.email,
+    emailVerified: row.email_verified,
+    fullName: row.full_name,
+    returnTo: row.return_to ?? '/',
+    expiresAt: row.expires_at,
+  };
+}
+
+/** Read-only view of a live pending sign-up (prefill for `/register/complete`). */
+export async function findLivePendingSignup(
+  db: Database,
+  tokenHash: Buffer,
+  now: Date,
+): Promise<PendingSignup | undefined> {
+  const row = await db
+    .selectFrom('oauth_pending_signups')
+    .select([
+      'id',
+      'provider',
+      'provider_subject',
+      'email',
+      'email_verified',
+      'full_name',
+      'return_to',
+      'expires_at',
+    ])
+    .where('token_hash', '=', tokenHash)
+    .where('used_at', 'is', null)
+    .where('expires_at', '>', now)
+    .executeTakeFirst();
+  return row === undefined ? undefined : toPending(row);
+}
+
+/** The single-use guard for a pending sign-up (used inside the completion transaction). */
+export async function consumePendingSignup(
+  db: Database,
+  tokenHash: Buffer,
+  now: Date,
+): Promise<PendingSignup | undefined> {
+  const row = await db
+    .updateTable('oauth_pending_signups')
+    .set({ used_at: sql<Date>`GREATEST(created_at, ${now}::timestamptz)` })
+    .where('token_hash', '=', tokenHash)
+    .where('used_at', 'is', null)
+    .where('expires_at', '>', now)
+    .returning([
+      'id',
+      'provider',
+      'provider_subject',
+      'email',
+      'email_verified',
+      'full_name',
+      'return_to',
+      'expires_at',
+    ])
+    .executeTakeFirst();
+  return row === undefined ? undefined : toPending(row);
+}
+
+/** The user an OAuth sign-up creates: no password, role PLAYER (database default). */
+export async function insertOAuthUser(
+  db: Database,
+  input: {
+    email: string;
+    fullName: string;
+    sex: UserSex;
+    provider: OAuthIdentityProvider;
+    subject: string;
+    emailVerifiedAt: Date | null;
+    now: Date;
+  },
+): Promise<UserRow> {
+  const user = await db
+    .insertInto('users')
+    .values({
+      email: input.email,
+      full_name: input.fullName,
+      sex: input.sex,
+      email_verified_at: input.emailVerifiedAt,
+    })
+    .returning(['id', 'email', 'full_name', 'sex', 'role'])
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto('auth_identities')
+    .values({
+      user_id: user.id,
+      provider: input.provider,
+      provider_subject: input.subject,
+      last_used_at: input.now,
+    })
+    .execute();
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.full_name,
+    sex: user.sex,
+    role: toRole(user.role),
+  };
+}
+
+export async function insertIdentity(
+  db: Database,
+  input: { userId: string; provider: OAuthIdentityProvider; subject: string; now: Date },
+): Promise<string> {
+  const row = await db
+    .insertInto('auth_identities')
+    .values({
+      user_id: input.userId,
+      provider: input.provider,
+      provider_subject: input.subject,
+      last_used_at: input.now,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return row.id;
+}
+
+/** Informational inbox proof (Google `email_verified` for the account's own email); read by no v1 rule. */
+export async function setEmailVerifiedIfUnset(
+  db: Database,
+  userId: string,
+  now: Date,
+): Promise<void> {
+  await db
+    .updateTable('users')
+    .set({ email_verified_at: now })
+    .where('id', '=', userId)
+    .where('email_verified_at', 'is', null)
+    .execute();
+}
+
+export interface IdentitySummary {
+  readonly identityId: string;
+  readonly provider: 'PASSWORD' | 'GOOGLE' | 'FACEBOOK';
+  readonly connectedAt: Date;
+  readonly lastUsedAt: Date | null;
+}
+
+export async function listIdentities(db: Database, userId: string): Promise<IdentitySummary[]> {
+  const rows = await db
+    .selectFrom('auth_identities')
+    .select(['id', 'provider', 'created_at', 'last_used_at'])
+    .where('user_id', '=', userId)
+    .orderBy('created_at')
+    .orderBy('id')
+    .execute();
+  return rows.map((row) => ({
+    identityId: row.id,
+    provider: row.provider,
+    connectedAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+  }));
+}
+
+export async function deleteIdentity(db: Database, identityId: string): Promise<void> {
+  await db.deleteFrom('auth_identities').where('id', '=', identityId).execute();
+}

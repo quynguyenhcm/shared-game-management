@@ -30,6 +30,7 @@ const REDACT_PATHS = [
   'req.headers.cookie',
   'req.headers["x-sgm-client-ip"]',
   'req.headers["x-sgm-internal-auth"]',
+  'req.headers["x-pending-signup"]',
   'req.headers["set-cookie"]',
 ];
 
@@ -53,6 +54,8 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   /^proxy-authorization$/i,
   // The web-to-API hop: the shared secret and the (personal) client address.
   /^x-sgm-(internal-auth|client-ip)$/i,
+  // OAuth pending sign-up handle: a bearer credential for POST /auth/oauth/complete.
+  /^x-pending-signup$/i,
   /password/i,
   /_token$/i,
   /^bank_account_/i,

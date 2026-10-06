@@ -65,3 +65,14 @@ export function validateResetPassword(values: Values): FieldErrors {
   const result = NewPasswordInput.safeParse(values.password ?? '');
   return result.success ? {} : { password: result.error.issues.map((issue) => issue.message) };
 }
+
+const CompleteSignupValues = z.object({ fullName: FullNameInput, sex: SexInput });
+
+/** `/register/complete`: the editable name and the required sex (the email comes from the provider). */
+export function validateCompleteSignup(values: Values): FieldErrors {
+  const result = CompleteSignupValues.safeParse({
+    fullName: values.fullName ?? '',
+    sex: values.sex === '' ? undefined : values.sex,
+  });
+  return result.success ? {} : errorsOf(result.error);
+}

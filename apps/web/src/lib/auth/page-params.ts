@@ -18,8 +18,16 @@ export function carriedReturnTo(params: ResolvedSearchParams): string | undefine
   return target === '/' ? undefined : target;
 }
 
-/** Which OAuth providers are enabled; none when the API cannot say (the buttons arrive in Phase 5). */
-export async function loadProviders(): Promise<EnabledProviders> {
+export interface ProviderStatus {
+  providers: EnabledProviders;
+  /** `GET /auth/providers` failed: the OAuth buttons are hidden and a hint says why (AC-ERROR-18). */
+  unavailable: boolean;
+}
+
+/** Which OAuth providers are enabled; none, and `unavailable`, when the API cannot say. */
+export async function loadProviderStatus(): Promise<ProviderStatus> {
   const result = await apiClient.providers({ incoming: await headers() });
-  return result.ok ? result.data : { google: false, facebook: false };
+  return result.ok
+    ? { providers: result.data, unavailable: false }
+    : { providers: { google: false, facebook: false }, unavailable: true };
 }

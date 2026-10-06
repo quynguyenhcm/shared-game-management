@@ -235,6 +235,7 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
             'x-sgm-internal-auth': 'internal-secret-value',
             'x-sgm-client-ip': '203.0.113.7',
             'set-cookie': 'sid=cookie-secret',
+            'x-pending-signup': 'pending-handle-secret',
             accept: 'application/json',
           },
         },
@@ -242,7 +243,12 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
       'request',
     );
     const serialised = JSON.stringify(sink.lines()[0]);
-    for (const secret of ['internal-secret-value', '203.0.113.7', 'cookie-secret']) {
+    for (const secret of [
+      'internal-secret-value',
+      '203.0.113.7',
+      'cookie-secret',
+      'pending-handle-secret',
+    ]) {
       expect(serialised).not.toContain(secret);
     }
     expect(serialised).toContain('application/json');

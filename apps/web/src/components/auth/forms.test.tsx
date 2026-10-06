@@ -16,7 +16,6 @@ const { LoginForm } = await import('./login-form.tsx');
 const { RegisterForm } = await import('./register-form.tsx');
 const { ResetPasswordForm } = await import('./reset-password-form.tsx');
 const { SexField } = await import('./sex-field.tsx');
-const { SignInMethods } = await import('./sign-in-methods.tsx');
 const { TextField } = await import('./text-field.tsx');
 
 const NO_PROVIDERS = { google: false, facebook: false };
@@ -163,16 +162,5 @@ describe('accessibility primitives (AC-VERIFY-11)', () => {
 
   it('renders nothing for an empty summary', () => {
     expect(renderToStaticMarkup(<ErrorSummary errors={{}} order={[]} />)).toBe('');
-  });
-});
-
-describe('/account sign-in methods stub (no OAuth rows yet)', () => {
-  it('lists Email and password as connected and explains the last-method rule', () => {
-    const html = renderToStaticMarkup(<SignInMethods />);
-    expect(html).toContain('Email and password');
-    expect(html).toContain('Connected');
-    expect(html).toContain('You need at least one way to sign in.');
-    expect(html).not.toContain('Google');
-    expect(html).not.toContain('Facebook');
   });
 });

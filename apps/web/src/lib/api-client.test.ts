@@ -142,6 +142,56 @@ describe('apiClient auth calls (bearer, internal headers, client address)', () =
   });
 });
 
+describe('apiClient OAuth and identity calls (Phase 5)', () => {
+  const AUTHORIZE = { authorizationUrl: 'https://accounts.example/o?x=1', state: 'a'.repeat(43) };
+
+  it('authorize posts the body to the lower-case provider path; callback forwards the bearer', async () => {
+    const authorize = stubJson(200, AUTHORIZE);
+    const result = await apiClient.oauthAuthorize('google', { returnTo: '/account' });
+    expect(result).toMatchObject({ ok: true, data: AUTHORIZE });
+    expect(String(authorize.mock.calls[0]?.[0])).toMatch(/\/auth\/oauth\/google\/authorize$/);
+    expect(JSON.parse(authorize.mock.calls[0]?.[1]?.body as string)).toEqual({
+      returnTo: '/account',
+    });
+    const callback = stubJson(409, {
+      error: { code: 'oauth_account_exists', message: 'x', email: USER.email },
+    });
+    const failed = await apiClient.oauthCallback(
+      'facebook',
+      { state: AUTHORIZE.state, code: 'c' },
+      { session: 'live-token' },
+    );
+    expect(failed).toMatchObject({ ok: false, error: { email: USER.email } });
+    expect((callback.mock.calls[0]?.[1]?.headers as Record<string, string>).authorization).toBe(
+      'Bearer live-token',
+    );
+  });
+
+  it('sends the pending handle only in X-Pending-Signup, and unlink resolves on 204', async () => {
+    const pending = stubJson(200, {
+      provider: 'GOOGLE',
+      email: USER.email,
+      fullName: null,
+      expiresAt: '2030-01-01T00:00:00.000Z',
+      returnTo: '/',
+    });
+    await expect(apiClient.oauthPending('pending-secret')).resolves.toMatchObject({ ok: true });
+    expect(String(pending.mock.calls[0]?.[0])).not.toContain('pending-secret');
+    expect(
+      (pending.mock.calls[0]?.[1]?.headers as Record<string, string>)['x-pending-signup'],
+    ).toBe('pending-secret');
+    const unlink = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(new Response(null, { status: 204 })),
+    );
+    vi.stubGlobal('fetch', unlink);
+    await expect(apiClient.unlink('google', 'live-token')).resolves.toMatchObject({
+      ok: true,
+      status: 204,
+    });
+    expect(unlink.mock.calls[0]?.[1]?.method).toBe('DELETE');
+  });
+});
+
 describe('apiClient trace propagation (web -> API)', () => {
   it('creates a W3C traceparent when the page has none, so every API call is traceable', async () => {
     const fetchMock = stubFetch();

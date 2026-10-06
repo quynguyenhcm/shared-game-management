@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import { AuthCard } from '../../components/auth/auth-card.tsx';
 import { FormBanner } from '../../components/auth/form-banner.tsx';
 import { SignInMethods } from '../../components/auth/sign-in-methods.tsx';
-import { LINK_CLASS } from '../../components/auth/styles.ts';
 import { StripAuthParams } from '../../components/flash-notice.tsx';
 import { SignOutButton } from '../../components/sign-out-button.tsx';
-import { forgotPasswordUrl } from '../../lib/auth/landing.ts';
+import { headers } from 'next/headers';
+import { apiClient } from '../../lib/api-client.ts';
+import { readCookie } from '../../lib/auth/cookies.ts';
 import { noticeMessage, urlErrorMessage } from '../../lib/auth/messages.ts';
 import { firstParam, type SearchParams } from '../../lib/auth/page-params.ts';
-import { requireUser } from '../../lib/auth/session.ts';
+import { SessionUnavailableError, requireUser } from '../../lib/auth/session.ts';
 
 export const metadata: Metadata = { title: 'Your account' };
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,11 @@ export const dynamic = 'force-dynamic';
 export default async function AccountPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireUser('/account');
   const params = await searchParams;
+  // `requireUser` just proved the session is live; an API that cannot answer now shows E-PAGE-1.
+  const token = await readCookie('session');
+  const identities =
+    token === null ? null : await apiClient.identities(token, { incoming: await headers() });
+  if (identities === null || !identities.ok) throw new SessionUnavailableError();
   const provider = firstParam(params, 'provider');
   const notice = noticeMessage(firstParam(params, 'notice'), { provider });
   const errorLines = urlErrorMessage(firstParam(params, 'error'), { provider, intent: 'link' });
@@ -47,13 +53,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Sear
         <h2 id="methods-heading" className="text-lg font-semibold">
           Sign-in methods
         </h2>
-        <SignInMethods />
-        <div className="flex flex-col">
-          <a href={forgotPasswordUrl({ returnTo: '/account' })} className={LINK_CLASS}>
-            Set a password
-          </a>
-          <p className="text-sm text-slate-700">We&apos;ll email you a link to set one.</p>
-        </div>
+        <SignInMethods
+          identities={identities.data.identities}
+          enabledProviders={identities.data.enabledProviders}
+        />
       </section>
 
       <section aria-labelledby="signout-heading" className="flex flex-col gap-2">

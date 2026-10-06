@@ -12,6 +12,7 @@ import { createCrypto } from '../../src/lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely, type Database } from '../../src/lib/db/kysely.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
+import { buildOAuthProviders } from '../../src/modules/auth/providers/registry.ts';
 import { createPasswordHasher, type PasswordHasher } from '../../src/modules/auth/password.ts';
 import { createLoginThrottle } from '../../src/modules/auth/throttle.ts';
 import { testConfig } from './app-deps.ts';
@@ -99,6 +100,7 @@ export async function buildAuthTestApp(
       keys: keyProviderFromConfig(config),
       config: config.auth,
     }),
+    oauthProviders: buildOAuthProviders({ auth: config.auth }),
     ...(options.extraPlugins === undefined ? {} : { extraPlugins: options.extraPlugins }),
   };
   const app = await buildApp(deps);

@@ -233,3 +233,17 @@ export const IdentitiesResponse = z.object({
   enabledProviders: ProvidersResponse,
 });
 export type IdentitiesResponse = z.infer<typeof IdentitiesResponse>;
+
+// ---------------------------------------------------------------------------------------------
+// OAuth and identity linking path/header parameters
+// ---------------------------------------------------------------------------------------------
+
+/** `:provider` in `/auth/oauth/:provider/*` and `/auth/identities/:provider*`: lower case, enabled or not. */
+export const OAuthProviderParams = z.strictObject({ provider: z.enum(['google', 'facebook']) });
+export type OAuthProviderParams = z.infer<typeof OAuthProviderParams>;
+
+/** `GET /auth/oauth/pending` carries the pending sign-up handle in a header, never in the URL. */
+export const OAuthPendingHeaders = z.looseObject({
+  'x-pending-signup': z.string().min(1).max(512),
+});
+export type OAuthPendingHeaders = z.infer<typeof OAuthPendingHeaders>;

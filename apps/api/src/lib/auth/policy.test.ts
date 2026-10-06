@@ -76,6 +76,14 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     expect(byRoute.get('POST /auth/password/forgot')).toBe('public');
     expect(byRoute.get('POST /auth/password/reset')).toBe('public');
     expect(byRoute.get('POST /auth/logout')).toBe('optionalSession');
+    // OAuth (AC-VERIFY-3): the callback reads an optional session (link intent); authorize, pending and complete are public.
+    expect(byRoute.get('POST /auth/oauth/:provider/callback')).toBe('optionalSession');
+    expect(byRoute.get('POST /auth/oauth/:provider/authorize')).toBe('public');
+    expect(byRoute.get('GET /auth/oauth/pending')).toBe('public');
+    expect(byRoute.get('POST /auth/oauth/complete')).toBe('public');
+    expect(byRoute.get('GET /auth/identities')).toBe('authenticated');
+    expect(byRoute.get('POST /auth/identities/:provider/link')).toBe('authenticated');
+    expect(byRoute.get('DELETE /auth/identities/:provider')).toBe('authenticated');
     expect(byRoute.get('GET /auth/me')).toBe('authenticated');
     for (const policy of byRoute.values()) {
       expect(['public', 'optionalSession', 'authenticated', 'globalRole', 'teamRole']).toContain(

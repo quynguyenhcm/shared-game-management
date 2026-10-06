@@ -26,6 +26,8 @@ import type { PasswordHasher } from './modules/auth/password.ts';
 import { createCommonPasswordBlocklist } from './modules/auth/password-policy.ts';
 import { createResetService } from './modules/auth/reset-service.ts';
 import { authRoutes } from './modules/auth/routes.ts';
+import { createOAuthService } from './modules/auth/oauth-service.ts';
+import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts';
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
@@ -49,6 +51,8 @@ export interface AppDeps extends HealthDeps {
   readonly passwordHasher: PasswordHasher;
   /** Postgres-backed sign-in and forgot-password throttle (`createLoginThrottle`). */
   readonly loginThrottle: LoginThrottle;
+  /** Enabled Google/Facebook adapters (`buildOAuthProviders`), or both fakes in `AUTH_FAKE_OAUTH` mode. */
+  readonly oauthProviders: OAuthProviderRegistry;
   /** Test seam: extra plugins registered after the auth module (guard fixture routes). They need a policy too. */
   readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
@@ -118,6 +122,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       throttle: deps.loginThrottle,
       blocklist,
       warnAddressMissing,
+      providers: deps.oauthProviders,
+    }),
+    oauthService: createOAuthService({
+      db: deps.db,
+      clock: deps.clock,
+      config: deps.auth,
+      sessions,
+      crypto: deps.crypto,
+      jobs: deps.jobs,
+      providers: deps.oauthProviders,
     }),
     resetService: createResetService({
       db: deps.db,

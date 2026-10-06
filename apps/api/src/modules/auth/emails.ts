@@ -47,3 +47,37 @@ export function buildPasswordResetEmail(input: PasswordResetEmailInput): EmailMe
     tags: { template: 'password-reset' },
   };
 }
+
+export interface IdentityLinkedEmailInput {
+  /** The account's normalised email: the only recipient. */
+  readonly to: string;
+  readonly fullName: string;
+  readonly provider: 'GOOGLE' | 'FACEBOOK';
+  /** `auth_identities.id` of the new identity: the job's idempotency key is derived from it. */
+  readonly identityId: string;
+}
+
+const PROVIDER_LABEL = { GOOGLE: 'Google', FACEBOOK: 'Facebook' } as const;
+
+/** AC-ASYNC-5: the security notice sent in the link transaction. */
+export function buildIdentityLinkedEmail(input: IdentityLinkedEmailInput): EmailMessage {
+  const label = PROVIDER_LABEL[input.provider];
+  const name = input.fullName.replace(/\s+/g, ' ').trim();
+  const text = [
+    `Hi ${name},`,
+    '',
+    `${label} was just connected as a sign-in method for your Shared Game Management account. You can now sign in with ${label}.`,
+    '',
+    "If this wasn't you, reset your password now. Resetting your password disconnects every Google and Facebook sign-in and signs you out on all your devices.",
+    '',
+    'Shared Game Management',
+    '',
+  ].join('\n');
+  return {
+    to: input.to,
+    subject: `${label} sign-in connected to your Shared Game Management account`,
+    text,
+    idempotencyKey: `identity-linked:${input.identityId}`,
+    tags: { template: 'identity-linked' },
+  };
+}

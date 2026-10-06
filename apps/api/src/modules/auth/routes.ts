@@ -6,8 +6,18 @@ import {
   ErrorResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
+  IdentitiesResponse,
   LoginRequest,
   MeResponse,
+  OAuthAuthorizeRequest,
+  OAuthAuthorizeResponse,
+  OAuthCallbackRequest,
+  OAuthCallbackResponse,
+  OAuthCompleteRequest,
+  OAuthCompleteResponse,
+  OAuthPendingHeaders,
+  OAuthPendingResponse,
+  OAuthProviderParams,
   ProvidersResponse,
   RegisterRequest,
   ResetPasswordRequest,
@@ -15,6 +25,7 @@ import {
 } from '@sgm/shared';
 import { authenticated, optionalSession, publicRoute } from '../../lib/auth/policy.ts';
 import { presentedToken, requireAuth } from '../../lib/auth/request-auth.ts';
+import type { OAuthService } from './oauth-service.ts';
 import type { ResetService } from './reset-service.ts';
 import type { AuthService, RequestContext } from './service.ts';
 import { storedUserAgent } from './sessions.ts';
@@ -22,6 +33,7 @@ import { storedUserAgent } from './sessions.ts';
 export interface AuthRoutesOptions {
   readonly service: AuthService;
   readonly resetService: ResetService;
+  readonly oauthService: OAuthService;
 }
 
 function contextOf(request: FastifyRequest): RequestContext {
@@ -34,7 +46,7 @@ function contextOf(request: FastifyRequest): RequestContext {
 
 /** `/auth/*` password endpoints. The API sets no cookies: the web owns them and sends the bearer token. */
 export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = (app, options) => {
-  const { service, resetService } = options;
+  const { service, resetService, oauthService } = options;
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.post(
@@ -175,6 +187,146 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = (app, options) 
       },
     },
     async (request) => resetService.reset(request.body, contextOf(request)),
+  );
+
+  typed.post(
+    '/oauth/:provider/authorize',
+    {
+      config: { policy: publicRoute() },
+      schema: {
+        summary: 'Start a Google or Facebook sign-in',
+        description:
+          'Stores a single-use state (10 minutes) and returns the provider URL and the raw state, which the web keeps in its `sgm_oauth` binding cookie. `rerequest` is honoured for Facebook only (`auth_type=rerequest`). 404 `provider_not_enabled` when the provider has no credentials.',
+        operationId: 'oauthAuthorize',
+        params: OAuthProviderParams,
+        body: OAuthAuthorizeRequest,
+        response: { 200: OAuthAuthorizeResponse, 404: ErrorResponse, 422: ErrorResponse },
+      },
+    },
+    (request) => oauthService.authorize(request.params.provider, request.body, contextOf(request)),
+  );
+
+  typed.post(
+    '/oauth/:provider/callback',
+    {
+      config: { policy: optionalSession() },
+      schema: {
+        summary: 'Finish a Google or Facebook sign-in or connect',
+        description:
+          "Consumes the state exactly once. Outcomes: `signed_in` (a session), `pending_signup` (first-time user; nothing is created until `/auth/oauth/complete`), `linked` and `already_linked` (connect flow, needs the same user's bearer token). An email that matches an existing account is never signed in or linked: 409 `oauth_account_exists`.",
+        operationId: 'oauthCallback',
+        params: OAuthProviderParams,
+        body: OAuthCallbackRequest,
+        response: {
+          200: OAuthCallbackResponse,
+          400: ErrorResponse,
+          401: ErrorResponse,
+          403: ErrorResponse,
+          404: ErrorResponse,
+          409: ErrorResponse,
+          422: ErrorResponse,
+          502: ErrorResponse,
+        },
+      },
+    },
+    (request) =>
+      oauthService.callback(request.params.provider, request.body, {
+        ...contextOf(request),
+        auth: request.auth,
+      }),
+  );
+
+  typed.get(
+    '/oauth/pending',
+    {
+      config: { policy: publicRoute() },
+      schema: {
+        summary: 'The pending first-time sign-up',
+        description:
+          'Prefills `/register/complete`. The handle travels in `X-Pending-Signup`, never in the URL.',
+        operationId: 'oauthPending',
+        headers: OAuthPendingHeaders,
+        response: { 200: OAuthPendingResponse, 400: ErrorResponse, 422: ErrorResponse },
+      },
+    },
+    (request) => oauthService.pending(request.headers['x-pending-signup'], contextOf(request)),
+  );
+
+  typed.post(
+    '/oauth/complete',
+    {
+      config: { policy: publicRoute() },
+      schema: {
+        summary: 'Finish a first-time Google or Facebook sign-up',
+        description:
+          'Requires the sex choice (422 keeps the pending sign-up valid). In one transaction consumes the pending sign-up and creates the user and identity. 201 for a new account, 200 when the identity already existed (finished in another tab).',
+        operationId: 'oauthComplete',
+        body: OAuthCompleteRequest,
+        response: {
+          200: OAuthCompleteResponse,
+          201: OAuthCompleteResponse,
+          400: ErrorResponse,
+          409: ErrorResponse,
+          422: ErrorResponse,
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await oauthService.complete(request.body, contextOf(request));
+      return reply.code(result.status).send(result.body);
+    },
+  );
+
+  typed.get(
+    '/identities',
+    {
+      config: { policy: authenticated() },
+      schema: {
+        summary: 'Sign-in methods of the signed-in user',
+        operationId: 'listIdentities',
+        response: { 200: IdentitiesResponse },
+      },
+    },
+    (request) => oauthService.identities(requireAuth(request)),
+  );
+
+  typed.post(
+    '/identities/:provider/link',
+    {
+      config: { policy: authenticated() },
+      schema: {
+        summary: 'Start connecting Google or Facebook',
+        operationId: 'startLinkIdentity',
+        params: OAuthProviderParams,
+        response: { 200: OAuthAuthorizeResponse, 404: ErrorResponse, 422: ErrorResponse },
+      },
+    },
+    (request) =>
+      oauthService.startLink(request.params.provider, requireAuth(request), contextOf(request)),
+  );
+
+  typed.delete(
+    '/identities/:provider',
+    {
+      config: { policy: authenticated() },
+      schema: {
+        summary: 'Disconnect Google or Facebook',
+        description:
+          'Never the last sign-in method: 409 `last_sign_in_method` (also enforced by a deferred database trigger).',
+        operationId: 'unlinkIdentity',
+        params: OAuthProviderParams,
+        response: {
+          204: z.null().describe('Disconnected'),
+          404: ErrorResponse,
+          409: ErrorResponse,
+          422: ErrorResponse,
+        },
+      },
+    },
+    async (request, reply) => {
+      await oauthService.unlink(request.params.provider, requireAuth(request), contextOf(request));
+      return reply.code(204).send(null);
+    },
   );
 
   return Promise.resolve();

@@ -7,6 +7,7 @@ import { createKysely } from './lib/db/kysely.ts';
 import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
+import { buildOAuthProviders } from './modules/auth/providers/registry.ts';
 import { createPasswordHasher } from './modules/auth/password.ts';
 import { createLoginThrottle } from './modules/auth/throttle.ts';
 
@@ -26,6 +27,10 @@ const crypto = createCrypto(keys);
 // argon2id hasher: its known-answer self-test runs here, so an unsuitable Node build stops boot (P7).
 const passwordHasher = createPasswordHasher();
 const loginThrottle = createLoginThrottle({ db, keys, config: config.auth });
+const oauthProviders = buildOAuthProviders({ auth: config.auth, nodeEnv: config.nodeEnv });
+if (config.auth.fakeOAuth) {
+  logger.warn({ event: 'auth.oauth.fake_enabled' }, 'fake OAuth providers are enabled (test only)');
+}
 // Producer only: the API enqueues jobs (for example the reset email) and never works them.
 const jobs = createJobRunner({
   databaseUrl: config.databaseUrl,
@@ -47,6 +52,7 @@ const app = await buildApp({
   internalAuthSecret: config.internalAuthSecret,
   passwordHasher,
   loginThrottle,
+  oauthProviders,
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

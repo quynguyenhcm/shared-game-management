@@ -69,6 +69,23 @@ describe('proxy.ts (Next 16 file convention; runs before every page)', () => {
     expect(proxy(request('/login')).headers.get('referrer-policy')).toBeNull();
   });
 
+  it('lets the OAuth callback GET through from a provider Origin, marks it no-store and no-referrer, and covers /register/complete', () => {
+    const callback = proxy(
+      request('/auth/callback/google?state=s&code=c', {
+        headers: { origin: 'https://accounts.google.com' },
+      }),
+    );
+    expect(callback.status).not.toBe(403);
+    expect(callback.headers.get('location')).toBeNull();
+    expect(callback.headers.get('cache-control')).toContain('no-store');
+    expect(callback.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(proxy(request('/register/complete')).headers.get('cache-control')).toContain('no-store');
+    const flashClear = proxy(
+      request('/auth/clear-flash', { method: 'POST', headers: { origin: 'https://evil.example' } }),
+    );
+    expect(flashClear.status).toBe(403);
+  });
+
   it('matches pages but not static assets', () => {
     expect(config.matcher).toEqual(['/((?!_next/static|_next/image|favicon.ico).*)']);
   });

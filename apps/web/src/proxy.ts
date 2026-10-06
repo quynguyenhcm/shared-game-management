@@ -14,6 +14,7 @@ const NO_STORE_PREFIXES = [
   '/forgot-password',
   '/reset-password',
   '/account',
+  '/auth/callback',
 ];
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
 const INTERNAL_HEADERS = ['x-sgm-client-ip', 'x-sgm-internal-auth'] as const;
@@ -53,8 +54,8 @@ export function proxy(request: NextRequest): NextResponse {
     // Dynamic auth pages must not be served from the back/forward cache or a shared cache.
     response.headers.set('cache-control', 'no-store');
   }
-  if (matchesPrefix(pathname, '/reset-password')) {
-    // The token is in the URL: never leak it through the Referer header.
+  if (matchesPrefix(pathname, '/reset-password') || matchesPrefix(pathname, '/auth/callback')) {
+    // The reset token or the OAuth `code` and `state` are in the URL: never leak them through the Referer header.
     response.headers.set('referrer-policy', 'no-referrer');
   }
   return response;
