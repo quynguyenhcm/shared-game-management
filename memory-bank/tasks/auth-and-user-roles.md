@@ -587,10 +587,11 @@ Build authentication and authorization as the reference `modules/<feature>` impl
 
 ### Active Sub-Agents
 - Architecture Design: COMPLETE
-- User Journey Design: DISPATCHED, Started: 2026-10-06
+- User Journey Design: COMPLETE
 - Algorithm Design: COMPLETE
 
 ### Completed Steps
 - 2026-10-06 Plan: Spec Writer (Sonnet) drafted 52 ACs; taxonomy lint CLEAN; specification approved by the user as drafted; 6-phase plan written; Architecture and Algorithm creative phases flagged (Level 3 with LOW-confidence questions).
 - Algorithm Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-algorithm.md (3A′ never auto-link + reset-proves-inbox R1; 4A block Facebook-without-email with rerequest; 7A Postgres sliding-log throttle)
 - Architecture Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-architecture.md (own Fastify module; node:crypto argon2id; own provider adapters + jose; opaque DB sessions, web-owned cookie, bearer to API; onRoute default-deny policies; Postgres OAuth state + pending sign-ups; env-selected fake provider). Reconciliation: the throttle interface follows the algorithm doc (`admit`/`settle`, reserve-then-verify), superseding the architecture doc's `check/recordFailure/recordSuccess` sketch.
+- User Journey Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-user-journey.md (dedicated single-purpose pages, OAuth buttons first, progressive-enhancement Server Actions, codes-only URLs, returnTo end to end; 10 flows, copy deck, contradictions X1–X14 resolved, contract additions C-1..C-7).
