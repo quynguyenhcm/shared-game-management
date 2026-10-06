@@ -42,22 +42,22 @@ Resolutions applied throughout this document. The planner should copy the AC-rel
 
 | # | Conflict | Sources | Resolution |
 |---|---|---|---|
-| X1 | Conflict error code `oauth_email_conflict` vs `oauth_account_exists`; link-conflict `identity_already_linked` vs `identity_in_use`; pending expiry `pending_signup_expired` vs `signup_expired` | Architecture `ErrorCode` list and Q6 flow vs algorithm decision table | **Algorithm codes win** (the architecture explicitly hands Q3/Q4 codes to the algorithm doc): `oauth_account_exists`, `identity_in_use`, `provider_already_connected`, `link_session_mismatch`, `signup_expired`, `oauth_email_missing`, `oauth_email_unverified`, `too_many_requests`. Drop `pending_signup_expired`, `oauth_email_conflict` and `identity_already_linked` from the shared `ErrorCode` list. |
+| X1 | The architecture's first `ErrorCode` draft used different codes from the algorithm decision table for the OAuth email conflict, the link conflict and the expired pending sign-up (old spellings listed in the Consolidation log) | Architecture `ErrorCode` list and Q6 flow vs algorithm decision table | **Algorithm codes win** (the architecture explicitly hands Q3/Q4 codes to the algorithm doc): `oauth_account_exists`, `identity_in_use`, `provider_already_connected`, `link_session_mismatch`, `signup_expired`, `oauth_email_missing`, `oauth_email_unverified`, `too_many_requests`. The single authoritative `ErrorCode` list (with HTTP statuses, plus `service_unavailable` for 503) now lives in the architecture doc, "Shared HTTP error shape"; this doc uses only codes from it. |
 | X2 | AC-ERROR-8 and algorithm S4 put the email in the message ("An account already exists for {email}"), but the architecture says flash messages travel only as codes in the query string and arbitrary text is never reflected | Spec, algorithm S4, architecture Q2 | Keep codes-only URLs. The callback (and the completion action for C4) sets a short-lived web cookie `sgm_flash` (HttpOnly, SameSite=Lax, Path=/, Max-Age 60) holding only the conflicting email as returned by the API. `/login?error=oauth_account_exists` reads it to fill `{email}`. If the cookie is absent (reload after 60 s), the page shows the email-free variant: "An account already exists for the email address on your {Provider} account. …". No email ever appears in a URL. |
 | X3 | AC-ERROR-2 shows "Use at least 10 characters." for both too-short and too-long passwords | Spec vs algorithm step B | Too long gets "Use at most 128 characters." (algorithm). Length is counted in code points after NFKC. |
 | X4 | AC-ERROR-4: "the same limit applies per client address" (5) vs address limit 20; message "Try again in {n} minutes." vs singular rule | Spec vs algorithm Q7 | Algorithm wins: 20 per address, singular "minute" when n = 1. |
 | X5 | AC-ERROR-8 link "to `/login`" vs algorithm "Sign in" → `/login?returnTo=%2Faccount` plus "Forgot your password?" | Spec vs algorithm S4 | Algorithm wins. The callback also lands the user on `/login?…&returnTo=%2Faccount`, so the sign-in form right below the banner already returns to `/account` to connect the provider. |
 | X6 | AC-ERROR-9 Facebook copy (no retry) vs algorithm 4A copy with "Try Facebook again" | Spec vs algorithm Q4 | Algorithm wins. The retry button needs a `rerequest` flag on `POST /auth/oauth/facebook/authorize` (contract addition C-1 below). |
 | X7 | AC-ENTRY-5: `/login` and `/register` redirect to `/` when signed in; AC-ENTRY-4 asks to "bring them back" | Spec | Redirect to the validated `returnTo` when present, else `/`. The "signed in" test uses `getCurrentUser()` (a real API check), **never cookie presence**: a dead cookie that still exists in the browser would otherwise bounce `/login` → `/` → … and lock the user out of the sign-in page. |
-| X8 | Architecture's OAuth flow redirects errors to `/login?error=<code>&provider=…` with no `returnTo`, and the state row's `return_to` is unknown to the web when the state is invalid; link-intent errors have no defined landing | Architecture Q6 | The web stores its own landing context in the binding cookie: `sgm_oauth = <state>.<base64url(JSON { r: returnTo, i: 'signin' \| 'link' })>`. The state comparison stays on the `<state>` part (unchanged security property); `r` is re-validated with `safeReturnTo` and `i` with an enum on read. Sign-in errors land on `/login?error=…&provider=…&returnTo=<r>`, link errors on `/account?error=…&provider=…`. Needs an architecture acknowledgement (contract addition C-2). |
+| X8 | Architecture's OAuth flow redirects errors to `/login?error=<code>&provider=…` with no `returnTo`, and the state row's `return_to` is unknown to the web when the state is invalid; link-intent errors have no defined landing | Architecture Q6 | The web keeps its own landing context in the `sgm_oauth` binding cookie, whose one schema is defined in the architecture doc ("Browser-binding cookie `sgm_oauth`"): `<state>.<ctx>` with `ctx = { v: 1, r, i }`. Only the state component is compared (constant time); `r` is re-validated with `safeReturnTo`; `i` is an untrusted hint that only picks the error landing, while the `oauth_states` row stays authoritative. Sign-in errors land on `/login?error=…&provider=…&returnTo=<r>`, link errors on `/account?error=…&provider=…`. Accepted by the architecture (C-2). |
 | X9 | AC-ENTRY-3 "the form cannot be submitted until a sex option is chosen" could be read as a disabled button | Spec | A disabled submit button explains nothing to screen-reader or sighted users. Interpretation: the submit button stays enabled; client-side validation (same shared zod messages) blocks the request and shows "Select your sex to continue." in the error summary and beside the field. The server's 422 remains the backstop when JavaScript is off. |
 | X10 | Algorithm says a malformed email at login gets the generic 401 and at forgot gets a silent 202 | Algorithm edge-case table | API behaviour stays as the algorithm says. The **web** checks email syntax with the shared `normaliseEmail` before calling the API on all three forms and shows "Enter a valid email address." A syntax check says nothing about whether an account exists, and it stops a typo like `aroha@gmail` from burning a throttle slot or sending the user to wait for an email that will never come. |
 | X11 | AC-HAPPY-7 does not say where sign-out lands | Spec | Lands on `/login?notice=signed_out` ("You've signed out."). On a shared phone at the venue the next player can sign in straight away. |
-| X12 | R1 can disconnect Facebook when an OAuth-only player resets to add a password, and the player is only told afterwards | Algorithm R1 trade-off | Warn before as well as after. `/account` shows the warning beside "Set a password" when the email is unproven and a provider is connected (needs `emailVerified` in `GET /auth/identities`, contract addition C-4). After the reset, the `/login` notice links the R1 sentence with `returnTo=/account` so signing in lands where they can reconnect. |
+| X12 | R1 disconnects Google and Facebook on every completed reset (user decision D1), and the player would otherwise only be told afterwards | Algorithm R1 as amended by D1 | Warn before as well as after. `/account` shows the warning beside "Set a password" whenever a provider is connected (no `emailVerified` check: no provider assertion exempts an identity), and the reset form hint and the reset email say that a new password disconnects Google and Facebook sign-in. After the reset, the `/login` notice names the removed providers and carries `returnTo=/account` so signing in lands where they can reconnect. |
 | X13 | `returnTo` could point at an auth page (`/login?returnTo=%2Fregister`), causing loops or a "signed in, now look at the sign-in page" landing | Not covered | `safeReturnTo` maps `/login`, `/register`, `/register/complete`, `/forgot-password`, `/reset-password` and anything under `/auth/` to `/`. Added to AC-ERROR-13. |
 | X14 | `GET /auth/session-expired` deletes the session cookie on any GET, so a cross-site `<img src>` could sign a user out | Architecture route handler | The handler deletes the cookie only after `GET /auth/me` with that cookie returns 401. With a live session it just redirects to `returnTo`. |
 
-Non-journey inconsistencies noticed while reading (for Phase 1, not decided here): OAuth state column `used_at` (architecture) vs `consumed_at` (algorithm); intent values `signin|link` vs `SIGN_IN|LINK`; `link_user_id` vs `bound_user_id`; `auth_sessions.user_agent` 512 vs 255 and `revoked_reason` present in one doc only; the plan's `fields?` vs `fieldErrors`. Pick one spelling each before writing migrations.
+Non-journey naming, settled in the 2026-10-06 consolidation and used in all four files: `used_at` on every single-use table; intent values `signin`/`link`; `link_user_id`; `auth_sessions.user_agent varchar(512)`; `revoked_reason` kept (`logout`, `password_reset`, `replaced`); `fieldErrors`.
 
 ---
 
@@ -240,8 +240,9 @@ Same start as F3. Callback outcome `signed_in` → web sets the session cookie a
 ```
 
 - **Sent state**: H1 "Check your email"; "If an account exists for that email, we've sent a reset link." (exact AC text); "We sent it to {typed email}. The link works once and expires in 60 minutes."; "Didn't get it after a few minutes? Check your spam folder, then send another link."; button "Send another link" (resubmits the same email; the API's 60-second floor silently absorbs fast repeats and the page is identical); link "Use a different email" (back to the form); link "Back to sign in" (keeps `returnTo`). Echoing the typed email is the same for real and unknown accounts, so it reveals nothing, and it lets the user spot a typo.
-- **Reset form**: H1 "Set a new password"; New password with "Show password" and hint "At least 10 characters. Avoid common passwords. Setting a new password signs you out on all your devices."; button "Set new password". No "confirm password" field: show/hide does the same job with less typing on a phone.
+- **Reset form**: H1 "Set a new password"; New password with "Show password" and hint "At least 10 characters. Avoid common passwords. Setting a new password signs you out on all your devices and disconnects any Google or Facebook sign-in."; button "Set new password". No "confirm password" field: show/hide does the same job with less typing on a phone.
 - **OAuth-only players** use the same flow to add a password (algorithm). From `/account` the entry is "Set a password".
+- **Every reset evicts Google and Facebook** (R1 as amended by user decision D1): `removedProviders` lists every provider identity the account had, whatever Google once asserted about the email, so the R1 landing applies to anyone with a connected provider.
 - **Signed-in user opens a reset link** (common: phone already signed in): allowed. On success the action also deletes this browser's session cookie, because the API revoked every session.
 
 ### Flow F6: Sign out (AC-HAPPY-7)
@@ -287,7 +288,7 @@ requireUser('/account') → GET /auth/me
 - **`/account` sees**: H1 "Your account". Section "Details": Name, Email, Sex (read-only), and "Platform admin" for `GLOBAL_ADMIN`. Section "Sign-in methods": a list with one row per method, in the order Email and password, Google, Facebook. A provider row appears when the provider is enabled **or** the user already has it connected. Each row shows the method name, a status ("Connected" or "Not connected") and one action:
   - Google or Facebook, not connected: "Connect Google" / "Connect Facebook".
   - Any connected method: "Disconnect" (accessible name "Disconnect Google"). With only one method left the button is `aria-disabled="true"` and the row explains "You need at least one way to sign in."
-  - Email and password, not connected: link "Set a password" → `/forgot-password?returnTo=%2Faccount` with the help text "We'll email you a link to set one." When `emailVerified` is false and a provider is connected, the R1 warning follows: "For your security, setting a password this way also disconnects {Facebook}. You can reconnect it straight after."
+  - Email and password, not connected: link "Set a password" → `/forgot-password?returnTo=%2Faccount` with the help text "We'll email you a link to set one." When any provider is connected, the R1 warning follows: "For your security, setting a password this way also disconnects {Facebook}. You can reconnect it straight after."
   - Section "Sign out": the same button as in the header.
 - **No disconnect confirmation step**: disconnecting is reversible in two clicks, does not sign the user out, and the last method cannot be removed. A confirm step would add friction to a COULD AC for no safety gain.
 
@@ -374,7 +375,7 @@ Queued in the link transaction. The user sees "{Provider} connected. You can now
 ```
 Browser ──HTTPS──► web (Next 16: RSC, Server Actions, route handlers, proxy.ts)
    ▲  cookies: __Host-sgm_session, __Host-sgm_oauth, __Host-sgm_pending, __Host-sgm_flash (https)
-   │                 │ Bearer + traceparent + user-agent + x-sgm-client-ip
+   │                 │ Bearer + traceparent + user-agent + x-sgm-internal-auth (+ x-sgm-client-ip)
    │ 302 redirects    ▼
    │             api (Fastify, internal) ──► PostgreSQL 17 (users, identities, sessions, tokens,
    │                 │                          oauth_states, oauth_pending_signups, auth_throttle, pgboss.job)
@@ -426,7 +427,7 @@ worker ── send-email ──► Mailpit / Postmark ──► player's inbox �
 | `forbidden` (403) | role or team guard | page-level 403 | E-AUTHZ-1 | Home link | n/a |
 | `cross_origin_request` (403) | origin checks | same page | E-SYS-3 | Reload | Yes |
 | network (browser offline) | client | same page | E-SYS-1 | Retry | Yes |
-| `internal_error` (500), 503, API unreachable, timeout | any | same page (forms) / `error.tsx` (pages) | E-SYS-2 / E-PAGE-1 | Retry | Yes (not passwords) |
+| `internal_error` (500), `service_unavailable` (503), API unreachable, timeout | any | same page (forms) / `error.tsx` (pages) | E-SYS-2 / E-PAGE-1 | Retry | Yes (not passwords) |
 | unknown code | any | same page | E-SYS-2 | Retry | Yes |
 
 ### Partial failure
@@ -438,20 +439,20 @@ worker ── send-email ──► Mailpit / Postmark ──► player's inbox �
 
 | Case | What happens | Why it is acceptable or how it is handled |
 |---|---|---|
-| Back button after sign-in | All post-auth redirects use `RedirectType.replace`, so the auth form is not in history. If the user reaches `/login` anyway, the server redirects to `returnTo` or `/` (X7). Auth and protected pages are dynamic, so `Cache-Control: no-store` keeps bfcache from showing stale forms. | AC-NAV-1 |
+| Back button after sign-in | All post-auth redirects use `RedirectType.replace`, so the auth form is not in history. If the user reaches `/login` anyway, the server redirects to `returnTo` or `/` (X7). Auth and protected pages are dynamic, so `Cache-Control: no-store` keeps bfcache from showing stale forms. | AC-ENTRY-7 |
 | Back button into the callback URL | Binding cookie already deleted. With a live session → `/` silently. Without → E-OAUTH-2. The API never runs the state twice. | AC-ERROR-7 replay rule |
 | Back after sign-out to `/account` | `no-store`; the request has no cookie → `/login?returnTo=%2Faccount` | |
 | Two tabs start OAuth at once | The second start overwrites `sgm_oauth`; the first tab's return fails the binding check with E-OAUTH-2 ("Please try again"), and retrying works. | Rare; one binding cookie per browser is the architecture's design |
-| Same pending sign-up finished in two tabs | Tab A completes (C5) and deletes `sgm_pending`. Tab B submits: no cookie, but a live session → lands on `returnTo` signed in. No error. | AC-NAV-2 |
+| Same pending sign-up finished in two tabs | Tab A completes (C5) and deletes `sgm_pending`. Tab B submits: no cookie, but a live session → lands on `returnTo` signed in. No error. | AC-ENTRY-8 |
 | Two separate pending sign-ups for one Google account (two browsers) | First C5 creates the user; the second gets C3 and is signed in as that user | Algorithm C3 |
 | Pending older than 15 min | `sgm_pending` Max-Age (900 s) equals the TTL, so the cookie is usually already gone → E-OAUTH-9 on reload or submit | AC-ERROR-14 |
 | Facebook login opens the Facebook app and returns in another browser | No binding cookie there → E-OAUTH-2 with the hint "open this page in your device's main browser" | Known mobile OAuth behaviour |
-| Google inside the Facebook/Instagram in-app browser | Google refuses embedded webviews on its own page (`disallowed_useragent`); our callback is never reached. So the web detects in-app browsers from the user agent and shows N-INAPP above the Google button. | AC-MOBILE-2 |
+| Google inside the Facebook/Instagram in-app browser | Google refuses embedded webviews on its own page (`disallowed_useragent`); our callback is never reached. So the web detects in-app browsers from the user agent and shows N-INAPP above the Google button. | AC-VERIFY-13 |
 | Reset link opened twice / in two tabs | First succeeds; second shows E-RESET-1 | Guarded single use |
 | Reset link opened while signed in on that device | Allowed; on success the browser's session cookie is deleted with all other sessions | F5 |
 | Sign out in tab A, keep using tab B | Tab B's next navigation has no cookie → anonymous header; protected pages → `/login?returnTo=…` | |
 | Session idle-expired while the cookie still exists | Public pages: anonymous header. Protected pages: `/auth/session-expired` → N-SESSION. | Architecture trade-off (cookie lives to the absolute expiry) |
-| Signed in while a stale `sgm_pending` exists | `/register/complete` is driven by the pending cookie only; completing replaces the session (SIGN_IN intent ignores the current session) | Rare; consistent with algorithm |
+| Signed in while a stale `sgm_pending` exists | `/register/complete` is driven by the pending cookie only; completing replaces the session (`signin` intent ignores the current session) | Rare; consistent with algorithm |
 | API down when opening `/login` | No cookie: form renders; `GET /auth/providers` fails → OAuth buttons hidden and banner N-UNAVAILABLE shown; submit gives E-SYS-2 | AC-ERROR-18 |
 
 ---
@@ -597,7 +598,7 @@ When a form returns validation errors, the `<title>` is prefixed with "Error: ".
 | Links | Forgot your password? · Don't have an account? Create one · Already have an account? Sign in · Back to sign in · Use a different email · Request a new link · Sign in instead · Reset your password · Set a password · Go to the home page |
 | Divider | or |
 | Labels | Full name · Email · Password · New password · Sex (legend) · Male · Female · Other |
-| Hints | Full name: "As your team will see it." · Email (register): "We'll send password reset links here." · Password (register): "At least 10 characters. Avoid common passwords." · New password: "At least 10 characters. Avoid common passwords. Setting a new password signs you out on all your devices." · Sex: "Some teams set session prices by sex." |
+| Hints | Full name: "As your team will see it." · Email (register): "We'll send password reset links here." · Password (register): "At least 10 characters. Avoid common passwords." · New password: "At least 10 characters. Avoid common passwords. Setting a new password signs you out on all your devices and disconnects any Google or Facebook sign-in." · Sex: "Some teams set session prices by sex." |
 | Password toggle | Show password / Hide password (`aria-pressed`) |
 | Error summary heading | There's a problem |
 | `/account` | Section headings "Details", "Sign-in methods", "Sign out" · method names "Email and password", "Google", "Facebook" · statuses "Connected" / "Not connected" · "Platform admin" · last-method note "You need at least one way to sign in." · set-password help "We'll email you a link to set one." · R1 warning "For your security, setting a password this way also disconnects {Provider list}. You can reconnect it straight after." |
@@ -661,7 +662,7 @@ When a form returns validation errors, the `<title>` is prefixed with "Error: ".
 | E-ACCT-1 | `last_sign_in_method` | `/account` | You can't disconnect your only sign-in method. Connect another one first. | |
 | E-AUTHZ-1 | `forbidden` | page / action | You don't have permission to do that. (page body: "If you think you should, ask your team admin.") | Go to the home page |
 | E-SYS-1 | (browser offline / action fetch failed) | same page | You seem to be offline. Check your connection and try again. | |
-| E-SYS-2 | `internal_error`, 503, timeout, API unreachable, unknown code | same page | Something went wrong on our side. Your details are still here. Try again in a minute. | |
+| E-SYS-2 | `internal_error`, `service_unavailable`, timeout, API unreachable, unknown code | same page | Something went wrong on our side. Your details are still here. Try again in a minute. | |
 | E-SYS-3 | `cross_origin_request` | same page | This request was blocked because it didn't come from this site. Reload the page and try again. | |
 | E-PAGE-1 | protected page load failed | `error.tsx` | Something went wrong on our side. Try again in a minute. | Try again |
 
@@ -676,7 +677,7 @@ We received a request to reset the password for your Shared Game Management acco
 Set a new password:
 {WEB_BASE_URL}/reset-password?token={token}
 
-This link expires in 60 minutes and can be used once. Setting a new password signs you out on all your devices.
+This link expires in 60 minutes and can be used once. Setting a new password signs you out on all your devices and disconnects any Google or Facebook sign-in from your account.
 
 If you didn't request this, ignore this email. Your password won't change.
 
@@ -690,7 +691,7 @@ Hi {fullName},
 {Provider} sign-in was connected to your Shared Game Management account. You can now sign in with {Provider}.
 
 If this wasn't you, reset your password now: {WEB_BASE_URL}/forgot-password
-Resetting your password signs out every device.
+Resetting your password signs out every device and disconnects Google and Facebook sign-in, including this one.
 
 Shared Game Management
 ```
@@ -704,18 +705,18 @@ Shared Game Management
 2. **State**: forms are client components around Server Actions with `useActionState`; the action returns `{ fieldErrors?, error?: { code, retryAfter?, email? }, values }` for in-place errors and calls `redirect()` for every navigation. Password fields are never echoed back.
 3. **Server Action wrapper** catches client-side rejection of the action call (offline) and shows E-SYS-1.
 4. **Redirects**: every post-auth redirect is `redirect(target, RedirectType.replace)`. `/login` and `/register` redirect signed-in users using `getCurrentUser()` (X7).
-5. **Callback route handler**: read and parse `sgm_oauth` (state and payload), delete it, compare in constant time, apply the landing tables in F3 and F8, set `sgm_session`, `sgm_pending` or `sgm_flash` as needed.
+5. **Callback route handler**: delete `sgm_oauth`, parse it with the shared codec (`packages/shared/src/auth/oauth-binding.ts`, schema in the architecture doc), compare only the state component in constant time, apply the landing tables in F3 and F8, set `sgm_session`, `sgm_pending` or `sgm_flash` as needed.
 6. **`FlashNotice`** in `layout.tsx` (client, inside `Suspense`) renders `notice=welcome` on any page and strips it. Auth pages render their own codes server-side and strip them after mount.
 7. **Mobile input attributes**: email `type="email" inputmode="email" autocomplete="email"` (`username` on `/login`), `autocapitalize="none" autocorrect="off" spellcheck="false"`; password `autocomplete="current-password"` (login) or `new-password` (register, reset); full name `autocomplete="name" autocapitalize="words"`; inputs at least 16 px font so iOS does not zoom; no `autofocus` (it pops the keyboard over the OAuth buttons).
 8. **In-app browser detection** (`apps/web/src/lib/auth/in-app-browser.ts`): server-side user-agent test for `FBAN|FBAV|FB_IAB|Instagram|Messenger` → N-INAPP.
 
-### Backend requirements (journey-driven contract additions)
+### Backend requirements (journey-driven contract additions, accepted in the 2026-10-06 consolidation; C-7 stays COULD)
 - **C-1** `POST /auth/oauth/:provider/authorize` accepts `{ returnTo?, rerequest?: boolean }`; `rerequest` is honoured only for Facebook (`auth_type=rerequest`), ignored otherwise.
-- **C-2** Binding cookie payload (web only): `sgm_oauth = <state>.<base64url(JSON {r, i})>`. No API change. Needs architecture acknowledgement (X8).
+- **C-2** Binding cookie payload: `sgm_oauth = <state>.<ctx>` exactly as defined once in the architecture doc ("Browser-binding cookie `sgm_oauth`": format, 1024-byte limit, state-only constant-time compare, `r` through `safeReturnTo`, `i` an untrusted hint, tamper/expiry/replay behaviour, interop tests). No API change (X8).
 - **C-3** `GET /auth/oauth/pending` and `POST /auth/oauth/complete` responses include `returnTo` from the pending row; the web callback redirects to `/register/complete` with no query.
-- **C-4** `GET /auth/identities` returns `{ identities: [{ provider, connectedAt, lastUsedAt }], emailVerified: boolean, enabledProviders: { google, facebook } }`.
+- **C-4** `GET /auth/identities` returns `{ identities: [{ provider, connectedAt, lastUsedAt }], enabledProviders: { google, facebook } }`. No `emailVerified` flag: after D1 the R1 warning depends only on whether a provider is connected.
 - **C-5** A 409 `oauth_account_exists` response (callback S4, complete C4) includes the conflicting email in `error.message` or an `error.email` field that only the web server reads, so the web can set `sgm_flash`. (The browser never sees the API body.)
-- **C-6** `POST /auth/password/reset` returns `{ removedProviders: ('GOOGLE'|'FACEBOOK')[] }` (already implied by algorithm step G).
+- **C-6** `POST /auth/password/reset` returns `{ removedProviders: ('GOOGLE'|'FACEBOOK')[] }`: every provider identity the account had before the reset (R1 per D1), possibly empty (algorithm step G).
 - **C-7** (COULD) `POST /auth/password/reset/check { token }` → 204 or 400 `invalid_or_expired_token`, public, no hashing, no consumption; lets `/reset-password` show E-RESET-1 before the user types.
 
 ### Integration points
@@ -731,7 +732,7 @@ Shared Game Management
 
 ## Acceptance Criteria (MANDATORY)
 
-The spec's ACs (with the architecture and algorithm amendments) remain the contract. The criteria below are the journey layer: amended wording for existing IDs where this design changes behaviour, and new IDs continuing the spec's numbering. The AC impact list at the end summarises them for the planner.
+The spec's ACs (with the architecture and algorithm amendments) remain the contract; the consolidated wording lives in `memory-bank/tasks/auth-and-user-roles.md`. The criteria below are the journey layer: amended wording for existing IDs where this design changes behaviour, and new IDs continuing the spec's numbering with the project's canonical prefixes (accessibility and mobile checks are `AC-VERIFY-*`, navigation is `AC-ENTRY-*`). The AC impact list at the end summarises them.
 
 ### AC-ENTRY-1: User can find the feature (amended)
 **Priority**: MUST
@@ -799,7 +800,7 @@ Add: "A missing `sgm_pending` cookie is treated as expired. If the browser alrea
 - [ ] E2E: sent state for known and unknown emails (DOM equal after masking the email)
 - [ ] E2E: Mailpit message, link opens `/reset-password`
 
-### AC-NAV-1: Back button and already-signed-in visits never show a stale auth form (new)
+### AC-ENTRY-7: Back button and already-signed-in visits never show a stale auth form (new)
 **Priority**: SHOULD
 **Given** a user who just signed in, registered, finished OAuth sign-up or reset their password
 **When** they press the browser Back button, or open `/login` or `/register` directly (with or without `returnTo`)
@@ -809,9 +810,12 @@ Add: "A missing `sgm_pending` cookie is treated as expired. If the browser alrea
 - [ ] E2E: `/login?returnTo=%2Faccount` while signed in → `/account`
 - [ ] Integration (web): expired session cookie + `/login` → form renders (no redirect loop)
 
-### AC-NAV-2: Finished-elsewhere and replays resolve to the signed-in state (new)
+### AC-ENTRY-8: Finished-elsewhere and replays resolve to the signed-in state (new)
 **Priority**: SHOULD
-Covered by the amended AC-ERROR-7 and AC-ERROR-14 above; listed separately so UAT walks both two-tab cases.
+**Given** a first-time OAuth sign-up open on `/register/complete` in two tabs, or a used OAuth callback URL still in the browser history
+**When** tab B submits or reloads after tab A finished, or a signed-in browser revisits the used callback URL
+**Then** the browser lands on the validated `returnTo` or `/`, signed in, with no error message, and no OAuth state or pending sign-up is used twice
+**Verification**: overlaps the amended AC-ERROR-7 and AC-ERROR-14; listed separately so UAT walks both two-tab cases.
 
 ### AC-INTEGRATION-1: Real email, real link, used once (unchanged)
 The reset email text in the [Copy deck](#emails) meets the spec's required phrases ("If you didn't request this, ignore this email.", the 60-minute expiry, the link prefix).
@@ -833,7 +837,7 @@ The reset email text in the [Copy deck](#emails) meets the spec's required phras
 **Verification**:
 - [ ] E2E (fake provider): URL has no `@`; banner text; sign-in lands on `/account`
 
-### AC-A11Y-1: Focus and announcements across the journey (new)
+### AC-VERIFY-11: Focus and announcements across the journey (new)
 **Priority**: MUST
 **Given** any auth page used with a keyboard and a screen reader
 **When** a submit fails validation, a server error returns, or a page loads with a notice or error code
@@ -843,7 +847,7 @@ The reset email text in the [Copy deck](#emails) meets the spec's required phras
 - [ ] E2E: `/login?error=oauth_cancelled&provider=google` → focus on the banner
 - [ ] E2E: axe scan of `/login`, `/register`, `/register/complete`, `/forgot-password` (both states), `/reset-password`, `/account`
 
-### AC-MOBILE-1: Phone-friendly forms (new)
+### AC-VERIFY-12: Phone-friendly forms (new)
 **Priority**: SHOULD
 **Given** a 360 × 740 viewport
 **When** the player opens `/login`, `/register` or `/register/complete`
@@ -851,7 +855,7 @@ The reset email text in the [Copy deck](#emails) meets the spec's required phras
 **Verification**:
 - [ ] E2E (mobile project): layout checks and attribute assertions
 
-### AC-MOBILE-2: In-app browser hint for Google (new)
+### AC-VERIFY-13: In-app browser hint for Google (new)
 **Priority**: SHOULD
 **Given** a request whose user agent identifies the Facebook, Messenger or Instagram in-app browser
 **When** `/login` or `/register` renders with Google enabled
@@ -877,10 +881,10 @@ The reset email text in the [Copy deck](#emails) meets the spec's required phras
 3. Every row in [Where every error lands](#where-every-error-lands-and-how-the-user-recovers) has at least one web-level test asserting landing URL and text (table-driven over `messages.ts`).
 
 ### Edge case tests
-1. AC-NAV-1: Back after sign-in; signed-in `/login`; dead-cookie `/login` (no loop).
-2. AC-NAV-2 / AC-ERROR-14: two tabs on `/register/complete`; callback replay while signed in.
+1. AC-ENTRY-7: Back after sign-in; signed-in `/login`; dead-cookie `/login` (no loop).
+2. AC-ENTRY-8 / AC-ERROR-14: two tabs on `/register/complete`; callback replay while signed in.
 3. `/auth/session-expired` with a live session does not delete the cookie (X14).
-4. AC-A11Y-1, AC-MOBILE-1/2.
+4. AC-VERIFY-11, AC-VERIFY-12/13.
 
 ## Accessibility Checklist
 
@@ -921,7 +925,7 @@ No web telemetry backend exists; the funnel is read from the API's structured ev
 - [x] Every error has a landing page, a message and a next step
 - [x] Async states are clear (reset sent state, resend, spam hint)
 - [x] Consistent with the binding architecture and algorithm decisions (contradictions listed and resolved)
-- [x] Accessible per the spec's NFR (AC-A11Y-1)
+- [x] Accessible per the spec's NFR (AC-VERIFY-11)
 - [x] Testable: every landing is a URL plus a code plus a copy-deck string
 
 ---
@@ -933,7 +937,7 @@ No web telemetry backend exists; the funnel is read from the API's structured ev
 2. **AC-ENTRY-3**: "the form cannot be submitted" means client-side validation blocks the request and shows "Select your sex to continue." in the summary and beside the field (X9); same on `/register/complete`.
 3. **AC-ENTRY-5**: signed-in visits to `/login` and `/register` redirect to the validated `returnTo` or `/`; "signed in" means `GET /auth/me` succeeds, and a dead cookie gets the form (X7).
 4. **AC-HAPPY-1 / AC-HAPPY-3 / AC-HAPPY-4**: after creating an account the destination shows "Welcome! Your account is ready." once; landing honours `returnTo` (the pending row's for OAuth).
-5. **AC-HAPPY-6**: after the reset, this browser's session cookie is deleted; with R1 removals the landing is `/login?notice=password_updated&removed=…&returnTo=%2Faccount`.
+5. **AC-HAPPY-6**: after the reset, this browser's session cookie is deleted; every reset removes all Google and Facebook identities (R1 per D1), and with removals the landing is `/login?notice=password_updated&removed=…&returnTo=%2Faccount`.
 6. **AC-HAPPY-7**: lands on `/login` with "You've signed out."; the cookie is deleted even when the API call fails.
 7. **AC-HAPPY-11/12**: `/account` lists only enabled or already-connected providers; "Set a password" for accounts without a PASSWORD identity; disconnect has no confirmation step; success notices "{Provider} connected. You can now sign in with it." and "{Provider} disconnected. You can connect it again at any time."; the last-method row explains "You need at least one way to sign in."
 8. **AC-ERROR-1**: helper sentence and link labels "Sign in instead" / "Reset your password"; links carry `returnTo`; sex is also preserved; focus moves to the banner.
@@ -947,11 +951,11 @@ No web telemetry backend exists; the funnel is read from the API's structured ev
 16. **AC-ERROR-13**: `returnTo` pointing at an auth page (`/login`, `/register`, `/register/complete`, `/forgot-password`, `/reset-password`, `/auth/*`) is treated as `/` (X13).
 17. **AC-ERROR-14**: missing cookie = expired; finished-in-another-tab → signed-in landing; "Use a different account" (above).
 18. **AC-ERROR-6**: the web rejects a syntactically invalid email with "Enter a valid email address." before calling the API (the API's uniform 202 is unchanged) (X10). The sent page echoes the typed email and offers "Send another link".
-19. **Spec code list**: use the algorithm's codes; drop `pending_signup_expired`, `oauth_email_conflict`, `identity_already_linked` (X1).
+19. **Spec code list**: use only the codes in the architecture doc's authoritative `ErrorCode` list, which adopts the algorithm's codes (X1).
 
-**Add**: AC-ERROR-18 (MUST, service unavailable), AC-ERROR-20 (MUST, conflict email not in URL), AC-A11Y-1 (MUST), AC-NAV-1 (SHOULD), AC-NAV-2 (SHOULD), AC-HAPPY-13 (SHOULD), AC-MOBILE-1 (SHOULD), AC-MOBILE-2 (SHOULD), and optionally AC-ERROR-19 (COULD): "`/reset-password` checks the token on load (C-7) and shows 'This reset link is invalid or has expired.' before any password is typed."
+**Add**: AC-ERROR-18 (MUST, service unavailable), AC-ERROR-20 (MUST, conflict email not in URL), AC-VERIFY-11 (MUST), AC-ENTRY-7 (SHOULD), AC-ENTRY-8 (SHOULD), AC-HAPPY-13 (SHOULD), AC-VERIFY-12 (SHOULD), AC-VERIFY-13 (SHOULD), and optionally AC-ERROR-19 (COULD): "`/reset-password` checks the token on load (C-7) and shows 'This reset link is invalid or has expired.' before any password is typed."
 
-**Contract additions** (need sign-off from the architecture owner): C-1 `rerequest`, C-2 binding-cookie payload, C-3 `returnTo` in pending/complete responses, C-4 identities response shape with `emailVerified`, C-5 conflict email for the web server, C-6 `removedProviders`, C-7 reset check (COULD).
+**Contract additions** (accepted in the 2026-10-06 consolidation): C-1 `rerequest`, C-2 binding-cookie payload (schema in the architecture doc), C-3 `returnTo` in pending/complete responses, C-4 identities response shape, C-5 conflict email for the web server (`error.email`), C-6 `removedProviders`; C-7 reset check stays COULD (spec AC-ERROR-19).
 
 ## Page and file changes vs the plan's New Source Files
 
@@ -965,7 +969,8 @@ Legend: **+** add, **=** confirmed, **~** extend.
 - **+** `apps/web/src/components/auth/{login-form,register-form,complete-signup-form,forgot-password-form,reset-password-form,sign-in-methods}.tsx`: client forms wired to the Server Actions
 - **+** `apps/web/src/app/account/error.tsx`: protected-page outage view (E-PAGE-1); later protected routes copy it
 - **+** `apps/web/src/lib/auth/in-app-browser.ts` (+ `in-app-browser.test.ts`)
-- **+** `apps/web/src/lib/auth/oauth-binding.ts` (+ test): encode, parse and validate the `sgm_oauth` payload (C-2)
+- **+** `packages/shared/src/auth/oauth-binding.ts` (+ test): encode, parse and validate the `sgm_oauth` value (C-2; shared so the API can test interop)
+- **+** `apps/web/src/lib/auth/client-address.ts` (+ test): client address from `X-Forwarded-For` with `WEB_TRUSTED_PROXY_HOPS` (architecture "Client address trust boundary")
 - **+** `apps/web/src/lib/auth/landing.ts` (+ test): pure mapping from callback and action outcomes to redirect URLs (the landing tables in F3, F8 and the error table), so the 25-odd landings are unit-tested once
 - ~ `packages/shared/src/auth/return-to.ts`: auth-page exclusion (X13)
 - ~ `packages/shared/src/api/auth.ts`: field messages from the copy deck; `rerequest`; identities response shape
@@ -975,7 +980,19 @@ Legend: **+** add, **=** confirmed, **~** extend.
 
 ## Next Steps
 
-1. Planner: fold the AC impact list and contract additions C-1 to C-7 into `memory-bank/tasks/auth-and-user-roles.md`, get the X8 and C-5 acknowledgement against the architecture doc, and settle the naming inconsistencies listed under the contradictions table before Phase 1.
-2. Phase 4 (web password flows): build the form primitives, `messages.ts` from the copy deck, `landing.ts`, header states, `FlashNotice`, `/account` without OAuth rows, AC-A11Y-1 and AC-MOBILE-1.
-3. Phase 5 (OAuth): callback landings, `oauth-binding.ts`, `/register/complete`, link rows on `/account`, the in-app hint, AC-ERROR-20.
+1. Done (2026-10-06): the AC impact list and contract additions are folded into `memory-bank/tasks/auth-and-user-roles.md`, X8 and C-5 are acknowledged in the architecture doc, and the naming is settled.
+2. Phase 4 (web password flows): build the form primitives, `messages.ts` from the copy deck, `landing.ts`, header states, `FlashNotice`, `/account` without OAuth rows, AC-VERIFY-11 and AC-VERIFY-12.
+3. Phase 5 (OAuth): callback landings, the shared `oauth-binding.ts` codec, `/register/complete`, link rows on `/account`, the in-app hint, AC-ERROR-20.
 4. Phase 6: Playwright journeys for every flow in this document (desktop and mobile projects) plus the axe scans; `/yay:uat` walks F1–F8 with the Player persona on a phone viewport.
+
+## Consolidation (2026-10-06)
+
+Reconciled with the architecture and algorithm docs, the spec, the codex design critique and the user's decisions D1 and D2. The **Chosen** journey (Option 1, dedicated single-purpose pages) is unchanged.
+
+- **R1 eviction (user decision D1, critique finding 1)**: every completed reset disconnects all Google and Facebook sign-in. Updated F5 (new bullet), X12 (warning shown whenever a provider is connected, no `emailVerified` check), the reset form hint, the reset email and the identity-linked email copy, C-4 (dropped `emailVerified`) and C-6 (`removedProviders` = every provider the account had). The success copy N-RESET-R1 is unchanged.
+- **Binding cookie (D2, finding 3)**: X8, C-2 and implementation guideline 5 now reference the single `sgm_oauth` schema in the architecture doc; the codec moved from `apps/web/src/lib/auth/oauth-binding.ts` to `packages/shared/src/auth/oauth-binding.ts`.
+- **Client address (D2, finding 2)**: the system-boundary diagram shows `x-sgm-internal-auth`; `apps/web/src/lib/auth/client-address.ts` added to the file list.
+- **Error contract (D2, finding 4)**: X1 points to the authoritative `ErrorCode` list in the architecture doc (retired codes: `pending_signup_expired` → `signup_expired`, `oauth_email_conflict` → `oauth_account_exists`, `identity_already_linked` → `identity_in_use`); `service_unavailable` (503) added to the error table and E-SYS-2.
+- **AC ids remapped to canonical prefixes**: AC-A11Y-1 → AC-VERIFY-11, AC-MOBILE-1 → AC-VERIFY-12, AC-MOBILE-2 → AC-VERIFY-13, AC-NAV-1 → AC-ENTRY-7, AC-NAV-2 → AC-ENTRY-8 (now with Given/When/Then). AC-ERROR-19 (C-7) is in the spec as COULD.
+- **Naming settled** (the paragraph under the contradictions table): `used_at`, `signin`/`link`, `link_user_id`, `user_agent varchar(512)`, `revoked_reason` kept, `fieldErrors`. The earlier spellings `consumed_at`, `SIGN_IN`/`LINK`, `bound_user_id`, 255 and `fields` are retired.
+- **Contract additions** C-1 to C-6 accepted; C-7 stays COULD.

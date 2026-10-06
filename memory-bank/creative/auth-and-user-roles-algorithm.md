@@ -24,16 +24,16 @@ Self-registration with email/password, Google and Facebook has to resolve four a
 | Raw email | string | ≤ 254 chars after trim | `/register`, `/login`, `/forgot-password`, CLI, provider profile |
 | Password | string | 10–128 code points after NFKC | `/register`, `/login`, `/reset-password` |
 | Provider assertion | `{ provider, subject, email?, emailVerified?, name? }` | one per callback | Google ID token (`sub`, `email`, `email_verified`, `name`), Facebook Graph `/me?fields=id,name,email` |
-| Flow intent | `SIGN_IN` \| `LINK` (+ bound `userId` for `LINK`) | per OAuth flow | OAuth state record (architecture Q6) |
-| Current session | `{ userId } \| null` | per request | session cookie (architecture Q2) |
-| Client address | IPv4 / IPv6 string or absent | per request | forwarded by the web tier (see assumptions) |
+| Flow intent | `signin` \| `link` (+ `link_user_id` for `link`) | per OAuth flow | `oauth_states` row (architecture Q6) |
+| Current session | `{ userId } \| null` | per request | bearer session token sent by the web (architecture Q2) |
+| Client address | IPv4 / IPv6 string or absent | per request | `request.clientAddress`, set only over the secret-authenticated web hop (architecture "Client address trust boundary") |
 | Clock `now` | `Date` | injected | `deps.clock` (tests advance it) |
 | Reset / session token | 32 random bytes, base64url (43 chars) | per issue | `crypto.randomBytes(32)` |
 
 ### Outputs
 | Name | Type | Description |
 |------|------|-------------|
-| OAuth outcome | `SIGNED_IN` \| `PENDING_SIGNUP` \| `LINKED` \| `ALREADY_LINKED` \| error code | Result of the decision table in Q3 |
+| OAuth outcome | `signed_in` \| `pending_signup` \| `linked` \| `already_linked` \| error code | Result of the decision table in Q3 |
 | Throttle verdict | `{ admitted: boolean, retryAfterSeconds: number }` | Result of `auth_throttle_admit` |
 | Normalised email | ASCII string | Stored in `users.email` and `auth_identities.provider_subject` (PASSWORD) |
 | Password verdict | ok \| `fieldErrors.password` | Length and blocklist checks |
@@ -42,12 +42,13 @@ Self-registration with email/password, Google and Facebook has to resolve four a
 ### Edge Cases
 1. Provider subject already linked, but the provider now reports a different email → sign in as the linked user, never update `users.email`.
 2. OAuth email matches a local account and the provider is Google with `email_verified=true` → still no sign-in and no link (Q3).
-3. Pre-hijacked account (attacker registered the victim's email by password and connected their own Facebook) → the victim's first completed password reset removes the attacker's identities and sessions (rule R1).
+3. Pre-hijacked account (attacker registered the victim's email by password and connected their own Facebook) → the victim's completed password reset removes the attacker's identities and sessions (rule R1).
+3a. Recycled inbox (the previous owner of an address signed up with Google, which asserted `email_verified=true`; the address later belongs to someone else) → the new owner's completed reset removes the GOOGLE identity too, so the previous owner's "Continue with Google" afterwards hits row S4 (`oauth_account_exists`) and cannot sign in (R1 as amended by user decision D1).
 4. Two browser tabs complete the same first-time Google sign-up → one creates the user, the other signs in as that user.
 5. Unknown email at `/login` → same throttle accounting, same dummy-hash cost, same 401 as a wrong password.
 6. 20 concurrent wrong-password attempts for one email → exactly 5 password verifications.
 7. A shared venue Wi-Fi (many players behind one NAT address) → the per-address limit is set higher than the per-email one.
-8. Client address missing (misconfigured relay) → the address dimension is skipped, the email dimension still applies, and a warning is logged.
+8. Client address missing (no trusted hop, untrusted or missing internal secret outside production) → the address dimension is skipped, the email dimension still applies, and a warning is logged. Production cannot boot without the trust settings.
 9. Email with uppercase letters, surrounding spaces, or an IDN domain such as `māori.nz` → lowercased, trimmed, domain converted to punycode; a non-ASCII local part is rejected.
 10. Empty, whitespace-only or 129+ code-point password → 422 before any hashing.
 11. Reset token submitted twice concurrently → exactly one succeeds (guarded UPDATE).
@@ -92,9 +93,9 @@ The threat model that decides this question:
 - **Pseudocode**:
   ```
   function oauthSignIn(a):
-      if identity(a.provider, a.subject) exists: return SIGNED_IN(owner)
+      if identity(a.provider, a.subject) exists: return signed_in(owner)
       if userByEmail(a.email) exists: return ERROR(oauth_account_exists)
-      return PENDING_SIGNUP
+      return pending_signup
   ```
 - **Time Complexity**: Best/Average/Worst O(1) indexed lookups (2 unique-index probes).
 - **Space Complexity**: O(1).
@@ -105,26 +106,24 @@ The threat model that decides this question:
 - **Worst For**: products with many "I forgot which button I used" users.
 
 #### Option 3A′: Never auto-link, plus "reset proves the inbox" hardening (implicit verification)
-- **Approach**: 3A, plus a nullable `users.email_verified_at`. It is set only by evidence the inbox owner acted: (a) Google sign-up or link with `email_verified=true` and the Google email equal to the account email; (b) completing a password reset, since the reset link was delivered to that inbox. **Rule R1**: when a password reset completes on an account whose `email_verified_at` was NULL, then in the same transaction delete every non-PASSWORD identity, upsert the PASSWORD identity, revoke all sessions, and set `email_verified_at = now`. Whoever proves the inbox evicts anyone who attached methods before the inbox was proven.
+- **Approach**: 3A, plus **rule R1** (as amended by user decision D1, 2026-10-06): **every** completed password reset, in one transaction, deletes **all** non-PASSWORD identities (GOOGLE and FACEBOOK, whatever any provider asserted in the past), upserts the PASSWORD identity, revokes all sessions, invalidates the user's other reset tokens, sets `users.email_verified_at = now` and clears the `login_email` throttle row. Whoever proves the inbox now owns the account, and every method attached by anyone else, at any time, is evicted. A nullable `users.email_verified_at` records inbox proof: it is set by a completed reset, and also by a Google sign-up (C5) or link (L4) when Google asserts `email_verified=true` for the account's email. It is **informational only** in v1: no rule reads it, it never exempts an identity from R1, and it is not shown in the v1 UI; it exists for the future email-verification flow.
 - **Pseudocode**:
   ```
   function completeReset(token, newPassword):
       tx:
         uid = consumeToken(token)                     # guarded UPDATE ... RETURNING
         lock users[uid] FOR UPDATE
-        wasUnverified = users[uid].email_verified_at IS NULL
-        upsert PASSWORD identity(uid, users[uid].email, hash(newPassword))
-        if wasUnverified:
-            removed = DELETE auth_identities WHERE user_id=uid AND provider <> 'PASSWORD' RETURNING provider
-            UPDATE users SET email_verified_at = now WHERE id = uid
-        revoke all sessions(uid); invalidate other reset tokens(uid); clear login_email throttle
+        upsert PASSWORD identity(uid, users[uid].email, hash(newPassword))   # before the delete: the last-method trigger sees ≥ 1 identity at commit
+        removed = DELETE auth_identities WHERE user_id=uid AND provider <> 'PASSWORD' RETURNING provider   # unconditional (D1)
+        UPDATE users SET email_verified_at = now WHERE id = uid
+        revoke all sessions(uid, reason='password_reset'); invalidate other reset tokens(uid); clear login_email throttle
       return { removedProviders: removed }
   ```
 - **Time Complexity**: O(1) for the OAuth path (same as 3A); reset adds O(k) for k ≤ 3 identities.
 - **Space Complexity**: one nullable column.
 - **Data Structures**: as 3A plus `users.email_verified_at`.
-- **Pros**: closes all three pre-hijack variants with no new email flow, page or token type. The column is reused when a real verification flow ships. Forgot-password also becomes the recovery path for OAuth-only users.
-- **Cons**: a legitimate user whose email was never proven (password or Facebook sign-up) and who connected Facebook or a different Google account loses those connections on their first reset. They see a message and can reconnect in two clicks. This is rare: a reset plus a connected provider plus an unproven email.
+- **Pros**: closes all three pre-hijack variants **and** the recycled-inbox case (a historical Google `email_verified` assertion no longer keeps a previous owner's identity alive, codex critique finding 1) with no new email flow, page or token type. Forgot-password also becomes the recovery path for OAuth-only users. The rule has no branches, so it is simple to test.
+- **Cons**: every user who resets loses their connected Google and Facebook sign-in and has to reconnect it (two clicks each). This is accepted (D1): resets are rare, the loss is warned about before (on `/account` and in the reset form hint) and explained after, and recoverability of the account outweighs the inconvenience.
 - **Best For**: this product, with its small audience, no verification flow, and wallet and team-banking access worth protecting.
 - **Worst For**: a large audience of Facebook-first users who often reset passwords.
 
@@ -132,12 +131,12 @@ The threat model that decides this question:
 - **Approach**: add a verification link at registration. Auto-link an unknown OAuth subject to a local account when the provider asserts the same email verified, authoritatively (Google and `@gmail.com`/`hd` only; never Facebook), **and** the local email is verified.
 - **Pseudocode**:
   ```
-  if identity known: SIGNED_IN
+  if identity known: signed_in
   m = userByEmail(a.email)
   if m and m.email_verified_at and a.provider == GOOGLE and a.emailVerified and googleAuthoritative(a):
-      link(m, a); return SIGNED_IN(m)
+      link(m, a); return signed_in(m)
   if m: return ERROR(oauth_account_exists)
-  return PENDING_SIGNUP
+  return pending_signup
   ```
 - **Time Complexity**: O(1) per callback; adds a verification token flow (O(1) per verification).
 - **Space Complexity**: verification tokens table (or a purpose column on reset tokens).
@@ -150,11 +149,11 @@ The threat model that decides this question:
 - **Approach**: on an email conflict, keep the provider assertion in a pending-link record and show "Enter your password to connect Google". The correct password links and signs in.
 - **Pseudocode**:
   ```
-  if identity known: SIGNED_IN
+  if identity known: signed_in
   m = userByEmail(a.email)
   if m: pl = createPendingLink(m, a); return NEEDS_PASSWORD(pl)
   ...
-  function confirmLink(pl, password): throttle(email); verify(m, password); link(m, pl); SIGNED_IN(m)
+  function confirmLink(pl, password): throttle(email); verify(m, password); link(m, pl); signed_in(m)
   ```
 - **Time Complexity**: O(1) plus one hash verification.
 - **Space Complexity**: a pending-link record type (architecture Q6 store).
@@ -314,7 +313,7 @@ The OAuth decision table costs at most 3 unique-index probes (≈ 1–3 ms) plus
 
 ## Decision
 
-### Q3: **Chosen: Option 3A′** (never auto-link, never sign in on an email match, link only while signed in, plus rule R1 "a completed reset proves the inbox and evicts unproven methods"). **Email verification does not enter v1 as a flow.** v1 adds the nullable `users.email_verified_at` column, set implicitly as described.
+### Q3: **Chosen: Option 3A′** (never auto-link, never sign in on an email match, link only while signed in, plus rule R1 "a completed reset proves the inbox and evicts every Google and Facebook identity"). R1 originally exempted accounts whose email was already proven; user decision D1 (2026-10-06) removed that exemption, so the choice of 3A′ stands with an unconditional R1. **Email verification does not enter v1 as a flow.** v1 adds the nullable, informational `users.email_verified_at` column, set as described.
 
 #### Rationale
 - Pre-hijacking is the dominant risk for an account system with no verification flow, and accounts here have real value (wallet balance up to $100, registrations that incur fees, team banking and exports for TEAM_ADMINs). 3A alone stops the classic variant but leaves the persistent one open. R1 closes it with two SQL statements inside a transaction the reset already runs. That makes the forgot-password flow the single recovery path for every pre-hijack variant, and for OAuth-only users.
@@ -325,41 +324,41 @@ The OAuth decision table costs at most 3 unique-index probes (≈ 1–3 ms) plus
 
 #### Decision table: OAuth callback (after the architecture layer has validated and consumed `state`)
 
-Definitions: `P` = provider, `S` = provider subject, `E` = provider email after S1 normalisation (`∅` if missing or not normalisable), `V` = verified (`true` only for Google with `email_verified=true`; Facebook is always `false`), `O` = owner of identity `(P, S)` if any, `M` = local user with `users.email = E` if any, `U` = user bound to a LINK flow at authorize time, `cur` = user of the session presented at callback.
+Definitions: `P` = provider, `S` = provider subject, `E` = provider email after S1 normalisation (`∅` if missing or not normalisable), `V` = verified (`true` only for Google with `email_verified=true`; Facebook is always `false`), `O` = owner of identity `(P, S)` if any, `M` = local user with `users.email = E` if any, `U` = user bound to a `link` flow at authorize time (`oauth_states.link_user_id`), `cur` = user of the session presented at callback.
 
 **Row 0 (all intents):** consent denied, state missing/unknown/expired/used, or provider token/userinfo failure → AC-ERROR-7 outcomes (architecture Q6 owns detection; messages unchanged).
 
-**Intent `SIGN_IN`** (from `/login` or `/register`; an existing session is ignored and replaced on success):
+**Intent `signin`** (from `/login` or `/register`; an existing session is ignored and replaced on success, revoked with `revoked_reason='replaced'`):
 
 | # | Identity (P,S) known? | E | V | Local M with email E? | Outcome | Code / HTTP | User-facing message (on `/login` unless noted) |
 |---|---|---|---|---|---|---|---|
-| S1 | Yes (owner O) | any | any | any | Sign in as O; rotate session; `last_used_at = now`; never change `users.email` | 200 `SIGNED_IN` | (lands on `returnTo` or `/`) |
+| S1 | Yes (owner O) | any | any | any | Sign in as O; rotate session; `last_used_at = now`; never change `users.email` | 200 `signed_in` | (lands on `returnTo` or `/`) |
 | S2 | No | ∅ | n/a | n/a | Block; nothing created | 422 `oauth_email_missing` | Facebook: "Facebook didn't share an email address, which we need to create your account. Try again and allow access to your email, or use Google or email and password instead." with button "Try Facebook again" (authorize with `auth_type=rerequest`). Google: "Google didn't share an email address we can use. Use another sign-in method." |
 | S3 | No | present | false, P = GOOGLE | n/a | Block; nothing created | 422 `oauth_email_unverified` | "Google says this email address isn't verified. Verify it with Google or use another method." |
-| S4 | No | present | any (Facebook) / true (Google) | Yes | Block; no session, no link; log `auth.oauth.conflict` (userId of M, provider; no email) | 409 `oauth_account_exists` | "An account already exists for {E}. Sign in with your existing method, then connect {Google\|Facebook} from your Account page." Links: "Sign in" → `/login?returnTo=%2Faccount`, "Forgot your password?" → `/forgot-password` |
-| S5 | No | present | any (Facebook) / true (Google) | No | Create pending sign-up `{P, S, E, V, name}` (TTL 15 min); redirect to `/register/complete` | 200 `PENDING_SIGNUP` | (shows `/register/complete`) |
+| S4 | No | present | any (Facebook) / true (Google) | Yes | Block; no session, no link; log `auth.oauth.conflict` (userId of M, provider; no email) | 409 `oauth_account_exists` (with `error.email = E` for the web server, architecture C-5) | "An account already exists for {E}. Sign in with your existing method, then connect {Google\|Facebook} from your Account page." Links: "Sign in" → `/login?returnTo=%2Faccount`, "Forgot your password?" → `/forgot-password` |
+| S5 | No | present | any (Facebook) / true (Google) | No | Create pending sign-up `{P, S, E, V, name}` (TTL 15 min); redirect to `/register/complete` | 200 `pending_signup` | (shows `/register/complete`) |
 
 **Completion `POST /auth/oauth/complete`** (pending sign-up `ps`, form `{ fullName, sex }`):
 
 | # | Condition | Outcome | Code / HTTP | Message |
 |---|---|---|---|---|
 | C1 | Form invalid (no sex, name empty or > 255) | 422; `ps` **not** consumed | 422 `validation_failed` | "Select your sex to continue." / "Enter your name." |
-| C2 | `ps` missing, expired or already consumed (guarded UPDATE returns 0 rows) | Nothing created | 400 `signup_expired` | "Your sign-up session expired. Please start again." |
-| C3 | In the transaction, identity `(P,S)` now exists (second tab finished first) | Consume `ps`; sign in as its owner | 200 `SIGNED_IN` | n/a |
+| C2 | `ps` missing, expired or already used (guarded `UPDATE … SET used_at` returns 0 rows) | Nothing created | 400 `signup_expired` | "Your sign-up session expired. Please start again." |
+| C3 | In the transaction, identity `(P,S)` now exists (second tab finished first) | Consume `ps`; sign in as its owner | 200 `signed_in` | n/a |
 | C4 | In the transaction, `users.email = E` now exists (23505 on `users.email`) | Roll back; consume `ps` in a new statement | 409 `oauth_account_exists` | same as S4 |
-| C5 | Otherwise | Consume `ps`; insert `users` (role PLAYER, sex, name, email E, `email_verified_at = now` iff `P = GOOGLE ∧ V`); insert identity `(P, S)`; issue session | 201 `SIGNED_IN` | (lands on `returnTo` or `/`) |
+| C5 | Otherwise | Consume `ps`; insert `users` (role PLAYER, sex, name, email E, `email_verified_at = now` iff `P = GOOGLE ∧ V`, informational only); insert identity `(P, S)`; issue session | 201 `signed_in` | (lands on `returnTo` or `/`) |
 
 On 23505 for `uq_auth_identities_provider_subject` inside C5, re-run the decision once (it resolves to C3).
 
-**Intent `LINK`** (started from `/account` while signed in as U):
+**Intent `link`** (started from `/account` while signed in as U = `oauth_states.link_user_id`):
 
 | # | Condition | Outcome | Code / HTTP | Message (on `/account` unless noted) |
 |---|---|---|---|---|
 | L0 | `cur` is null, expired, or `cur ≠ U` | Nothing linked | 401 `session_expired` or 403 `link_session_mismatch` | "Sign in again to connect {Provider}." (redirect to `/login?returnTo=%2Faccount`) |
-| L1 | (P,S) known and O = U | No-op | 200 `ALREADY_LINKED` | "{Provider} is already connected." |
+| L1 | (P,S) known and O = U | No-op | 200 `already_linked` | "{Provider} is already connected." |
 | L2 | (P,S) known and O ≠ U | Nothing linked; log `auth.oauth.link_conflict` | 409 `identity_in_use` | "That {Provider} account is already connected to a different account." |
 | L3 | (P,S) unknown and U already has a P identity | Nothing linked | 409 `provider_already_connected` | "Your account already has a {Provider} sign-in. Disconnect it first to connect a different one." |
-| L4 | Otherwise (E may be ∅, unverified, or differ from U's email) | Insert identity (U, P, S); if `P = GOOGLE ∧ V ∧ E = U.email` and `email_verified_at` is NULL, set it to now; enqueue the security notification email (same transaction, P5) | 200 `LINKED` | "{Provider} connected. You can now sign in with it." |
+| L4 | Otherwise (E may be ∅, unverified, or differ from U's email) | Insert identity (U, P, S); if `P = GOOGLE ∧ V ∧ E = U.email` and `email_verified_at` is NULL, set it to now (informational only; it never exempts the identity from R1); enqueue the security notification email (same transaction, P5) | 200 `linked` | "{Provider} connected. You can now sign in with it." |
 
 **Unlink `DELETE /auth/identities/:provider`**: lock the users row `FOR UPDATE`; if the user has ≤ 1 identity → 409 `last_sign_in_method`; else delete. A deferred constraint trigger enforces the same rule in the database (schema item 4).
 
@@ -369,8 +368,8 @@ On 23505 for `uq_auth_identities_provider_subject` inside C5, re-run the decisio
 
 #### Trade-offs Accepted
 - A user who registered by password and later clicks Google sees the conflict page and has to sign in, then connect: one extra round trip. Mitigated by the direct `returnTo=/account` link. Revisit with 3C if `auth.oauth.conflict` exceeds about 5% of OAuth callbacks.
-- R1 can disconnect a legitimate Facebook identity (or a Google one with a different email) on the user's first reset. The reset success page then reads: "Password updated. For your security we disconnected {Facebook} from this account. Sign in and reconnect it from your Account page." The page shows only providers that were removed.
-- Google `email_verified=true` for non-authoritative domains still sets `email_verified_at` on sign-up. The only effect is that R1 will not evict identities later; an attacker would need to have controlled the inbox when Google verified it.
+- R1 disconnects every Google and Facebook identity on every completed reset, including legitimate ones and ones whose sign-up set `email_verified_at` (user decision D1). The reset success page then reads: "Password updated. For your security we disconnected {Provider list} from this account. Sign in and reconnect it from your Account page." The page shows only providers that were removed, and `/account` plus the reset form warn beforehand.
+- No historical provider assertion is trusted at reset time: Google's `email_verified=true` proves only that the address was verified when Google checked it, so a recycled address would otherwise leave the previous owner a way in (codex critique finding 1). `email_verified_at` is kept as an informational record only.
 
 ### Q4: **Chosen: Option 4A** (block with guidance plus a `rerequest` retry).
 
@@ -405,7 +404,7 @@ Consistent with Q3: every account email in v1 is either user-typed at password r
 
 **Keys and privacy**: `key_hash = HMAC-SHA256(K_throttle, scope || 0x00 || value)`, where `K_throttle = HKDF-SHA256(active encryption key, info = "sgm:v1:auth-throttle")` derived at boot (no new secret; rotating the encryption key just resets counters). Because the hash is keyed, the IPv4 space (2^32) cannot be brute-forced back to addresses, and emails typed by non-users are never stored. Rows live no longer than the window plus the time until the next cleanup run (≤ about 24 h). That is stated in the getting-started retention note, and it meets "no IP addresses stored" because only a keyed pseudonym exists and it is discarded on schedule.
 
-**Missing address**: if the relayed address is absent, the address scope is skipped for that request and a rate-limited warning `auth.throttle.address_missing` is logged. In `NODE_ENV=production` the architecture should make the relay mandatory (see assumptions).
+**Missing address**: if `request.clientAddress` is absent, the address scope is skipped for that request and a rate-limited warning `auth.throttle.address_missing` is logged. The address is set only through the architecture's enforced trust boundary (web reads `X-Forwarded-For` from the right with `WEB_TRUSTED_PROXY_HOPS`; the API trusts `x-sgm-client-ip` only with a valid `x-sgm-internal-auth`), and `NODE_ENV=production` refuses to boot without those settings. A client-supplied `X-Forwarded-For` or `x-sgm-client-ip` therefore cannot choose the address key.
 
 #### Rationale
 7A is the only option that is exact across replicas and under concurrency, counts failures rather than requests, needs no new infrastructure, and makes the AC literally testable: 20 parallel wrong guesses give exactly 5 verifications, and the boundary test at minute 15 holds. Its cost is about 1–2 small writes per sign-in, insignificant at this scale. 7B is simpler but lets 9 failures through in a sliding 15 minutes. 7C changes the semantics the AC and message are written in. 7D fails across replicas (memory) or needs Redis, and counts the wrong thing.
@@ -430,10 +429,10 @@ Consistent with Q3: every account email in v1 is either user-typed at password r
 
 | Artefact | Entropy / storage | Lifetime | Consumption |
 |----------|-------------------|----------|-------------|
-| Session token | 32 bytes `randomBytes`, base64url in the cookie; `sha256` (bytea, 32 bytes) in `auth_sessions.token_hash` | idle 7 d (`AUTH_SESSION_IDLE_DAYS`, 1–30), absolute 30 d (`AUTH_SESSION_ABSOLUTE_DAYS`, ≥ idle, ≤ 90); `absolute_expires_at` stored at issue, so a config change never extends existing sessions | Issued fresh on every sign-in (fixation defence); revoked on logout, on reset (all of the user's sessions), and when a SIGN_IN success replaces a presented session |
+| Session token | 32 bytes `randomBytes`, base64url in the web's cookie and the bearer header; `sha256` (bytea, 32 bytes) in `auth_sessions.token_hash` | idle 7 d (`AUTH_SESSION_IDLE_DAYS`, 1–30), absolute 30 d (`AUTH_SESSION_ABSOLUTE_DAYS`, ≥ idle, ≤ 90); `absolute_expires_at` stored at issue, so a config change never extends existing sessions | Issued fresh on every sign-in (fixation defence); revoked on logout (`revoked_reason='logout'`), on reset (all of the user's sessions, `password_reset`), and when a `signin` success replaces a presented session (`replaced`) |
 | Reset token | 32 bytes, `sha256` in `password_reset_tokens.token_hash` | 60 min (`AUTH_RESET_TOKEN_MINUTES`, 10–1440) | Guarded `UPDATE … SET used_at = $now WHERE token_hash = $h AND used_at IS NULL AND expires_at > $now RETURNING user_id` inside the reset transaction. Success also sets `used_at` on every other unused token of that user. |
-| OAuth state | (architecture Q6 storage) | 10 min | Single use, consumed with the same guarded UPDATE pattern (`consumed_at IS NULL AND expires_at > now`) |
-| Pending sign-up | (architecture Q6 storage) | 15 min (AC-ERROR-14) | Consumed only in C2–C5; never on a 422 (C1) |
+| OAuth state | `oauth_states` (architecture Q6) | 10 min | Single use, consumed with the same guarded UPDATE pattern (`SET used_at = $now WHERE used_at IS NULL AND expires_at > $now`) |
+| Pending sign-up | `oauth_pending_signups` (architecture Q6) | 15 min (AC-ERROR-14) | `used_at` set only in C3–C5 (C2 finds nothing to use); never on a 422 (C1) |
 
 A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database leak cannot be brute-forced back to a token.
 
@@ -445,7 +444,7 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 | Structure | Purpose | Operations Used |
 |-----------|---------|-----------------|
 | `users.email` UNIQUE + normalisation CHECK | Account lookup, conflict detection | O(log n) index probe |
-| `users.email_verified_at` | Inbox-proven flag for R1 and the future verification flow | O(1) read/write |
+| `users.email_verified_at` | Informational inbox-proof record (set by every completed reset and by Google sign-up/link with a matching verified email); read by no v1 rule; kept for the future verification flow | O(1) write |
 | `auth_identities UNIQUE(provider, provider_subject)` | Known-subject lookup (S1, L1/L2) | O(log n) |
 | `auth_identities UNIQUE(user_id, provider)` (new) | One identity per provider per user (L3, `DELETE /:provider`) | O(log n) |
 | `auth_throttle` PK `(scope, key_hash)` + `timestamptz[]` | Sliding-log counters | O(log n) probe + O(L) array prune |
@@ -474,7 +473,7 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 3. `v = auth_throttle_admit(keys, W, now)`; if not admitted → 429 `too_many_attempts`, `Retry-After: v.retryAfterSeconds`; log `auth.login.failed reason=throttled_*`; stop.
 4. `ident = repo.findIdentity('PASSWORD', email)`; `ok = await hasher.verify(ident?.passwordHash ?? DUMMY_HASH, NFKC(pw)) && ident !== null`.
 5. If not ok → 401 `invalid_credentials`; log `auth.login.failed reason=invalid_credentials`; stop (the failure is already recorded).
-6. `auth_throttle_settle(keys, now)`. In one transaction: revoke the presented session if any; insert the new session; set `last_used_at = now`; if `hasher.needsRehash(hash)`, update `password_hash`. Then return 200 with the cookie.
+6. `auth_throttle_settle(keys, now)`. In one transaction: revoke the presented session if any (`revoked_reason='replaced'`); insert the new session; set `last_used_at = now`; if `hasher.needsRehash(hash)`, update `password_hash`. Then return 200 `{ user, session }`; the web sets the cookie (architecture Q2).
 
 **D. `auth_throttle_admit(p_scopes text[], p_keys bytea[], p_limits int[], p_windows interval[], p_now timestamptz) RETURNS TABLE(admitted boolean, retry_after_seconds int)`** (plpgsql, migration)
 1. `INSERT … SELECT … ON CONFLICT DO NOTHING` an empty row for each key.
@@ -493,20 +492,20 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 **G. Reset password** (AC-HAPPY-6, AC-ERROR-5, R1)
 1. Validate the new password with B (422 without touching the token). The email for B's context check comes from the token's user, so first do a cheap **non-locking** `SELECT user_id … WHERE token_hash = $h AND used_at IS NULL AND expires_at > $now`. If it misses → 400 `invalid_or_expired_token` without hashing (stops CPU-burn with random tokens).
 2. Hash outside the transaction.
-3. In a transaction: guarded consume UPDATE (0 rows → 400, so the race loser loses here) → lock the user row → `wasUnverified` → upsert the PASSWORD identity (`ON CONFLICT (provider, provider_subject) DO UPDATE SET password_hash`) → if `wasUnverified`: delete non-PASSWORD identities (`RETURNING provider`), set `email_verified_at` → revoke sessions → set `used_at` on the user's other tokens → delete the `login_email` throttle row (HMAC of `users.email`).
-4. Log `auth.password_reset.completed` (`userId`, `removedProviders`) and redirect to `/login` with the message (plus the R1 sentence when `removedProviders` is non-empty).
+3. In a transaction (R1 as amended by user decision D1; no branch on `email_verified_at`): guarded consume UPDATE (0 rows → 400, so the race loser loses here) → lock the user row → upsert the PASSWORD identity (`ON CONFLICT (provider, provider_subject) DO UPDATE SET password_hash`) → delete **every** non-PASSWORD identity of the user (`RETURNING provider`) → set `email_verified_at = $now` → revoke all sessions (`password_reset`) → set `used_at` on the user's other unused tokens → delete the `login_email` throttle row (HMAC of `users.email`).
+4. Return 200 `{ removedProviders }` (possibly empty; user-journey C-6). Log `auth.password_reset.completed` (`userId`, `removedProviders`). The web redirects to `/login` with the message (plus the R1 sentence when `removedProviders` is non-empty).
 
 **H. Session validation and touch** (per authenticated request; guard mechanics belong to architecture Q5)
-1. `row = SELECT s.*, u.role … FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = sha256(cookie)`.
-2. No row → 401 `unauthenticated`. If `revoked_at` is set, or `now ≥ expires_at`, or `now ≥ absolute_expires_at` → 401 `session_expired`.
+1. No bearer token → 401 `unauthenticated`. Otherwise `row = SELECT s.*, u.role … FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = sha256(bearer token)`.
+2. No row (unknown, or already removed by cleanup), `revoked_at` set, `now ≥ expires_at` or `now ≥ absolute_expires_at` → 401 `session_expired` (architecture Q2 resolve rule, adopted in consolidation so a cleaned-up session still reads as expired).
 3. If `now − last_seen_at ≥ 1 h`: `UPDATE auth_sessions SET last_seen_at = $now, expires_at = LEAST($now + idle, absolute_expires_at) WHERE id = $id AND last_seen_at <= $now − interval '1 hour' AND revoked_at IS NULL` (fire-and-forget within the request; parallel requests write once).
-4. Cookie: `Max-Age = absolute_expires_at − now` at issue. The cookie is **not** re-set on touch; idle expiry is enforced server-side. This removes the need to relay `Set-Cookie` from read-only page renders (see the AC-ASYNC-4 amendment; to be confirmed against architecture Q2).
+4. Cookie (web-owned, architecture Q2): `Expires` = `absolute_expires_at` at issue. The cookie is **not** re-set on touch; idle expiry is enforced server-side. Confirmed by architecture Q2 (AC-ASYNC-4).
 
 **I. Cleanup** (`auth-cleanup`, daily 05:00 Pacific/Auckland, AC-ASYNC-3). Each statement runs in batches of 5000 until 0 rows (keeps lock time short), and the job is idempotent:
 - `auth_sessions WHERE revoked_at IS NOT NULL OR expires_at <= $now OR absolute_expires_at <= $now`
 - `password_reset_tokens WHERE used_at IS NOT NULL OR expires_at <= $now`
 - `auth_throttle WHERE updated_at <= $now − interval '60 minutes'` (the longest window, so every attempt in the row is stale)
-- OAuth state and pending sign-ups `WHERE consumed_at IS NOT NULL OR expires_at <= $now` (architecture tables)
+- `oauth_states` and `oauth_pending_signups` `WHERE used_at IS NOT NULL OR expires_at <= $now`
 
 ### Edge Case Handling
 | Edge Case | Handling |
@@ -514,6 +513,7 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 | Known subject, changed provider email | S1: sign in; `users.email` never touched |
 | Email matches but provider is Google-verified | S4: block (no auto-link in v1) |
 | Pre-hijack with an attacker-linked Facebook | Victim resets → R1 deletes FACEBOOK, revokes sessions, sets `email_verified_at` |
+| Recycled inbox: previous owner's Google identity (sign-up set `email_verified_at`) | New owner resets → R1 deletes GOOGLE regardless; previous owner's next Google sign-in → S4 409 `oauth_account_exists`, no session |
 | OAuth-first pre-hijack (Facebook claims victim's email) | Victim's register gets 409 → reset → R1 removes the attacker's FACEBOOK identity, adds PASSWORD |
 | Two tabs complete the same pending sign-up | Guarded consume per record; second record → C3 (identity exists → sign in) or C4 |
 | Facebook declined the email permission | S2 with a "Try Facebook again" `rerequest` button |
@@ -530,7 +530,7 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 ### Error Handling
 | Error Condition | Response |
 |-----------------|----------|
-| Throttle function or DB unavailable | 503 via the shared error mapper (fail **closed**: never verify a password without the throttle) |
+| Throttle function or DB unavailable | 503 `service_unavailable` via the shared error mapper (fail **closed**: never verify a password without the throttle) |
 | Hasher throws | 500; the reservation stays (counts as a failure) |
 | 23505 `users.email` at register | 409 `email_taken` (AC-ERROR-1, AC-INTEGRATION-5) |
 | 23505 identity at OAuth completion | Re-run the decision once (C3) |
@@ -578,7 +578,8 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 ### Integration Tests (real Postgres 17)
 - `auth_throttle_admit`: 5 failures → 6th blocked without a verify call; blocked attempts do not extend the window; injected clock at +15 min → admitted; success deletes the email row and refunds the address entry; address limit 20 across 20 emails.
 - Concurrency (dedicated clone, pool ≥ 21): 20 parallel wrong-password sign-ins for one email → exactly 5 `verify` calls and 15 × 429.
-- R1: pre-hijack scenario end to end (password register, link fake-provider FACEBOOK, reset → identity gone, sessions revoked, `email_verified_at` set); verified-Google account reset keeps GOOGLE.
+- R1: pre-hijack scenario end to end (password register, link fake-provider FACEBOOK, reset → identity gone, sessions revoked, `email_verified_at` set); an account created by verified Google sign-up (so `email_verified_at` was already set) loses GOOGLE on reset too; `removedProviders` lists exactly the deleted providers.
+- Recycled email: user A signs up with fake-provider Google (verified) for `x@example.com`; user B (the new inbox owner) completes a reset for that address; A's next Google callback with the same `sub` resolves to S4 409 `oauth_account_exists` and creates no session.
 - Reset race (AC-INTEGRATION-5), forgot 60-s limit under 5 concurrent requests → 1 token.
 - Last-method trigger: two concurrent disconnects of a two-method user → one 409/23514.
 - Session touch: requests within 1 h write nothing; after 1 h one write; `expires_at` never exceeds `absolute_expires_at`; idle and absolute expiry with the injected clock.
@@ -592,9 +593,9 @@ A plain SHA-256 (no pepper) is sufficient for 256-bit random tokens: a database 
 ## Next Steps
 
 1. Phase 1 migrations: apply the schema implications below and add D-27 onwards ledger entries.
-2. `packages/shared`: `normaliseEmail`, password length rule, error codes (`too_many_attempts`, `too_many_requests`, `oauth_account_exists`, `oauth_email_missing`, `oauth_email_unverified`, `identity_in_use`, `provider_already_connected`, `link_session_mismatch`, `signup_expired`, `last_sign_in_method`).
+2. `packages/shared`: `normaliseEmail`, password length rule, and these codes in the authoritative `ErrorCode` list kept in the architecture doc: `too_many_attempts`, `too_many_requests`, `oauth_account_exists`, `oauth_email_missing`, `oauth_email_unverified`, `identity_in_use`, `provider_already_connected`, `link_session_mismatch`, `signup_expired`, `last_sign_in_method`, `service_unavailable`.
 3. Phase 2: `throttle.ts` (key derivation, admit/settle wrappers), `password.ts` blocklist, session touch.
-4. Phase 3: reset with R1; cleanup including `auth_throttle`.
+4. Phase 3: reset with R1 (unconditional, D1); cleanup including `auth_throttle`.
 5. Phase 5: the OAuth decision function as a pure, table-tested module (`modules/auth/oauth-decision.ts`) called by the service.
 
 ---
@@ -607,39 +608,51 @@ Amend (proposed wording):
 - **AC-ERROR-6**: append "…; more than 10 requests from one client address within 60 minutes return 429 `too_many_requests`, regardless of whether the accounts exist."
 - **AC-ERROR-8**: message becomes "An account already exists for {email}. Sign in with your existing method, then connect {Provider} from your Account page." with links "Sign in" (`/login?returnTo=%2Faccount`) and "Forgot your password?"; applies to Google (verified) and Facebook alike; drop "(conservative default, revisit in creative)", since this is now decided.
 - **AC-ERROR-9**: Facebook message becomes "Facebook didn't share an email address, which we need to create your account. Try again and allow access to your email, or use Google or email and password instead." with a "Try Facebook again" button that re-requests the email permission; add "a returning user whose Facebook identity is already connected signs in even without an email".
-- **AC-HAPPY-6**: append "…; a user whose account has only Google or Facebook sign-in can use the same flow, which adds an Email and password method."
+- **AC-HAPPY-6**: the reset transaction also deletes every GOOGLE and FACEBOOK identity, invalidates other reset tokens, sets `email_verified_at` and clears the email throttle count (R1 per D1); the API returns `{ removedProviders }`; append "…; a user whose account has only Google or Facebook sign-in can use the same flow, which adds an Email and password method."
 - **AC-ASYNC-3**: add "expired throttle counters (older than 60 minutes)" to the deleted artefacts.
-- **AC-ASYNC-4**: "…use within the idle window extends `expires_at` (written at most once per hour per session, never past the absolute cap)… the cookie's lifetime equals the session's absolute expiry; idle expiry is enforced by the server" (pending confirmation against architecture Q2's cookie relay).
+- **AC-ASYNC-4**: "…use within the idle window extends `expires_at` (written at most once per hour per session, never past the absolute cap)… the cookie's lifetime equals the session's absolute expiry; idle expiry is enforced by the server" (confirmed by architecture Q2).
 - **AC-INTEGRATION-5**: add "and 20 concurrent wrong-password sign-ins for one email cause exactly 5 password verifications and 15 responses of 429".
 
 Add:
-- **AC-ERROR-16 (MUST) — A completed reset evicts sign-in methods attached before the email was proven.** Given an account whose email has never been proven (no Google-verified matching email, no previous reset) and that has a connected Facebook identity, when a password reset completes, then the Facebook identity is removed, all sessions are revoked, `users.email_verified_at` is set, and `/login` shows "Password updated. For your security we disconnected Facebook from this account. Sign in and reconnect it from your Account page."; for an account created with a Google-verified matching email, the Google identity is kept.
+- **AC-ERROR-16 (MUST) — Every completed reset evicts all Google and Facebook sign-in methods** (rewritten per user decision D1). Given an account with a connected FACEBOOK and/or GOOGLE identity (including a Google identity whose sign-up or link set `email_verified_at`), when a password reset completes, then every GOOGLE and FACEBOOK identity is removed in the reset transaction, all sessions are revoked, other reset tokens are invalidated, `users.email_verified_at` is set, the API returns them in `removedProviders`, and `/login` shows "Password updated. For your security we disconnected {Provider list} from this account. Sign in and reconnect it from your Account page."; in the recycled-email case the previous owner's Google sign-in afterwards ends in 409 `oauth_account_exists` with no session.
 - **AC-ERROR-17 (SHOULD) — Connecting a method that is already in use is refused.** Connecting a Google or Facebook account that belongs to another user returns 409 `identity_in_use` ("That {Provider} account is already connected to a different account."); connecting a second account of a provider the user already has returns 409 `provider_already_connected`; connecting an already-connected one is a no-op ("{Provider} is already connected.").
 - **AC-ASYNC-5 (SHOULD) — Connecting a sign-in method sends a security notice.** Linking a provider enqueues (same transaction, `idempotencyKey = identity-linked:<identityId>`, tag `template: identity-linked`) an email to the account address: "{Provider} sign-in was connected to your Shared Game Management account. If this wasn't you, reset your password." The email is delivered through the existing worker.
 
 ## Schema implications (Phase 1 migrations)
 
-1. **`users`** (migration `…_users_email_and_role_checks.sql`):
-   - `ADD COLUMN email_verified_at timestamptz` (nullable).
+1. **`users`** (migration `db/migrations/20261006000100000_users_email_and_role_checks.sql`, which also carries items 2 and 4):
+   - `ADD COLUMN email_verified_at timestamptz` (nullable; informational only in v1).
    - `CONSTRAINT users_email_normalised CHECK (email = lower(email) AND email ~ '^[!-?A-~]+@[!-?A-~]+$' AND char_length(email) <= 254)`: ASCII printable, no space, exactly one `@`, lowercase. The class `[!-?A-~]` is 0x21–0x7E minus `@` (0x40).
    - `CONSTRAINT users_role_not_team_admin CHECK (role <> 'TEAM_ADMIN')` (AC-VERIFY-4; enum handling per architecture Q5).
    - `CONSTRAINT uq_users_id_email UNIQUE (id, email)` (target of item 2's composite FK).
 2. **`auth_identities`**:
    - `CONSTRAINT uq_auth_identities_user_provider UNIQUE (user_id, provider)` (one identity per provider per user; L3; `DELETE /auth/identities/:provider` is unambiguous).
    - `password_email varchar(255) GENERATED ALWAYS AS (CASE WHEN provider = 'PASSWORD' THEN provider_subject END) STORED` plus `FOREIGN KEY (user_id, password_email) REFERENCES users (id, email) ON UPDATE CASCADE ON DELETE CASCADE` (MATCH SIMPLE, so NULL for OAuth rows). This makes "PASSWORD `provider_subject` equals `users.email`" a DB invariant (P1) and follows any future email change automatically.
-3. **`auth_throttle`** (new table + functions, in the sessions migration or its own `…_auth_throttle.sql`):
+3. **`auth_throttle`** (new table + functions, own migration `db/migrations/20261006000500000_auth_throttle.sql`):
    - `scope varchar(32) NOT NULL CHECK (scope IN ('login_email','login_address','forgot_address'))`, `key_hash bytea NOT NULL CHECK (octet_length(key_hash) = 32)`, `attempts timestamptz[] NOT NULL DEFAULT '{}' CHECK (cardinality(attempts) <= 256)`, `updated_at timestamptz NOT NULL`, `PRIMARY KEY (scope, key_hash)`.
    - Functions `auth_throttle_admit(text[], bytea[], int[], interval[], timestamptz)` and `auth_throttle_settle(bytea, bytea, timestamptz)`; the down migration drops both.
 4. **Last-method trigger**: `CONSTRAINT TRIGGER auth_identities_last_method AFTER DELETE ON auth_identities DEFERRABLE INITIALLY DEFERRED FOR EACH ROW`. The function locks `users` row `OLD.user_id` `FOR UPDATE` (skipped if the user is gone, i.e. a cascade) and raises SQLSTATE 23514 `auth_identities_last_method` if no identity remains. Platform-foundation factories that create users without identities are unaffected (the trigger fires only on DELETE).
-5. **`auth_sessions`**: `id uuid PK`, `user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32)`, `created_at`, `last_seen_at`, `expires_at`, `absolute_expires_at` (all `timestamptz NOT NULL`), `revoked_at timestamptz`, `user_agent varchar(255)`. CHECKs: `last_seen_at >= created_at`, `expires_at <= absolute_expires_at`, `absolute_expires_at > created_at`, `revoked_at IS NULL OR revoked_at >= created_at`. Index `(user_id)`.
+5. **`auth_sessions`** (shape owned by the architecture doc, which now includes these CHECKs): `id uuid PK`, `user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32)`, `created_at`, `last_seen_at`, `expires_at`, `absolute_expires_at` (all `timestamptz NOT NULL`), `revoked_at timestamptz`, `revoked_reason varchar(32)` (`logout`, `password_reset`, `replaced`; NULL iff `revoked_at` is NULL), `user_agent varchar(512)`. CHECKs: `last_seen_at >= created_at`, `expires_at <= absolute_expires_at`, `absolute_expires_at > created_at`, `revoked_at IS NULL OR revoked_at >= created_at`. Indexes `(user_id) WHERE revoked_at IS NULL` and `(expires_at)`.
 6. **`password_reset_tokens`**: `id uuid PK`, `user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32)`, `created_at timestamptz NOT NULL DEFAULT now()`, `expires_at timestamptz NOT NULL CHECK (expires_at > created_at)`, `used_at timestamptz CHECK (used_at IS NULL OR used_at >= created_at)`. Index `(user_id, created_at DESC)`.
-7. **OAuth state and pending sign-ups** (shape owned by architecture Q6). Fields these rules need: state → `intent ('SIGN_IN'|'LINK')`, `bound_user_id` (NOT NULL iff intent = LINK, by CHECK), `provider`, `expires_at`, `consumed_at`; pending sign-up → `provider`, `provider_subject`, `email` (normalised, CHECK as in users), `email_verified boolean`, `suggested_name`, `expires_at`, `consumed_at`.
+7. **OAuth state and pending sign-ups** (shape owned by architecture Q6, migration `20261006000400000`). Fields these rules need: `oauth_states` → `intent ('signin'|'link')`, `link_user_id` (NOT NULL iff intent = `link`, by CHECK), `provider`, `expires_at`, `used_at`; `oauth_pending_signups` → `provider`, `provider_subject`, `email` (NOT NULL, normalised, CHECK as in users), `email_verified boolean`, `full_name`, `return_to`, `expires_at`, `used_at`.
 8. Ledger: D-27 onwards in `db/schema-deviations.md` for every item above, with Source "Algo Q3/Q7/S1/S3" as applicable.
 
-## Assumptions about the architecture (to reconcile with `auth-and-user-roles-architecture.md`)
+## Assumptions about the architecture (reconciled with `auth-and-user-roles-architecture.md` on 2026-10-06)
 
-- **A1 Client address relay**: the API sees the web container, not the browser. The web server must forward the end-user address it receives from the platform edge in a dedicated header that the API trusts only from the web (internal network, Fastify `trustProxy` limited to the web's address, or a shared header secret). Without it, the address dimension is skipped (email limits still apply). Production should refuse to boot if the trust setting is absent.
-- **A2 OAuth store interface**: `createState({intent, boundUserId?, provider, ttl})`, `consumeState(id) → record | null` (single use, guarded), `createPendingSignup({...})`, `peekPendingSignup(id)` (for prefill and the 422 path), `consumePendingSignup(id) → record | null` (guarded, inside the completion transaction). The decision table needs no more than this.
-- **A3 Cookie lifetime**: the cookie Max-Age equals the absolute expiry and is not refreshed on touch (Algorithm H.4). If Q2 relays `Set-Cookie` on every response anyway, refreshing is allowed but not required.
-- **A4 Hasher**: exposes `hash`, `verify`, `needsRehash`; the dummy hash is created at boot with current parameters (Q1 picks argon2id or scrypt; both satisfy this).
-- **A5 Throttle key derivation**: HKDF from the active `ENCRYPTION_KEYS` entry. If architecture prefers a dedicated `AUTH_HMAC_KEY` secret, the algorithm is unchanged.
+- **A1 Client address relay** (resolved): the architecture's enforced trust boundary applies: the web derives the address from `X-Forwarded-For` read from the right with `WEB_TRUSTED_PROXY_HOPS`, strips incoming internal headers, and sends `x-sgm-client-ip` with `x-sgm-internal-auth`; the API compares the secret (`API_INTERNAL_SHARED_SECRET`) in constant time and otherwise ignores the address. Production refuses to boot without the secret or the hop count. Without an address, the address dimension is skipped (email limits still apply).
+- **A2 OAuth store interface** (resolved): `createState({intent, linkUserId?, provider, ttl})`, `consumeState(id) → record | null` (single use, guarded `used_at`), `createPendingSignup({...})`, `peekPendingSignup(id)` (for prefill and the 422 path), `consumePendingSignup(id) → record | null` (guarded, inside the completion transaction). The decision table needs no more than this.
+- **A3 Cookie lifetime** (confirmed): the web-owned cookie expires at the absolute expiry and is not refreshed on touch (step H.4).
+- **A4 Hasher** (confirmed): `node:crypto` argon2id exposes `hash`, `verify` (with `needsRehash`); the dummy hash is created at boot with current parameters.
+- **A5 Throttle key derivation** (confirmed): HKDF from the active `ENCRYPTION_KEYS` entry; no dedicated secret.
+
+## Consolidation (2026-10-06)
+
+Reconciled with the architecture and user-journey docs, the spec, the codex design critique and the user's decisions D1 and D2. The **Chosen** options (3A′, 4A, 7A, S1-b, S2-b, S3-b) are unchanged; R1 inside 3A′ is changed by D1.
+
+- **R1 (critique finding 1, user decision D1)**: every completed reset now deletes all GOOGLE and FACEBOOK identities, unconditionally, in the reset transaction (plus upsert PASSWORD, revoke all sessions, invalidate other reset tokens, set `email_verified_at`, clear the email throttle row). The previous exemption for accounts with a proven email (including a Google `email_verified=true` sign-up) is removed. Updated: the 3A′ approach, pseudocode, pros and cons; the Q3 decision line; trade-offs; step G; edge cases 3 and 3a and the edge-case table (recycled inbox); R1 tests (the old "verified-Google account reset keeps GOOGLE" test is inverted, a recycled-email test is added); AC-ERROR-16 rewritten.
+- **`email_verified_at`**: still set by Google sign-up (C5) and link (L4) when Google asserts a verified matching email, and by every reset; informational only, read by no v1 rule, not shown in the v1 UI.
+- **Client address (D2, finding 2)**: the throttle's address now comes only from the architecture's enforced trust boundary; A1 is resolved and the "Missing address" paragraph updated.
+- **Session resolve**: an unknown presented token now returns `session_expired` (architecture rule) instead of `unauthenticated`; `unauthenticated` means no token at all. The session token travels as a bearer header; the web owns the cookie (A3, H.4 confirmed).
+- **Naming settled**: intents `signin`/`link` (was `SIGN_IN`/`LINK`); outcomes `signed_in`, `pending_signup`, `linked`, `already_linked` (were upper case); `link_user_id` (was `bound_user_id`/`boundUserId`); `used_at` on OAuth state and pending sign-ups (was `consumed_at`); `full_name` (was `suggested_name`); `auth_sessions.user_agent varchar(512)` (was 255) and `revoked_reason` with the value `replaced` for a session replaced at sign-in.
+- **Error codes**: the authoritative list now lives in the architecture doc; this doc's codes are all in it, plus `service_unavailable` for the fail-closed 503. `oauth_account_exists` responses carry `error.email` for the web server (journey C-5); reset returns `removedProviders` (C-6).
+- **Schema**: migration names pinned (`20261006000100000` carries the users and identity invariants and the last-method trigger; `20261006000500000_auth_throttle.sql` is its own file); pending sign-up `email` is `NOT NULL`.

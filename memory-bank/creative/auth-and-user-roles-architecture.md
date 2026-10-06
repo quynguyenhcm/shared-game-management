@@ -44,6 +44,9 @@
 |-----------|---------|------------------|
 | `apps/api/src/lib/http/errors.ts` | Shared HTTP error handling | `AppError(code, status, message, fieldErrors?)`; Fastify error and not-found handlers that map zod validation to 422, domain errors to their status, and anything unknown to a 500 with no details. |
 | `apps/api/src/lib/http/origin.ts` | Cross-origin refusal | An `onRequest` hook that answers 403 `cross_origin_request` when a mutating request carries an `Origin` other than `WEB_BASE_URL`'s origin. |
+| `apps/api/src/lib/http/internal-auth.ts` | Authenticated web hop | An `onRequest` hook that checks `x-sgm-internal-auth` against `API_INTERNAL_SHARED_SECRET` in constant time and sets `request.clientAddress` from `x-sgm-client-ip` only when it matches (see [Client address](#client-address-trust-boundary-enforced-invariant)). |
+| `packages/shared/src/auth/oauth-binding.ts` | `sgm_oauth` codec | Encode, parse and validate the browser-binding cookie value defined in [Browser-binding cookie `sgm_oauth`](#browser-binding-cookie-sgm_oauth-the-one-schema). Isomorphic, so API tests can prove interop. |
+| `apps/web/src/lib/auth/client-address.ts` | Client address derivation | Reads `X-Forwarded-For` from the right using `WEB_TRUSTED_PROXY_HOPS`; returns a valid IP or `null`. |
 | `apps/api/src/lib/auth/policy.ts` | Route policy registry | The `RoutePolicy` type and its constructors (`publicRoute()`, `optionalSession()`, `authenticated()`, `requireGlobalRole()`, `requireTeamRole()`). An `onRoute` hook that refuses to register a route without a policy, attaches the guard hooks and adds the OpenAPI `security` and error responses. |
 | `apps/api/src/lib/auth/request-auth.ts` | Request identity | Fastify type augmentation (`config.policy`, `request.auth`, `request.teamMembership`). Session resolution from `Authorization: Bearer`. |
 | `apps/api/src/lib/auth/guards.ts` | Authorization checks | `authenticate` (401 `unauthenticated` or `session_expired`), global-role check (403), team-role check against approved `team_members` (403), the `allowGlobalAdmin` opt-in. |
@@ -54,7 +57,7 @@
 | `packages/shared/src/auth/return-to.ts` | `returnTo` validation | Isomorphic `safeReturnTo(value)`, used by the web (redirects) and the API (stored with the OAuth state). |
 | `apps/web/src/lib/config.ts` | Web config (P7) | zod-validated `API_INTERNAL_URL` and `WEB_BASE_URL`, loaded from `instrumentation.ts` `register()` so a bad value fails at boot. |
 | `apps/web/src/lib/auth/*` | Web auth layer | Cookie names and options, `getCurrentUser()` and `requireUser()`, Server Actions, notice and error message maps. |
-| `apps/web/src/proxy.ts` | Edge of the web origin | Cheap redirect when a protected path has no session cookie. `Origin` check on mutating requests. `Referrer-Policy: no-referrer` on `/reset-password`. |
+| `apps/web/src/proxy.ts` | Edge of the web origin | Cheap redirect when a protected path has no session cookie. `Origin` check on mutating requests. Strips incoming `x-sgm-client-ip` and `x-sgm-internal-auth` request headers. `Referrer-Policy: no-referrer` on `/reset-password`. |
 | `apps/web/src/app/auth/callback/[provider]/route.ts` | OAuth redirect target | Compares `state` with the binding cookie, calls the API callback, sets the session or pending-sign-up cookie, then redirects. |
 | `apps/web/src/app/auth/session-expired/route.ts` | Dead-cookie cleanup | Deletes the session cookie (Server Components cannot) and redirects to `/login?returnTo=…&notice=session_expired`. |
 
@@ -64,19 +67,22 @@
 Browser ──HTTPS──► web (Next.js 16, only public origin)
                     │  cookies (HttpOnly, SameSite=Lax, __Host- when https):
                     │    sgm_session  (opaque session token, Expires = absolute expiry)
-                    │    sgm_oauth    (OAuth state binding, 10 min)
+                    │    sgm_oauth    (OAuth state binding <state>.<ctx>, 10 min)
                     │    sgm_pending  (pending sign-up token, 15 min)
+                    │    sgm_flash    (conflict email for one banner, 60 s; user-journey X2)
                     │
                     │  Server Actions / route handlers / RSC ──► api-client.ts
                     │      Authorization: Bearer <session token>    (when signed in)
-                    │      traceparent, user-agent, x-sgm-client-ip
+                    │      traceparent, user-agent,
+                    │      x-sgm-internal-auth (shared secret) + x-sgm-client-ip (derived, may be absent)
                     ▼
-                  api (Fastify, internal) ── onRequest: origin check → session resolve (policy ≠ public)
+                  api (Fastify, internal) ── onRequest: origin check → internal-auth (client address) → session resolve (policy ≠ public)
                     │                        preHandler: role / team guard
                     │  modules/auth: routes → services → repo (Kysely) ─┬─► PostgreSQL 17
                     │                                                   │   users, auth_identities, auth_sessions,
                     │  enqueueEmail(…, { trx })  ── same transaction ───┘   password_reset_tokens, oauth_states,
-                    │                                                       oauth_pending_signups, team_members, pgboss.job
+                    │                                                       oauth_pending_signups, auth_throttle,
+                    │                                                       team_members, pgboss.job
                     └─► Google / Facebook (token + profile over HTTPS, 5 s timeout, client spans only)
 worker ── send-email (reset link) ──► Notifier ──► Mailpit / Postmark
 worker ── auth-cleanup (0 5 * * * Pacific/Auckland) ──► DELETE expired auth rows
@@ -291,7 +297,7 @@ All options assume the web is the only public origin and the API is internal (C5
 **Topology (confirmed, assumed by the spec):** the provider redirects to the **web-owned** callback `/auth/callback/[provider]`. The browser can only reach the web, and the redirect URI must be on a public origin. The API builds the authorization URL and redirect URI from `WEB_BASE_URL`, and the web callback calls JSON API endpoints server-side.
 
 #### Option 6A: Postgres rows for state and pending sign-up; browser-binding cookies hold only random handles
-- **Description**: `POST /auth/oauth/:provider/authorize` inserts an `oauth_states` row with the SHA-256 of `state`, provider, intent, `link_user_id`, nonce, `return_to`, the encrypted PKCE verifier and a 10-minute expiry. The callback consumes it with one guarded `UPDATE … SET used_at = $now WHERE state_hash = $1 AND used_at IS NULL AND expires_at > $now RETURNING`. A first-time user gets an `oauth_pending_signups` row (verified provider profile, 15 min). The web holds only `sgm_oauth` (the raw state, for the browser binding) and `sgm_pending` (the raw pending token).
+- **Description**: `POST /auth/oauth/:provider/authorize` inserts an `oauth_states` row with the SHA-256 of `state`, provider, intent, `link_user_id`, nonce, `return_to`, the encrypted PKCE verifier and a 10-minute expiry. The callback consumes it with one guarded `UPDATE … SET used_at = $now WHERE state_hash = $1 AND used_at IS NULL AND expires_at > $now RETURNING`. A first-time user gets an `oauth_pending_signups` row (verified provider profile, 15 min). The web holds only `sgm_oauth` (the raw state plus an unauthenticated landing hint, for the browser binding) and `sgm_pending` (the raw pending token).
 - **Pros**:
   - Single use is enforced by the database (P1). A replayed callback finds a used row and does nothing (AC-ERROR-7).
   - Pending sign-ups can expire, be consumed once and be cleaned (AC-ERROR-14, AC-ASYNC-3).
@@ -325,9 +331,27 @@ All options assume the web is the only public origin and the API is internal (C5
 | Performance (.05) | 4 | 5 | 4 |
 | **Weighted** | **4.60** | 3.80 | 3.60 |
 
-**Browser binding (in addition to 6A, not instead of it).** A state row alone does not stop login CSRF: an attacker could start a flow, approve with their own account and send the victim the callback URL. The web therefore sets `sgm_oauth = <state>` when it starts the flow. The callback route handler compares the query `state` with that cookie (constant-time) **before** calling the API. A mismatch or a missing cookie gives "We couldn't verify that sign-in attempt" and the state is not consumed. `SameSite=Lax` is enough because Google and Facebook return with a top-level GET.
+**Browser binding (in addition to 6A, not instead of it).** A state row alone does not stop login CSRF: an attacker could start a flow, approve with their own account and send the victim the callback URL. The web therefore sets the `sgm_oauth` cookie when it starts the flow, and the callback route handler compares the query `state` with the cookie's state component (constant-time) **before** calling the API. A mismatch or a missing cookie gives "We couldn't verify that sign-in attempt" and the state is not consumed. `SameSite=Lax` is enough because Google and Facebook return with a top-level GET. The cookie's format is defined once, below; the user-journey document references it.
 
-**Link intent.** `POST /auth/identities/:provider/link` (policy `authenticated`) creates the state with `intent='link'` and `link_user_id = request.auth.userId`. On callback (policy `optionalSession`), the API requires `request.auth?.userId === link_user_id` before it attaches the identity. What happens on an identity or email conflict is Algorithm Q3's decision.
+#### Browser-binding cookie `sgm_oauth` (the one schema)
+
+| Aspect | Rule |
+|---|---|
+| Name | `__Host-sgm_oauth` when `WEB_BASE_URL` is https, else `sgm_oauth`; HttpOnly, SameSite=Lax, Path=/, Secure when https, no Domain; Max-Age 600 (equal to the state TTL) |
+| Value | `<state>.<ctx>`, exactly one `.` |
+| `state` | the raw state returned by `authorize`: 32 random bytes as base64url, so it matches `OAUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{43}$/` (no `.` possible) |
+| `ctx` | base64url (no padding) of UTF-8 JSON `{ "v": 1, "r": <returnTo>, "i": "signin" \| "link" }`, parsed with a strict zod schema (unknown keys rejected); `r` is a string of at most 512 characters |
+| Size | the whole value is at most 1024 bytes; a longer value is rejected before decoding |
+| Comparison | only the state component is compared with the query `state`, using `timingSafeEqual` over two 43-byte buffers; a query `state` that fails `OAUTH_STATE_PATTERN` is a mismatch without comparing. `ctx` is never compared and never authenticated |
+| `r` (returnTo) | always passed through `safeReturnTo` when read; used **only** for error landings, when the API cannot supply a stored `returnTo`. On success the API's `oauth_states.return_to` (or the pending row's) is authoritative |
+| `i` (intent) | an untrusted hint used **only** to choose the error landing (`/login` for `signin`, `/account` for `link`). The `oauth_states` row's `intent` and `link_user_id` decide what the callback does; editing `i` can at most move an error message to the other page |
+| Missing or expired | treated as a binding mismatch: the API is not called, so the server state is not consumed. Landing: a signed-in browser goes to `/` silently; otherwise `/login?error=oauth_state_invalid&provider=…` (no `returnTo`, since there is no `ctx`) |
+| Tampered (bad format, oversized, bad base64url or JSON, unknown `v`, `i` not in the enum, state mismatch) | same as missing; if `ctx` itself parsed, its sanitised `r` and `i` may still choose the error landing |
+| Replay | the handler deletes the cookie on **every** callback outcome before calling the API, so a replayed callback URL finds no cookie; the guarded `used_at` UPDATE independently makes the state single-use |
+| New flow | starting another flow overwrites the cookie, so the first tab's return fails the binding check ("Please try again") |
+| Interop tests | `packages/shared/src/auth/oauth-binding.test.ts`: encode/parse round trip; every tamper case above; size limit; constant-time compare called with the state component only; a fixture state produced by the API's `newToken()` (and asserted in the API's `oauth-service` tests to match `OAUTH_STATE_PATTERN`) parses in the codec |
+
+**Link intent.** `POST /auth/identities/:provider/link` (policy `authenticated`) creates the state with `intent='link'` and `link_user_id = request.auth.userId`. On callback (policy `optionalSession`), the API requires `request.auth?.userId === link_user_id` before it attaches the identity (else 403 `link_session_mismatch`, or 401 `session_expired` when the presented session is dead). What happens on an identity or email conflict is Algorithm Q3's decision.
 
 ### Q8: Fake OAuth provider for E2E
 
@@ -391,19 +415,21 @@ All options assume the web is the only public origin and the API is internal (C5
 - **Format**: structured JSON with `timestamp`, `level`, `message`, `service`, `version`, `traceId`, `spanId` and `requestId` (existing).
 - **Redaction changes** (AC-VERIFY-6):
   - Query masking gains an **exact-name** list `code`, `state`, `token`, `error_description`. It is not a key pattern, because the substring `code` would also mask `statusCode` and `providerCode`.
-  - Exact header paths `req.headers["x-sgm-client-ip"]` and `req.headers["set-cookie"]` are added to `REDACT_PATHS`. `authorization` and `cookie` are already redacted.
+  - Exact header paths `req.headers["x-sgm-client-ip"]`, `req.headers["x-sgm-internal-auth"]` and `req.headers["set-cookie"]` are added to `REDACT_PATHS`. `authorization` and `cookie` are already redacted.
   - Body keys matching `token` and `password` are already covered by the default `LOG_REDACT_PATTERNS` and `BASE_KEY_PATTERNS`.
   - Services never log request bodies, emails or names.
 - **Business events** (info unless noted, `userId` only as PII):
   - `auth.register` (`provider`)
   - `auth.login.succeeded` (`userId`, `provider`)
-  - `auth.login.failed` (warn; `reason`: `unknown_account|bad_password|no_password_identity|throttled`; never the email)
-  - `auth.session.revoked` (`reason`: `logout|password_reset`)
+  - `auth.login.failed` (warn; `reason`: `invalid_credentials|throttled_email|throttled_address`, the algorithm doc's reason codes; never the email or a key hash)
+  - `auth.session.revoked` (`reason`: `logout|password_reset|replaced`)
   - `auth.password_reset.requested` (`userId` or `known: false`)
-  - `auth.password_reset.completed`
+  - `auth.password_reset.completed` (`userId`, `removedProviders`)
   - `auth.oauth.started|cancelled|failed` (`provider`, `reason`)
-  - `auth.oauth.conflict` (`provider`; the rule is Q3's)
+  - `auth.oauth.conflict`, `auth.oauth.link_conflict`, `auth.oauth.email_missing` (`provider`; the rules are Q3/Q4's)
+  - `auth.oauth.pending.created` (`provider`)
   - `auth.identity.linked|unlinked`
+  - `auth.throttle.address_missing` (rate-limited warn) and `auth.client_address.untrusted` (warn: `x-sgm-client-ip` arrived without a valid `x-sgm-internal-auth`)
   - `auth.authz.denied` (debug; `policy` kind, `status`)
 - **Configuration**: unchanged (`LOG_LEVEL`, `LOG_FORMAT`, `LOG_OUTPUT`, `LOG_FILE_PATH`, `LOG_REDACT_PATTERNS`).
 
@@ -503,7 +529,7 @@ class ProviderError extends Error { readonly kind: 'unavailable' | 'rejected' | 
   - bearer present but no row (unknown or already cleaned up), `revoked_at` set, or `expires_at <= clock.now()` → 401 `session_expired`
   - otherwise `request.auth = { userId, sessionId, role }`. The role comes from `users` on every request, and the session carries no role claim (AC-VERIFY-4).
 - **Issue**: always a new row on register, login and OAuth completion. There is no pre-auth session, so session fixation does not apply. The user agent is stored truncated to 512 characters (forwarded by the web as `user-agent`). No IP address is stored.
-- **Revoke**: logout sets `revoked_at` and `revoked_reason='logout'`. A completed reset revokes every live session of the user with `password_reset`, in the reset transaction.
+- **Revoke**: logout sets `revoked_at` and `revoked_reason='logout'`. A completed reset revokes every live session of the user with `password_reset`, in the reset transaction. A sign-in that presents an existing session revokes it with `replaced` (algorithm token table).
 - **Response contract**: successful `register`, `login` and `oauth/complete` (and an OAuth callback that signs in) return `{ user: UserView, session: { token, expiresAt } }`, where `expiresAt` is the absolute expiry. `GET /auth/me` returns `{ user }` only (AC Success Criteria).
 
 **Cookies** (web only, `apps/web/src/lib/auth/cookies.ts`):
@@ -511,8 +537,9 @@ class ProviderError extends Error { readonly kind: 'unavailable' | 'rejected' | 
 | Cookie | Name when `WEB_BASE_URL` is https / http | Value | Lifetime | Attributes |
 |---|---|---|---|---|
 | Session | `__Host-sgm_session` / `sgm_session` | session token | `Expires = session.expiresAt` (absolute) | HttpOnly, SameSite=Lax, Path=/, Secure when https, no Domain |
-| OAuth binding | `__Host-sgm_oauth` / `sgm_oauth` | raw `state` | Max-Age 600 | same |
+| OAuth binding | `__Host-sgm_oauth` / `sgm_oauth` | `<state>.<ctx>` (see [the one schema](#browser-binding-cookie-sgm_oauth-the-one-schema)) | Max-Age 600 | same |
 | Pending sign-up | `__Host-sgm_pending` / `sgm_pending` | raw pending token | Max-Age 900 | same |
+| Flash email | `__Host-sgm_flash` / `sgm_flash` | conflicting email from a 409 `oauth_account_exists` (user-journey X2) | Max-Age 60 | same |
 
 - Secure and the `__Host-` prefix depend on **`WEB_BASE_URL` being https**, not on `NODE_ENV`. The Compose web container runs the production build over `http://localhost:3000`, so a `NODE_ENV` rule would break E2E. The web config refuses `NODE_ENV=production` with an `http:` `WEB_BASE_URL` unless the hostname is `localhost` or `127.0.0.1`. The API config refuses `NODE_ENV=production` with a non-https `WEB_BASE_URL`, with no exception.
 - The cookie lifetime is the absolute expiry. Idle expiry is enforced by the API and shows up as `session_expired`. The cookie is never rewritten during a render (Server Components cannot set cookies).
@@ -524,7 +551,7 @@ class ProviderError extends Error { readonly kind: 'unavailable' | 'rejected' | 
 
 **Web helpers**:
 - `getCurrentUser()` is wrapped in React `cache()`, with one `GET /auth/me` per render. It returns `null` on 401.
-- `requireUser(returnTo)`: on no cookie → `redirect('/login?returnTo=…')`. On 401 with a cookie present → `redirect('/auth/session-expired?returnTo=…')`. That route handler deletes the cookie and redirects to `/login?returnTo=…&notice=session_expired` (AC-ERROR-11).
+- `requireUser(returnTo)`: on no cookie → `redirect('/login?returnTo=…')`. On 401 with a cookie present → `redirect('/auth/session-expired?returnTo=…')`. That route handler calls `GET /auth/me` again and deletes the cookie only on 401 (user-journey X14, so a cross-site GET cannot sign anyone out), then redirects to `/login?returnTo=…&notice=session_expired`; with a live session it redirects to `returnTo` (AC-ERROR-11).
 - `proxy.ts` only checks that the cookie exists on protected matchers (`/account` for now). The real check is `requireUser` in the page, following Next's guidance that proxy is not an auth boundary.
 
 ### Q5: RBAC guards
@@ -575,15 +602,17 @@ app.get('/teams/:teamId/settings', { config: { policy: requireTeamRole('TEAM_ADM
 **Sign-in flow (intent `signin`):**
 ```
 Browser  ── click "Continue with Google" (form → Server Action startOAuth('google', returnTo)) ──► web
-web      ── POST /auth/oauth/google/authorize { returnTo }  (policy public) ─────────────────────► api
+web      ── POST /auth/oauth/google/authorize { returnTo, rerequest? }  (policy public) ─────────► api
+            (rerequest: Facebook only → auth_type=rerequest; ignored for Google)
 api      ── state, nonce, PKCE verifier = randomBytes(32) each; INSERT oauth_states(state_hash, provider,
             intent='signin', nonce, code_verifier_enc = encrypt(verifier, oauth_states.code_verifier:<id>),
             return_to = safeReturnTo(returnTo), expires_at = now+10m)
          ◄── 200 { authorizationUrl, state }
-web      ── cookies().set(sgm_oauth = state, 600 s); redirect(authorizationUrl) ──► Google consent
+web      ── cookies().set(sgm_oauth = <state>.<ctx>, 600 s); redirect(authorizationUrl) ──► Google consent
 Google   ── 302 WEB_BASE_URL/auth/callback/google?code&state  (or ?error=access_denied&state) ──► web route handler
-web      ── state === cookie(sgm_oauth)? (timingSafeEqual)  else → /login?error=oauth_state
-         ── delete sgm_oauth; POST /auth/oauth/google/callback { state, code } | { state, error }
+web      ── delete sgm_oauth; parse it; state component === query state? (timingSafeEqual)
+            else → /login?error=oauth_state_invalid&provider=google (API not called)
+         ── POST /auth/oauth/google/callback { state, code } | { state, error }
             (policy optionalSession; Bearer forwarded if the browser has a session) ──► api
 api      ── UPDATE oauth_states SET used_at=$now WHERE state_hash=$1 AND provider=$2 AND used_at IS NULL
             AND expires_at > $now RETURNING …   (0 rows → 400 oauth_state_invalid; replay does nothing)
@@ -593,13 +622,16 @@ api      ── UPDATE oauth_states SET used_at=$now WHERE state_hash=$1 AND pro
               signed_in      → 200 { outcome:'signed_in', user, session, returnTo }
               pending_signup → 200 { outcome:'pending_signup', pendingToken, returnTo }   (INSERT oauth_pending_signups)
               linked         → 200 { outcome:'linked', returnTo:'/account' }
-              rejected       → 4xx { error:{ code } }   (oauth_email_conflict, oauth_email_missing, …)
+              already_linked → 200 { outcome:'already_linked', returnTo:'/account' }
+              rejected       → 4xx { error:{ code, message, email? } }   (oauth_account_exists, oauth_email_missing, …;
+                                 email only on oauth_account_exists, read by the web server for sgm_flash)
 web      ── signed_in: set session cookie, redirect(returnTo) | pending: set sgm_pending (900 s),
-            redirect('/register/complete') | error: redirect('/login?error=<code>&provider=google')
+            redirect('/register/complete') | linked/already_linked: redirect('/account?notice=…')
+            | error: landing from lib/auth/landing.ts (user-journey F3/F8), e.g. /login?error=<code>&provider=google&returnTo=<ctx.r>)
 ```
 **Completion:**
-- `/register/complete` (an RSC) calls `GET /auth/oauth/pending` with header `X-Pending-Signup: <token>` (policy public) and gets `{ provider, email, fullName, expiresAt }` to prefill the form.
-- The "Finish sign-up" Server Action calls `POST /auth/oauth/complete { pendingToken, fullName, sex }`. In one transaction the API runs a guarded `UPDATE oauth_pending_signups SET consumed_at … RETURNING`, then `INSERT users`, `INSERT auth_identities`, then issues the session. Unique constraints arbitrate races.
+- `/register/complete` (an RSC) calls `GET /auth/oauth/pending` with header `X-Pending-Signup: <token>` (policy public) and gets `{ provider, email, fullName, expiresAt, returnTo }` to prefill the form (user-journey C-3).
+- The "Finish sign-up" Server Action calls `POST /auth/oauth/complete { pendingToken, fullName, sex }`. In one transaction the API runs a guarded `UPDATE oauth_pending_signups SET used_at = $now WHERE token_hash = $1 AND used_at IS NULL AND expires_at > $now RETURNING …`, then `INSERT users`, `INSERT auth_identities`, then issues the session and returns `{ user, session, returnTo }`. Unique constraints arbitrate races (algorithm rows C3/C4).
 - A 422 for a missing sex does **not** consume the row (validation runs before the transaction), as AC-ERROR-14 requires.
 
 **Expiry constants**: OAuth state 10 min, pending sign-up 15 min (AC-ERROR-14). Both are constants in `modules/auth/oauth-service.ts`, not env.
@@ -627,7 +659,8 @@ export interface AppDeps extends HealthDeps {
   readonly auth: AuthConfig;                     // config.auth
   readonly oauthProviders: OAuthProviderRegistry;// providers/registry.ts, built from config
   readonly passwordHasher: PasswordHasher;       // modules/auth/password.ts
-  readonly loginThrottle: LoginThrottle;         // modules/auth/throttle.ts (mechanism: Algorithm Q7)
+  readonly loginThrottle: LoginThrottle;         // modules/auth/throttle.ts (Algorithm Q7: auth_throttle admit/settle)
+  readonly internalAuthSecret: string | null;    // API_INTERNAL_SHARED_SECRET (required in production)
   /** Test seam: extra plugins registered after auth (e.g. guard fixture routes for AC-HAPPY-8/9). */
   readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
@@ -637,6 +670,7 @@ export interface AppDeps extends HealthDeps {
 2. Zod compilers.
 3. `registerErrorHandling(app)`.
 4. `registerOriginCheck(app, auth.webBaseUrl)`.
+4a. `registerInternalAuth(app, internalAuthSecret)` (decorates `request.clientAddress`).
 5. `registerAuthPlatform(app, deps)` (decorators and the `onRoute` registry).
 6. Swagger, with `components.securitySchemes.sessionToken = { type: 'http', scheme: 'bearer' }`.
 7. `registerHealthRoute` (now with `config.policy: publicRoute()`).
@@ -652,7 +686,7 @@ export interface AppDeps extends HealthDeps {
 5. `createJobRunner({ role: 'producer' })` → `await start()`
 6. `createPasswordHasher()` (self-test)
 7. `buildOAuthProviders(config.auth)`
-8. `createLoginThrottle(...)` (Algorithm Q7)
+8. `createLoginThrottle(db, keyring)` (Algorithm Q7; HKDF throttle key from the active encryption key)
 9. `buildApp(...)`
 10. listen.
 
@@ -660,37 +694,84 @@ Shutdown: `app.close()` → `runner.stop()` → `pool.end()`.
 
 `openapi.ts` builds the app with inert deps (no DB): a Kysely over an unconnected pool, a no-op runner, the fake providers. The routes, not the deps, define the document.
 
-**Client address**: the web forwards `x-sgm-client-ip` from its own `x-forwarded-for` (first hop set by the platform edge). The API reads it only for the throttle port (`request.clientAddress`, falling back to `request.ip`). It is redacted from logs and never stored in plaintext. How it is keyed (for example HMAC) is Algorithm Q7's choice. Fastify `trustProxy` stays off, so request logs keep showing the web hop, not the client IP (privacy NFR).
+#### Client address trust boundary (enforced invariant)
+
+The client address feeds only the throttle's address dimension (Algorithm Q7). It must not be influenced by the browser. This replaces the earlier "copy the first `x-forwarded-for` value" rule (critique finding 2).
+
+1. **Derivation (web only, `apps/web/src/lib/auth/client-address.ts`)**: `WEB_TRUSTED_PROXY_HOPS = N` is the number of reverse proxies in front of the web that each **append** the peer address to `X-Forwarded-For`. The web splits the incoming `X-Forwarded-For` on commas, trims each entry, and takes the **N-th entry counted from the right** (N = 1 means the last entry, written by the proxy closest to the web). Entries to the left of it were supplied by the client or by untrusted hops and are ignored. If the header has fewer than N entries, if N = 0, or if the chosen entry is not a valid IP (`net.isIP`), the address is `null`. A trusted proxy that **overwrites** `X-Forwarded-For` instead of appending counts as one hop and must be the outermost one; document the platform's behaviour in `docs/getting-started.md`.
+2. **Strip**: `proxy.ts` removes any incoming `x-sgm-client-ip` and `x-sgm-internal-auth` request headers, and `apiFetch` builds outgoing headers from an allowlist (it never copies incoming headers), always overwriting `x-sgm-client-ip` with the derived value or omitting it when `null`.
+3. **Authenticated hop**: every web→API call carries `x-sgm-internal-auth: <API_INTERNAL_SHARED_SECRET>`. The API's `internal-auth.ts` `onRequest` hook compares it in constant time (`timingSafeEqual` over the SHA-256 digests of the presented and configured values, so lengths never leak). Only on a match does it set `request.clientAddress` from `x-sgm-client-ip` (re-validated with `net.isIP`). Without a match, or with no secret configured, `request.clientAddress = null`, any `x-sgm-client-ip` is ignored and `auth.client_address.untrusted` is logged (rate-limited). There is **no fallback to `request.ip`**: behind the web that is the web container, which would put every player in one bucket.
+4. **Scope**: the secret authenticates the hop, not the user. A request without it is still served (bearer sessions remain the authority); it only loses the address dimension. It is not an OpenAPI security scheme.
+5. **Boot (P7)**: with `NODE_ENV=production`, the API refuses to start without `API_INTERNAL_SHARED_SECRET` (at least 32 characters), and the web refuses to start without `API_INTERNAL_SHARED_SECRET` or `WEB_TRUSTED_PROXY_HOPS` (integer 0–5; 0 is allowed only when `WEB_BASE_URL`'s host is `localhost` or `127.0.0.1`, as for the Compose E2E stack). Outside production both may be unset; the address dimension is then skipped with `auth.throttle.address_missing`.
+6. **Privacy**: the address is redacted from logs, never stored in plaintext (only the HMAC pseudonym in `auth_throttle`), and Fastify `trustProxy` stays off, so request logs keep showing the web hop.
+7. **Tests**: `client-address.test.ts` (no XFF, client-supplied leftmost entries, multi-hop XFF with N = 1 and 2, fewer entries than N, invalid IP), `internal-auth.test.ts` (missing secret, forged secret of equal and different length, valid secret), `api-client.test.ts` (incoming internal headers never forwarded), config tests for the production refusals.
 
 ### Shared HTTP error shape
 
 ```ts
-// packages/shared/src/api/errors.ts
+// packages/shared/src/api/errors.ts — the authoritative list (consolidated 2026-10-06; the spec mirrors it)
 export const ErrorCode = [
+  // generic
   'validation_failed', 'unauthenticated', 'session_expired', 'forbidden', 'cross_origin_request',
-  'not_found', 'conflict', 'internal_error',
-  'email_taken', 'invalid_credentials', 'too_many_attempts', 'invalid_or_expired_token',
+  'not_found', 'conflict', 'internal_error', 'service_unavailable',
+  // password auth and reset
+  'email_taken', 'invalid_credentials', 'too_many_attempts', 'too_many_requests', 'invalid_or_expired_token',
+  // OAuth sign-in and sign-up (algorithm Q3/Q4)
   'provider_not_enabled', 'provider_unavailable', 'oauth_state_invalid', 'oauth_cancelled',
-  'pending_signup_expired', 'last_sign_in_method',
-  // Algorithm Q3/Q4 append their codes here (e.g. oauth_email_conflict, oauth_email_missing,
-  // oauth_email_unverified, identity_already_linked).
+  'oauth_email_missing', 'oauth_email_unverified', 'oauth_account_exists', 'signup_expired',
+  // identities (algorithm Q3 link and unlink)
+  'identity_in_use', 'provider_already_connected', 'link_session_mismatch', 'last_sign_in_method',
 ] as const;
 export const ErrorResponse = z.object({
   error: z.object({
     code: z.enum(ErrorCode),
     message: z.string(),                                    // safe, user-presentable, never echoes input
     fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
+    email: z.string().optional(),                           // only with oauth_account_exists (user-journey C-5);
+                                                            // read by the web server, never rendered from a URL
   }),
 });
 ```
+
+| Code | HTTP | Raised by |
+|---|---|---|
+| `validation_failed` | 422 | any strict body or params schema; password policy; carries `fieldErrors` |
+| `unauthenticated` | 401 | protected route without a bearer token |
+| `session_expired` | 401 | presented token expired, revoked or unknown; link callback with a dead session (L0) |
+| `forbidden` | 403 | global-role or team-role guard |
+| `cross_origin_request` | 403 | `origin.ts` |
+| `not_found` | 404 | not-found handler |
+| `conflict` | 409 | untranslated 23505 |
+| `internal_error` | 500 | anything unmapped |
+| `service_unavailable` | 503 | throttle store or DB unavailable (algorithm: fail closed) |
+| `email_taken` | 409 | register (23505 on `users.email`) |
+| `invalid_credentials` | 401 | login |
+| `too_many_attempts` | 429 + `Retry-After` | login throttle |
+| `too_many_requests` | 429 + `Retry-After` | forgot-password address limit |
+| `invalid_or_expired_token` | 400 | reset, reset check |
+| `provider_not_enabled` | 404 | authorize, callback, link for a disabled provider |
+| `provider_unavailable` | 502 | provider network error, timeout or 5xx |
+| `oauth_state_invalid` | 400 | state missing, unknown, expired or used; provider `rejected` or `invalid_response` |
+| `oauth_cancelled` | 400 | callback with `error=access_denied` |
+| `oauth_email_missing` | 422 | decision row S2 |
+| `oauth_email_unverified` | 422 | decision row S3 |
+| `oauth_account_exists` | 409 | decision rows S4 and C4 (with `error.email`) |
+| `signup_expired` | 400 | decision row C2; pending lookup for a missing, expired or used row |
+| `identity_in_use` | 409 | decision row L2 |
+| `provider_already_connected` | 409 | decision row L3 |
+| `link_session_mismatch` | 403 | decision row L0 (session belongs to another user) |
+| `last_sign_in_method` | 409 | unlink; 23514 from `auth_identities_last_method` |
+
+`already_linked` is a 200 callback outcome, not an error.
 - **Mapper** (`lib/http/errors.ts`):
   - `AppError` → its status and code.
   - Zod schema validation (`hasZodFastifySchemaValidationErrors`) → **422** `validation_failed` with `fieldErrors`, replacing Fastify's default 400.
   - Unknown key in a strict body → 422.
   - SQLSTATE 23505 not translated by a service → 409 `conflict`.
+  - Database unavailable (connection errors, the throttle function failing) → 503 `service_unavailable`.
   - Any other error → 500 `internal_error`, logged with `err`, with no detail in the body.
   - `setNotFoundHandler` → 404 `not_found`.
-- `too_many_attempts` sets the `Retry-After` header (seconds).
+- `too_many_attempts` and `too_many_requests` set the `Retry-After` header (seconds).
 - Field messages for AC-ERROR-2 come from the shared schemas, so web and API show the same text.
 
 ### Final environment variables
@@ -705,29 +786,35 @@ export const ErrorResponse = z.object({
 | `AUTH_SESSION_ABSOLUTE_DAYS` | api | integer 1–90 and ≥ idle | `30` |
 | `AUTH_RESET_TOKEN_MINUTES` | api | integer 10–1440 | `60` |
 | `API_INTERNAL_URL` | web | existing; now validated by the web config | `http://localhost:4000` |
-| Throttle limits | api | **named by Algorithm Q7** (e.g. `AUTH_LOGIN_MAX_FAILURES`, `AUTH_LOGIN_WINDOW_MINUTES`) | AC-ERROR-4: 5 / 15 |
+| `AUTH_LOGIN_MAX_FAILURES_PER_EMAIL` | api | integer 3–20 (Algorithm Q7) | `5` |
+| `AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS` | api | integer 5–200 | `20` |
+| `AUTH_LOGIN_WINDOW_MINUTES` | api | integer 5–60 | `15` |
+| `AUTH_FORGOT_MAX_PER_ADDRESS` | api | integer 3–100, fixed 60-minute window | `10` |
+| `API_INTERNAL_SHARED_SECRET` | api, web | at least 32 characters; same value on both; **required when `NODE_ENV=production`**; never logged | unset (address dimension skipped); `.env.example` ships a dev-only placeholder |
+| `WEB_TRUSTED_PROXY_HOPS` | web | integer 0–5 ([Client address](#client-address-trust-boundary-enforced-invariant)); **required when `NODE_ENV=production`**, where 0 is allowed only for a localhost `WEB_BASE_URL` | `0` outside production |
 
-Constants, not env: OAuth state TTL 10 min, pending sign-up TTL 15 min, session touch interval 1 h, provider HTTP timeout 5 s, argon2 parameters, Graph API version, the reset email's 60-second per-user resend floor (AC-ERROR-6; mechanism in Algorithm Q7 if it shares the throttle store). Compose: the `web` service gains `WEB_BASE_URL`. `.env.example` gains every variable above, and `AUTH_FAKE_OAUTH=true` is documented for E2E.
+Constants, not env: OAuth state TTL 10 min, pending sign-up TTL 15 min, session touch interval 1 h, provider HTTP timeout 5 s, argon2 parameters, Graph API version, the reset email's 60-second per-user resend floor (AC-ERROR-6; a `FOR UPDATE` on the user row plus the latest token's `created_at`, Algorithm step F), the `sgm_oauth` size limit (1024 bytes), the `sgm_flash` lifetime (60 s). The throttle HMAC key is derived by HKDF from the active `ENCRYPTION_KEYS` entry (no new secret). Compose: the `web` service gains `WEB_BASE_URL`, `API_INTERNAL_SHARED_SECRET` and `WEB_TRUSTED_PROXY_HOPS=0`; the `api` service gains `API_INTERNAL_SHARED_SECRET` and the `AUTH_FAKE_OAUTH` passthrough. `.env.example` gains every variable above, and `AUTH_FAKE_OAUTH=true` is documented for E2E.
 
 ### Schema shapes (input to Phase 1 migrations)
 
-1. **`_users_email_and_role_checks.sql`**:
-   - `users`: `CHECK (email = lower(email))` and `CHECK (role <> 'TEAM_ADMIN')`.
-   - `auth_identities`: `UNIQUE (user_id, provider)`, so there is one identity per method per user (needed by `DELETE /auth/identities/:provider` and AC-HAPPY-11), and `CHECK (provider <> 'PASSWORD' OR provider_subject = lower(provider_subject))`.
-2. **`_auth_sessions.sql`**:
-   - Columns: `id uuid PK`, `user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32)`, `created_at timestamptz NOT NULL DEFAULT now()`, `last_seen_at timestamptz NOT NULL`, `expires_at timestamptz NOT NULL`, `absolute_expires_at timestamptz NOT NULL`, `revoked_at timestamptz`, `revoked_reason varchar(32) CHECK (revoked_reason IN ('logout','password_reset'))`, `user_agent varchar(512)`.
-   - CHECKs: `(revoked_at IS NULL) = (revoked_reason IS NULL)`, `expires_at <= absolute_expires_at`, `absolute_expires_at > created_at`.
-   - Indexes: `(user_id) WHERE revoked_at IS NULL` and `(expires_at)`.
-3. **`_password_reset_tokens.sql`**:
-   - Columns: `id uuid PK`, `user_id … ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length = 32)`, `created_at`, `expires_at timestamptz NOT NULL CHECK (expires_at > created_at)`, `used_at timestamptz`.
-   - Index: `(user_id, created_at DESC)` for the 60-second floor.
-4. **`_oauth_states_and_pending_signups.sql`**:
-   - `oauth_states`: `id`, `state_hash bytea UNIQUE (32)`, `provider auth_provider CHECK (provider <> 'PASSWORD')`, `intent varchar(8) CHECK (intent IN ('signin','link'))`, `link_user_id uuid REFERENCES users ON DELETE CASCADE`, `CHECK ((intent = 'link') = (link_user_id IS NOT NULL))`, `nonce varchar(64)`, `code_verifier_enc text` (with the existing envelope CHECK pattern), `return_to varchar(512) CHECK (return_to IS NULL OR (return_to LIKE '/%' AND return_to NOT LIKE '//%'))`, `created_at`, `expires_at`, `used_at`.
-   - `oauth_pending_signups`: `id`, `token_hash bytea UNIQUE (32)`, `provider` (≠ PASSWORD), `provider_subject varchar(255) NOT NULL`, `email varchar(255) CHECK (email IS NULL OR email = lower(email))`, `email_verified boolean NOT NULL`, `full_name varchar(255)`, `return_to` (same CHECK), `created_at`, `expires_at`, `consumed_at`.
-   - Algorithm Q3/Q4 may add or tighten columns (for example making `email NOT NULL` if a missing email always blocks sign-up). Confirm before Phase 1.
-5. **Throttle storage** (if Algorithm Q7 picks Postgres): a fifth migration named by that doc.
+Final file names (consolidated 2026-10-06; the algorithm doc's "Schema implications" add the invariants marked *Algo*):
 
-Each object gets a `db/schema-deviations.md` entry (D-27 onwards), and enum parity is unchanged (no new enum: `intent` and `revoked_reason` are CHECKed varchars to avoid the enum add/remove migration cost for internal state).
+1. **`db/migrations/20261006000100000_users_email_and_role_checks.sql`**:
+   - `users`: `CONSTRAINT users_email_normalised CHECK (email = lower(email) AND email ~ '^[!-?A-~]+@[!-?A-~]+$' AND char_length(email) <= 254)` (*Algo* S1, stricter than a plain `lower()` check), `CONSTRAINT users_role_not_team_admin CHECK (role <> 'TEAM_ADMIN')`, `ADD COLUMN email_verified_at timestamptz` (*Algo*; informational only in v1, see the algorithm doc's R1), `CONSTRAINT uq_users_id_email UNIQUE (id, email)`.
+   - `auth_identities`: `CONSTRAINT uq_auth_identities_user_provider UNIQUE (user_id, provider)`, so there is one identity per method per user (needed by `DELETE /auth/identities/:provider` and AC-HAPPY-11); `CHECK (provider <> 'PASSWORD' OR provider_subject = lower(provider_subject))`; `password_email` generated column with `FOREIGN KEY (user_id, password_email) REFERENCES users (id, email) ON UPDATE CASCADE ON DELETE CASCADE` (*Algo*); deferred constraint trigger `auth_identities_last_method` (*Algo*, raises 23514 when a user's last identity is deleted).
+2. **`db/migrations/20261006000200000_auth_sessions.sql`**:
+   - Columns: `id uuid PK`, `user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32)`, `created_at timestamptz NOT NULL DEFAULT now()`, `last_seen_at timestamptz NOT NULL`, `expires_at timestamptz NOT NULL`, `absolute_expires_at timestamptz NOT NULL`, `revoked_at timestamptz`, `revoked_reason varchar(32) CHECK (revoked_reason IN ('logout','password_reset','replaced'))`, `user_agent varchar(512)`.
+   - CHECKs: `(revoked_at IS NULL) = (revoked_reason IS NULL)`, `last_seen_at >= created_at`, `expires_at <= absolute_expires_at`, `absolute_expires_at > created_at`, `revoked_at IS NULL OR revoked_at >= created_at`.
+   - Indexes: `(user_id) WHERE revoked_at IS NULL` and `(expires_at)`.
+3. **`db/migrations/20261006000300000_password_reset_tokens.sql`**:
+   - Columns: `id uuid PK`, `user_id … ON DELETE CASCADE`, `token_hash bytea NOT NULL UNIQUE CHECK (octet_length = 32)`, `created_at timestamptz NOT NULL DEFAULT now()`, `expires_at timestamptz NOT NULL CHECK (expires_at > created_at)`, `used_at timestamptz CHECK (used_at IS NULL OR used_at >= created_at)`.
+   - Index: `(user_id, created_at DESC)` for the 60-second floor.
+4. **`db/migrations/20261006000400000_oauth_states_and_pending_signups.sql`**:
+   - `oauth_states`: `id`, `state_hash bytea UNIQUE (32)`, `provider auth_provider CHECK (provider <> 'PASSWORD')`, `intent varchar(8) CHECK (intent IN ('signin','link'))`, `link_user_id uuid REFERENCES users ON DELETE CASCADE`, `CHECK ((intent = 'link') = (link_user_id IS NOT NULL))`, `nonce varchar(64)`, `code_verifier_enc text` (with the existing envelope CHECK pattern), `return_to varchar(512) CHECK (return_to IS NULL OR (return_to LIKE '/%' AND return_to NOT LIKE '//%'))`, `created_at`, `expires_at`, `used_at`.
+   - `oauth_pending_signups`: `id`, `token_hash bytea UNIQUE (32)`, `provider` (≠ PASSWORD), `provider_subject varchar(255) NOT NULL`, `email varchar(255) NOT NULL` with the same normal-form CHECK as `users.email` (Algorithm Q4 4A: a missing email never reaches a pending sign-up), `email_verified boolean NOT NULL`, `full_name varchar(255)`, `return_to` (same CHECK), `created_at`, `expires_at`, `used_at`.
+5. **`db/migrations/20261006000500000_auth_throttle.sql`** (*Algo* Q7): `auth_throttle(scope, key_hash, attempts timestamptz[], updated_at)` with `PRIMARY KEY (scope, key_hash)` and the functions `auth_throttle_admit` and `auth_throttle_settle`; the down migration drops both functions and the table.
+
+Each object gets a `db/schema-deviations.md` entry (D-27 onwards), and enum parity is unchanged (no new enum: `intent`, `revoked_reason` and `scope` are CHECKed varchars to avoid the enum add/remove migration cost for internal state).
 
 ### Rationale (summary)
 The web is the only public origin, so it should be the only cookie writer. The API is the authority, so it holds sessions, roles and every invariant in Postgres. Pre-built auth frameworks bring their own data model, cookies and HTTP surface. Each of those conflicts with one of the three points above. The pieces we write are small, and each is backed by a constraint or a test. The one native-code risk the plan flagged (the argon2 addon on a slim, classic-builder image) goes away because Node 24 ships argon2.
@@ -737,7 +824,7 @@ The web is the only public origin, so it should be the only cookie writer. The A
 - **`node:crypto.argon2` is recent (v24.7.0).** The boot self-test and known-answer vector catch an unsuitable runtime. `@node-rs/argon2` is a drop-in fallback with the same PHC format.
 - **The session token travels in a JSON body on the internal hop.** Acceptable under C5 (private network or HTTPS). Bodies are never logged.
 - **The cookie lifetime is the absolute expiry, not the sliding idle expiry.** A browser may keep a cookie that the server already treats as idle-expired. The first request gets `session_expired` and the cookie is cleared. AC-ASYNC-4's wording is amended accordingly.
-- **The API trusts `x-sgm-client-ip`** because it is reachable only from the web (C6). If the API is ever exposed publicly, the header becomes spoofable for throttling purposes. That is recorded as a risk, with a deferred shared-secret hardening.
+- **The API trusts `x-sgm-client-ip` only behind the shared secret**, and the web derives it only from a configured number of trusted proxy hops. A misconfigured hop count can put players in the wrong address bucket (too low: a proxy's address; too high: unknown, so the address dimension is skipped); the per-email limit, which protects each account, does not depend on it. One shared secret means rotation is a coordinated redeploy of web and api.
 - **`global_role` keeps `TEAM_ADMIN` behind a CHECK** for draft parity, so the generated type is wider than the assignable type. `AssignableGlobalRole` narrows it.
 - **The E2E fake bypasses the real adapters' HTTP.** Covered by fixture unit tests and the manual smoke test.
 
@@ -745,21 +832,26 @@ The web is the only public origin, so it should be the only cookie writer. The A
 
 ## Interfaces handed to Algorithm Design
 
-The architecture fixes these seams. `auth-and-user-roles-algorithm.md` chooses what goes behind them.
+The architecture fixes these seams. `auth-and-user-roles-algorithm.md` chooses what goes behind them (all three are now settled).
 
-1. **Throttle port (Q7)**:
+1. **Throttle port (Q7)**, following the algorithm doc's reserve-then-verify design (this supersedes the earlier three-method sketch; see Consolidation):
    ```ts
    interface LoginThrottle {
-     /** Called before any credential check; denied → 429 too_many_attempts, no hash verify (AC-ERROR-4). */
-     check(keys: ThrottleKeys, now: Date): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }>;
-     recordFailure(keys: ThrottleKeys, now: Date): Promise<void>;
-     recordSuccess(keys: ThrottleKeys, now: Date): Promise<void>;
+     /** Before any lookup or hash; reserves a provisional failure on every key, or denies → 429 (AC-ERROR-4). */
+     admitLogin(keys: ThrottleKeys, now: Date): Promise<ThrottleVerdict>;
+     /** Successful sign-in: delete the email row, refund this attempt's address entry. */
+     settleLogin(keys: ThrottleKeys, now: Date): Promise<void>;
+     /** Forgot-password address limit (10 per 60 min) → 429 too_many_requests. */
+     admitForgot(clientAddress: string | null, now: Date): Promise<ThrottleVerdict>;
+     /** Completed reset: delete the email row inside the reset transaction. */
+     clearEmail(email: string, trx: Transaction<DB>): Promise<void>;
    }
-   interface ThrottleKeys { email: string /* normalised */; clientAddress: string | null }
+   interface ThrottleKeys { email: string /* normalised */; clientAddress: string | null /* request.clientAddress */ }
+   type ThrottleVerdict = { admitted: true } | { admitted: false; retryAfterSeconds: number };
    ```
-   It must work across API replicas without Redis (no new stateful service). It may take its own Kysely table and migration. Any stored client address must not be plaintext (privacy NFR). The 60-second reset-email floor may reuse it.
-2. **OAuth outcome (Q3/Q4)**: `oauth-service.resolveCallback(profile, state, request.auth)` returns `signed_in | pending_signup | linked | rejected(code)`. The algorithm doc defines the rules (existing identity, email matching an existing user, verified vs unverified email, a missing Facebook email, linking an identity already owned by another user), any new `ErrorCode`s and their web messages, and any `oauth_pending_signups` column changes.
-3. **Email verification**: if Q3 brings email verification into v1, it reuses the `password_reset_tokens` pattern (hashed single-use token, `enqueueEmail` in the same transaction). That needs a new table and an AC set, which goes back to the spec owner.
+   Backed by the `auth_throttle` table and its two plpgsql functions (migration 5). Keys are HMAC pseudonyms; no plaintext address or email is stored.
+2. **OAuth outcome (Q3/Q4)**: `oauth-service` calls the pure `oauth-decision.ts` and returns `signed_in | pending_signup | linked | already_linked | rejected(code)`. The codes are in the authoritative `ErrorCode` list above.
+3. **Email verification**: not in v1 as a flow. `users.email_verified_at` exists and is set by Google sign-up/link and by every completed reset, but no v1 rule reads it (algorithm R1 as amended by user decision D1).
 
 ---
 
@@ -768,13 +860,13 @@ The architecture fixes these seams. `auth-and-user-roles-algorithm.md` chooses w
 1. **Phase 1 order**: migrations and deviations → `db:codegen` → shared `api/errors.ts`, `api/auth.ts`, `auth/return-to.ts` → `lib/http/errors.ts`, `lib/http/origin.ts`, `lib/clock.ts` → config additions (API and web) → `AppDeps` and `main.ts` wiring with a stub auth module that registers no routes. The `onRoute` registry lands in Phase 2, but `health.ts` gets its `policy` in Phase 1 so the registry can be strict from its first commit.
 2. **Time from the clock**: every expiry comparison and timestamp written by auth code takes `clock.now()` as a parameter (`expires_at > ${now}`), never SQL `now()`, so AC-ASYNC-4 can advance time. Column defaults (`created_at DEFAULT now()`) are fine.
 3. **Tokens**: `tokens.ts` exports `newToken(): { raw: string; hash: Buffer }` and `hashToken(raw): Buffer`. Raw tokens exist only in responses and emails. Never put them in a log field, an error message or a span attribute.
-4. **Transactions**: the register, OAuth complete, reset (consume token + update hash + revoke sessions) and forgot (insert token + `enqueueEmail(runner, msg, { trx })`) flows each run in one `db.transaction()`. Services translate 23505 on `users_email_key` to `email_taken` and on `uq_auth_identities_*` to the Q3 code.
+4. **Transactions**: the register, OAuth complete, link (insert identity + security email), reset (consume token + upsert PASSWORD + delete every GOOGLE/FACEBOOK identity + revoke sessions + invalidate other tokens + set `email_verified_at` + clear the email throttle row) and forgot (insert token + `enqueueEmail(runner, msg, { trx })`) flows each run in one `db.transaction()`. Services translate 23505 on `users_email_key` to `email_taken` (register) or `oauth_account_exists` (OAuth complete), and on `uq_auth_identities_*` per the algorithm decision table.
 5. **Route modules**: `modules/auth/routes.ts` registers every route with an explicit `config.policy` and strict shared schemas. Handlers stay thin and the services hold the rules (module convention).
-6. **Web API client**: extend `api-client.ts` with one internal `apiFetch({ path, method, body, schema, session, incoming })`. It always sends `traceHeaders(incoming)`, `user-agent` and `x-sgm-client-ip` from the incoming request, and `Authorization` when a session is given. It returns a discriminated result `{ ok: true, data } | { ok: false, status, error: ErrorResponse['error'] }`. It never throws on 4xx and has a 5 s timeout. Auth methods are thin wrappers over it.
-7. **`returnTo`**: `safeReturnTo` accepts only strings that start with exactly one `/`, contain no `\`, no control characters and no `//` prefix after decoding, and resolve to the same origin as a dummy base. Everything else becomes `/`. The web applies it before every redirect, and the API applies it before storing.
+6. **Web API client**: extend `api-client.ts` with one internal `apiFetch({ path, method, body, schema, session, incoming })`. It builds headers from an allowlist and always sends `traceHeaders(incoming)`, `user-agent` from the incoming request, `x-sgm-internal-auth` when the secret is configured, and `x-sgm-client-ip` only when `client-address.ts` derived one; `Authorization` when a session is given. It never copies incoming headers wholesale. It returns a discriminated result `{ ok: true, data } | { ok: false, status, error: ErrorResponse['error'] }`. It never throws on 4xx and has a 5 s timeout. Auth methods are thin wrappers over it.
+7. **`returnTo`**: `safeReturnTo` accepts only strings that start with exactly one `/`, contain no `\`, no control characters and no `//` prefix after decoding, and resolve to the same origin as a dummy base. Auth-page paths (`/login`, `/register`, `/register/complete`, `/forgot-password`, `/reset-password`, anything under `/auth/`) also become `/` (user-journey X13). Everything else becomes `/`. The web applies it before every redirect, and the API applies it before storing.
 8. **`/reset-password`**: `proxy.ts` sets `Referrer-Policy: no-referrer` (and `Cache-Control: no-store`) on that path. The Server Action reads the token from a hidden form field, not from a re-read URL.
 9. **CLI `users set-role`**: uses the same Kysely repo. It validates the role with `AssignableGlobalRole` (`TEAM_ADMIN` rejected before the DB, and the CHECK as backstop), looks up the email normalised, prints `id` and the new role, and exits 1 on an unknown email.
-10. **`auth-cleanup`**: a new queue (`exclusive`) and schedule slot `0 5 * * *` in Pacific/Auckland (passes `assertNoDstHourFirings`). It runs one `DELETE … WHERE` per table, inside one transaction, using `clock.now()`. It logs counts only.
+10. **`auth-cleanup`**: a new queue (`exclusive`) and schedule slot `0 5 * * *` in Pacific/Auckland (passes `assertNoDstHourFirings`). It deletes stale rows from `auth_sessions`, `password_reset_tokens`, `oauth_states`, `oauth_pending_signups` and `auth_throttle` with one `DELETE … WHERE` per table, in batches of 5000 until 0 rows (algorithm step I), using `clock.now()`. It logs counts only.
 11. **ADR 0013** records Q1, Q2, Q5, Q6 and Q8 with their alternatives (the phase review of platform-foundation flagged ADRs without alternatives).
 
 ---
@@ -814,7 +906,8 @@ The architecture fixes these seams. `auth-and-user-roles-algorithm.md` chooses w
 | argon2 memory pressure under burst sign-ins (64 MiB each) | M | M | Per-process semaphore of 2 (≤128 MiB). The throttle bounds abuse. Parameters can be raised or lowered later through `needsRehash`. |
 | Next 16 Server Action origin check misfires behind the platform proxy (false 403s or a weakened check) | M | M | `serverActions.allowedOrigins` from `WEB_BASE_URL`, plus `proxy.ts`'s own Origin check. AC-ERROR-15 and AC-INTEGRATION-4 run through the real stack. |
 | Facebook Graph version pinned in code expires (about 2-year lifetime) | M | M | A single constant, an ADR note, and a getting-started checklist item. Meta auto-upgrades calls to expired versions to the oldest live one, so the failure mode is degraded, not broken. |
-| API accidentally exposed publicly (makes `x-sgm-client-ip` spoofable and the internal JSON token visible to direct callers) | L | M | C6 forbids it, and the deployment feature verifies it. Deferred hardening: a shared `API_INTERNAL_SECRET` header checked by the API (not built now). |
+| API accidentally exposed publicly (direct callers could try to supply a client address) | L | M | C6 forbids it, and the deployment feature verifies it. Built now: `x-sgm-client-ip` is ignored unless `x-sgm-internal-auth` matches `API_INTERNAL_SHARED_SECRET` (constant time), and production refuses to boot without the secret. |
+| Spoofed or mis-derived client address skews the address throttle (critique finding 2) | M | M | The web takes the N-th `X-Forwarded-For` entry from the right (`WEB_TRUSTED_PROXY_HOPS`), strips incoming internal headers, and never falls back to the leftmost entry or to `request.ip`; production refuses to boot without the hop count; unit tests for client-supplied and multi-hop XFF. |
 | Login CSRF through OAuth (an attacker's callback URL) | L | H | Browser-binding `sgm_oauth` cookie compared before the state is consumed. State is single-use and expires in 10 min. |
 | Missing policy on a future route | M | H | Boot-time refusal in the `onRoute` registry, and route enumeration in the unit test. |
 | `onRoute` schema mutation not visible to `@fastify/swagger` (hook order) | M | L | Register the registry before swagger. `openapi.test.ts` drift check. Fallback: declare `security` explicitly per route. |
@@ -831,13 +924,15 @@ ACs to amend, with proposed wording. Everything not listed stands as written.
 2. **AC-ASYNC-4**: "…use within the idle window extends `expires_at` (at most once per hour of activity, never past the absolute cap), a request after 7 idle days or after 30 absolute days returns 401 `session_expired`, and the session cookie's `Expires` equals the session's absolute expiry."
 3. **AC-ERROR-11**: "…the API returns 401 `unauthenticated` (no session token), 401 `session_expired` (a presented token that is expired, revoked or unknown) or 403 `forbidden`…"
 4. **AC-VERIFY-3**: "…each declares one policy (`public`, `optionalSession`, `authenticated`, `globalRole`, `teamRole`)…; `/health` and the public auth endpoints are declared `public`, and `POST /auth/logout` and `POST /auth/oauth/:provider/callback` are `optionalSession`…"
-5. **AC-VERIFY-8**: "…documents the bearer session-token security scheme (the browser cookie is owned by the web) and the 401/403/409/422/429 responses."
+5. **AC-VERIFY-8**: "…documents the bearer session-token security scheme `sessionToken` (the browser cookie is owned by the web and is not part of the API contract), the `ErrorCode` enum equals the authoritative list, and the 401/403/409/422/429 responses."
 6. **AC-ERROR-15**: "…the request is rejected with 403 (`cross_origin_request` from the API) and has no effect (cookies are `SameSite=Lax`, Server Actions and `proxy.ts` check `Origin`, and the API refuses a foreign `Origin` on mutating requests)."
 7. **AC-INTEGRATION-3**: "…and the Google adapter rejects an ID token with a bad signature (verified with `jose` against Google's JWKS), wrong audience, wrong issuer, wrong nonce or past expiry; the Facebook adapter sends `appsecret_proof`…"
-8. **AC-VERIFY-7**: add `AUTH_FAKE_OAUTH` to the variable list. Add: "`NODE_ENV=production` with a non-https `WEB_BASE_URL` is refused; the web app validates `API_INTERNAL_URL` and `WEB_BASE_URL` at boot the same way."
+8. **AC-VERIFY-7**: add `AUTH_FAKE_OAUTH`, the four throttle variables, `API_INTERNAL_SHARED_SECRET` and `WEB_TRUSTED_PROXY_HOPS` to the variable list. Add: "`NODE_ENV=production` with a non-https `WEB_BASE_URL`, or without `API_INTERNAL_SHARED_SECRET` (api and web) or `WEB_TRUSTED_PROXY_HOPS` (web), is refused; the web app validates `API_INTERNAL_URL` and `WEB_BASE_URL` at boot the same way."
+8a. **AC-ERROR-4** and new **AC-VERIFY-14** (consolidation, critique finding 2): the address dimension uses only the client address derived and authenticated as in [Client address](#client-address-trust-boundary-enforced-invariant); tests cover client-supplied and multi-hop `X-Forwarded-For` and a missing or forged secret.
+8b. New **AC-VERIFY-15** (consolidation, critique finding 3): the `sgm_oauth` binding cookie behaves as in [the one schema](#browser-binding-cookie-sgm_oauth-the-one-schema).
 9. **AC-HAPPY-7**: "`POST /auth/logout` returns 204 (also for an already dead session), the `auth_sessions` row is marked revoked, the web deletes the cookie…"
 10. **AC-VERIFY-5**: add "`UNIQUE(user_id, provider)` on `auth_identities`" to the list of new constraints. A second GOOGLE identity for one user fails with 23505.
-11. **AC-ERROR-2 / Implementation Plan**: the shared error shape's field map is `fieldErrors` (the plan's Component Analysis says `fields?`; align the plan).
+11. **AC-ERROR-2 / Implementation Plan**: the shared error shape's field map is `fieldErrors` everywhere (the plan's Component Analysis has been aligned).
 12. **Invocation Method**:
     - Add `GET /auth/oauth/pending` (pending sign-up prefill, token in `X-Pending-Signup`).
     - `POST /auth/oauth/:provider/callback` accepts `{ state, code }` or `{ state, error }`.
@@ -849,10 +944,13 @@ ACs to amend, with proposed wording. Everything not listed stands as written.
 
 Legend: **+** add, **R** rename/move, **=** confirmed, **−** removed.
 
-- = all four planned migrations, with the shapes in [Schema shapes](#schema-shapes-input-to-phase-1-migrations). Migration 1 also adds `UNIQUE(user_id, provider)` and the lowercase PASSWORD-subject CHECK on `auth_identities`. A fifth throttle migration may come from Algorithm Q7.
+- = all four planned migrations, with the shapes in [Schema shapes](#schema-shapes-input-to-phase-1-migrations); **+** `db/migrations/20261006000500000_auth_throttle.sql` (Algorithm Q7). Migration 1 also carries the `auth_identities` constraints and the last-method trigger.
 - = `packages/shared/src/api/auth.ts`, `packages/shared/src/api/errors.ts`
+- **+** `packages/shared/src/auth/email.ts` (`normaliseEmail`, Algorithm S1) and **+** `packages/shared/src/auth/oauth-binding.ts` (the `sgm_oauth` codec; moved here from the user-journey doc's `apps/web/src/lib/auth/oauth-binding.ts` so the API can test interop), each with a test.
 - **R** `apps/web/src/lib/auth/return-to.ts` → **`packages/shared/src/auth/return-to.ts`** (+ `return-to.test.ts`), because the API validates `returnTo` too. Test pin `apps/web/src/lib/auth/return-to.test.ts` → `packages/shared/src/auth/return-to.test.ts`.
-- = `apps/api/src/lib/http/errors.ts`; **+** `apps/api/src/lib/http/origin.ts`
+- = `apps/api/src/lib/http/errors.ts`; **+** `apps/api/src/lib/http/origin.ts`; **+** `apps/api/src/lib/http/internal-auth.ts` (+ test)
+- **+** `apps/web/src/lib/auth/client-address.ts` (+ test)
+- **+** `apps/api/src/modules/auth/oauth-decision.ts`, `password-policy.ts`, `common-passwords.txt` (Algorithm Q3, S2)
 - **+** `apps/api/src/lib/clock.ts`
 - = `apps/api/src/lib/auth/{policy.ts,guards.ts,request-auth.ts}`
 - = `apps/api/src/modules/auth/{routes.ts,repo.ts,password.ts,tokens.ts,sessions.ts,throttle.ts,emails.ts}`
@@ -871,16 +969,28 @@ Legend: **+** add, **R** rename/move, **=** confirmed, **−** removed.
   - `apps/api/src/lib/crypto` usage in `main.ts`
   - `apps/web/src/instrumentation.ts` (load web config)
   - `apps/web/next.config.ts` (`serverActions.allowedOrigins`)
-  - `docker-compose.yml` (`WEB_BASE_URL` for web, `AUTH_FAKE_OAUTH` passthrough)
+  - `docker-compose.yml` (web: `WEB_BASE_URL`, `API_INTERNAL_SHARED_SECRET`, `WEB_TRUSTED_PROXY_HOPS`; api: `API_INTERNAL_SHARED_SECRET`, `AUTH_FAKE_OAUTH` passthrough)
   - root `package.json` engines `>=24.7 <25`
   - `apps/api/test/helpers/factories.ts` (users, sessions, memberships)
-- **Dependencies**: add `jose` (api). Do **not** add `arctic`, `argon2`, `@node-rs/argon2` (fallback only, not installed unless needed), `@fastify/cookie` or `@fastify/rate-limit`. The Q7 mechanism is decided in the algorithm doc.
-- **ADR (Phase 6)**: `docs/adr/0013-authentication-sessions-and-route-authorization.md`, titled **"ADR 0013: Authentication, sessions and route authorization"**. It covers Q1 (composition, `node:crypto` argon2id, thin adapters + jose), Q2 (web-owned cookie, bearer to the API, opaque DB sessions), Q5 (`onRoute` default-deny policy registry), Q6 (web-owned callback, Postgres state with a browser-binding cookie) and Q8 (env-selected fake provider), with the alternatives for each. Algorithm Q3, Q4 and Q7 get their own ADR number after it.
+- **Dependencies**: add `jose` (api). Do **not** add `arctic`, `argon2`, `@node-rs/argon2` (fallback only, not installed unless needed), `@fastify/cookie` or `@fastify/rate-limit`. The Q7 mechanism (Postgres `auth_throttle`) is decided in the algorithm doc.
+- **ADR (Phase 6)**: `docs/adr/0013-authentication-sessions-and-route-authorization.md`, titled **"ADR 0013: Authentication, sessions and route authorization"**. It covers Q1 (composition, `node:crypto` argon2id, thin adapters + jose), Q2 (web-owned cookie, bearer to the API, opaque DB sessions, authenticated internal hop), Q5 (`onRoute` default-deny policy registry), Q6 (web-owned callback, Postgres state with a browser-binding cookie) and Q8 (env-selected fake provider), with the alternatives for each. Algorithm Q3, Q4 and Q7 get `docs/adr/0014-account-linking-and-login-throttling.md`.
 
 ## Next Steps
 
-1. Algorithm Design completes Q3, Q4 and Q7 behind the interfaces above, and confirms the `oauth_pending_signups` columns and any throttle migration.
-2. The planner applies the AC amendments and file changes to `memory-bank/tasks/auth-and-user-roles.md` and marks Architecture creative complete. The user journey then uses both docs.
-3. Phase 1: migrations and deviations (D-27+), codegen, shared contracts, the HTTP error and origin layer, clock, config (API and web), `AppDeps` and `main.ts` wiring, the engines bump, and `health.ts` policy.
+1. Done: Algorithm Design settled Q3, Q4 and Q7 behind the interfaces above, and the consolidation of 2026-10-06 reconciled all three creative docs with the spec.
+2. Done: the planner applied the AC amendments and file changes to `memory-bank/tasks/auth-and-user-roles.md`.
+3. Phase 1: migrations and deviations (D-27+), codegen, shared contracts, the HTTP error and origin layer, clock, config (API and web, incl. the production trust settings), `AppDeps` and `main.ts` wiring, the engines bump, and `health.ts` policy.
 4. Phase 2: hasher (with self-test and known-answer vector), tokens, sessions, the policy registry and guards, password routes, CLI `set-role`, then `docker compose build api` to confirm the image still builds without native addons.
-5. Phases 3 to 6 as planned. Phase 6 writes ADR 0013 and the `systemPatterns.md` auth pattern (policy registry, bearer relay, the `modules/auth` reference shape).
+5. Phases 3 to 6 as planned. Phase 6 writes ADR 0013 and the `systemPatterns.md` auth pattern (policy registry, bearer relay, internal-hop secret, the `modules/auth` reference shape).
+
+## Consolidation (2026-10-06)
+
+Reconciled with the algorithm and user-journey docs, the spec, the codex design critique and the user's decisions D1 and D2. The **Chosen** decisions (1A + H1 + O3, 2B, 5A, 6A, 8A) are unchanged.
+
+- **Client address (critique finding 2, D2)**: replaced "copy the first `x-forwarded-for` value" with an enforced invariant: `WEB_TRUSTED_PROXY_HOPS` read from the right, incoming internal headers stripped, `x-sgm-internal-auth` checked in constant time against `API_INTERNAL_SHARED_SECRET`, no fallback to `request.ip`, production boot refusal. The shared-secret hardening that was deferred in the risk table is now built. New components `lib/http/internal-auth.ts` and `apps/web/src/lib/auth/client-address.ts`.
+- **Binding cookie (critique finding 3, D2)**: added the single `sgm_oauth` schema (`<state>.<ctx>`, ≤ 1024 bytes, state-only constant-time compare, `ctx` an untrusted hint, tamper/expiry/replay rules, interop tests). The codec lives in `packages/shared/src/auth/oauth-binding.ts`. Added the `sgm_flash` cookie from the journey doc.
+- **Error contract (critique finding 4, D2)**: one authoritative `ErrorCode` list with a status table. Removed `pending_signup_expired` (now `signup_expired`); dropped the placeholders `oauth_email_conflict` and `identity_already_linked` (now `oauth_account_exists`, `identity_in_use`); added `oauth_email_missing`, `oauth_email_unverified`, `provider_already_connected`, `link_session_mismatch`, `too_many_requests`, `service_unavailable`; `ErrorResponse` gains the optional `email` for `oauth_account_exists` (C-5). `fieldErrors` is the only field-map name. OpenAPI documents only the bearer `sessionToken` scheme.
+- **Reset eviction (D1)**: the reset transaction (implementation guideline 4) now always deletes every GOOGLE and FACEBOOK identity; `email_verified_at` is informational.
+- **Naming settled**: `used_at` on all single-use tables (was `consumed_at` for pending sign-ups); intent values `signin`/`link`; outcomes `signed_in`/`pending_signup`/`linked`/`already_linked`; `link_user_id`; `user_agent varchar(512)`; `revoked_reason` kept with the new value `replaced`; `full_name` on pending sign-ups; login-failure log reasons follow the algorithm doc (`invalid_credentials|throttled_email|throttled_address`).
+- **Schema**: migration file names pinned (`20261006000100000`–`20261006000500000`); `oauth_pending_signups.email` is `NOT NULL`; the algorithm's email CHECK, `email_verified_at`, composite FK, last-method trigger and `auth_throttle` migration folded in.
+- **Contracts**: `authorize` accepts `rerequest` (C-1); the throttle port is the algorithm's admit/settle shape (replacing `check/recordFailure/recordSuccess`); pending and complete return `returnTo` (C-3); `already_linked` outcome; `/auth/session-expired` deletes the cookie only on a confirmed 401 (X14); `safeReturnTo` excludes auth pages (X13); new env vars for throttling and the trust boundary; cleanup runs in batches.
