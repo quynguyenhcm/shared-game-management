@@ -7,6 +7,8 @@ import { createKysely } from './lib/db/kysely.ts';
 import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
+import { createPasswordHasher } from './modules/auth/password.ts';
+import { createLoginThrottle } from './modules/auth/throttle.ts';
 
 // Boot order (AC-ERROR-1): config validation first; nothing binds a port before it passes.
 const config = loadConfigOrExit();
@@ -19,7 +21,11 @@ const pool = createPool({
 });
 const db = createKysely(pool);
 // The keyring is validated at boot, as in the worker: a bad key fails here, not on the first OAuth call.
-const crypto = createCrypto(keyProviderFromConfig(config));
+const keys = keyProviderFromConfig(config);
+const crypto = createCrypto(keys);
+// argon2id hasher: its known-answer self-test runs here, so an unsuitable Node build stops boot (P7).
+const passwordHasher = createPasswordHasher();
+const loginThrottle = createLoginThrottle({ db, keys, config: config.auth });
 // Producer only: the API enqueues jobs (for example the reset email) and never works them.
 const jobs = createJobRunner({
   databaseUrl: config.databaseUrl,
@@ -39,6 +45,8 @@ const app = await buildApp({
   crypto,
   auth: config.auth,
   internalAuthSecret: config.internalAuthSecret,
+  passwordHasher,
+  loginThrottle,
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

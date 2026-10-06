@@ -8,6 +8,8 @@ import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { createPool } from './lib/db/pool.ts';
 import { createLogger } from './lib/logger/logger.ts';
+import { createPasswordHasher } from './modules/auth/password.ts';
+import { createLoginThrottle } from './modules/auth/throttle.ts';
 
 /** Builds the app with inert dependencies and returns its OpenAPI document as YAML. */
 export async function generateOpenApiYaml(): Promise<string> {
@@ -28,16 +30,21 @@ export async function generateOpenApiYaml(): Promise<string> {
     ENCRYPTION_ACTIVE_KEY_ID: 'openapi',
   });
   const pool = createPool({ connectionString: config.databaseUrl, max: 1 });
+  const db = createKysely(pool);
+  const keys = keyProviderFromConfig(config);
   const app = await buildApp({
     logger,
     version: 'openapi',
     checkDb: () => Promise.resolve(true),
-    db: createKysely(pool),
+    db,
     jobs: { enqueue: () => Promise.resolve(null) },
     clock: systemClock,
-    crypto: createCrypto(keyProviderFromConfig(config)),
+    crypto: createCrypto(keys),
     auth: config.auth,
     internalAuthSecret: config.internalAuthSecret,
+    // Cheapest legal cost: the document does not depend on it and the hasher self-tests on creation.
+    passwordHasher: createPasswordHasher({ memoryKiB: 19_456, passes: 2 }),
+    loginThrottle: createLoginThrottle({ db, keys, config: config.auth }),
   });
   try {
     return app.swagger({ yaml: true });

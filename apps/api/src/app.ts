@@ -1,5 +1,10 @@
 import swagger from '@fastify/swagger';
-import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
+import Fastify, {
+  LogController,
+  type FastifyBaseLogger,
+  type FastifyInstance,
+  type FastifyPluginAsync,
+} from 'fastify';
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -9,11 +14,19 @@ import type { Clock } from './lib/clock.ts';
 import type { AuthConfig } from './lib/config/config.ts';
 import type { FieldCrypto } from './lib/crypto/crypto.ts';
 import type { Database } from './lib/db/kysely.ts';
+import { registerAuthPlatform } from './lib/auth/policy.ts';
 import { registerErrorHandling } from './lib/http/errors.ts';
+import { registerInternalAuth } from './lib/http/internal-auth.ts';
 import { registerOriginCheck } from './lib/http/origin.ts';
 import type { JobRunner } from './lib/jobs/jobs.ts';
 import type { Logger } from './lib/logger/logger.ts';
 import { currentTrace } from './lib/telemetry/trace-context.ts';
+import type { PasswordHasher } from './modules/auth/password.ts';
+import { createCommonPasswordBlocklist } from './modules/auth/password-policy.ts';
+import { authRoutes } from './modules/auth/routes.ts';
+import { createAuthService } from './modules/auth/service.ts';
+import { createSessionService } from './modules/auth/sessions.ts';
+import type { LoginThrottle } from './modules/auth/throttle.ts';
 import { registerHealthRoute, type HealthDeps } from './routes/health.ts';
 
 export interface AppDeps extends HealthDeps {
@@ -30,6 +43,12 @@ export interface AppDeps extends HealthDeps {
   readonly auth: AuthConfig;
   /** `API_INTERNAL_SHARED_SECRET`; `null` when unset (only allowed outside production). */
   readonly internalAuthSecret: string | null;
+  /** argon2id hasher with its boot self-test already passed (`createPasswordHasher`). */
+  readonly passwordHasher: PasswordHasher;
+  /** Postgres-backed sign-in and forgot-password throttle (`createLoginThrottle`). */
+  readonly loginThrottle: LoginThrottle;
+  /** Test seam: extra plugins registered after the auth module (guard fixture routes). They need a policy too. */
+  readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
 
 /**
@@ -62,6 +81,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.setSerializerCompiler(serializerCompiler);
   registerErrorHandling(app);
   registerOriginCheck(app, deps.auth.webBaseUrl);
+  registerInternalAuth(app, deps.internalAuthSecret);
+  const sessions = createSessionService({
+    db: deps.db,
+    clock: deps.clock,
+    config: deps.auth,
+    logger: deps.logger,
+  });
+  // Before swagger and before any route: the onRoute registry refuses a route without a policy, and adds
+  // the bearer requirement to each route's OpenAPI schema.
+  registerAuthPlatform(app, { sessions, db: deps.db });
   // Registered before the routes so the generated OpenAPI document (src/openapi.ts) sees every route.
   await app.register(swagger, {
     openapi: {
@@ -73,6 +102,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     transform: jsonSchemaTransform,
   });
   registerHealthRoute(app, { version: deps.version, checkDb: deps.checkDb });
+  await app.register(authRoutes, {
+    prefix: '/auth',
+    service: createAuthService({
+      db: deps.db,
+      clock: deps.clock,
+      config: deps.auth,
+      sessions,
+      hasher: deps.passwordHasher,
+      throttle: deps.loginThrottle,
+      blocklist: createCommonPasswordBlocklist(),
+    }),
+  });
+  for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);
   await app.ready();
   return app;
 }

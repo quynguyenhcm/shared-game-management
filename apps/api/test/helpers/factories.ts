@@ -2,7 +2,7 @@
  * Row factories for schema integration tests. Each call creates fresh, uniquely-keyed rows, so tests
  * sharing one cloned database never collide. Money is always passed as a 2-dp string.
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { inTransaction, type Queryable } from './test-db.ts';
 
@@ -53,6 +53,50 @@ export function insertOAuthIdentity(
     db,
     `INSERT INTO auth_identities (user_id, provider, provider_subject) VALUES ($1, $2, $3) RETURNING id`,
     [userId, provider, `${provider.toLowerCase()}-${randomUUID()}`],
+  );
+}
+
+/**
+ * A live session row for `userId`, for tests that need a session without driving sign-in. Returns the raw
+ * token (only its SHA-256 is stored, as in production). Times are absolute instants so a manual clock
+ * can place the session anywhere on the timeline.
+ */
+export async function insertAuthSession(
+  db: Queryable,
+  userId: string,
+  options: { createdAt: Date; idleDays?: number; absoluteDays?: number },
+): Promise<{ id: string; token: string }> {
+  const token = randomBytes(32).toString('base64url');
+  const created = options.createdAt.getTime();
+  const day = 86_400_000;
+  const id = await insertId(
+    db,
+    `INSERT INTO auth_sessions (user_id, token_hash, created_at, last_seen_at, expires_at, absolute_expires_at)
+     VALUES ($1, $2, $3, $3, $4, $5) RETURNING id`,
+    [
+      userId,
+      createHash('sha256').update(token).digest(),
+      options.createdAt,
+      new Date(created + (options.idleDays ?? 7) * day),
+      new Date(created + (options.absoluteDays ?? 30) * day),
+    ],
+  );
+  return { id, token };
+}
+
+export function insertTeamMember(
+  db: Queryable,
+  input: {
+    teamId: string;
+    userId: string;
+    role?: 'TEAM_ADMIN' | 'MEMBER';
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED';
+  },
+): Promise<string> {
+  return insertId(
+    db,
+    `INSERT INTO team_members (team_id, user_id, role, status) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [input.teamId, input.userId, input.role ?? 'MEMBER', input.status ?? 'APPROVED'],
   );
 }
 

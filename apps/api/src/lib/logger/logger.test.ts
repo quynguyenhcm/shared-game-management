@@ -202,3 +202,49 @@ describe('request url query-string masking', () => {
     expect((harmless?.req as { url: string }).url).toBe('/x?a=1');
   });
 });
+
+describe('auth log hygiene (AC-VERIFY-6)', () => {
+  it('masks the exact OAuth query parameters code, state, token and error_description, but not look-alikes', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        req: {
+          method: 'GET',
+          url: '/auth/callback/google?code=4%2F0AbCd&state=st-123&error_description=denied&statusCode=7&providerCode=9',
+          headers: {},
+        },
+      },
+      'request',
+    );
+    const url = (sink.lines()[0]?.req as { url: string }).url;
+    expect(url).toBe(
+      '/auth/callback/google?code=[REDACTED]&state=[REDACTED]&error_description=[REDACTED]&statusCode=7&providerCode=9',
+    );
+  });
+
+  it('redacts the internal-hop headers and set-cookie in logged requests', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        req: {
+          method: 'POST',
+          url: '/auth/login',
+          headers: {
+            'x-sgm-internal-auth': 'internal-secret-value',
+            'x-sgm-client-ip': '203.0.113.7',
+            'set-cookie': 'sid=cookie-secret',
+            accept: 'application/json',
+          },
+        },
+      },
+      'request',
+    );
+    const serialised = JSON.stringify(sink.lines()[0]);
+    for (const secret of ['internal-secret-value', '203.0.113.7', 'cookie-secret']) {
+      expect(serialised).not.toContain(secret);
+    }
+    expect(serialised).toContain('application/json');
+  });
+});

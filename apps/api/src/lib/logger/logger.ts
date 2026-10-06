@@ -25,7 +25,24 @@ export interface LoggerOptions {
 export const REDACTED = '[REDACTED]';
 
 /** Exact-path redaction for HTTP headers (pino `redact`). */
-const REDACT_PATHS = ['req.headers.authorization', 'req.headers.cookie'];
+const REDACT_PATHS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'req.headers["x-sgm-client-ip"]',
+  'req.headers["x-sgm-internal-auth"]',
+  'req.headers["set-cookie"]',
+];
+
+/**
+ * Query parameters masked by exact (decoded) name: OAuth `code` and `state` and the like. Exact, not a key
+ * pattern, because the substring `code` would also mask `statusCode` and `providerCode`.
+ */
+const EXACT_QUERY_NAMES: ReadonlySet<string> = new Set([
+  'code',
+  'state',
+  'token',
+  'error_description',
+]);
 
 /** Key patterns redacted at any depth (architecture: Observability > Logging > Redaction). */
 const BASE_KEY_PATTERNS: readonly RegExp[] = [
@@ -34,6 +51,8 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   /^set-cookie$/i,
   /^x-api-key$/i,
   /^proxy-authorization$/i,
+  // The web-to-API hop: the shared secret and the (personal) client address.
+  /^x-sgm-(internal-auth|client-ip)$/i,
   /password/i,
   /_token$/i,
   /^bank_account_/i,
@@ -73,7 +92,8 @@ function maskQuerySecrets(
     } catch {
       // Keep the raw name when it is not valid percent-encoding.
     }
-    return patterns.some((pattern) => pattern.test(decoded))
+    return EXACT_QUERY_NAMES.has(decoded.toLowerCase()) ||
+      patterns.some((pattern) => pattern.test(decoded))
       ? `${separator}${name}=${REDACTED}`
       : whole;
   });

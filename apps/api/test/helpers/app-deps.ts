@@ -11,6 +11,8 @@ import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
+import { createPasswordHasher } from '../../src/modules/auth/password.ts';
+import { createLoginThrottle } from '../../src/modules/auth/throttle.ts';
 
 export const TEST_WEB_BASE_URL = 'https://games.example.nz';
 
@@ -28,17 +30,25 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
 
 export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): AppDeps {
   const config = testConfig();
+  // Never queried: pg opens connections lazily on checkout.
+  const db = createKysely(createPool({ connectionString: config.databaseUrl, max: 1 }));
   return {
     logger,
     version: 'test',
     checkDb: () => Promise.resolve(true),
-    // Never queried: pg opens connections lazily on checkout.
-    db: createKysely(createPool({ connectionString: config.databaseUrl, max: 1 })),
+    db,
     jobs: { enqueue: () => Promise.resolve(null) },
     clock: createManualClock(new Date('2026-10-06T00:00:00Z')),
     crypto: createCrypto(keyProviderFromConfig(config)),
     auth: config.auth,
     internalAuthSecret: config.internalAuthSecret,
+    // OWASP-minimum cost keeps the boot self-test and dummy hash cheap in unit tests.
+    passwordHasher: createPasswordHasher({ memoryKiB: 19456, passes: 2 }),
+    loginThrottle: createLoginThrottle({
+      db,
+      keys: keyProviderFromConfig(config),
+      config: config.auth,
+    }),
     ...overrides,
   };
 }
