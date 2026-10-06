@@ -776,6 +776,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 - Phase 3 | registerJobs | now requires `db` and takes optional `clock`.
 - Phase 3 | forgot | 202 body `{ accepted: true }`; enqueue failure returns 500 with token and job rolled back; unknown-email forgot is faster than known (timing not padded; address limit bounds it). Optional POST /auth/password/reset/check (COULD) not built.
 - Phase 3 | review APPROVED; non-blocking: login racing a reset commit can issue a session after revokeAllSessions; hash-queue 503 does not refund the email throttle reservation; auth-cleanup has no max-batch guard. Phase 2 follow-ups (onRequest role check, queue cap, register address limit, HEAD 401 test, injected clock) done.
+- Phase 3 | phase review PROCEED (2ee428d..476a561) | (a) login-vs-reset race (service.ts ~175-181, reset-service.ts ~157) is a real but narrow gap against D1/AC-ERROR-16: assigned to the START of Phase 4 (lock the user row in the login transaction, re-read the PASSWORD identity, 401 if the hash changed or the row is gone; regression test committing a reset between verify and issue). (b) unknown-email forgot is faster than known-email: accepted, AC-ERROR-6 does not require timing equivalence (only AC-VERIFY-10 for login). (c) hash-queue 503 without throttle refund and no auth-cleanup iteration cap: accepted, low priority. AC-ERROR-19 reset/check (COULD) not built, so Phase 4 web must not call it.
 
 ### Active Sub-Agents
 (none)
