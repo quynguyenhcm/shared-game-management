@@ -576,16 +576,21 @@ Build authentication and authorization as the reference `modules/<feature>` impl
 
 ## Execution State
 
-**Build Status**: IDLE
+**Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Current Step**: Planning complete; next /yay:creative auth-and-user-roles (architecture, algorithm)
-**Can Resume**: NO
+**Current Step**: Step 3 - Architecture and Algorithm COMPLETE; User Journey design agent dispatched
+**Step Started**: 2026-10-06
+**Can Resume**: YES
 
 ### Deviations
 - Plan | branch base | `feature/auth-and-user-roles` is stacked on `feature/platform-foundation` (63dbc43), not `origin/main`, because origin/main has only the initial commit (push blocked with a 403). Rebase onto main once platform-foundation merges.
 
 ### Active Sub-Agents
-(none)
+- Architecture Design: COMPLETE
+- User Journey Design: DISPATCHED, Started: 2026-10-06
+- Algorithm Design: COMPLETE
 
 ### Completed Steps
 - 2026-10-06 Plan: Spec Writer (Sonnet) drafted 52 ACs; taxonomy lint CLEAN; specification approved by the user as drafted; 6-phase plan written; Architecture and Algorithm creative phases flagged (Level 3 with LOW-confidence questions).
+- Algorithm Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-algorithm.md (3A′ never auto-link + reset-proves-inbox R1; 4A block Facebook-without-email with rerequest; 7A Postgres sliding-log throttle)
+- Architecture Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-architecture.md (own Fastify module; node:crypto argon2id; own provider adapters + jose; opaque DB sessions, web-owned cookie, bearer to API; onRoute default-deny policies; Postgres OAuth state + pending sign-ups; env-selected fake provider). Reconciliation: the throttle interface follows the algorithm doc (`admit`/`settle`, reserve-then-verify), superseding the architecture doc's `check/recordFailure/recordSuccess` sketch.
