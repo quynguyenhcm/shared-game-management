@@ -84,6 +84,31 @@ export async function insertAuthSession(
   return { id, token };
 }
 
+/**
+ * A `password_reset_tokens` row for `userId` without going through `forgot` (no email job). Returns the raw
+ * token (only its SHA-256 is stored). Defaults: created at `createdAt`, valid for 60 minutes, unused.
+ */
+export async function insertResetToken(
+  db: Queryable,
+  userId: string,
+  options: { createdAt: Date; validMinutes?: number; usedAt?: Date | null },
+): Promise<{ id: string; token: string }> {
+  const token = randomBytes(32).toString('base64url');
+  const id = await insertId(
+    db,
+    `INSERT INTO password_reset_tokens (user_id, token_hash, created_at, expires_at, used_at)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [
+      userId,
+      createHash('sha256').update(token).digest(),
+      options.createdAt,
+      new Date(options.createdAt.getTime() + (options.validMinutes ?? 60) * 60_000),
+      options.usedAt ?? null,
+    ],
+  );
+  return { id, token };
+}
+
 export function insertTeamMember(
   db: Queryable,
   input: {

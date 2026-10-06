@@ -400,6 +400,15 @@ describe('auth_throttle (Algorithm Q7)', () => {
     );
   });
 
+  it('knows the register_address scope (Phase 3 migration) and runs the admit function over it', async () => {
+    const key = hash();
+    const verdicts = await Promise.all(
+      Array.from({ length: 5 }, () => admit(['register_address'], [key], [3], at(0))),
+    );
+    expect(verdicts.filter((verdict) => verdict.admitted)).toHaveLength(3);
+    expect(await attempts('register_address', key)).toBe(3);
+  });
+
   it('admits up to the limit, then blocks with Retry-After and records nothing for blocked attempts', async () => {
     const key = hash();
     for (let i = 0; i < 5; i += 1) {
@@ -462,9 +471,10 @@ describe('migration files and the deviations ledger (AC-VERIFY-5)', () => {
     '20261006000300000_password_reset_tokens.sql',
     '20261006000400000_oauth_states_and_pending_signups.sql',
     '20261006000500000_auth_throttle.sql',
+    '20261006000600000_auth_throttle_register_scope.sql',
   ];
 
-  it('ships the five pinned migrations, each with an Up and a Down section', () => {
+  it('ships the six pinned migrations, each with an Up and a Down section', () => {
     const present = readdirSync(`${REPO_ROOT}db/migrations`);
     for (const name of MIGRATIONS) {
       expect(present, name).toContain(name);

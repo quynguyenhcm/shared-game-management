@@ -1,8 +1,9 @@
 /**
  * Declarative, default-deny route authorization (architecture Q5). Every route declares exactly one policy in
  * `config.policy`; an `onRoute` hook refuses to register a route without one, so the app cannot boot with an
- * unprotected route. Global hooks then enforce the declared policy: `onRequest` authenticates (401 before the
- * body is parsed), `preHandler` checks the role or team membership (after params validation).
+ * unprotected route. One global `onRequest` hook then enforces the declared policy: it authenticates (401)
+ * and checks the role or team membership (403), all before the body is parsed or validated, so an
+ * unauthorised caller can never be answered with a 422 first (AC-ERROR-11).
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AssignableGlobalRole, TeamRole } from '@sgm/shared';
@@ -132,27 +133,13 @@ export function registerAuthPlatform(app: FastifyInstance, deps: AuthPlatformDep
       return;
     }
     try {
-      request.auth = await authenticate(deps.sessions, request);
-    } catch (error) {
-      if (error instanceof AppError) {
-        request.log.debug({
-          event: 'auth.authz.denied',
-          policy: policy.kind,
-          status: error.status,
-        });
-      }
-      throw error;
-    }
-  });
-
-  app.addHook('preHandler', async (request: FastifyRequest) => {
-    const policy = request.routeOptions.config.policy;
-    if (policy?.kind !== 'globalRole' && policy?.kind !== 'teamRole') return;
-    const auth = request.auth;
-    if (auth === null) throw new AppError('unauthenticated');
-    try {
+      const auth = await authenticate(deps.sessions, request);
+      request.auth = auth;
+      // The role and team checks run here too, not in preHandler: route params are already routed in
+      // onRequest, and answering 403 before the body is parsed or validated means an unauthorised caller
+      // never sees a 422 (which would leak the route's body shape).
       if (policy.kind === 'globalRole') checkGlobalRole(policy, auth);
-      else await checkTeamRole(deps.db, policy, request, auth);
+      else if (policy.kind === 'teamRole') await checkTeamRole(deps.db, policy, request, auth);
     } catch (error) {
       if (error instanceof AppError) {
         request.log.debug({

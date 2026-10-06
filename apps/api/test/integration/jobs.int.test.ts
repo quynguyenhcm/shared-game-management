@@ -62,6 +62,7 @@ beforeAll(async () => {
   await registerJobs({
     runner: worker,
     notifier,
+    db: createKysely(db.pool),
     queues: QUEUES.map((queue) =>
       queue.name === 'send-email'
         ? { ...queue, retryLimit: 2, retryDelay: 1, retryBackoff: false }
@@ -376,13 +377,14 @@ describe('schedules (AC-ASYNC-2)', () => {
     expect(next('2027-04-02T15:00:01Z')).toBe('2027-04-03T16:00:00.000Z');
   });
 
-  it('lists all three slots, and every placeholder plus heartbeat can be triggered manually and observed', async () => {
+  it('lists all four slots, and every placeholder plus heartbeat can be triggered manually and observed', async () => {
     const schedules = await worker.listSchedules();
     expect(
       schedules
         .map(({ name, cron, tz }) => ({ name, cron, tz }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     ).toEqual([
+      { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },

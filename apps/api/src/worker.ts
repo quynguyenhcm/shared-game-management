@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { registerJobs } from './jobs/bootstrap.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
+import { createKysely } from './lib/db/kysely.ts';
 import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
@@ -63,6 +64,7 @@ try {
   await registerJobs({
     runner,
     notifier,
+    db: createKysely(pool),
     expireSecondsOverride: config.jobs.expireSecondsOverride,
   });
 } catch (error) {

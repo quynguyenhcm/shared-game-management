@@ -6,6 +6,7 @@
 import * as nodeCrypto from 'node:crypto';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { trace } from '@opentelemetry/api';
+import { AppError } from '../../lib/http/errors.ts';
 
 type Argon2Sync = typeof nodeCrypto.argon2Sync;
 
@@ -23,6 +24,7 @@ const MAX_MEMORY_KIB = 1_048_576;
 const MAX_PASSES = 20;
 const MAX_PARALLELISM = 16;
 const DEFAULT_MAX_CONCURRENCY = 2;
+const DEFAULT_MAX_QUEUE = 100;
 const DUMMY_PASSWORD = 'dummy-password-for-constant-time-verification';
 
 export interface PasswordHasher {
@@ -42,6 +44,8 @@ export interface PasswordHasherOptions {
   readonly passes?: number;
   /** At most this many hashes or verifications run at once per process (bounds transient memory). */
   readonly maxConcurrency?: number;
+  /** At most this many callers wait for a free slot; further ones fail fast with 503 (default 100). */
+  readonly maxQueue?: number;
 }
 
 const tracer = trace.getTracer('sgm-api');
@@ -127,19 +131,32 @@ function parsePhc(phc: string): ParsedPhc | null {
   return { memoryKiB, passes, parallelism, salt: decodeB64(salt), tag: decodeB64(tag) };
 }
 
-/** A counting semaphore: callers beyond `limit` queue in arrival order. */
-function createLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+/**
+ * A counting semaphore: callers beyond `limit` queue in arrival order, and once `maxQueue` callers are
+ * already waiting the next one is shed with 503 `service_unavailable` instead of queueing without bound
+ * (a flood of unknown-account sign-ins or registrations must not grow memory or latency forever).
+ */
+function createLimiter(limit: number, maxQueue: number): <T>(task: () => Promise<T>) => Promise<T> {
   let active = 0;
   const waiting: (() => void)[] = [];
+  // A finishing task hands its slot straight to the next waiter (`active` stays), so a caller arriving
+  // in between can never run alongside it and exceed `limit`.
   const release = (): void => {
-    active -= 1;
-    waiting.shift()?.();
+    const next = waiting.shift();
+    if (next === undefined) active -= 1;
+    else next();
   };
   return async <T>(task: () => Promise<T>): Promise<T> => {
     if (active >= limit) {
+      if (waiting.length >= maxQueue) {
+        throw new AppError('service_unavailable', {
+          message: 'Too many sign-ins are being processed right now. Try again shortly.',
+        });
+      }
       await new Promise<void>((resolve) => waiting.push(resolve));
+    } else {
+      active += 1;
     }
-    active += 1;
     try {
       return await task();
     } finally {
@@ -180,7 +197,10 @@ export function createPasswordHasher(options: PasswordHasherOptions = {}): Passw
     parallelism: ARGON2_DEFAULTS.parallelism,
     tagLength: ARGON2_DEFAULTS.tagLength,
   };
-  const limited = createLimiter(options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY);
+  const limited = createLimiter(
+    options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+    options.maxQueue ?? DEFAULT_MAX_QUEUE,
+  );
 
   const encode = (salt: Buffer, tag: Buffer): string =>
     `$argon2id$v=19$m=${current.memoryKiB},t=${current.passes},p=${current.parallelism}$${encodeB64(salt)}$${encodeB64(tag)}`;

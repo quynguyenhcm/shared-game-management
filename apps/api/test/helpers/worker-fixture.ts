@@ -6,6 +6,7 @@
  */
 import { registerJobs } from '../../src/jobs/bootstrap.ts';
 import { loadConfigOrExit } from '../../src/lib/config/config.ts';
+import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import { createJobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from '../../src/lib/logger/logger.ts';
@@ -27,6 +28,7 @@ await runner.start();
 await registerJobs({
   runner,
   notifier: createInMemoryNotifier(),
+  db: createKysely(pool),
   expireSecondsOverride: config.jobs.expireSecondsOverride,
   extraQueues: [
     {

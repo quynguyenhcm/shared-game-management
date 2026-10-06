@@ -11,7 +11,7 @@ import type { KeyProvider } from '../../lib/crypto/keyring.ts';
 import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
 
-export type ThrottleScope = 'login_email' | 'login_address' | 'forgot_address';
+export type ThrottleScope = 'login_email' | 'login_address' | 'forgot_address' | 'register_address';
 
 export interface ThrottleKeys {
   /** Normalised email, or the sentinel for an input that does not normalise. */
@@ -36,6 +36,8 @@ export interface LoginThrottle {
   settleLogin(keys: ThrottleKeys, now: Date): Promise<void>;
   /** Forgot-password address limit. A `null` address is admitted (the address dimension is skipped). */
   admitForgot(clientAddress: string | null, now: Date): Promise<ThrottleVerdict>;
+  /** Registration address limit (its own scope, so it never spends the sign-in or forgot budget). */
+  admitRegister(clientAddress: string | null, now: Date): Promise<ThrottleVerdict>;
   /** A completed reset: delete the email row inside the reset transaction. */
   clearEmail(email: string, trx: Pick<Database, 'deleteFrom'>): Promise<void>;
 }
@@ -49,10 +51,12 @@ export interface LoginThrottleOptions {
     | 'loginMaxFailuresPerAddress'
     | 'loginWindowMinutes'
     | 'forgotMaxPerAddress'
+    | 'registerMaxPerAddress'
   >;
 }
 
 const FORGOT_WINDOW_MINUTES = 60;
+const REGISTER_WINDOW_MINUTES = 60;
 const HKDF_INFO = 'sgm:v1:auth-throttle';
 
 /** `K_throttle = HKDF-SHA256(active encryption key, info = "sgm:v1:auth-throttle")`: no new secret to manage. */
@@ -155,6 +159,22 @@ export function createLoginThrottle(options: LoginThrottleOptions): LoginThrottl
     }
   }
 
+  /** One address-only dimension (forgot, register). A `null` address is admitted: the dimension is skipped. */
+  async function admitAddress(
+    scope: 'forgot_address' | 'register_address',
+    clientAddress: string | null,
+    limit: number,
+    windowMinutes: number,
+    now: Date,
+  ): Promise<ThrottleVerdict> {
+    const key = addressKey(scope, clientAddress);
+    if (key === null) return { admitted: true };
+    const row = await admit([{ scope, key, limit, windowSeconds: windowMinutes * 60 }], now);
+    return row.admitted
+      ? { admitted: true }
+      : { admitted: false, retryAfterSeconds: row.retry_after_seconds, blockedBy: 'address' };
+  }
+
   return {
     async admitLogin(keys, now) {
       const emailKey = deriveThrottleKey(secret, 'login_email', keys.email);
@@ -211,24 +231,23 @@ export function createLoginThrottle(options: LoginThrottleOptions): LoginThrottl
       }
     },
 
-    async admitForgot(clientAddress, now) {
-      const key = addressKey('forgot_address', clientAddress);
-      if (key === null) return { admitted: true };
-      const row = await admit(
-        [
-          {
-            scope: 'forgot_address',
-            key,
-            limit: config.forgotMaxPerAddress,
-            windowSeconds: FORGOT_WINDOW_MINUTES * 60,
-          },
-        ],
+    admitForgot: (clientAddress, now) =>
+      admitAddress(
+        'forgot_address',
+        clientAddress,
+        config.forgotMaxPerAddress,
+        FORGOT_WINDOW_MINUTES,
         now,
-      );
-      return row.admitted
-        ? { admitted: true }
-        : { admitted: false, retryAfterSeconds: row.retry_after_seconds, blockedBy: 'address' };
-    },
+      ),
+
+    admitRegister: (clientAddress, now) =>
+      admitAddress(
+        'register_address',
+        clientAddress,
+        config.registerMaxPerAddress,
+        REGISTER_WINDOW_MINUTES,
+        now,
+      ),
 
     async clearEmail(email, trx) {
       await trx

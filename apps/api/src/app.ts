@@ -21,8 +21,10 @@ import { registerOriginCheck } from './lib/http/origin.ts';
 import type { JobRunner } from './lib/jobs/jobs.ts';
 import type { Logger } from './lib/logger/logger.ts';
 import { currentTrace } from './lib/telemetry/trace-context.ts';
+import { createAddressMissingWarning } from './modules/auth/address-warning.ts';
 import type { PasswordHasher } from './modules/auth/password.ts';
 import { createCommonPasswordBlocklist } from './modules/auth/password-policy.ts';
+import { createResetService } from './modules/auth/reset-service.ts';
 import { authRoutes } from './modules/auth/routes.ts';
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
@@ -102,6 +104,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     transform: jsonSchemaTransform,
   });
   registerHealthRoute(app, { version: deps.version, checkDb: deps.checkDb });
+  const blocklist = createCommonPasswordBlocklist();
+  // One instance so the register, sign-in and forgot-password paths share the "no client address" warning.
+  const warnAddressMissing = createAddressMissingWarning(deps.clock);
   await app.register(authRoutes, {
     prefix: '/auth',
     service: createAuthService({
@@ -111,7 +116,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       sessions,
       hasher: deps.passwordHasher,
       throttle: deps.loginThrottle,
-      blocklist: createCommonPasswordBlocklist(),
+      blocklist,
+      warnAddressMissing,
+    }),
+    resetService: createResetService({
+      db: deps.db,
+      clock: deps.clock,
+      config: deps.auth,
+      hasher: deps.passwordHasher,
+      throttle: deps.loginThrottle,
+      blocklist,
+      jobs: deps.jobs,
+      warnAddressMissing,
     }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);

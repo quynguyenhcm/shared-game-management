@@ -20,7 +20,7 @@ let h: AuthTestApp;
 beforeAll(async () => {
   database = await createTestDatabase();
   h = await buildAuthTestApp(database.pool, {
-    env: { API_INTERNAL_SHARED_SECRET: TEST_INTERNAL_SECRET },
+    env: { API_INTERNAL_SHARED_SECRET: TEST_INTERNAL_SECRET, AUTH_REGISTER_MAX_PER_ADDRESS: '3' },
   });
 });
 afterAll(async () => {
@@ -167,6 +167,51 @@ describe('per-address throttle and the trusted client address (AC-ERROR-4, AC-VE
       internalHeaders('2001:db8:aa:bb:ffff:ffff:ffff:ffff'),
     );
     expect(blocked.statusCode).toBe(429);
+  });
+});
+
+describe('register address limit (AUTH_REGISTER_MAX_PER_ADDRESS=3 here)', () => {
+  const register = (email: string, headers: Record<string, string> = {}) =>
+    h.app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      headers,
+      payload: { fullName: 'Limit Tester', email, password: STRONG_PASSWORD, sex: 'OTHER' },
+    });
+
+  it('answers 429 too_many_requests with Retry-After from the 4th attempt of one address, before any hashing', async () => {
+    const address = internalHeaders('198.51.100.20');
+    expect((await register('reg.limit1@example.com', address)).statusCode).toBe(201);
+    expect((await register('reg.limit2@example.com', address)).statusCode).toBe(201);
+    // A duplicate attempt is an attempt too: it spends budget like any other request.
+    expect((await register('reg.limit1@example.com', address)).statusCode).toBe(409);
+
+    h.hasher.resetCalls();
+    const blocked = await register('reg.limit4@example.com', address);
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.json()).toMatchObject({ error: { code: 'too_many_requests' } });
+    expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+    expect(h.hasher.hashCount()).toBe(0);
+    const { rows } = await database.pool.query(
+      `SELECT 1 FROM users WHERE email = 'reg.limit4@example.com'`,
+    );
+    expect(rows).toHaveLength(0);
+
+    // Another address is unaffected, and an unauthenticated address header cannot choose the key.
+    expect(
+      (await register('reg.other@example.com', internalHeaders('198.51.100.21'))).statusCode,
+    ).toBe(201);
+    expect(
+      (await register('reg.spoof@example.com', { 'x-sgm-client-ip': '198.51.100.20' })).statusCode,
+    ).toBe(201);
+  });
+
+  it('does not share its budget with the sign-in or forgot-password limits', async () => {
+    const address = internalHeaders('198.51.100.30');
+    for (let i = 0; i < 3; i += 1) {
+      await login(h, `reg.shared${i}@example.com`, WRONG, address);
+    }
+    expect((await register('reg.separate@example.com', address)).statusCode).toBe(201);
   });
 });
 

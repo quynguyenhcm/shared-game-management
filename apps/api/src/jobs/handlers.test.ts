@@ -122,11 +122,16 @@ describe('registerJobs', () => {
       },
       previewSchedule: () => [],
     } as unknown as JobRunner;
-    await registerJobs({ runner, notifier: createInMemoryNotifier(), expireSecondsOverride: 5 });
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      db: {} as never, // the auth-cleanup handler only touches it when a job runs
+      expireSecondsOverride: 5,
+    });
     expect(defined.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
     expect(worked.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
     expect(scheduled.sort()).toEqual(
-      ['daily-overdue', 'post-game-billing', 'recurrence-materialisation'].sort(),
+      ['auth-cleanup', 'daily-overdue', 'post-game-billing', 'recurrence-materialisation'].sort(),
     );
   });
 });

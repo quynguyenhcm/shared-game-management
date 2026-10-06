@@ -72,6 +72,39 @@ describe('password hasher (AC-VERIFY-1)', () => {
   });
 });
 
+describe('hash limiter queue cap', () => {
+  it('rejects with service_unavailable once the queue is full, and serves the queued work normally', async () => {
+    const hasher = createPasswordHasher({
+      memoryKiB: 19_456,
+      passes: 2,
+      maxConcurrency: 1,
+      maxQueue: 1,
+    });
+    const first = hasher.hash('kowhai-court-27'); // runs
+    const second = hasher.hash('kowhai-court-28'); // waits in the queue (size 1)
+    const third = hasher.hash('kowhai-court-29'); // queue full: shed, not queued
+    await expect(third).rejects.toMatchObject({ code: 'service_unavailable', status: 503 });
+    await expect(first).resolves.toMatch(PHC);
+    await expect(second).resolves.toMatch(PHC);
+    // The limiter recovers: a later hash is accepted again.
+    await expect(hasher.hash('kowhai-court-30')).resolves.toMatch(PHC);
+  });
+
+  it('sheds verifications too, so an unknown-account flood cannot grow the queue without bound', async () => {
+    const hasher = createPasswordHasher({
+      memoryKiB: 19_456,
+      passes: 2,
+      maxConcurrency: 1,
+      maxQueue: 0,
+    });
+    const running = hasher.verify(hasher.dummyHash, 'a-password-123');
+    await expect(hasher.verify(hasher.dummyHash, 'a-password-456')).rejects.toMatchObject({
+      code: 'service_unavailable',
+    });
+    await running;
+  });
+});
+
 describe('argon2 boot self-test', () => {
   it('passes the RFC 9106 argon2id known-answer vector on this runtime', () => {
     expect(() => {

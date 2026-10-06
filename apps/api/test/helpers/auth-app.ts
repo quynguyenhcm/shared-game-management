@@ -28,22 +28,30 @@ export const FAST_HASHER_OPTIONS = { memoryKiB: 19456, passes: 2 } as const;
 export interface SpyHasher extends PasswordHasher {
   /** Every `verify` call: the stored hash it was given and whether it was the dummy hash. */
   readonly verifyCalls: { phc: string; isDummy: boolean }[];
+  /** How many times `hash` was called since the last `resetCalls` (a reset must not hash for a bad token). */
+  hashCount(): number;
   resetCalls(): void;
 }
 
 export function createSpyHasher(): SpyHasher {
   const real = createPasswordHasher(FAST_HASHER_OPTIONS);
   const verifyCalls: SpyHasher['verifyCalls'] = [];
+  let hashes = 0;
   return {
     dummyHash: real.dummyHash,
-    hash: (password) => real.hash(password),
+    hash: (password) => {
+      hashes += 1;
+      return real.hash(password);
+    },
     verify: (phc, password) => {
       verifyCalls.push({ phc, isDummy: phc === real.dummyHash });
       return real.verify(phc, password);
     },
     verifyCalls,
+    hashCount: () => hashes,
     resetCalls: () => {
       verifyCalls.length = 0;
+      hashes = 0;
     },
   };
 }
@@ -62,6 +70,8 @@ export interface AuthTestOptions {
   readonly env?: Record<string, string>;
   readonly extraPlugins?: readonly FastifyPluginAsync[];
   readonly logger?: Logger;
+  /** Job producer; defaults to a no-op. Reset tests pass a real pg-boss producer or a failing one. */
+  readonly jobs?: AppDeps['jobs'];
 }
 
 export async function buildAuthTestApp(
@@ -78,7 +88,7 @@ export async function buildAuthTestApp(
     version: 'test',
     checkDb: () => Promise.resolve(true),
     db,
-    jobs: { enqueue: () => Promise.resolve(null) },
+    jobs: options.jobs ?? { enqueue: () => Promise.resolve(null) },
     clock,
     crypto: createCrypto(keyProviderFromConfig(config)),
     auth: config.auth,

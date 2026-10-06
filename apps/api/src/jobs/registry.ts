@@ -20,6 +20,7 @@ export const QUEUE_NAMES = {
   postGameBilling: 'post-game-billing',
   dailyOverdue: 'daily-overdue',
   sendEmail: 'send-email',
+  authCleanup: 'auth-cleanup',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -40,6 +41,8 @@ export const QUEUES: readonly QueueDefinition[] = [
   { ...DEFAULTS, name: QUEUE_NAMES.dailyOverdue, policy: 'exclusive' },
   // One email per idempotency key at a time (`singletonKey = notify:<idempotencyKey>`).
   { ...DEFAULTS, name: QUEUE_NAMES.sendEmail, policy: 'exclusive' },
+  // Daily housekeeping of expired auth rows (sessions, tokens, OAuth state, throttle). One run at a time.
+  { ...DEFAULTS, name: QUEUE_NAMES.authCleanup, policy: 'exclusive' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

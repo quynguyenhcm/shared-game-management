@@ -99,6 +99,7 @@ const envSchema = z.object({
   AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS: intInRange(5, 200, 20),
   AUTH_LOGIN_WINDOW_MINUTES: intInRange(5, 60, 15),
   AUTH_FORGOT_MAX_PER_ADDRESS: intInRange(3, 100, 10),
+  AUTH_REGISTER_MAX_PER_ADDRESS: intInRange(3, 200, 20),
   API_INTERNAL_SHARED_SECRET: z.preprocess(
     blankAsUnset,
     z.string().min(32, 'must be at least 32 characters').optional(),
@@ -157,6 +158,8 @@ export interface AuthConfig {
   readonly loginMaxFailuresPerAddress: number;
   readonly loginWindowMinutes: number;
   readonly forgotMaxPerAddress: number;
+  /** Registration attempts per client address per 60 minutes (own throttle scope, `register_address`). */
+  readonly registerMaxPerAddress: number;
 }
 
 export interface Config {
@@ -392,6 +395,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       loginMaxFailuresPerAddress: data.AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS,
       loginWindowMinutes: data.AUTH_LOGIN_WINDOW_MINUTES,
       forgotMaxPerAddress: data.AUTH_FORGOT_MAX_PER_ADDRESS,
+      registerMaxPerAddress: data.AUTH_REGISTER_MAX_PER_ADDRESS,
     },
     internalAuthSecret: data.API_INTERNAL_SHARED_SECRET ?? null,
     log: {

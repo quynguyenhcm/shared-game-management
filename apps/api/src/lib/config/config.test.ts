@@ -259,6 +259,7 @@ describe('auth configuration (AC-VERIFY-7)', () => {
     'AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS',
     'AUTH_LOGIN_WINDOW_MINUTES',
     'AUTH_FORGOT_MAX_PER_ADDRESS',
+    'AUTH_REGISTER_MAX_PER_ADDRESS',
     'API_INTERNAL_SHARED_SECRET',
     'WEB_TRUSTED_PROXY_HOPS',
   ];
@@ -277,6 +278,7 @@ describe('auth configuration (AC-VERIFY-7)', () => {
       loginMaxFailuresPerAddress: 20,
       loginWindowMinutes: 15,
       forgotMaxPerAddress: 10,
+      registerMaxPerAddress: 20,
     });
     expect(internalAuthSecret).toBeNull();
   });
@@ -354,6 +356,8 @@ describe('auth configuration (AC-VERIFY-7)', () => {
       ['AUTH_LOGIN_WINDOW_MINUTES', '61'],
       ['AUTH_FORGOT_MAX_PER_ADDRESS', '2'],
       ['AUTH_FORGOT_MAX_PER_ADDRESS', '101'],
+      ['AUTH_REGISTER_MAX_PER_ADDRESS', '2'],
+      ['AUTH_REGISTER_MAX_PER_ADDRESS', '201'],
       ['AUTH_SESSION_IDLE_DAYS', 'seven'],
     ];
     for (const [name, value] of outOfRange) {

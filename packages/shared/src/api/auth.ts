@@ -174,6 +174,10 @@ export type MeResponse = z.infer<typeof MeResponse>;
 export const ProvidersResponse = z.object({ google: z.boolean(), facebook: z.boolean() });
 export type ProvidersResponse = z.infer<typeof ProvidersResponse>;
 
+/** The one body `forgot` ever returns (202), so a response never reveals whether the account exists. */
+export const ForgotPasswordResponse = z.object({ accepted: z.literal(true) });
+export type ForgotPasswordResponse = z.infer<typeof ForgotPasswordResponse>;
+
 export const ResetPasswordResponse = z.object({
   removedProviders: z.array(z.enum(['GOOGLE', 'FACEBOOK'])),
 });

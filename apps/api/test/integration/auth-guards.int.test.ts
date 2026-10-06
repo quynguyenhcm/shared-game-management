@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   authenticated,
   optionalSession,
@@ -42,6 +43,18 @@ const fixtures: FastifyPluginAsync = (app) => {
   app.get(
     '/_t/teams/:teamId/admin-or-global',
     { config: { policy: requireTeamRole('TEAM_ADMIN', { allowGlobalAdmin: true }) } },
+    () => ({ ok: true }),
+  );
+  // Mutating routes with a validated body: the guard must answer before validation can (AC-ERROR-11).
+  const body = { body: z.strictObject({ name: z.string().min(1) }) };
+  app.post(
+    '/_t/admin-body',
+    { config: { policy: requireGlobalRole('GLOBAL_ADMIN') }, schema: body },
+    () => ({ ok: true }),
+  );
+  app.post(
+    '/_t/teams/:teamId/admin-body',
+    { config: { policy: requireTeamRole('TEAM_ADMIN') }, schema: body },
     () => ({ ok: true }),
   );
   return Promise.resolve();
@@ -179,6 +192,55 @@ describe('team role guard', () => {
     expect((await get(`/_t/teams/${team}/admin`, token)).statusCode).toBe(200);
     await h.pool.query(`UPDATE team_members SET status = 'BANNED' WHERE id = $1`, [memberId]);
     expect((await get(`/_t/teams/${team}/admin`, token)).statusCode).toBe(403);
+  });
+});
+
+describe('guards answer before body validation (AC-ERROR-11: no 422 before 403)', () => {
+  const post = (url: string, payload: unknown, token?: string) =>
+    h.app.inject({
+      method: 'POST',
+      url,
+      payload: payload as object,
+      ...(token === undefined ? {} : { headers: bearer(token) }),
+    });
+
+  it('answers 403 forbidden, not 422, to a valid session without the global role and an invalid body', async () => {
+    const player = await createPasswordUser(h, { email: 'body.player@example.com' });
+    const token = await sessionFor(h, player);
+    for (const invalid of [{}, { name: '' }, { name: 'x', role: 'GLOBAL_ADMIN' }]) {
+      const response = await post('/_t/admin-body', invalid, token);
+      expect(response.statusCode, JSON.stringify(invalid)).toBe(403);
+      expect(response.json()).toMatchObject({ error: { code: 'forbidden' } });
+      expect(JSON.stringify(response.json())).not.toContain('fieldErrors');
+    }
+  });
+
+  it('still validates the body for a caller who passes the guard (422), and answers 401 before 422 without a session', async () => {
+    const admin = await createPasswordUser(h, {
+      email: 'body.admin@example.com',
+      role: 'GLOBAL_ADMIN',
+    });
+    const token = await sessionFor(h, admin);
+    expect((await post('/_t/admin-body', {}, token)).statusCode).toBe(422);
+    expect((await post('/_t/admin-body', { name: 'ok' }, token)).statusCode).toBe(200);
+    const anonymous = await post('/_t/admin-body', {});
+    expect(anonymous.statusCode).toBe(401);
+    expect(anonymous.json()).toMatchObject({ error: { code: 'unauthenticated' } });
+  });
+
+  it('answers 403, not 422, to a non-member on a team route with an invalid body, and 422 to the team admin', async () => {
+    const user = await createPasswordUser(h, { email: 'body.team@example.com' });
+    const [mine, theirs] = [await insertTeam(h.pool), await insertTeam(h.pool)];
+    await insertTeamMember(h.pool, { teamId: mine, userId: user.id, role: 'TEAM_ADMIN' });
+    const token = await sessionFor(h, user);
+    const denied = await post(`/_t/teams/${theirs}/admin-body`, {}, token);
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json()).toMatchObject({ error: { code: 'forbidden' } });
+    expect((await post('/_t/teams/not-a-uuid/admin-body', {}, token)).statusCode).toBe(403);
+    expect((await post(`/_t/teams/${mine}/admin-body`, {}, token)).statusCode).toBe(422);
+    expect((await post(`/_t/teams/${mine}/admin-body`, { name: 'ok' }, token)).statusCode).toBe(
+      200,
+    );
   });
 });
 

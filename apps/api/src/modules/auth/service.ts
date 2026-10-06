@@ -17,6 +17,7 @@ import type { Clock } from '../../lib/clock.ts';
 import type { AuthConfig } from '../../lib/config/config.ts';
 import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
+import { createAddressMissingWarning } from './address-warning.ts';
 import type { PasswordHasher } from './password.ts';
 import { checkPasswordForSet, type PasswordBlocklist } from './password-policy.ts';
 import {
@@ -31,7 +32,6 @@ import type { LoginThrottle } from './throttle.ts';
 
 /** The throttle key for a sign-in email that does not normalise; it cannot equal a real normalised email. */
 const MALFORMED_EMAIL_KEY = '!malformed';
-const ADDRESS_MISSING_WARNING_INTERVAL_MS = 60_000;
 
 /** The subset of the request logger the service uses (`request.log`, which carries the trace ids). */
 export type AuthLogger = Pick<FastifyBaseLogger, 'info' | 'warn' | 'error' | 'debug'>;
@@ -65,6 +65,8 @@ export interface AuthServiceDeps {
   readonly hasher: PasswordHasher;
   readonly throttle: LoginThrottle;
   readonly blocklist: PasswordBlocklist;
+  /** Shared with the reset service so both log one "no trusted address" warning per minute together. */
+  readonly warnAddressMissing?: ReturnType<typeof createAddressMissingWarning>;
 }
 
 const isUniqueViolation = (error: unknown): boolean =>
@@ -76,10 +78,26 @@ function toSessionInfo(session: IssuedSession): SessionInfo {
 
 export function createAuthService(deps: AuthServiceDeps): AuthService {
   const { db, clock, config, sessions, hasher, throttle, blocklist } = deps;
-  let lastAddressWarning = 0;
+  const warnAddressMissing = deps.warnAddressMissing ?? createAddressMissingWarning(clock);
+
+  /** Per-address registration limit, spent before any hashing; a missing address skips the dimension. */
+  async function enforceRegisterLimit(ctx: RequestContext): Promise<void> {
+    if (ctx.clientAddress === null) {
+      warnAddressMissing(
+        ctx.log,
+        'no trusted client address: the register address limit is skipped',
+      );
+      return;
+    }
+    const admitted = await throttle.admitRegister(ctx.clientAddress, clock.now());
+    if (admitted.admitted) return;
+    ctx.log.warn({ event: 'auth.register.throttled' }, 'registration throttled by address');
+    throw new AppError('too_many_requests', { retryAfterSeconds: admitted.retryAfterSeconds });
+  }
 
   return {
     async register(input, ctx) {
+      await enforceRegisterLimit(ctx);
       const verdict = checkPasswordForSet(input.password, input.email, blocklist);
       if (!verdict.ok) {
         throw new AppError('validation_failed', { fieldErrors: { password: [verdict.message] } });
@@ -113,14 +131,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       const email = normaliseEmail(input.email);
       const keys = { email: email ?? MALFORMED_EMAIL_KEY, clientAddress: ctx.clientAddress };
       if (ctx.clientAddress === null) {
-        const now = Date.now();
-        if (now - lastAddressWarning >= ADDRESS_MISSING_WARNING_INTERVAL_MS) {
-          lastAddressWarning = now;
-          ctx.log.warn(
-            { event: 'auth.throttle.address_missing' },
-            'no trusted client address: only the per-email limit applies',
-          );
-        }
+        warnAddressMissing(ctx.log, 'no trusted client address: only the per-email limit applies');
       }
 
       // Reserve before verifying: a blocked attempt does no lookup and no hash (same cost for any email).

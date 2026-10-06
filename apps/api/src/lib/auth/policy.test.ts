@@ -73,6 +73,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     expect(byRoute.get('POST /auth/register')).toBe('public');
     expect(byRoute.get('POST /auth/login')).toBe('public');
     expect(byRoute.get('GET /auth/providers')).toBe('public');
+    expect(byRoute.get('POST /auth/password/forgot')).toBe('public');
+    expect(byRoute.get('POST /auth/password/reset')).toBe('public');
     expect(byRoute.get('POST /auth/logout')).toBe('optionalSession');
     expect(byRoute.get('GET /auth/me')).toBe('authenticated');
     for (const policy of byRoute.values()) {
@@ -111,6 +113,29 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     expect((await app.inject({ method: 'GET', url: '/_t/public' })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/_t/optional' })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/nope' })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('answers HEAD on a protected GET route with 401 too (Fastify auto-HEAD inherits the policy)', async () => {
+    const app = await buildApp(
+      inertAppDeps(logger, {
+        extraPlugins: [
+          (instance) => {
+            instance.get('/_t/authed', { config: { policy: authenticated() } }, () => ({ ok: 3 }));
+            instance.get(
+              '/_t/admin',
+              { config: { policy: requireGlobalRole('GLOBAL_ADMIN') } },
+              () => ({ ok: 4 }),
+            );
+            return Promise.resolve();
+          },
+        ],
+      }),
+    );
+    for (const url of ['/_t/authed', '/_t/admin', '/auth/me']) {
+      const response = await app.inject({ method: 'HEAD', url });
+      expect(response.statusCode, `HEAD ${url}`).toBe(401);
+    }
     await app.close();
   });
 });
