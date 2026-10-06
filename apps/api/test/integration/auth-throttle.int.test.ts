@@ -127,6 +127,36 @@ describe('per-address throttle and the trusted client address (AC-ERROR-4, AC-VE
     expect(other.statusCode).toBe(401);
   });
 
+  it('refunds the address entry of every success even when the clock advances between admit and settle', async () => {
+    // A real clock moves during the password hash; a frozen test clock hid that the settle must match the
+    // very instant that the admit recorded.
+    const ip = '203.0.113.60';
+    const user = await createPasswordUser(h, { email: 'addr.advance@example.com' });
+    const mutableHasher = h.hasher as { verify: typeof h.hasher.verify };
+    const realVerify = h.hasher.verify.bind(h.hasher);
+    mutableHasher.verify = async (phc, password) => {
+      const result = await realVerify(phc, password);
+      h.clock.advance(1000);
+      return result;
+    };
+    try {
+      for (let i = 0; i < 25; i += 1) {
+        const result = await login(h, user.email, user.password, internalHeaders(ip));
+        expect(result.statusCode, `sign-in ${i + 1}`).toBe(200);
+      }
+    } finally {
+      mutableHasher.verify = realVerify;
+    }
+    // All 25 refunded: the address still has its full budget (20) for failures.
+    for (let i = 0; i < 20; i += 1) {
+      const failed = await login(h, `addr.advspray${i}@example.com`, WRONG, internalHeaders(ip));
+      expect(failed.statusCode, `spray ${i}`).toBe(401);
+    }
+    expect(
+      (await login(h, 'addr.advfresh@example.com', WRONG, internalHeaders(ip))).statusCode,
+    ).toBe(429);
+  });
+
   it('cannot be moved to another address key by X-Forwarded-For, a forged x-sgm-client-ip or a forged secret', async () => {
     const forged = (ip: string): Record<string, string> => ({
       'x-forwarded-for': ip,

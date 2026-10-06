@@ -6,7 +6,7 @@
 import type { AppDeps } from '../../src/app.ts';
 import { createManualClock } from '../../src/lib/clock.ts';
 import { loadConfig, type Config } from '../../src/lib/config/config.ts';
-import { createCrypto } from '../../src/lib/crypto/crypto.ts';
+import { createCrypto, type FieldCrypto } from '../../src/lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
@@ -27,6 +27,11 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     WEB_BASE_URL: TEST_WEB_BASE_URL,
     ...overrides,
   });
+}
+
+/** Field crypto over the fixed test keyring: the API, the worker and the tests all seal and open with it. */
+export function testCrypto(): FieldCrypto {
+  return createCrypto(keyProviderFromConfig(testConfig()));
 }
 
 export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): AppDeps {

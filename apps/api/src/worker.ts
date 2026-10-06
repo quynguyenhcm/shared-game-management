@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import { registerJobs } from './jobs/bootstrap.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
+import { createCrypto } from './lib/crypto/crypto.ts';
+import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
@@ -64,6 +66,8 @@ try {
   await registerJobs({
     runner,
     notifier,
+    // Opens the sealed reset emails; the keyring is validated here at boot, as in the API.
+    crypto: createCrypto(keyProviderFromConfig(config)),
     db: createKysely(pool),
     expireSecondsOverride: config.jobs.expireSecondsOverride,
   });

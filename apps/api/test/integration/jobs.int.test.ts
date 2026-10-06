@@ -16,6 +16,7 @@ import { createNotifier } from '../../src/lib/notifications/notifier.ts';
 import { TransientDeliveryError } from '../../src/lib/notifications/errors.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
 import { freePort, spawnNode } from '../helpers/spawn-node.ts';
+import { testCrypto } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { sleep, waitFor } from '../helpers/wait-for.ts';
 
@@ -62,6 +63,7 @@ beforeAll(async () => {
   await registerJobs({
     runner: worker,
     notifier,
+    crypto: testCrypto(),
     db: createKysely(db.pool),
     queues: QUEUES.map((queue) =>
       queue.name === 'send-email'

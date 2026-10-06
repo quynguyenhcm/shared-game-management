@@ -43,10 +43,12 @@ import {
   findLivePendingSignup,
   findUserByEmail,
   getUserById,
+  identityBelongsToUser,
   insertIdentity,
   insertOAuthState,
   insertOAuthUser,
   insertPendingSignup,
+  isSessionLive,
   listIdentities,
   lockUserRow,
   recordOAuthLogin,
@@ -233,11 +235,20 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
     ctx: RequestContext,
   ): Promise<{ user: UserRow; session: IssuedSession }> {
     const now = clock.now();
-    const { session, replaced } = await db.transaction().execute(async (trx) => {
+    const outcome = await db.transaction().execute(async (trx) => {
+      // A reset may have committed since the identity was read (D1 evicts the OAuth identities): lock the
+      // user and refuse unless the identity is still theirs, as the password login does.
+      await lockUserRow(trx, userId);
+      if (!(await identityBelongsToUser(trx, identityId, userId))) return null;
       const replacedId = await replacePresented(trx, auth);
       await recordOAuthLogin(trx, identityId, now);
       return { session: await sessions.issue(trx, userId, ctx.userAgent), replaced: replacedId };
     });
+    if (outcome === null) {
+      fail(ctx, null, 'identity_removed');
+      throw new AppError('oauth_state_invalid');
+    }
+    const { session, replaced } = outcome;
     const user = await getUserById(db, userId);
     if (user === undefined) throw new AppError('session_expired');
     if (replaced !== null) {
@@ -364,6 +375,10 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
         const user = await getUserById(trx, state.linkUserId);
         if (user === undefined) throw new AppError('session_expired');
         const now = clock.now();
+        // The linking session was validated before this transaction: a reset since then revoked it.
+        if (auth === null || !(await isSessionLive(trx, auth.sessionId, now))) {
+          throw new AppError('session_expired');
+        }
         const id = await insertIdentity(trx, {
           userId: user.id,
           provider: profile.provider,
@@ -449,6 +464,11 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
       if (decision.row === 'C4') return { kind: 'conflict', pending }; // only the consume is committed
       if (decision.row === 'C3') {
         if (owner === undefined) throw new Error('C3 decided without an identity owner');
+        // Same guard as the sign-in: a reset that committed since the owner was read removed the identity.
+        await lockUserRow(trx, decision.userId);
+        if (!(await identityBelongsToUser(trx, owner.identityId, decision.userId))) {
+          return { kind: 'expired' };
+        }
         await recordOAuthLogin(trx, owner.identityId, now);
         const user = await getUserById(trx, decision.userId);
         if (user === undefined) return { kind: 'expired' };

@@ -14,8 +14,12 @@ import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createJobRunner, type JobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 import { TransientDeliveryError } from '../../src/lib/notifications/errors.ts';
-import { createNotifier, type Notifier } from '../../src/lib/notifications/notifier.ts';
-import { TEST_WEB_BASE_URL } from '../helpers/app-deps.ts';
+import {
+  createNotifier,
+  type EmailMessage,
+  type Notifier,
+} from '../../src/lib/notifications/notifier.ts';
+import { TEST_WEB_BASE_URL, testCrypto } from '../helpers/app-deps.ts';
 import {
   bearer,
   buildAuthTestApp,
@@ -59,7 +63,14 @@ let worker: JobRunner;
 const workerLogs = captureLogs();
 const memory = createInMemoryNotifier();
 let activeNotifier: Notifier = memory;
-const delegating: Notifier = { send: (message) => activeNotifier.send(message) };
+// Every delivery attempt as the worker made it (after it opened the sealed payload), even a failing one.
+const attempted: EmailMessage[] = [];
+const delegating: Notifier = {
+  send: (message) => {
+    attempted.push(message);
+    return activeNotifier.send(message);
+  },
+};
 
 beforeAll(async () => {
   database = await createTestDatabase({ poolMax: 30 });
@@ -80,6 +91,7 @@ beforeAll(async () => {
   await registerJobs({
     runner: worker,
     notifier: delegating,
+    crypto: testCrypto(),
     db: createKysely(database.pool),
     // Short retry policy so the transient-retry test runs in seconds.
     queues: QUEUES.map((queue) =>
@@ -131,20 +143,32 @@ const jobsForToken = (tokenId: string) =>
     id: string;
     state: string;
     retry_count: number;
-    data: { to: string; subject: string; text: string; idempotencyKey: string; tags: object };
+    data: { idempotencyKey: string; sealed: string };
   }>(
     `SELECT id, state, retry_count, data FROM pgboss.job
       WHERE name = 'send-email' AND singleton_key = $1`,
     [`notify:password-reset:${tokenId}`],
   );
 
-/** The raw token the way a user gets it: out of the emailed link inside the queued job. */
+/** The raw token the way a user gets it: out of the link in the email the worker delivers. */
 async function emailedToken(tokenId: string): Promise<string> {
-  const [job] = await jobsForToken(tokenId);
-  const match = /\/reset-password\?token=(\S+)/.exec(job?.data.text ?? '');
-  if (match?.[1] === undefined) throw new Error('no reset link in the job payload');
+  const mail = await waitFor(
+    () => attempted.find((message) => message.idempotencyKey === `password-reset:${tokenId}`),
+    { timeoutMs: 15_000, label: 'reset email delivery attempt' },
+  );
+  const match = /\/reset-password\?token=(\S+)/.exec(mail.text);
+  if (match?.[1] === undefined) throw new Error('no reset link in the delivered email');
   return decodeURIComponent(match[1]);
 }
+
+const sendEmailJobCount = async (): Promise<number> =>
+  Number(
+    (
+      await query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM pgboss.job WHERE name = 'send-email'`,
+      )
+    )[0]?.n,
+  );
 
 async function requestReset(email: string): Promise<{ tokenId: string; token: string }> {
   const response = await forgot(email);
@@ -165,6 +189,7 @@ const identitiesOf = (userId: string) =>
 describe('POST /auth/password/forgot (AC-ERROR-6, AC-ASYNC-1)', () => {
   it('answers the identical 202 for a known and an unknown email, creating token and job only for the known one', async () => {
     const user = await createPasswordUser(h, { email: 'forgot.known@example.com' });
+    const jobsBefore = await sendEmailJobCount();
     const known = await forgot('Forgot.Known@Example.com');
     const unknown = await forgot('forgot.nobody@example.com');
     expect(known.statusCode).toBe(202);
@@ -182,12 +207,11 @@ describe('POST /auth/password/forgot (AC-ERROR-6, AC-ASYNC-1)', () => {
 
     const jobs = await jobsForToken(token?.id ?? '');
     expect(jobs).toHaveLength(1);
-    expect(jobs[0]?.data).toMatchObject({
-      to: 'forgot.known@example.com',
-      subject: 'Reset your Shared Game Management password',
-      idempotencyKey: `password-reset:${token?.id}`,
-      tags: { template: 'password-reset' },
-    });
+    // The queued job is sealed (AC-VERIFY-2): only the idempotency key is readable.
+    expect(jobs[0]?.data).toMatchObject({ idempotencyKey: `password-reset:${token?.id}` });
+    expect(jobs[0]?.data).toHaveProperty('sealed');
+    expect(jobs[0]?.data).not.toHaveProperty('text');
+    expect(jobs[0]?.data).not.toHaveProperty('to');
     const raw = await emailedToken(token?.id ?? '');
     expect(
       createHash('sha256')
@@ -195,12 +219,28 @@ describe('POST /auth/password/forgot (AC-ERROR-6, AC-ASYNC-1)', () => {
         .digest()
         .equals(token?.token_hash ?? Buffer.alloc(0)),
     ).toBe(true);
-    // Unknown address: no token anywhere for it, and no job addressed to it.
-    expect(
-      await query(`SELECT 1 FROM pgboss.job WHERE name = 'send-email' AND data->>'to' = $1`, [
-        'forgot.nobody@example.com',
-      ]),
-    ).toHaveLength(0);
+    // Unknown address: no token anywhere for it, and no job for it (only the known request queued one).
+    expect(await sendEmailJobCount()).toBe(jobsBefore + 1);
+  });
+
+  it('never stores the raw token in pgboss.job and still delivers a working link (AC-VERIFY-2)', async () => {
+    const user = await createPasswordUser(h, { email: 'forgot.sealed@example.com' });
+    const { tokenId, token } = await requestReset(user.email);
+
+    const jobs = await query<{ data: string }>(
+      `SELECT data::text AS data FROM pgboss.job WHERE name = 'send-email' AND singleton_key = $1`,
+      [`notify:password-reset:${tokenId}`],
+    );
+    expect(jobs).toHaveLength(1);
+    const stored = jobs[0]?.data ?? '';
+    expect(stored).not.toContain(token);
+    expect(stored).not.toContain(encodeURIComponent(token));
+    expect(stored).not.toContain('reset-password');
+    expect(stored).not.toContain(user.email);
+
+    // The link the worker delivered is the one the service issued.
+    expect((await reset(token, NEW_PASSWORD)).statusCode).toBe(200);
+    expect((await login(h, user.email, NEW_PASSWORD)).statusCode).toBe(200);
   });
 
   it('answers a malformed email with the same 202 and does nothing', async () => {
@@ -260,6 +300,7 @@ describe('POST /auth/password/forgot (AC-ERROR-6, AC-ASYNC-1)', () => {
 
   it('commits the token and the email job together: a failing enqueue leaves neither (P5)', async () => {
     const user = await createPasswordUser(h, { email: 'forgot.atomic@example.com' });
+    const jobsBefore = await sendEmailJobCount();
     const failing = await buildAuthTestApp(database.pool, {
       jobs: {
         enqueue: async (queue, data, options) => {
@@ -279,11 +320,7 @@ describe('POST /auth/password/forgot (AC-ERROR-6, AC-ASYNC-1)', () => {
       await failing.close();
     }
     expect(await tokensOf(user.id)).toHaveLength(0);
-    expect(
-      await query(`SELECT 1 FROM pgboss.job WHERE name = 'send-email' AND data->>'to' = $1`, [
-        'forgot.atomic@example.com',
-      ]),
-    ).toHaveLength(0);
+    expect(await sendEmailJobCount()).toBe(jobsBefore);
   });
 });
 

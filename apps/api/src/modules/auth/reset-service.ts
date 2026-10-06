@@ -15,6 +15,7 @@ import { normaliseEmail } from '@sgm/shared';
 import { enqueueEmail } from '../../jobs/send-email.ts';
 import type { Clock } from '../../lib/clock.ts';
 import type { AuthConfig } from '../../lib/config/config.ts';
+import type { FieldCrypto } from '../../lib/crypto/crypto.ts';
 import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
 import type { JobRunner } from '../../lib/jobs/jobs.ts';
@@ -59,11 +60,13 @@ export interface ResetServiceDeps {
   readonly blocklist: PasswordBlocklist;
   /** Producer used to enqueue the email inside the request transaction (P5). */
   readonly jobs: Pick<JobRunner, 'enqueue'>;
+  /** Seals the email (it holds the raw reset token) before it reaches the retained job table (AC-VERIFY-2). */
+  readonly crypto: FieldCrypto;
   readonly warnAddressMissing?: ReturnType<typeof createAddressMissingWarning>;
 }
 
 export function createResetService(deps: ResetServiceDeps): ResetService {
-  const { db, clock, config, hasher, throttle, blocklist, jobs } = deps;
+  const { db, clock, config, hasher, throttle, blocklist, jobs, crypto } = deps;
   const warnAddressMissing = deps.warnAddressMissing ?? createAddressMissingWarning(clock);
 
   return {
@@ -120,7 +123,7 @@ export function createResetService(deps: ResetServiceDeps): ResetService {
             webBaseUrl: config.webBaseUrl,
             expiryMinutes: config.resetTokenMinutes,
           }),
-          { trx },
+          { trx, crypto },
         );
         return id;
       });

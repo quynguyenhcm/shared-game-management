@@ -30,6 +30,7 @@ import {
   type AuthTestApp,
 } from '../helpers/auth-app.ts';
 import { insertAuthSession, insertOAuthIdentity, insertUser } from '../helpers/factories.ts';
+import { testCrypto } from '../helpers/app-deps.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
@@ -61,7 +62,12 @@ beforeAll(async () => {
   });
   await producer.start();
   await worker.start();
-  await registerJobs({ runner: worker, notifier: memory, db: createKysely(database.pool) });
+  await registerJobs({
+    runner: worker,
+    notifier: memory,
+    crypto: testCrypto(),
+    db: createKysely(database.pool),
+  });
   h = await buildAuthTestApp(database.pool, {
     env: { AUTH_FAKE_OAUTH: 'true', API_INTERNAL_SHARED_SECRET: TEST_INTERNAL_SECRET },
     jobs: {

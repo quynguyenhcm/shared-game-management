@@ -140,7 +140,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       }
 
       // Reserve before verifying: a blocked attempt does no lookup and no hash (same cost for any email).
-      const verdict = await throttle.admitLogin(keys, clock.now());
+      // The settle refunds by exact instant, so it must reuse this one `now` (a real clock moves while hashing).
+      const attemptedAt = clock.now();
+      const verdict = await throttle.admitLogin(keys, attemptedAt);
       if (!verdict.admitted) {
         ctx.log.warn(
           {
@@ -195,7 +197,7 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         );
         throw new AppError('invalid_credentials');
       }
-      await throttle.settleLogin(keys, clock.now());
+      await throttle.settleLogin(keys, attemptedAt);
       const { session, replacedSessionId } = outcome;
       const user = await getUserById(db, identity.userId);
       if (user === undefined) throw new Error('user vanished during sign-in');

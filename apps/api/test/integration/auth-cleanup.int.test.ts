@@ -12,6 +12,7 @@ import { createJobRunner, type JobContext, type JobRunner } from '../../src/lib/
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 import { insertAuthSession, insertResetToken, insertUser } from '../helpers/factories.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
+import { testCrypto } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
 
@@ -236,6 +237,7 @@ describe('auth-cleanup queue (production wiring)', () => {
     await registerJobs({
       runner: worker,
       notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
       db: createKysely(database.pool),
     });
   });

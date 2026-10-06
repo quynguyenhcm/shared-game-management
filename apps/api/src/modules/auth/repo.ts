@@ -439,6 +439,34 @@ export async function userHasIdentity(
   return row !== undefined;
 }
 
+/** Whether the identity still belongs to the user (a reset removes the OAuth ones). Re-check under `lockUserRow`. */
+export async function identityBelongsToUser(
+  db: Database,
+  identityId: string,
+  userId: string,
+): Promise<boolean> {
+  const row = await db
+    .selectFrom('auth_identities')
+    .select('id')
+    .where('id', '=', identityId)
+    .where('user_id', '=', userId)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** Whether the session is still live (not revoked, not expired). Re-check under `lockUserRow`. */
+export async function isSessionLive(db: Database, sessionId: string, now: Date): Promise<boolean> {
+  const row = await db
+    .selectFrom('auth_sessions')
+    .select('id')
+    .where('id', '=', sessionId)
+    .where('revoked_at', 'is', null)
+    .where('expires_at', '>', now)
+    .where('absolute_expires_at', '>', now)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
 export async function recordOAuthLogin(db: Database, identityId: string, now: Date): Promise<void> {
   await db
     .updateTable('auth_identities')

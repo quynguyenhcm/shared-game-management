@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { JobContext, JobRunner } from '../lib/jobs/jobs.ts';
 import { NonRetryableJobError } from '../lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../lib/notifications/adapters/in-memory.ts';
+import type { EmailMessage } from '../lib/notifications/notifier.ts';
+import { testCrypto } from '../../test/helpers/app-deps.ts';
 import { registerJobs } from './bootstrap.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { QUEUES } from './registry.ts';
@@ -47,7 +49,7 @@ describe('send-email handler', () => {
   it('delivers through the notifier', async () => {
     const notifier = createInMemoryNotifier();
     const { ctx } = context();
-    await createSendEmailHandler(notifier)(message, ctx);
+    await createSendEmailHandler(notifier, testCrypto())(message, ctx);
     expect(notifier.sent).toHaveLength(1);
   });
 
@@ -55,7 +57,9 @@ describe('send-email handler', () => {
     const notifier = createInMemoryNotifier();
     notifier.failWith('transient');
     const { ctx } = context();
-    const error = await createSendEmailHandler(notifier)(message, ctx).catch((e: unknown) => e);
+    const error = await createSendEmailHandler(notifier, testCrypto())(message, ctx).catch(
+      (e: unknown) => e,
+    );
     expect(error).not.toBeInstanceOf(NonRetryableJobError);
     expect((error as Error).name).toBe('TransientDeliveryError');
   });
@@ -66,7 +70,9 @@ describe('send-email handler', () => {
       const notifier = createInMemoryNotifier();
       notifier.failWith(kind);
       const { ctx, logs } = context();
-      const error = await createSendEmailHandler(notifier)(message, ctx).catch((e: unknown) => e);
+      const error = await createSendEmailHandler(notifier, testCrypto())(message, ctx).catch(
+        (e: unknown) => e,
+      );
       expect(error).toBeInstanceOf(NonRetryableJobError);
       expect(logs.find((entry) => entry.level === 'error')?.fields).toMatchObject({
         event: 'notification.failed',
@@ -85,7 +91,7 @@ describe('send-email handler', () => {
     const notifier = createInMemoryNotifier();
     const send = vi.spyOn(notifier, 'send');
     const { ctx, logs } = context();
-    const error = await createSendEmailHandler(notifier)(payload as never, ctx).catch(
+    const error = await createSendEmailHandler(notifier, testCrypto())(payload as never, ctx).catch(
       (e: unknown) => e,
     );
     expect(error).toBeInstanceOf(NonRetryableJobError);
@@ -99,6 +105,53 @@ describe('send-email handler', () => {
     const enqueue = vi.fn().mockResolvedValue('id-1');
     await expect(enqueueEmail({ enqueue }, message)).resolves.toBe('id-1');
     expect(enqueue).toHaveBeenCalledWith('send-email', message, { singletonKey: 'notify:unit:1' });
+  });
+
+  it('enqueueEmail with crypto files only a sealed payload: the message never appears in the job data', async () => {
+    const enqueue = vi.fn().mockResolvedValue('id-2');
+    const secret = { ...message, text: 'Link: https://x.test/reset?token=raw-secret-token' };
+    await enqueueEmail({ enqueue }, secret, { crypto: testCrypto() });
+    const [queue, data, options] = enqueue.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+      object,
+    ];
+    expect(queue).toBe('send-email');
+    expect(options).toEqual({ singletonKey: 'notify:unit:1' });
+    expect(Object.keys(data).sort()).toEqual(['idempotencyKey', 'sealed']);
+    expect(data.idempotencyKey).toBe('unit:1');
+    expect(JSON.stringify(data)).not.toContain('raw-secret-token');
+    expect(JSON.stringify(data)).not.toContain(message.to);
+  });
+
+  it('opens a sealed payload and delivers the original message', async () => {
+    const enqueue = vi.fn().mockResolvedValue('id-3');
+    const crypto = testCrypto();
+    await enqueueEmail({ enqueue }, message, { crypto });
+    const notifier = createInMemoryNotifier();
+    const { ctx } = context();
+    await createSendEmailHandler(notifier, crypto)(enqueue.mock.calls[0]?.[1] as EmailMessage, ctx);
+    expect(notifier.sent).toHaveLength(1);
+    expect(notifier.sent[0]).toMatchObject(message);
+  });
+
+  it('fails a sealed payload moved to another idempotency key at once, without calling the notifier', async () => {
+    const enqueue = vi.fn().mockResolvedValue('id-4');
+    const crypto = testCrypto();
+    await enqueueEmail({ enqueue }, message, { crypto });
+    const sealed = enqueue.mock.calls[0]?.[1] as { sealed: string };
+    const notifier = createInMemoryNotifier();
+    const send = vi.spyOn(notifier, 'send');
+    const { ctx, logs } = context();
+    const error = await createSendEmailHandler(notifier, crypto)(
+      { ...sealed, idempotencyKey: 'unit:other' } as never,
+      ctx,
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(NonRetryableJobError);
+    expect(send).not.toHaveBeenCalled();
+    expect(logs.find((entry) => entry.level === 'error')?.fields).toMatchObject({
+      event: 'notification.invalid_payload',
+    });
   });
 });
 
@@ -125,6 +178,7 @@ describe('registerJobs', () => {
     await registerJobs({
       runner,
       notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
       db: {} as never, // the auth-cleanup handler only touches it when a job runs
       expireSecondsOverride: 5,
     });

@@ -151,6 +151,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       throttle: deps.loginThrottle,
       blocklist,
       jobs: deps.jobs,
+      crypto: deps.crypto,
       warnAddressMissing,
     }),
   });

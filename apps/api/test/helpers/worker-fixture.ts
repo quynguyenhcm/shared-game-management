@@ -6,6 +6,8 @@
  */
 import { registerJobs } from '../../src/jobs/bootstrap.ts';
 import { loadConfigOrExit } from '../../src/lib/config/config.ts';
+import { createCrypto } from '../../src/lib/crypto/crypto.ts';
+import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import { createJobRunner } from '../../src/lib/jobs/jobs.ts';
@@ -28,6 +30,7 @@ await runner.start();
 await registerJobs({
   runner,
   notifier: createInMemoryNotifier(),
+  crypto: createCrypto(keyProviderFromConfig(config)),
   db: createKysely(pool),
   expireSecondsOverride: config.jobs.expireSecondsOverride,
   extraQueues: [
