@@ -2,13 +2,13 @@
 slug: auth-and-user-roles
 legacy_id:
 feature: auth-and-user-roles
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # auth-and-user-roles: Auth and User Roles
 
 **Complexity**: Level 3 (inherited from auth-and-user-roles)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: auth-and-user-roles
 **Branch**: feature/auth-and-user-roles
 **Worktree**: ~/yay-wt/shared-game-management/feature-auth-and-user-roles
@@ -569,18 +569,30 @@ Build authentication and authorization as the reference `modules/<feature>` impl
 
 ## Creative Phases
 
-- [ ] Architecture design → pending (Q1 library and hasher, Q2 session strategy and cookie relay, Q5 RBAC guard design, Q6 OAuth redirect topology and state storage, Q8 fake provider)
-- [ ] Algorithm design → pending (Q3 OAuth linking and email-conflict rules, including email verification; Q4 Facebook without email; Q7 throttling across replicas)
+- [x] Architecture design → complete: `memory-bank/creative/auth-and-user-roles-architecture.md` (Q1, Q2, Q5, Q6, Q8)
+- [x] Algorithm design → complete: `memory-bank/creative/auth-and-user-roles-algorithm.md` (Q3, Q4, Q7, plus email normalisation, password policy, token and session rules)
+- [x] User Journey design → complete: `memory-bank/creative/auth-and-user-roles-user-journey.md` (added because Level 3 requires it; consumes the two docs above)
+
+**Pending before /yay:build Phase 1**: fold the three docs' "AC impact" sections into the Specification (amendments plus new ACs) and settle the naming mismatches the journey doc lists (`used_at`/`consumed_at`, `signin`/`SIGN_IN`, `link_user_id`/`bound_user_id`, user_agent length, `fields`/`fieldErrors`). Proposed new ACs with non-canonical prefixes (`AC-A11Y-1`, `AC-MOBILE-1/2`, undeclared `AC-NAV-1/2`) must be remapped to canonical prefixes (e.g. AC-VERIFY / AC-ENTRY) when folded in.
+
+### Design Critique (advisory)
+- **Backend**: codex (adversarial-review), 2026-10-06. Log: `.claude-logs/codex-critique-20261006.log` (not committed)
+- **Verdict**: needs-attention. The design leaves a persistent account-recovery bypass, trusts a client-IP chain that can be spoofed, and gives implementers conflicting OAuth and API contracts.
+- **Findings**:
+  1. [high] R1 keeps a stale Google identity after the inbox changes owner (algorithm.md:107-128). A historical `email_verified` assertion exempts the Google identity from eviction on reset, so a recycled address leaves the previous owner able to sign in.
+  2. [high] The client-address throttle trusts forwarding data an attacker can influence (architecture.md:663). The first `x-forwarded-for` value is copied to `x-sgm-client-ip` with no allowlisted proxy chain and no authenticated web-to-API hop.
+  3. [medium] The OAuth binding-cookie contracts conflict (user-journey.md:707-715): architecture uses the raw state, the journey uses `<state>.<payload>`.
+  4. [medium] The HTTP contract still contradicts itself (architecture.md:665-684): the error-code enum differs from the algorithm and journey docs, and the spec says OpenAPI uses a cookie scheme while the architecture uses bearer.
 
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Step 3 - Architecture and Algorithm COMPLETE; User Journey design agent dispatched
-**Step Started**: 2026-10-06
-**Can Resume**: YES
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete; spec consolidation (AC impact, naming, critique findings) pending before Phase 1
+**Can Resume**: NO
+**Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: 2 high, 2 medium; not yet applied)
 
 ### Deviations
 - Plan | branch base | `feature/auth-and-user-roles` is stacked on `feature/platform-foundation` (63dbc43), not `origin/main`, because origin/main has only the initial commit (push blocked with a 403). Rebase onto main once platform-foundation merges.
