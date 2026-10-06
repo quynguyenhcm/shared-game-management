@@ -36,8 +36,10 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
       include: [
-        'packages/shared/src/{money,time,invoice}/**/*.ts',
-        'apps/api/src/lib/{crypto,config,notifications,jobs,logger,telemetry}/**/*.ts',
+        'packages/shared/src/{money,time,invoice,auth}/**/*.ts',
+        'apps/api/src/lib/{crypto,config,notifications,jobs,logger,telemetry,http}/**/*.ts',
+        'apps/api/src/lib/clock.ts',
+        'apps/web/src/lib/config.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.int.test.ts'],
       // Thresholds apply to every file matched by `include` (the platform library modules above).

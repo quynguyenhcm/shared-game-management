@@ -10,6 +10,8 @@ x-app-env: &app-env # Container-network hostnames override the host-oriented val
   NODE_ENV: development
   LOG_FORMAT: json
   LOG_OUTPUT: stdout
+  # Same value for api and web (at least 32 characters). The fallback is the dev-only placeholder of .env.example.
+  API_INTERNAL_SHARED_SECRET: ${API_INTERNAL_SHARED_SECRET:-dev-only-internal-secret-change-me-0123456789}
 
 services:
   postgres:
@@ -57,6 +59,8 @@ services:
     environment:
       <<: *app-env
       OTEL_SERVICE_NAME: sgm-api
+      # `true` (from .env) swaps in fake Google/Facebook providers for `pnpm run test:e2e`.
+      AUTH_FAKE_OAUTH: ${AUTH_FAKE_OAUTH:-false}
     ports:
       - '127.0.0.1:4000:4000'
     depends_on:
@@ -109,6 +113,10 @@ services:
     image: sgm-web:dev
     environment:
       API_INTERNAL_URL: http://api:4000
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:3000}
+      API_INTERNAL_SHARED_SECRET: ${API_INTERNAL_SHARED_SECRET:-dev-only-internal-secret-change-me-0123456789}
+      # No reverse proxy in the local stack. Production sets the real hop count (see docs/getting-started.md).
+      WEB_TRUSTED_PROXY_HOPS: '0'
     ports:
       - '127.0.0.1:3000:3000'
     depends_on:

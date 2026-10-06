@@ -3,7 +3,7 @@
  * The compile-time guard is apps/api/src/lib/db/enum-parity.ts; the codegen drift guard is
  * db-codegen.int.test.ts.
  */
-import { DB_ENUMS } from '@sgm/shared';
+import { AssignableGlobalRole, DB_ENUMS } from '@sgm/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 
@@ -30,5 +30,15 @@ describe('enum parity', () => {
     );
     expect(shared).toEqual(database);
     expect(Object.keys(database)).toEqual(expect.arrayContaining(['auth_provider', 'fee_basis']));
+  });
+
+  it('keeps TEAM_ADMIN in the database enum but never as an assignable global role (AC-VERIFY-4)', async () => {
+    const { rows } = await db.pool.query<{ label: string }>(
+      `SELECT e.enumlabel AS label FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE t.typname = 'global_role' ORDER BY e.enumsortorder`,
+    );
+    const labels = rows.map((row) => row.label);
+    expect(labels).toContain('TEAM_ADMIN');
+    expect([...AssignableGlobalRole]).toEqual(labels.filter((label) => label !== 'TEAM_ADMIN'));
   });
 });

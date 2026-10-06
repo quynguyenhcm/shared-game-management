@@ -706,7 +706,7 @@ Build authentication and authorization as the reference `modules/<feature>` impl
 
 ### Phases
 Each AC is assigned to exactly one phase: the phase that builds its API behaviour, unless its subject is web-owned. Where an API-phase AC also names web copy or landings (HAPPY-1, HAPPY-2, HAPPY-6, HAPPY-7, ERROR-1 to 4, ERROR-11, ERROR-16), Phase 4 or 5 builds that half and re-runs the AC; it is not re-assigned.
-- [ ] Phase 1: Schema, contracts and wiring: the 5 migrations, deviations ledger (D-27 onwards), codegen and enum parity; `packages/shared/src/api/{auth,errors}.ts`, `packages/shared/src/auth/{email,return-to}.ts`; the HTTP error mapper, Origin hook and clock; API and web config vars; `buildApp`/`main.ts` dependency injection; engines bump; `health.ts` policy. ACs: VERIFY-4, VERIFY-5, VERIFY-7.
+- [x] Phase 1: Schema, contracts and wiring: the 5 migrations, deviations ledger (D-27 onwards), codegen and enum parity; `packages/shared/src/api/{auth,errors}.ts`, `packages/shared/src/auth/{email,return-to}.ts`; the HTTP error mapper, Origin hook and clock; API and web config vars; `buildApp`/`main.ts` dependency injection; engines bump; `health.ts` policy. ACs: VERIFY-4, VERIFY-5, VERIFY-7.
 - [ ] Phase 2: Password auth, sessions, throttle and guards (API): hasher and password policy, tokens, sessions, `auth_throttle` port, internal-auth hook, Origin check; `register`, `login`, `logout`, `me`, `providers`; route policy registry and guards; CLI `users set-role`; log hygiene. ACs: HAPPY-1, HAPPY-2, HAPPY-7, HAPPY-8, HAPPY-9, HAPPY-10, ERROR-1, ERROR-2, ERROR-3, ERROR-4, ERROR-11, ERROR-12, ERROR-15, ASYNC-4, VERIFY-1, VERIFY-3, VERIFY-6, VERIFY-10, INTEGRATION-2.
 - [ ] Phase 3: Password reset and cleanup: `password/forgot` (with the address limit) and `password/reset` with R1 eviction (D1) and `removedProviders`, reset email via `enqueueEmail` in the same transaction, `auth-cleanup` queue and schedule (incl. throttle rows). ACs: HAPPY-6, ERROR-5, ERROR-6, ERROR-16, ASYNC-1, ASYNC-2, ASYNC-3, INTEGRATION-1, INTEGRATION-5.
 - [ ] Phase 4: Web password flows: web config, `SiteHeader` and `FlashNotice`, form primitives, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/account` (no OAuth rows yet), Server Actions, cookies, `messages.ts`, `landing.ts`, `proxy.ts`, `/auth/session-expired`, `returnTo` validation, api-client bearer, `traceparent` and internal headers, client-address derivation, `POST /auth/password/reset/check` (COULD). ACs: ENTRY-1, ENTRY-3, ENTRY-4, ENTRY-5, ENTRY-6, ENTRY-7, HAPPY-13, ERROR-13, ERROR-18, ERROR-19, VERIFY-2, VERIFY-11, VERIFY-12, VERIFY-14.
@@ -741,15 +741,18 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 1 of 6
+**Current Phase**: 1 of 6 (COMPLETE; next Phase 2)
 **Auto-Build Mode**: YES
 **Current Step**: Auto-build run started 2026-10-06 (base commit 6e0d753)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 1
+**Resume From**: Phase 2
 **Notes**: Local-only run: commit per phase, do not push (GitHub push returns 403 for Quy-Nguyen-1156376; same as platform-foundation). Branch is stacked on feature/platform-foundation (63dbc43); review ranges start at 6e0d753, not the merge-base with origin/main.
+
+### Guard & Recovery Log
+- Phase 1: code review iteration 1 CHANGES_REQUIRED (open redirect in safeReturnTo, throttle insert lock order, 23514 mapping, placeholder secret) -> TDD fix, all applied; re-verified green.
 
 ### Halt State
 (none)
@@ -765,3 +768,4 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 - Algorithm Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-algorithm.md (3A′ never auto-link + reset-proves-inbox R1; 4A block Facebook-without-email with rerequest; 7A Postgres sliding-log throttle)
 - Architecture Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-architecture.md (own Fastify module; node:crypto argon2id; own provider adapters + jose; opaque DB sessions, web-owned cookie, bearer to API; onRoute default-deny policies; Postgres OAuth state + pending sign-ups; env-selected fake provider). Reconciliation: the throttle interface follows the algorithm doc (`admit`/`settle`, reserve-then-verify), superseding the architecture doc's `check/recordFailure/recordSuccess` sketch.
 - User Journey Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-user-journey.md (dedicated single-purpose pages, OAuth buttons first, progressive-enhancement Server Actions, codes-only URLs, returnTo end to end; 10 flows, copy deck, contradictions X1–X14 resolved, contract additions C-1..C-7).
+- Phase 1 Build (Schema, contracts, wiring): COMPLETE 2026-10-06 - 5 migrations, D-27..D-39, shared contracts, error mapper/Origin/clock, API+web config, buildApp DI; 204 unit + 87 integration passing; build/lint/typecheck PASS. Deviations: health.ts policy deferred to Phase 2; composite FK ON DELETE CASCADE DEFERRABLE (D-32); trigger FOR NO KEY UPDATE (D-33). Push skipped (local-only run). Note: pnpm shim is v12 vs repo pin 10.34.6; underlying binaries were run directly.

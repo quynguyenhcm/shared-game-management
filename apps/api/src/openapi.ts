@@ -1,6 +1,12 @@
 // Console output is allowed here (see eslint.config.mjs): this script writes the spec to stdout.
 import { fileURLToPath } from 'node:url';
 import { buildApp } from './app.ts';
+import { systemClock } from './lib/clock.ts';
+import { loadConfig } from './lib/config/config.ts';
+import { createCrypto } from './lib/crypto/crypto.ts';
+import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
+import { createKysely } from './lib/db/kysely.ts';
+import { createPool } from './lib/db/pool.ts';
 import { createLogger } from './lib/logger/logger.ts';
 
 /** Builds the app with inert dependencies and returns its OpenAPI document as YAML. */
@@ -14,11 +20,30 @@ export async function generateOpenApiYaml(): Promise<string> {
     output: 'stdout',
     redactPatterns: [],
   });
-  const app = await buildApp({ logger, version: 'openapi', checkDb: () => Promise.resolve(true) });
+  // Inert dependencies: the routes, not the deps, define the document. The pool never connects.
+  const config = loadConfig({
+    NODE_ENV: 'test',
+    DATABASE_URL: 'postgres://openapi:openapi@localhost:5432/openapi',
+    ENCRYPTION_KEYS: `openapi:${Buffer.alloc(32).toString('base64')}`,
+    ENCRYPTION_ACTIVE_KEY_ID: 'openapi',
+  });
+  const pool = createPool({ connectionString: config.databaseUrl, max: 1 });
+  const app = await buildApp({
+    logger,
+    version: 'openapi',
+    checkDb: () => Promise.resolve(true),
+    db: createKysely(pool),
+    jobs: { enqueue: () => Promise.resolve(null) },
+    clock: systemClock,
+    crypto: createCrypto(keyProviderFromConfig(config)),
+    auth: config.auth,
+    internalAuthSecret: config.internalAuthSecret,
+  });
   try {
     return app.swagger({ yaml: true });
   } finally {
     await app.close();
+    await pool.end();
   }
 }
 

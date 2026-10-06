@@ -17,11 +17,42 @@ async function insertId(db: Queryable, text: string, values: unknown[]): Promise
   return id;
 }
 
-export function insertUser(db: Queryable, sex: Sex = 'MALE'): Promise<string> {
+export function insertUser(
+  db: Queryable,
+  sex: Sex = 'MALE',
+  options: { email?: string } = {},
+): Promise<string> {
   return insertId(
     db,
     `INSERT INTO users (email, full_name, sex) VALUES ($1, 'Test Player', $2) RETURNING id`,
-    [`player-${randomUUID()}@example.test`, sex],
+    [options.email ?? `player-${randomUUID()}@example.test`, sex],
+  );
+}
+
+/** A PASSWORD identity whose subject is the user's own email (the composite FK requires it). */
+export function insertPasswordIdentity(
+  db: Queryable,
+  userId: string,
+  passwordHash = '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$aGFzaA',
+): Promise<string> {
+  return insertId(
+    db,
+    `INSERT INTO auth_identities (user_id, provider, provider_subject, password_hash)
+     SELECT id, 'PASSWORD', email, $2 FROM users WHERE id = $1 RETURNING id`,
+    [userId, passwordHash],
+  );
+}
+
+/** A GOOGLE or FACEBOOK identity with a unique provider subject. */
+export function insertOAuthIdentity(
+  db: Queryable,
+  userId: string,
+  provider: 'GOOGLE' | 'FACEBOOK',
+): Promise<string> {
+  return insertId(
+    db,
+    `INSERT INTO auth_identities (user_id, provider, provider_subject) VALUES ($1, $2, $3) RETURNING id`,
+    [userId, provider, `${provider.toLowerCase()}-${randomUUID()}`],
   );
 }
 

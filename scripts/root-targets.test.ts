@@ -34,7 +34,7 @@ describe('root package.json targets (AC-VERIFY-1)', () => {
 
   it('pins pnpm 10 and Node 24 and keeps ci equal to the local gates', () => {
     expect(pkg.packageManager).toMatch(/^pnpm@10\./);
-    expect(pkg.engines.node).toBe('>=24 <25');
+    expect(pkg.engines.node).toBe('>=24.7 <25');
     expect(pkg.scripts.ci).toBe(
       'pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:integration && pnpm run build',
     );

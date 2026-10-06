@@ -6,7 +6,7 @@ Everything a developer needs to run, test and extend the platform foundation. Al
 ## Prerequisites
 
 - Docker with Compose v2+ (Docker Desktop, or Colima on macOS: `colima start`).
-- Node 24 (`.nvmrc`; `engines` is `>=24 <25`).
+- Node 24.7 or newer (`.nvmrc`; `engines` is `>=24.7 <25`). Password hashing uses argon2id from `node:crypto`, which first shipped in 24.7.
 - Corepack, which ships with Node. It provides pnpm 10 at the version pinned in `packageManager`; no global pnpm install is needed.
 
 ## First run
@@ -107,6 +107,33 @@ values, and do not put secrets, bank details or tokens in a job payload.
 6. Key rotation: add the new key to `ENCRYPTION_KEYS`, flip `ENCRYPTION_ACTIVE_KEY_ID`, re-encrypt rows where
    `split_part(col, '.', 2) <> active` (`needsRotation` / `reencrypt`), then remove the old key. Errors and logs never contain key
    material or plaintext.
+
+## Authentication configuration
+
+Both apps validate these variables at boot and exit 1 with `Invalid configuration: <VAR> — <reason>` before binding a
+port. The message names the variable and never its value. `.env.example` lists every one with its default.
+
+| Variable                                               | Process  | Rule                                                                                                                                               | Default                                    |
+| ------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `WEB_BASE_URL`                                         | api, web | http(s) URL with no path. https is required when `NODE_ENV=production` (the web alone allows a `localhost` / `127.0.0.1` host, as in Compose).     | `http://localhost:3000` (required in prod) |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | api      | Set both or neither. A half-configured provider fails boot; neither disables Google.                                                               | unset (Google disabled)                    |
+| `FACEBOOK_OAUTH_APP_ID`, `FACEBOOK_OAUTH_APP_SECRET`   | api      | Set both or neither, as above.                                                                                                                     | unset (Facebook disabled)                  |
+| `AUTH_FAKE_OAUTH`                                      | api      | `true` or `false`. `true` swaps in fake providers for E2E and is refused in production.                                                            | `false`                                    |
+| `AUTH_SESSION_IDLE_DAYS`                               | api      | Integer 1 to 30.                                                                                                                                   | `7`                                        |
+| `AUTH_SESSION_ABSOLUTE_DAYS`                           | api      | Integer 1 to 90, at least the idle days.                                                                                                           | `30`                                       |
+| `AUTH_RESET_TOKEN_MINUTES`                             | api      | Integer 10 to 1440.                                                                                                                                | `60`                                       |
+| `AUTH_LOGIN_MAX_FAILURES_PER_EMAIL`                    | api      | Integer 3 to 20 failed sign-ins per email within the window.                                                                                       | `5`                                        |
+| `AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS`                  | api      | Integer 5 to 200 failed sign-ins per client address (all emails) within the window.                                                                | `20`                                       |
+| `AUTH_LOGIN_WINDOW_MINUTES`                            | api      | Integer 5 to 60.                                                                                                                                   | `15`                                       |
+| `AUTH_FORGOT_MAX_PER_ADDRESS`                          | api      | Integer 3 to 100 forgot-password requests per client address per 60 minutes.                                                                       | `10`                                       |
+| `API_INTERNAL_SHARED_SECRET`                           | api, web | At least 32 characters, same value on both; authenticates the web-to-API hop. **Required in production.** Never logged.                            | unset (client-address throttle skipped)    |
+| `WEB_TRUSTED_PROXY_HOPS`                               | web      | Integer 0 to 5: reverse proxies in front of the web that append to `X-Forwarded-For`. **Required in production**; 0 only for a localhost base URL. | `0` outside production                     |
+| `API_INTERNAL_URL`                                     | web      | http(s) URL of the API as seen from the web server (also read by the api config, unchanged).                                                       | `http://localhost:4000`                    |
+
+Rules of thumb: the shared secret must be identical in both apps or the client-address dimension of the sign-in throttle is
+ignored (the per-email limit still applies). The sign-in throttle stores only keyed hashes of emails and addresses, and
+the scheduled cleanup removes them within a day. Compose passes `WEB_BASE_URL`, `API_INTERNAL_SHARED_SECRET` and
+`WEB_TRUSTED_PROXY_HOPS=0` to the web service and `API_INTERNAL_SHARED_SECRET` and `AUTH_FAKE_OAUTH` to the api.
 
 ## Money and time rules
 

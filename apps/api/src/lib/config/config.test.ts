@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfigError, loadConfig, loadConfigOrExit, parseEncryptionKeys } from './config.ts';
 
@@ -16,6 +18,18 @@ function validEnv(overrides: Record<string, string | undefined> = {}): NodeJS.Pr
     if (value === undefined) delete env[name];
   }
   return env;
+}
+
+const SECRET_32 = 's3cret-'.repeat(6);
+
+function productionEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
+  return validEnv({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://u:p@db.internal:5432/sgm?sslmode=require',
+    WEB_BASE_URL: 'https://games.example.nz',
+    API_INTERNAL_SHARED_SECRET: SECRET_32,
+    ...overrides,
+  });
 }
 
 function issuesFor(env: NodeJS.ProcessEnv): readonly string[] {
@@ -152,12 +166,7 @@ describe('configuration edge cases', () => {
   });
 
   it('accepts sslmode=require in production', () => {
-    const config = loadConfig(
-      validEnv({
-        NODE_ENV: 'production',
-        DATABASE_URL: 'postgres://u:p@db.internal:5432/sgm?sslmode=require',
-      }),
-    );
+    const config = loadConfig(productionEnv());
     expect(config.nodeEnv).toBe('production');
   });
 
@@ -232,5 +241,186 @@ describe('job runner tuning', () => {
     ).join('\n');
     expect(issues).toContain('JOBS_EXPIRE_SECONDS_OVERRIDE');
     expect(issues).toContain('JOBS_POLL_INTERVAL_SECONDS');
+  });
+});
+
+describe('auth configuration (AC-VERIFY-7)', () => {
+  const AUTH_VARIABLES = [
+    'WEB_BASE_URL',
+    'GOOGLE_OAUTH_CLIENT_ID',
+    'GOOGLE_OAUTH_CLIENT_SECRET',
+    'FACEBOOK_OAUTH_APP_ID',
+    'FACEBOOK_OAUTH_APP_SECRET',
+    'AUTH_FAKE_OAUTH',
+    'AUTH_SESSION_IDLE_DAYS',
+    'AUTH_SESSION_ABSOLUTE_DAYS',
+    'AUTH_RESET_TOKEN_MINUTES',
+    'AUTH_LOGIN_MAX_FAILURES_PER_EMAIL',
+    'AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS',
+    'AUTH_LOGIN_WINDOW_MINUTES',
+    'AUTH_FORGOT_MAX_PER_ADDRESS',
+    'API_INTERNAL_SHARED_SECRET',
+    'WEB_TRUSTED_PROXY_HOPS',
+  ];
+
+  it('applies the documented defaults and leaves providers disabled when neither variable is set', () => {
+    const { auth, internalAuthSecret } = loadConfig(validEnv());
+    expect(auth).toEqual({
+      webBaseUrl: 'http://localhost:3000',
+      google: null,
+      facebook: null,
+      fakeOAuth: false,
+      sessionIdleDays: 7,
+      sessionAbsoluteDays: 30,
+      resetTokenMinutes: 60,
+      loginMaxFailuresPerEmail: 5,
+      loginMaxFailuresPerAddress: 20,
+      loginWindowMinutes: 15,
+      forgotMaxPerAddress: 10,
+    });
+    expect(internalAuthSecret).toBeNull();
+  });
+
+  it('enables a provider only when both of its variables are set; empty strings count as unset', () => {
+    const both = loadConfig(
+      validEnv({
+        GOOGLE_OAUTH_CLIENT_ID: 'gid',
+        GOOGLE_OAUTH_CLIENT_SECRET: 'gsecret',
+        FACEBOOK_OAUTH_APP_ID: '',
+        FACEBOOK_OAUTH_APP_SECRET: '',
+      }),
+    );
+    expect(both.auth.google).toEqual({ clientId: 'gid', clientSecret: 'gsecret' });
+    expect(both.auth.facebook).toBeNull();
+  });
+
+  it('fails a half-configured provider naming the missing variable and never the value', () => {
+    const cases: [Record<string, string>, string][] = [
+      [{ GOOGLE_OAUTH_CLIENT_ID: 'gid-value' }, 'GOOGLE_OAUTH_CLIENT_SECRET'],
+      [{ GOOGLE_OAUTH_CLIENT_SECRET: 'gsecret-value' }, 'GOOGLE_OAUTH_CLIENT_ID'],
+      [{ FACEBOOK_OAUTH_APP_ID: 'fid-value' }, 'FACEBOOK_OAUTH_APP_SECRET'],
+      [{ FACEBOOK_OAUTH_APP_SECRET: 'fsecret-value' }, 'FACEBOOK_OAUTH_APP_ID'],
+    ];
+    for (const [env, missing] of cases) {
+      const issues = issuesFor(validEnv(env));
+      expect(issues, missing).toEqual([
+        expect.stringContaining(`Invalid configuration: ${missing} — `),
+      ]);
+      expect(issues.join('\n')).not.toMatch(/-value/);
+    }
+  });
+
+  it('rejects a non-http(s) or path-bearing WEB_BASE_URL and, in production, a non-https one', () => {
+    for (const bad of [
+      'ftp://games.example.nz',
+      'not a url secret-host',
+      'https://games.example.nz/app',
+    ]) {
+      const issues = issuesFor(validEnv({ WEB_BASE_URL: bad }));
+      expect(issues).toEqual([expect.stringContaining('Invalid configuration: WEB_BASE_URL — ')]);
+      expect(issues.join('\n')).not.toContain('secret-host');
+    }
+    expect(issuesFor(productionEnv({ WEB_BASE_URL: 'http://games.example.nz' }))).toEqual([
+      expect.stringContaining('WEB_BASE_URL — must use https in production'),
+    ]);
+    // The API has no localhost exception: only the web does.
+    expect(issuesFor(productionEnv({ WEB_BASE_URL: 'http://localhost:3000' }))).toEqual([
+      expect.stringContaining('WEB_BASE_URL — must use https in production'),
+    ]);
+    expect(issuesFor(productionEnv({ WEB_BASE_URL: undefined }))).toEqual([
+      expect.stringContaining('WEB_BASE_URL — is required'),
+    ]);
+    expect(loadConfig(productionEnv()).auth.webBaseUrl).toBe('https://games.example.nz');
+  });
+
+  it('normalises WEB_BASE_URL to an origin without a trailing slash', () => {
+    expect(loadConfig(validEnv({ WEB_BASE_URL: 'http://localhost:3000/' })).auth.webBaseUrl).toBe(
+      'http://localhost:3000',
+    );
+  });
+
+  it('rejects out-of-range TTLs and throttle limits by name, and an absolute lifetime below the idle one', () => {
+    const outOfRange: [string, string][] = [
+      ['AUTH_SESSION_IDLE_DAYS', '0'],
+      ['AUTH_SESSION_IDLE_DAYS', '31'],
+      ['AUTH_SESSION_ABSOLUTE_DAYS', '91'],
+      ['AUTH_RESET_TOKEN_MINUTES', '9'],
+      ['AUTH_RESET_TOKEN_MINUTES', '1441'],
+      ['AUTH_LOGIN_MAX_FAILURES_PER_EMAIL', '2'],
+      ['AUTH_LOGIN_MAX_FAILURES_PER_EMAIL', '21'],
+      ['AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS', '4'],
+      ['AUTH_LOGIN_MAX_FAILURES_PER_ADDRESS', '201'],
+      ['AUTH_LOGIN_WINDOW_MINUTES', '4'],
+      ['AUTH_LOGIN_WINDOW_MINUTES', '61'],
+      ['AUTH_FORGOT_MAX_PER_ADDRESS', '2'],
+      ['AUTH_FORGOT_MAX_PER_ADDRESS', '101'],
+      ['AUTH_SESSION_IDLE_DAYS', 'seven'],
+    ];
+    for (const [name, value] of outOfRange) {
+      const issues = issuesFor(validEnv({ [name]: value }));
+      expect(issues, `${name}=${value}`).toEqual([
+        expect.stringContaining(`Invalid configuration: ${name} — `),
+      ]);
+    }
+    expect(
+      issuesFor(validEnv({ AUTH_SESSION_IDLE_DAYS: '20', AUTH_SESSION_ABSOLUTE_DAYS: '10' })),
+    ).toEqual([
+      expect.stringContaining(
+        'AUTH_SESSION_ABSOLUTE_DAYS — must be at least AUTH_SESSION_IDLE_DAYS',
+      ),
+    ]);
+    const ok = loadConfig(
+      validEnv({
+        AUTH_SESSION_IDLE_DAYS: '30',
+        AUTH_SESSION_ABSOLUTE_DAYS: '90',
+        AUTH_LOGIN_WINDOW_MINUTES: '60',
+      }),
+    ).auth;
+    expect([ok.sessionIdleDays, ok.sessionAbsoluteDays, ok.loginWindowMinutes]).toEqual([
+      30, 90, 60,
+    ]);
+  });
+
+  it('refuses AUTH_FAKE_OAUTH=true in production and allows it elsewhere', () => {
+    expect(issuesFor(productionEnv({ AUTH_FAKE_OAUTH: 'true' }))).toEqual([
+      expect.stringContaining('AUTH_FAKE_OAUTH — must not be true in production'),
+    ]);
+    expect(loadConfig(validEnv({ AUTH_FAKE_OAUTH: 'true' })).auth.fakeOAuth).toBe(true);
+    expect(issuesFor(validEnv({ AUTH_FAKE_OAUTH: 'yes' }))).toEqual([
+      expect.stringContaining('AUTH_FAKE_OAUTH'),
+    ]);
+  });
+
+  it('requires API_INTERNAL_SHARED_SECRET (at least 32 characters) in production and checks length elsewhere when set', () => {
+    expect(issuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: undefined }))).toEqual([
+      expect.stringContaining('API_INTERNAL_SHARED_SECRET — is required in production'),
+    ]);
+    const short = issuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: 'too-short-secret' }));
+    expect(short).toEqual([
+      expect.stringContaining('API_INTERNAL_SHARED_SECRET — must be at least 32'),
+    ]);
+    expect(short.join('\n')).not.toContain('too-short-secret');
+    expect(issuesFor(validEnv({ API_INTERNAL_SHARED_SECRET: 'short' }))).toHaveLength(1);
+    expect(loadConfig(productionEnv()).internalAuthSecret).toBe(SECRET_32);
+  });
+
+  it('rejects the known dev placeholder API_INTERNAL_SHARED_SECRET in production, without echoing it', () => {
+    const placeholder = 'dev-only-internal-secret-change-me-0123456789';
+    const issues = issuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: placeholder }));
+    expect(issues).toEqual([expect.stringContaining('API_INTERNAL_SHARED_SECRET')]);
+    expect(issues.join('\n')).not.toContain(placeholder);
+    expect(
+      loadConfig(validEnv({ API_INTERNAL_SHARED_SECRET: placeholder })).internalAuthSecret,
+    ).toBe(placeholder);
+  });
+
+  it('lists every new variable in .env.example and docs/getting-started.md', () => {
+    const root = fileURLToPath(new URL('../../../../../', import.meta.url));
+    const example = readFileSync(`${root}.env.example`, 'utf8');
+    const guide = readFileSync(`${root}docs/getting-started.md`, 'utf8');
+    for (const name of AUTH_VARIABLES) {
+      expect(example, `.env.example ${name}`).toMatch(new RegExp(`^#?\\s*${name}=`, 'm'));
+      expect(guide, `getting-started ${name}`).toContain(name);
+    }
   });
 });

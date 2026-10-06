@@ -3,6 +3,10 @@ info:
   title: Shared Game Management API
   version: 0.1.0
 components:
+  securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
   schemas: {}
 paths:
   /health:

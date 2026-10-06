@@ -32,6 +32,9 @@ describe('db rollback guard', () => {
           DATABASE_URL: 'postgres://sgm:sgm@127.0.0.1:1/sgm?sslmode=require',
           ENCRYPTION_KEYS: `k1:${randomBytes(32).toString('base64')}`,
           ENCRYPTION_ACTIVE_KEY_ID: 'k1',
+          // Production config also needs the auth settings (the CLI loads the same config as the api).
+          WEB_BASE_URL: 'https://games.example.nz',
+          API_INTERNAL_SHARED_SECRET: randomBytes(24).toString('base64'),
         },
       },
     );
