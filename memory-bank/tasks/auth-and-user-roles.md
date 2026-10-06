@@ -745,6 +745,15 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 **Auto-Build Mode**: YES
 **Current Step**: Phase 6 committed (review: 2 blocking e2e assertion fixes applied inline, security PASS); all phases complete
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
+**Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (range 63dbc43..5c62539; verdict: Ready to merge with fixes — 1 Critical, 5 Important, 5 Minor; not addressed autonomously)
+**Final Review Findings (open)**:
+- Critical 1: login throttle never refunds the address reservation in production. `admitLogin` (service.ts:143) and `settleLogin` (:198) each call `clock.now()`, and `auth_throttle_settle` refunds via `array_position(attempts, p_now)`, an exact-instant match, so about 20 successful sign-ins per 15 min from one address/64 lock everyone out. Fix: one `now` per login + a test that advances the clock between admit and settle.
+- Important 2: OAuth sign-in (`signInAs`, `completeOnce` C3) can race a reset and get a session after D1 eviction. Fix: lock the user row and re-check the identity in the transaction; add a race test.
+- Important 3: a link callback can re-attach a provider after a reset (`finishLink` trusts the pre-transaction session). Fix: re-check the session is live after `lockUserRow`.
+- Important 4: the raw reset token is stored in `pgboss.job` (email text, kept ≥7 days), against AC-VERIFY-2. Fix: encrypt the payload with FieldCrypto, or record an accepted deviation and narrow the AC.
+- Important 5: the 368-entry password blocklist is still not the designed SecLists-derived list.
+- Important 6: pre-release items: real-credential smoke test (AC-INTEGRATION-3); AC-INTEGRATION-4 not proven in CI (e2e self-skip, no CI e2e job); `pnpm audit --prod` / next bump.
+- Minor 7-11: migration 0001 CHECKs validate immediately with no backfill; the compose default internal secret passes production validation; the web logger ignores LOG_LEVEL and has no traceId; key rotation resets throttle counters (document); hygiene (errorMessage typed on string, stale comment at cookies.ts:7, oauth-service.ts ~600 lines, redactDeep Error instances).
 
 ### Resumption Notes
 **Can Resume**: NO
