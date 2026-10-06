@@ -743,7 +743,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 **Build Status**: RUNNING
 **Current Phase**: 1 of 6 (COMPLETE; next Phase 2)
 **Auto-Build Mode**: YES
-**Current Step**: Auto-build run started 2026-10-06 (base commit 6e0d753)
+**Current Step**: Phase 1 review PROCEED (b22b25e); Phase 2 next
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
 
 ### Resumption Notes
@@ -759,6 +759,10 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 
 ### Deviations
 - Plan | branch base | `feature/auth-and-user-roles` is stacked on `feature/platform-foundation` (63dbc43), not `origin/main`, because origin/main has only the initial commit (push blocked with a 403). Rebase onto main once platform-foundation merges.
+- Phase 1 | apps/api/src/routes/health.ts | `publicRoute` policy deferred to Phase 2, where the policy registry lands (AC-VERIFY-3); phase review PROCEED.
+- Phase 1 | db/migrations/20261006000100000_users_email_and_role_checks.sql:25-27 (D-32) | the PASSWORD-subject composite FK is `ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE` on a generated `password_email` column (Postgres forbids ON UPDATE CASCADE on generated columns), so an email change must move both rows in one transaction; phase review PROCEED.
+- Phase 1 | db/migrations/20261006000100000_users_email_and_role_checks.sql:41 (D-33) | the last-method trigger locks the user row with `FOR NO KEY UPDATE` and stays deferred to COMMIT; phase review PROCEED.
+- Phase 1 | AC-VERIFY-4 "session carries no role claim" | not verifiable until the session code lands in Phase 2; carry the check forward.
 
 ### Active Sub-Agents
 (none)
