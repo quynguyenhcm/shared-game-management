@@ -2,13 +2,13 @@
 slug: auth-and-user-roles
 legacy_id:
 feature: auth-and-user-roles
-status: CREATIVE_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # auth-and-user-roles: Auth and User Roles
 
 **Complexity**: Level 3 (inherited from auth-and-user-roles)
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: auth-and-user-roles
 **Branch**: feature/auth-and-user-roles
 **Worktree**: ~/yay-wt/shared-game-management/feature-auth-and-user-roles
@@ -711,7 +711,7 @@ Each AC is assigned to exactly one phase: the phase that builds its API behaviou
 - [x] Phase 3: Password reset and cleanup: `password/forgot` (with the address limit) and `password/reset` with R1 eviction (D1) and `removedProviders`, reset email via `enqueueEmail` in the same transaction, `auth-cleanup` queue and schedule (incl. throttle rows). ACs: HAPPY-6, ERROR-5, ERROR-6, ERROR-16, ASYNC-1, ASYNC-2, ASYNC-3, INTEGRATION-1, INTEGRATION-5.
 - [x] Phase 4: Web password flows: web config, `SiteHeader` and `FlashNotice`, form primitives, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/account` (no OAuth rows yet), Server Actions, cookies, `messages.ts`, `landing.ts`, `proxy.ts`, `/auth/session-expired`, `returnTo` validation, api-client bearer, `traceparent` and internal headers, client-address derivation, `POST /auth/password/reset/check` (COULD). ACs: ENTRY-1, ENTRY-3, ENTRY-4, ENTRY-5, ENTRY-6, ENTRY-7, HAPPY-13, ERROR-13, ERROR-18, ERROR-19, VERIFY-2, VERIFY-11, VERIFY-12, VERIFY-14.
 - [x] Phase 5: OAuth and identity linking: provider adapters, registry, PKCE, fake provider, the pure decision table, authorize/callback/pending/complete, `/auth/callback/[provider]` with the binding cookie, `/register/complete`, provider buttons and in-app hint, identities link and unlink on `/account`, identity-linked email. ACs: ENTRY-2, ENTRY-8, HAPPY-3, HAPPY-4, HAPPY-5, HAPPY-11, HAPPY-12, ERROR-7, ERROR-8, ERROR-9, ERROR-10, ERROR-14, ERROR-17, ERROR-20, ASYNC-5, VERIFY-13, VERIFY-15, INTEGRATION-3.
-- [ ] Phase 6: End-to-end, contract and docs: Playwright `auth.spec.ts` covering every journey on desktop and mobile with axe scans, trace continuity, OpenAPI regeneration, coverage gate, `docs/getting-started.md` (OAuth setup, first admin, production trust settings), ADRs 0013 and 0014, `systemPatterns.md` auth pattern. ACs: INTEGRATION-4, VERIFY-8, VERIFY-9; recheck every MUST AC.
+- [x] Phase 6: End-to-end, contract and docs: Playwright `auth.spec.ts` covering every journey on desktop and mobile with axe scans, trace continuity, OpenAPI regeneration, coverage gate, `docs/getting-started.md` (OAuth setup, first admin, production trust settings), ADRs 0013 and 0014, `systemPatterns.md` auth pattern. ACs: INTEGRATION-4, VERIFY-8, VERIFY-9; recheck every MUST AC.
 
 ## Creative Phases
 
@@ -740,26 +740,39 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: 5 of 6 (COMPLETE; next Phase 6)
+**Build Status**: COMPLETE
+**Current Phase**: 6 of 6 (COMPLETE)
 **Auto-Build Mode**: YES
-**Current Step**: Phase 5 committed (review: 1 blocking fixed inline, security PASS after fix); Phase 6 next
+**Current Step**: Phase 6 committed (review: 2 blocking e2e assertion fixes applied inline, security PASS); all phases complete
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
 
 ### Resumption Notes
-**Can Resume**: YES
-**Resume From**: Phase 6
+**Can Resume**: NO
+**Resume From**: n/a (run /yay:reflect)
 **Notes**: Local-only run: commit per phase, do not push (GitHub push returns 403 for Quy-Nguyen-1156376; same as platform-foundation). Branch is stacked on feature/platform-foundation (63dbc43); review ranges start at 6e0d753, not the merge-base with origin/main.
 
 ### Guard & Recovery Log
 - Phase 1: code review iteration 1 CHANGES_REQUIRED (open redirect in safeReturnTo, throttle insert lock order, 23514 mapping, placeholder secret) -> TDD fix, all applied; re-verified green.
 
 - Phase 5: code review CHANGES_REQUIRED (x-pending-signup header unredacted in request logs) -> fixed inline (REDACT_PATHS + BASE_KEY_PATTERNS + logger test); verify re-run of logger unit tests green.
+- Phase 6: code review CHANGES_REQUIRED (2 vacuous e2e assertions: Connected row, returnTo fallback) -> fixed inline; Playwright re-run 35 passed/3 skipped; prettier/eslint clean.
 
 ### Halt State
 (none)
 
 ### Deviations
+- Phase 6 | common-passwords.txt (follow-up d) | the SecLists fetch was denied in this environment (a network permission, not a network outage), so the 368-entry hand-curated list stays. The `PasswordBlocklist` interface is unchanged, so swapping in the real list (10+ chars, about 5-15k entries, lower-cased, de-duplicated, MIT attribution in the file header) is a one-file change. **Tracked before release.**
+- Phase 6 | `@axe-core/playwright` / pnpm | installed with a real `npx -y pnpm@10.34.6 add -D @axe-core/playwright --filter @sgm/web` (corepack's shim is v12), so `pnpm-lock.yaml` is now a real install result that also covers the Phase 5 `jose` addition (the earlier `--lockfile-only` caveat is closed). Lockfile diff is the axe packages only.
+- Phase 6 | AC-VERIFY-6 "every line carries traceId" (follow-up a) | narrowed in practice, not in the AC text: Fastify's "incoming request" line is now emitted from the `onRequest` hook (a `TracedLogController` suppresses Fastify's own pre-hook line), so it carries the request's traceId like every other request-scoped line (test: `auth-logs.int.test.ts`). Lines logged outside any request or job (boot, shutdown) have no trace by nature, and with `OTEL_SDK_DISABLED=true` there is no span to read, so no line carries one.
+- Phase 6 | `pnpm run ci` / coverage gate (AC-VERIFY-9) | unit-only coverage of the listed files is about 76%, because the DB-backed auth services are exercised by the integration project. New root script `test:coverage` (`vitest run --coverage`, both projects, 619 tests, 96/90/98/98% statements/branches/functions/lines) replaces `test` + `test:integration` inside `ci`; `test` is now the unit project without coverage and `test:integration` is unchanged. `scripts/root-targets.test.ts` pins the new `ci` string. Added to the include list: `apps/api/src/modules/auth/**`, `apps/api/src/lib/auth/**` and `apps/web/src/lib/**`.
+- Phase 6 | docker-compose.yml internal secret | the web container runs the production build, which refuses the `.env.example` placeholder, so the Compose stack could not boot the web service (a Phase 4/5 gap found when running the E2E). Compose now uses its own local-only default (`COMPOSE_API_INTERNAL_SHARED_SECRET`, with a built-in value) for api, worker and web instead of reading `API_INTERNAL_SHARED_SECRET` from `.env`.
+- Phase 6 | WEB_BASE_URL build arg (follow-up b) | `apps/web/Dockerfile` has no default for the arg and fails the image build when it is not an http(s) origin; `next.config.ts` exposes the baked host as `SGM_BAKED_WEB_HOST` and `instrumentation.ts` passes it to `loadWebConfigOrExit`, which refuses to boot in production when the runtime `WEB_BASE_URL` host differs (verified in the built image). A plain local `next build` without `WEB_BASE_URL` still falls back to `localhost:3000` and bakes nothing (so `pnpm run build` and CI keep working); only the image build is strict. Documented in `docs/getting-started.md`.
+- Phase 6 | logger hardening (follow-up c) | key patterns now cover any key ending in `token` (camelCase and snake_case), the `sgm_session|pending|oauth|flash` cookie names, `client_secret` and `code_verifier`; secret query parameters (`code`, `state`, `client_secret`, ...) are masked inside any logged string, so error messages and stacks that embed a token-exchange URL are scrubbed. `providerFetch` no longer keeps the transport error as `cause` (only its class name). Tests: `logger.test.ts`, `providers.test.ts`.
+- Phase 6 | oauth-service follow-ups (e) | `code_verifier_enc as never` removed (the repo input is typed `Ciphertext`); `requireLinkUserId` and `requireProviderEmail` (new `oauth-invariants.ts`) replace the `?? ''` fallbacks and throw if the impossible state ever occurs; the login-vs-reset race test now also asserts the refused attempt stays counted against the client address (the per-email count is cleared by the reset itself, so the address scope is the one that proves it). `oauth-service.ts` was NOT split (it stays one file of about 600 lines); no behaviour risk was taken.
+- Phase 6 | product fixes found by the browser journeys | (1) `/account?notice=welcome` showed the welcome banner twice (layout `FlashNotice` plus the page's own notice): the account page now leaves `welcome` to `FlashNotice`. (2) After a sign-up finished in another tab, the second tab's redirect kept its cached signed-out header (the tab set no cookie, so Next reused the layout): `signupExpired` now calls `revalidatePath('/', 'layout')` before the redirect (AC-ENTRY-8; unit test `oauth-actions.test.ts`).
+- Phase 6 | `pnpm audit --prod` (follow-up f) | 1 finding, high: `source-map-js` < 1.2.2 (GHSA-68fv-2mgg-jv7q, event-loop DoS through indexed source-map offsets), reached only through `apps/web > next > postcss > source-map-js`. It is a build-time source-map parser inside Next's CSS pipeline, not on a request path of the running server; not fixable here without an override of a transitive dependency of Next. Re-run the audit before release and bump `next` when it carries a patched postcss/source-map-js.
+- Phase 6 | Playwright run | the full stack (postgres, mailpit, api, worker, web, `AUTH_FAKE_OAUTH=true`) ran locally under Colima: 35 passed, 3 skipped (the phone-layout tests skip on the desktop project) across the desktop and 360 x 740 projects, Chromium from the Playwright cache. The trace-continuity test reads `docker compose logs api` (override with `E2E_API_LOG_COMMAND`) and skips itself if the logs are unreadable. The E2E suite is not part of `pnpm run ci`.
+- Phase 6 | manual smoke test with real Google and Facebook credentials | still a **pre-release item** (AC-INTEGRATION-3): register and sign in once with each, connect and disconnect from `/account`, and confirm Facebook accepts the Authorization-header token for the Graph call. Steps are in `docs/getting-started.md`.
 - Phase 5 | jose | added `jose ^6.2.12` to apps/api via `pnpm add --lockfile-only` (pinned pnpm store mismatch); lockfile diff is jose only (+8 lines). node_modules/jose is a local symlink; run a real `pnpm install` once before CI.
 - Phase 5 | Facebook Graph version | pinned v26.0 (changelog fetched 2026-10-06; v25.0 expires 2028-07-29). Facebook access token sent in Authorization header; confirm in the manual real-credentials smoke test. No real credentials: fixtures + fake provider only.
 - Phase 5 | web `POST /auth/clear-flash` route | added to clear `sgm_flash` (Server Components cannot delete cookies); Origin check covers it.
@@ -798,6 +811,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 (none)
 
 ### Completed Steps
+- Phase 6 Build (E2E, contract, docs): COMPLETE 2026-10-07 - 619 unit+integration tests (96% stmt coverage), 38 Playwright tests (35 pass, 3 desktop-skipped phone-layout), build/lint/typecheck PASS, security PASS, 1 dev dep (@axe-core/playwright). Push skipped (local-only run).
 - Phase 5 Build (OAuth and identity linking): COMPLETE 2026-10-06 - ~127 new tests (604 unit+integration passing in verifier run, +logger test), build/lint/typecheck PASS, review CHANGES_REQUIRED (1 blocking) fixed inline, security PASS after fix, 1 dep (jose). Push skipped (local-only run).
 - Phase 4 Build (Web password flows): COMPLETE 2026-10-06 - 107 web unit tests + 1 race integration test (341 unit + 154 integration passing, 97% stmt coverage), build/lint/typecheck PASS, review APPROVED (security PASS, 0 deps). Push skipped (local-only run).
 - Phase 3 Build (Password reset and cleanup): COMPLETE 2026-10-06 - 9 unit + 28 integration tests added (244 unit + 153 integration passing), build/lint/typecheck PASS, review APPROVED (security PASS, 0 deps). D1 implemented. Push skipped (local-only run).

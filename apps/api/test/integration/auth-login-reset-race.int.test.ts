@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   buildAuthTestApp,
   createPasswordUser,
+  internalHeaders,
   login,
+  TEST_INTERNAL_SECRET,
   type AuthTestApp,
 } from '../helpers/auth-app.ts';
 import { insertResetToken } from '../helpers/factories.ts';
@@ -17,7 +19,9 @@ let database: TestDatabase;
 let h: AuthTestApp;
 beforeAll(async () => {
   database = await createTestDatabase();
-  h = await buildAuthTestApp(database.pool);
+  h = await buildAuthTestApp(database.pool, {
+    env: { API_INTERNAL_SHARED_SECRET: TEST_INTERNAL_SECRET },
+  });
 });
 afterAll(async () => {
   await h.close();
@@ -53,7 +57,7 @@ describe('login racing a committed password reset', () => {
     };
     let response;
     try {
-      response = await login(h, user.email, user.password);
+      response = await login(h, user.email, user.password, internalHeaders('203.0.113.20'));
     } finally {
       mutableHasher.verify = realVerify;
     }
@@ -62,5 +66,12 @@ describe('login racing a committed password reset', () => {
     expect(response.statusCode).toBe(401);
     expect(response.body).toMatchObject({ error: { code: 'invalid_credentials' } });
     expect(await countSessions(user.id)).toBe(0);
+    // The refused attempt is a failed sign-in: it is never settled (refunded) as a success, so it stays
+    // counted against the client address and a caller cannot probe the race for free. (The reset itself
+    // clears the per-email count, which is why the address scope is the one that proves it.)
+    const { rows } = await database.pool.query<{ attempts: number | null }>(
+      `SELECT sum(cardinality(attempts))::int AS attempts FROM auth_throttle WHERE scope = 'login_address'`,
+    );
+    expect(rows[0]?.attempts).toBe(1);
   });
 });

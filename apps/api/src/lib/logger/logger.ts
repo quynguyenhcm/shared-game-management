@@ -57,7 +57,13 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   // OAuth pending sign-up handle: a bearer credential for POST /auth/oauth/complete.
   /^x-pending-signup$/i,
   /password/i,
-  /_token$/i,
+  // snake_case and camelCase credentials: access_token, pendingToken, sessionToken, resetToken ...
+  /token$/i,
+  // The browser cookies the web owns, as keys of a logged cookie map.
+  /sgm_(session|pending|oauth|flash)$/i,
+  // OAuth client credentials and PKCE material.
+  /client_?secret/i,
+  /code_?verifier/i,
   /^bank_account_/i,
   /^ird_number$/i,
   /^akahu_/i,
@@ -80,7 +86,9 @@ interface RequestLike {
   ip?: string;
 }
 
-const QUERY_PARAM = /([?&])([^=&#]+)=([^&#]*)/g;
+// Whitespace and quotes end a value so the same masking is safe on free text (error messages and stacks
+// that embed a URL), not only on a bare request url.
+const QUERY_PARAM = /([?&])([^=&#\s"']+)=([^&#\s"']*)/g;
 
 /** Masks the value of every query parameter whose (decoded) name matches a redaction pattern. */
 function maskQuerySecrets(
@@ -100,6 +108,10 @@ function maskQuerySecrets(
       ? `${separator}${name}=${REDACTED}`
       : whole;
   });
+}
+
+function maskQueryText(text: string, patterns: readonly RegExp[]): string {
+  return maskQuerySecrets(text, patterns) ?? text;
 }
 
 /** Fastify request shape (also passes raw Node requests through); headers stay so `redact` can mask secrets. */
@@ -125,7 +137,11 @@ function redactDeep(
   depth: number,
   seen: WeakSet<object>,
 ): unknown {
-  if (typeof value === 'string') return value.replace(URL_USERINFO, `$1${REDACTED}@`);
+  if (typeof value === 'string') {
+    // Credentials in URL userinfo and secret query parameters of any URL inside a string (error messages,
+    // stacks and `cause` chains of a failed OAuth token exchange).
+    return maskQueryText(value.replace(URL_USERINFO, `$1${REDACTED}@`), patterns);
+  }
   if (value === null || typeof value !== 'object' || depth > MAX_DEPTH) return value;
   // Raw bytes are almost always key material or ciphertext; never log them.
   if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return REDACTED;

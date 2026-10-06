@@ -23,7 +23,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Sear
     token === null ? null : await apiClient.identities(token, { incoming: await headers() });
   if (identities === null || !identities.ok) throw new SessionUnavailableError();
   const provider = firstParam(params, 'provider');
-  const notice = noticeMessage(firstParam(params, 'notice'), { provider });
+  const noticeCode = firstParam(params, 'notice');
+  // `welcome` belongs to the layout's FlashNotice (shown once on whatever page the user lands on);
+  // rendering it here too showed the banner twice after a sign-up that returns to /account.
+  const notice = noticeCode === 'welcome' ? null : noticeMessage(noticeCode, { provider });
   const errorLines = urlErrorMessage(firstParam(params, 'error'), { provider, intent: 'link' });
 
   return (

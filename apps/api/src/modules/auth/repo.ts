@@ -6,6 +6,7 @@ import { sql } from 'kysely';
 import {
   normaliseEmail,
   type AssignableGlobalRole,
+  type Ciphertext,
   type PublicUser,
   type UserSex,
 } from '@sgm/shared';
@@ -348,7 +349,8 @@ export interface NewOAuthState {
   readonly intent: 'signin' | 'link';
   readonly linkUserId: string | null;
   readonly nonce: string | null;
-  readonly codeVerifierEnc: string | null;
+  /** AES-GCM envelope from `FieldCrypto.encrypt`; the column rejects anything else (23514). */
+  readonly codeVerifierEnc: Ciphertext | null;
   readonly returnTo: string;
   readonly createdAt: Date;
   readonly expiresAt: Date;
@@ -364,7 +366,7 @@ export async function insertOAuthState(db: Database, input: NewOAuthState): Prom
       intent: input.intent,
       link_user_id: input.linkUserId,
       nonce: input.nonce,
-      code_verifier_enc: input.codeVerifierEnc as never,
+      code_verifier_enc: input.codeVerifierEnc,
       return_to: input.returnTo,
       created_at: input.createdAt,
       expires_at: input.expiresAt,

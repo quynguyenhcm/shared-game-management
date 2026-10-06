@@ -151,6 +151,23 @@ describe('Google adapter', () => {
     expect(url.searchParams.get('scope')).toBe('openid email profile');
     expect(url.searchParams.get('nonce')).toBe(NONCE);
   });
+
+  it('does not keep a transport error (whose message may embed the token-exchange URL) as the cause', async () => {
+    const secretUrl = `${'https://graph.facebook.com/v26.0/oauth/access_token'}?client_secret=APP-SECRET-X&code=CODE-X`;
+    const facebook = createFacebookProvider({
+      appId: '1',
+      appSecret: 'APP-SECRET-X',
+      fetch: () => Promise.reject(new TypeError(`fetch failed: ${secretUrl}`)),
+    });
+    const error = await facebook
+      .exchange({ code: 'CODE-X', redirectUri: 'https://games.example.nz/cb' })
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ProviderError);
+    const text = JSON.stringify(error, Object.getOwnPropertyNames(error)) + String(error);
+    expect(text).not.toContain('APP-SECRET-X');
+    expect(text).not.toContain('CODE-X');
+    expect((error as ProviderError).cause).toBeUndefined();
+  });
 });
 
 describe('Facebook adapter', () => {

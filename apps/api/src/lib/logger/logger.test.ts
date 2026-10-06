@@ -253,4 +253,39 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
     }
     expect(serialised).toContain('application/json');
   });
+
+  it('redacts camelCase *Token keys, sgm_ cookie names and OAuth client secrets at any depth', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        pendingToken: 'pending-secret-1',
+        nested: { sessionToken: 'session-secret-2', resetToken: 'reset-secret-3' },
+        cookies: { sgm_pending: 'cookie-secret-4', sgm_session: 'cookie-secret-5' },
+        client_secret: 'client-secret-6',
+        code_verifier: 'verifier-secret-7',
+        tokenCount: 3,
+        keep: 'visible',
+      },
+      'tokens',
+    );
+    const line = sink.lines()[0];
+    const serialised = JSON.stringify(line);
+    for (let i = 1; i <= 7; i += 1) expect(serialised).not.toMatch(new RegExp(`-${i}\\b`));
+    expect(line).toMatchObject({ keep: 'visible', tokenCount: 3 });
+  });
+
+  it('never serialises OAuth secrets that ride in a URL inside an error message, stack or cause chain', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    const url =
+      'https://graph.facebook.com/v26.0/oauth/access_token?client_id=123&client_secret=FB-APP-SECRET&redirect_uri=x&code=AUTH-CODE-1';
+    const root = new Error(`connect failed for ${url}`);
+    const wrapped = new Error('provider request failed', { cause: root });
+    logger.warn({ err: wrapped }, 'oauth exchange failed');
+    const serialised = JSON.stringify(sink.lines()[0]);
+    expect(serialised).not.toContain('FB-APP-SECRET');
+    expect(serialised).not.toContain('AUTH-CODE-1');
+    expect(serialised).toContain('provider request failed');
+  });
 });

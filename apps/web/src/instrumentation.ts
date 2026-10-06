@@ -13,5 +13,7 @@ export async function register(): Promise<void> {
     return;
   }
   const { loadWebConfigOrExit } = await import('@/lib/config');
-  loadWebConfigOrExit();
+  // `SGM_BAKED_WEB_HOST` is inlined by `next build` (next.config.ts `env`): the host the Server Action
+  // origin allowlist was built for. In production it must equal the runtime WEB_BASE_URL host.
+  loadWebConfigOrExit(process.env, { bakedHost: process.env.SGM_BAKED_WEB_HOST });
 }

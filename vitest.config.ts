@@ -40,9 +40,13 @@ export default defineConfig({
         'apps/api/src/lib/{crypto,config,notifications,jobs,logger,telemetry,http}/**/*.ts',
         'apps/api/src/lib/clock.ts',
         'apps/web/src/lib/config.ts',
+        // The authentication module (AC-VERIFY-9) and the web's auth/library code.
+        'apps/api/src/modules/auth/**/*.ts',
+        'apps/api/src/lib/auth/**/*.ts',
+        'apps/web/src/lib/**/*.ts',
       ],
-      exclude: ['**/*.test.ts', '**/*.int.test.ts'],
-      // Thresholds apply to every file matched by `include` (the platform library modules above).
+      exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.int.test.ts'],
+      // Thresholds apply to every file matched by `include` (platform library modules and the auth code above).
       thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
     },
   },

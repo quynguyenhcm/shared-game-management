@@ -4,6 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   jar: new Map<string, string>(),
   sets: [] as { name: string; value: string; options: Record<string, unknown> }[],
+  revalidated: [] as [string, string | undefined][],
+}));
+
+vi.mock('next/cache', () => ({
+  revalidatePath: (path: string, type?: string) => {
+    mocks.revalidated.push([path, type]);
+  },
 }));
 
 vi.mock('next/headers', () => ({
@@ -93,6 +100,7 @@ async function redirectOf(promise: Promise<unknown>): Promise<string> {
 beforeEach(() => {
   mocks.jar.clear();
   mocks.sets.length = 0;
+  mocks.revalidated.length = 0;
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -214,6 +222,9 @@ describe('completeSignupAction (AC-HAPPY-3/4, AC-ERROR-14, AC-ENTRY-8)', () => {
     await expect(redirectOf(completeSignupAction({}, form(fields)))).resolves.toBe(
       '/account:replace',
     );
+    // The tab never set a cookie, so Next would reuse its cached signed-out layout (header) after the
+    // redirect: the action must invalidate the layout so the header shows the signed-in state.
+    expect(mocks.revalidated).toContainEqual(['/', 'layout']);
   });
 
   it('blocks a missing sex before the API and keeps the name (AC-ENTRY-3 pattern)', async () => {

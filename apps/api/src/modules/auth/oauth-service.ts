@@ -26,6 +26,7 @@ import { AppError } from '../../lib/http/errors.ts';
 import type { JobRunner } from '../../lib/jobs/jobs.ts';
 import { buildIdentityLinkedEmail } from './emails.ts';
 import { decideComplete, decideLink, decideSignIn } from './oauth-decision.ts';
+import { requireLinkUserId, requireProviderEmail } from './oauth-invariants.ts';
 import {
   ProviderError,
   type OAuthProvider,
@@ -295,7 +296,7 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
           'oauth email belongs to an existing account',
         );
         // `email` is non-null here (S2 ruled out null); the web server shows it, never a URL.
-        throw new AppError(decision.code, { email: email ?? '' });
+        throw new AppError(decision.code, { email: requireProviderEmail(email, 'S4') });
       case 'S5': {
         const token = newToken();
         const now = clock.now();
@@ -303,7 +304,7 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
           tokenHash: token.hash,
           provider: profile.provider,
           subject: profile.subject,
-          email: email ?? '',
+          email: requireProviderEmail(email, 'S5'),
           emailVerified: profile.provider === 'GOOGLE' && profile.emailVerified,
           fullName: profile.fullName,
           returnTo: safeReturnTo(state.returnTo),
@@ -513,7 +514,7 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
       }
       const profile = await exchange(provider, slug, input.code, state, ctx);
       if (state.intent === 'link') {
-        return finishLink(profile, { linkUserId: state.linkUserId ?? '' }, ctx.auth, ctx);
+        return finishLink(profile, { linkUserId: requireLinkUserId(state) }, ctx.auth, ctx);
       }
       return finishSignIn(profile, state, ctx.auth, ctx);
     },

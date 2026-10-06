@@ -70,8 +70,18 @@ export function registerRequestTracing(app: FastifyInstance): void {
       request.log = log;
       reply.log = log;
     }
+    // Fastify writes its own "incoming request" line before any hook runs, when no span exists yet
+    // (`TracedLogController` suppresses it); emitting it here makes it carry the trace like every other line.
+    request.log.info({ req: request }, 'incoming request');
     done();
   });
+}
+
+/** Fastify's log controller with the pre-hook "incoming request" line removed (`registerRequestTracing` logs it). */
+class TracedLogController extends LogController {
+  override incomingRequest(): void {
+    // Intentionally empty.
+  }
 }
 
 /** Fastify factory. Every dependency is injected so tests can build the app without a database. */
@@ -80,7 +90,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const loggerInstance: FastifyBaseLogger = deps.logger;
   const app = Fastify({
     loggerInstance,
-    logController: new LogController({ requestIdLogLabel: 'requestId' }),
+    logController: new TracedLogController({ requestIdLogLabel: 'requestId' }),
   });
   registerRequestTracing(app);
   app.setValidatorCompiler(validatorCompiler);

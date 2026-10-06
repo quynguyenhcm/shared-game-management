@@ -64,7 +64,11 @@ export const PROVIDER_TIMEOUT_MS = 5_000;
 
 export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
-/** `fetch` with the 5 s timeout; any network or timeout failure is `unavailable`, never a leaked cause. */
+/**
+ * `fetch` with the 5 s timeout; any network or timeout failure is `unavailable`. The transport error is
+ * deliberately NOT kept as `cause`: the Facebook token exchange carries `client_secret` and `code` in its
+ * query string, and a transport error's message or stack can embed that URL. Only the error class survives.
+ */
 export async function providerFetch(
   fetchImpl: FetchLike,
   url: string | URL,
@@ -73,7 +77,8 @@ export async function providerFetch(
   try {
     return await fetchImpl(url, { ...init, signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) });
   } catch (error) {
-    throw new ProviderError('unavailable', 'provider request failed', { cause: error });
+    const kind = error instanceof Error ? error.name : 'unknown';
+    throw new ProviderError('unavailable', `provider request failed (${kind})`);
   }
 }
 

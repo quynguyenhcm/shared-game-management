@@ -1,5 +1,6 @@
 // Console output is allowed here (see eslint.config.mjs): this script writes the spec to stdout.
 import { fileURLToPath } from 'node:url';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.ts';
 import { systemClock } from './lib/clock.ts';
 import { loadConfig } from './lib/config/config.ts';
@@ -12,8 +13,8 @@ import { buildOAuthProviders } from './modules/auth/providers/registry.ts';
 import { createPasswordHasher } from './modules/auth/password.ts';
 import { createLoginThrottle } from './modules/auth/throttle.ts';
 
-/** Builds the app with inert dependencies and returns its OpenAPI document as YAML. */
-export async function generateOpenApiYaml(): Promise<string> {
+/** Builds the app with inert dependencies, hands it to `read`, then closes it. */
+async function withInertApp<T>(read: (app: FastifyInstance) => T): Promise<T> {
   const logger = createLogger({
     service: 'openapi',
     version: 'openapi',
@@ -49,11 +50,21 @@ export async function generateOpenApiYaml(): Promise<string> {
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
   });
   try {
-    return app.swagger({ yaml: true });
+    return read(app);
   } finally {
     await app.close();
     await pool.end();
   }
+}
+
+/** The OpenAPI document of the full app as YAML (what `apps/api/openapi.yaml` commits). */
+export function generateOpenApiYaml(): Promise<string> {
+  return withInertApp((app) => app.swagger({ yaml: true }));
+}
+
+/** The same document as an object, for tests that assert on its structure. */
+export function generateOpenApiDocument(): Promise<ReturnType<FastifyInstance['swagger']>> {
+  return withInertApp((app) => app.swagger());
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

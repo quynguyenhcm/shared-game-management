@@ -2,7 +2,7 @@
  * Log hygiene for the password flows (AC-VERIFY-6): register, login (success and failure), throttling,
  * logout and a request carrying OAuth-style query parameters leave no secret in any log line, the auth.*
  * events carry the documented fields and no email, and every request-scoped line carries the request's
- * traceId. (Fastify's own "incoming request" line is written before any hook runs, so it cannot carry one.)
+ * traceId, including Fastify's "incoming request" line (emitted from the onRequest hook once the span is bound).
  */
 import type { InjectOptions } from 'fastify';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
@@ -145,8 +145,12 @@ describe('password flows leave no secrets in logs', () => {
 
     // The business events and "request completed" carry the request's trace.
     const scoped = lines.filter(
-      (line) => typeof line.event === 'string' || line.message === 'request completed',
+      (line) =>
+        typeof line.event === 'string' ||
+        line.message === 'request completed' ||
+        line.message === 'incoming request',
     );
+    expect(lines.filter((line) => line.message === 'incoming request').length).toBeGreaterThan(8);
     expect(scoped.length).toBeGreaterThan(10);
     for (const line of scoped)
       expect(line.traceId, JSON.stringify(line).slice(0, 200)).toBe(TRACE_ID);

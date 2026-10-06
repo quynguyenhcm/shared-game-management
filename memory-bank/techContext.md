@@ -43,7 +43,8 @@
   - **Encrypted columns**: `teams.bank_account_number`, `teams.akahu_app_token`, `teams.bank_account_name`, `teams.ird_number`
   - DB Guard: CHECK constraint on envelope format; corrupted ciphertext fails on decryption with typed error
 - **Environment Secrets**: 12-factor config via `.env`, validated by zod at boot with fail-fast on invalid values
-- **Credential Redaction**: pino redaction patterns ban logging `authorization`, `cookie`, `*_token`, `bank_account_*`, `ird_number`, `akahu_*`, `encryptionKeys`
+- **Credential Redaction**: pino redaction patterns ban logging `authorization`, `cookie`, `set-cookie`, any key ending in `token` (snake or camelCase, e.g. `pendingToken`), `sgm_session|pending|oauth|flash`, `client_secret`, `code_verifier`, `x-sgm-internal-auth`, `x-sgm-client-ip`, `x-pending-signup`, `bank_account_*`, `ird_number`, `akahu_*`, `encryptionKeys`; OAuth `code`/`state` query values and secret query parameters inside error messages are masked
+- **Authentication**: argon2id from `node:crypto` (Node >=24.7, no native addon), `jose` 6.x for Google ID-token verification, opaque Postgres sessions (SHA-256 of a 256-bit token); the web owns the session cookie and calls the API with a bearer token. Variables: `WEB_BASE_URL` (also a **build arg** of the web image), `GOOGLE_OAUTH_CLIENT_ID/_SECRET`, `FACEBOOK_OAUTH_APP_ID/_SECRET`, `AUTH_FAKE_OAUTH`, `AUTH_SESSION_*`, `AUTH_RESET_TOKEN_MINUTES`, `AUTH_LOGIN_*`, `AUTH_FORGOT_MAX_PER_ADDRESS`, `AUTH_REGISTER_MAX_PER_ADDRESS`, `API_INTERNAL_SHARED_SECRET`, `WEB_TRUSTED_PROXY_HOPS` (see `docs/getting-started.md`)
 
 ### Logging & Observability
 - **Logging**: pino 10.3.1 (structured JSON)
@@ -63,6 +64,7 @@
 - **Email**: SMTP adapter for Mailpit (dev/CI) or Postmark (prod, likely)
   - **Provider contract**: idempotency keys, low-cardinality tags, typed error semantics (transient vs permanent)
   - No integration built in foundation; adapter contract stable for downstream billing features
+- **Google OAuth 2.0 / OpenID Connect** and **Facebook Login** (Graph API, pinned `v26.0`, refresh within two years): sign-in providers; credentials in env, setup steps in `docs/getting-started.md`. A manual real-credentials smoke test is a pre-release item (CI uses recorded fixtures and the fake provider).
 - **Akahu** (Open Banking, NZ): arrives in wallet-and-akahu-billing phase; crypto and job primitives already in place
 
 ### Development Tools
@@ -70,8 +72,8 @@
 - **Testing**: vitest 5.0.2
   - **Unit tests**: `**/*.test.ts` (no DB, no network, Node environment)
   - **Integration tests**: `**/*.int.test.ts` against real PostgreSQL 17 (forks pool, SKIP LOCKED job polling)
-  - **Coverage provider**: v8, threshold 80% for money/time/invoice/crypto/config/notifications/jobs modules
-  - **E2E tests**: Playwright 1.63.0 for smoke tests (`apps/web/e2e/smoke.spec.ts`)
+  - **Coverage provider**: v8, threshold 80% for money/time/invoice/auth shared code, the api platform libraries, `apps/api/src/modules/auth/**` and `apps/web/src/lib/**`; measured over unit and integration tests together (`pnpm run test:coverage`)
+  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
 - **Linting & Formatting**: ESLint 9.39.5 + TypeScript support, Prettier 3.9.9
   - **Type checking**: `tsc --noEmit` strict mode (no `any`, explicit return types)
   - **Code quality**: `no-console` error in `apps/api/src` (except `cli.ts`); bans on unsafe money operations (parseFloat, toFixed); host-TZ independence rules in `packages/shared/src/time/`
@@ -104,7 +106,8 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `dev` | `docker compose up -d --wait postgres mailpit && pnpm run db:migrate && pnpm -r --parallel --filter "./apps/*" dev` | Start local stack (Postgres, Mailpit), run migrations, start Next.js dev server and API dev server in parallel |
 | `lint` | `eslint . --max-warnings 0 && prettier --check .` | Check code style, fail on any ESLint warning or format violation |
 | `typecheck` | `pnpm -r --include-workspace-root --workspace-concurrency=4 exec tsc --noEmit -p tsconfig.json` | Type-check all packages with strict mode, run in parallel (4 at a time) |
-| `test` | `vitest run --project unit --coverage` | Run unit tests (*.test.ts, no DB), report coverage for the foundation library modules |
+| `test` | `vitest run --project unit` | Run unit tests (*.test.ts, no DB); the fast loop, no coverage |
+| `test:coverage` | `vitest run --coverage` | Run unit and integration tests together and enforce the 80% coverage gate (the DB-backed auth code is covered by integration tests); needs the Compose `postgres` |
 | `test:integration` | `vitest run --project integration` | Run integration tests (*.int.test.ts) against real PostgreSQL 17, 30-second timeout, fork pool isolation |
 | `db:migrate` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db migrate` | Apply pending migrations (node-pg-migrate), then install/upgrade pgboss schema |
 | `db:rollback` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts db rollback` | Roll back one migration step (or `-- --count N` for multiple, `-- --all` to zero) |
@@ -114,8 +117,8 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `build` | `pnpm -r build` | Build all packages: Next.js standalone output (web), tsup bundle (api, outputs `dist/{main,worker,cli,instrumentation}.js`) |
 | `openapi` | `pnpm --filter @sgm/api exec tsx src/openapi.ts > apps/api/openapi.yaml` | Generate OpenAPI spec from Fastify router |
 | `jobs:trigger` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts jobs trigger <slot>` | Manually trigger a scheduled job (e.g., `jobs:trigger recurrence-materialisation`) |
-| `test:e2e` | `playwright test -c apps/web/playwright.config.ts` | Run Playwright smoke tests (requires the Compose stack: `docker compose up -d --wait`); not part of `ci` |
-| `ci` | `pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:integration && pnpm run build` | Full CI pipeline: lint, type-check, unit tests, integration tests, build; must all pass |
+| `test:e2e` | `playwright test -c apps/web/playwright.config.ts` | Run the Playwright journeys (requires the Compose stack: `AUTH_FAKE_OAUTH=true docker compose up -d --build --wait`); not part of `ci` |
+| `ci` | `pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run build` | Full CI pipeline: lint, type-check, unit + integration tests with the coverage gate, build; must all pass |
 
 ## Test Strategy
 
@@ -157,10 +160,13 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `apps/api/src/lib/jobs/**` | 80% | pg-boss wrapper, schedule safety |
 | `apps/api/src/lib/config/**` | 80% | Env validation, fail-fast |
 | `apps/api/src/lib/db/**` | Integration only | Tested via `test:integration` |
-| `apps/api/src/lib/logger/**` | Not gated | Unit-tested, outside the coverage gate |
+| `apps/api/src/lib/{logger,telemetry,http,auth}/**`, `apps/api/src/lib/clock.ts` | 80% | Redaction, trace context, error mapper, Origin and internal-auth hooks, route policy and guards |
+| `packages/shared/src/auth/**` | 80% | Email normalisation, `safeReturnTo`, OAuth binding codec |
+| `apps/api/src/modules/auth/**` | 80% | Auth services, repo, sessions, throttle, providers (mostly through integration tests) |
+| `apps/web/src/lib/**` | 80% | Web config, api-client, auth actions, cookies, landing and messages |
 | Other modules, generated types | Not required | Coverage gate applies only to listed modules |
 
-Coverage is checked via `vitest run --project unit --coverage` with the v8 provider; thresholds are `lines: 80, functions: 80, branches: 80, statements: 80`.
+Coverage is checked via `vitest run --coverage` (`pnpm run test:coverage`, both projects) with the v8 provider; thresholds are `lines: 80, functions: 80, branches: 80, statements: 80`. Unit tests alone cover about 76% of the listed files because the DB-backed auth services are exercised by the integration project.
 
 ### What Is NOT Tested
 
@@ -176,8 +182,9 @@ Coverage is checked via `vitest run --project unit --coverage` with the v8 provi
 The `.github/workflows/ci.yml` runs:
 1. `pnpm run lint` — ESLint and Prettier on all files
 2. `pnpm run typecheck` — TypeScript strict mode
-3. `pnpm run test` — Unit tests with coverage report
-4. `pnpm run test:integration` — Integration tests with real Postgres 17 service container
-5. `pnpm run build` — Full build (web and api)
+3. `pnpm run test:coverage` — Unit and integration tests (real Postgres 17 service container) with the coverage gate
+4. `pnpm run build` — Full build (web and api)
+
+(`pnpm run ci` runs these four in order; `pnpm run test` and `pnpm run test:integration` remain for a single project.)
 
 Total time: ~5 min (varies with cache and Postgres startup). Each step must exit 0 for the job to pass.

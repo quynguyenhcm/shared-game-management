@@ -15,6 +15,9 @@ const allowedOrigins = [publicHost() ?? 'localhost:3000'];
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Exposes the baked host to the boot check in `instrumentation.ts` (runtime WEB_BASE_URL must match it in
+  // production). Only set when a WEB_BASE_URL was given to the build; the Dockerfile refuses to build without one.
+  ...(publicHost() === undefined ? {} : { env: { SGM_BAKED_WEB_HOST: publicHost() ?? '' } }),
   // Monorepo: trace workspace packages from the repository root so the standalone output includes them.
   outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
   transpilePackages: ['@sgm/shared'],

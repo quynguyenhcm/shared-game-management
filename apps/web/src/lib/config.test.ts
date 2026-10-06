@@ -22,9 +22,12 @@ function productionEnv(overrides: Record<string, string | undefined> = {}): Node
   });
 }
 
-function issuesFor(source: NodeJS.ProcessEnv): readonly string[] {
+function issuesFor(
+  source: NodeJS.ProcessEnv,
+  options: { bakedHost?: string } = {},
+): readonly string[] {
   try {
-    loadWebConfig(source);
+    loadWebConfig(source, options);
   } catch (error) {
     expect(error).toBeInstanceOf(WebConfigError);
     return (error as WebConfigError).issues;
@@ -109,6 +112,34 @@ describe('loadWebConfig (AC-VERIFY-7)', () => {
     }
     expect(loadWebConfig(productionEnv()).trustedProxyHops).toBe(1);
     expect(loadWebConfig(env({ WEB_TRUSTED_PROXY_HOPS: '2' })).trustedProxyHops).toBe(2);
+  });
+
+  it('refuses to boot in production when the host baked into the build differs from the runtime WEB_BASE_URL host', () => {
+    // Server Actions compare Origin with the build-time `allowedOrigins`: a mismatch would reject every form.
+    const issues = issuesFor(productionEnv(), { bakedHost: 'staging.example.nz' });
+    expect(issues).toEqual([
+      expect.stringContaining('Invalid configuration: WEB_BASE_URL — host differs from the host'),
+    ]);
+    expect(issues.join('\n')).not.toContain('staging.example.nz');
+    expect(issues.join('\n')).not.toContain('games.example.nz');
+    // Same host, no baked host (a local `next build`) and non-production all boot; the port is part of the host.
+    expect(() => loadWebConfig(productionEnv(), { bakedHost: 'games.example.nz' })).not.toThrow();
+    expect(() => loadWebConfig(productionEnv(), {})).not.toThrow();
+    expect(() => loadWebConfig(env(), { bakedHost: 'staging.example.nz' })).not.toThrow();
+    expect(() =>
+      loadWebConfig(productionEnv({ WEB_BASE_URL: 'https://games.example.nz:8443' }), {
+        bakedHost: 'games.example.nz',
+      }),
+    ).toThrow(WebConfigError);
+  });
+
+  it('the production image build fails without the WEB_BASE_URL build arg (no localhost fallback)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const dockerfile = await readFile(new URL('../../Dockerfile', import.meta.url), 'utf8');
+    expect(dockerfile).toMatch(/^ARG WEB_BASE_URL$/m);
+    expect(dockerfile).not.toMatch(/ARG WEB_BASE_URL=/);
+    expect(dockerfile).toContain('build arg WEB_BASE_URL is required');
+    expect(dockerfile).toMatch(/exit 1/);
   });
 
   it('loadWebConfigOrExit prints value-free issues to stderr and exits 1', () => {

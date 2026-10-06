@@ -55,8 +55,21 @@ function parseOrigin(raw: string): URL | undefined {
   return plain ? url : undefined;
 }
 
+export interface LoadOptions {
+  /**
+   * The host of `WEB_BASE_URL` that `next build` baked into `serverActions.allowedOrigins`
+   * (`next.config.ts`, exposed as `SGM_BAKED_WEB_HOST`). In production the runtime `WEB_BASE_URL` must have
+   * the same host, or every Server Action would be refused with a cross-origin error. Absent for a build
+   * that had no `WEB_BASE_URL` (a local `next build`): nothing to compare.
+   */
+  readonly bakedHost?: string | undefined;
+}
+
 /** Validates the environment and returns typed config, or throws `WebConfigError`. */
-export function loadWebConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
+export function loadWebConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: LoadOptions = {},
+): WebConfig {
   const issues: string[] = [];
   const nodeEnv =
     env.NODE_ENV === 'production' || env.NODE_ENV === 'test' ? env.NODE_ENV : 'development';
@@ -84,6 +97,20 @@ export function loadWebConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
         issue('WEB_BASE_URL', 'must use https in production unless the host is localhost'),
       );
     }
+  }
+  if (
+    production &&
+    baseUrl !== undefined &&
+    options.bakedHost !== undefined &&
+    options.bakedHost !== '' &&
+    options.bakedHost !== baseUrl.host
+  ) {
+    issues.push(
+      issue(
+        'WEB_BASE_URL',
+        'host differs from the host this image was built for (rebuild with the WEB_BASE_URL build arg of this environment)',
+      ),
+    );
   }
   const baseIsLocalhost = baseUrl !== undefined && LOCALHOST_HOSTS.has(baseUrl.hostname);
 
@@ -131,9 +158,12 @@ export function loadWebConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
 }
 
 /** Process-entry helper: prints every issue to stderr and exits 1 before the server takes traffic. */
-export function loadWebConfigOrExit(env: NodeJS.ProcessEnv = process.env): WebConfig {
+export function loadWebConfigOrExit(
+  env: NodeJS.ProcessEnv = process.env,
+  options: LoadOptions = {},
+): WebConfig {
   try {
-    return loadWebConfig(env);
+    return loadWebConfig(env, options);
   } catch (error) {
     const lines =
       error instanceof WebConfigError ? error.issues : ['Invalid configuration: unexpected error'];

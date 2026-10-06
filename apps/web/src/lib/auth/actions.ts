@@ -9,6 +9,7 @@ import {
   encodeOAuthBinding,
   safeReturnTo,
 } from '@sgm/shared';
+import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { RedirectType, redirect } from 'next/navigation';
 import { apiClient, type ApiResult, type OAuthProviderPath } from '../api-client.ts';
@@ -253,7 +254,12 @@ export async function disconnectProviderAction(formData: FormData): Promise<void
 /** The pending sign-up is gone: a live session means it finished in another tab (AC-ENTRY-8). */
 async function signupExpired(returnTo: string): Promise<never> {
   const session = await getSessionState();
-  if (session.kind === 'signed_in') return redirect(returnTo, RedirectType.replace);
+  if (session.kind === 'signed_in') {
+    // This tab never set a cookie, so Next would keep its cached (signed-out) layout and header after the
+    // redirect. Invalidating the layout makes the landing page render the signed-in header.
+    revalidatePath('/', 'layout');
+    return redirect(returnTo, RedirectType.replace);
+  }
   return redirect(loginUrl({ error: 'signup_expired' }), RedirectType.replace);
 }
 
