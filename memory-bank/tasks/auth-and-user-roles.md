@@ -771,6 +771,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 - Phase 2 | AC-VERIFY-6 | traceId asserted on auth.* events and request-completed lines, not on Fastify's pre-hook "incoming request" line.
 - Phase 2 | carry-forward | health.ts now declares publicRoute (Phase 1 deviation closed); AC-VERIFY-4 "no role claim" verified (no role column on auth_sessions; role change visible next request).
 - Phase 2 | review follow-ups (non-blocking): move globalRole check to onRequest (422-before-403); hash-limiter queue cap / register address limit (Phase 3 address-limit work); add HEAD 401 regression test; injected clock in warning throttle; modules/auth/** coverage list in Phase 6.
+- Phase 2 | phase review PROCEED (fc924b6..63ed1c5) | accepted all builder deviations. Two tracked before release: (a) apps/api/src/lib/auth/policy.ts preHandler role/team check yields 422 before 403 for an unauthorised caller with an invalid body, a literal departure from AC-ERROR-11 that leaks route shape; assigned to Phase 3 (move to onRequest + 403-with-invalid-body regression test). (b) the 368-entry blocklist is far weaker than the designed SecLists-derived list (algorithm S2-b, ~5-15k entries); swap in the real list before Phase 6 closes or before release. AC-VERIFY-6 "every line" gap on Fastify's incoming-request line: Phase 6 attaches traceId or narrows the AC.
 
 ### Active Sub-Agents
 (none)
