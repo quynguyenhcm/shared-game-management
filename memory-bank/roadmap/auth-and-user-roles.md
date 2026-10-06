@@ -1,6 +1,6 @@
 ---
 version: v1.0.0
-status: planned
+status: complete
 priority: high
 complexity: 3
 linked_tasks: [auth-and-user-roles]

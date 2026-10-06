@@ -42,6 +42,7 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Trigger**: a domain change or a cron slot in `apps/api/src/jobs/schedules.ts` (Pacific/Auckland).
 - **Guarantee**: at-least-once; handlers are idempotent through a unique constraint or guarded status transition.
 - **Output**: job state visible in `pgboss.job` (failed jobs stay visible after 3 retries with backoff).
+- **Secrets in payloads**: job data is kept for days, so any message carrying a secret (reset link, token) is enqueued with `enqueueEmail(..., { crypto })`; `pgboss.job.data` then holds only `{ idempotencyKey, sealed }` (FieldCrypto envelope bound to the idempotency key) and the handler opens it.
 
 ## Design Patterns Used
 
@@ -64,7 +65,8 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Default-deny route policy**: every route declares `config: { policy }` with `publicRoute()`, `optionalSession()`, `authenticated()`, `requireGlobalRole(...)` or `requireTeamRole(role, { teamIdParam?, allowGlobalAdmin? })` (`lib/auth/policy.ts`). A route without one makes `buildApp` fail. Handlers read `requireAuth(request)`; team roles come from `team_members` with `status = 'APPROVED'`, read fresh each request. New features must follow this for every route.
 - **Errors and contracts**: the shared `{ error: { code, message, fieldErrors? } }` shape and one `ErrorCode` list in `packages/shared/src/api/errors.ts`; zod request schemas are strict (an unknown field such as `role` is a 422); the web `api-client` and the Fastify routes import the same schemas.
 - **Trust boundary for the client address**: the web derives it from `WEB_TRUSTED_PROXY_HOPS` counted from the right of `X-Forwarded-For` and sends `x-sgm-client-ip` only with `x-sgm-internal-auth` (`API_INTERNAL_SHARED_SECRET`, constant-time compare); production refuses to boot without both.
-- **Account linking and throttling**: never auto-link and never sign in on an email match; a completed password reset evicts every Google and Facebook identity (rule R1); sign-in, forgot-password and registration are throttled by the Postgres sliding-log functions `auth_throttle_admit` / `auth_throttle_settle` with HMAC-keyed counters (no email or address in clear).
+- **Account linking and throttling**: never auto-link and never sign in on an email match; a completed password reset evicts every Google and Facebook identity (rule R1); sign-in, forgot-password and registration are throttled by the Postgres sliding-log functions `auth_throttle_admit` / `auth_throttle_settle` with HMAC-keyed counters (no email or address in clear). One login uses one timestamp for both admit and settle (the refund matches it exactly).
+- **Session-issuance invariant (D1)**: every path that issues a session or attaches a credential (password login, OAuth sign-in, sign-up completion, identity link) locks the user row (`lockUserRow`) and re-checks the credential or identity, and for links the linking session, inside the issuing transaction, so a concurrent password reset always wins.
 - **Logging**: `auth.*` events with `userId`/`provider`/`reason` and no email; every request line (including Fastify's "incoming request") carries `traceId`; redaction covers `*token` keys, `sgm_*` cookie names, client secrets, `code`/`state` query values and secret query parameters inside error messages; provider transport errors are never kept as `cause`.
 - **Testing**: DB-backed behaviour via `app.inject` over a cloned Postgres (`buildAuthTestApp`), pure rules as table-driven unit tests, browser journeys and axe scans in Playwright on desktop and a 360 px project with `AUTH_FAKE_OAUTH=true` (the fake provider answers `oauth.fake.invalid`).
 - **Trade-offs**: we own security-sensitive code (small surfaces, recorded fixtures, tampered-token tests); no MFA, passkeys or session list in v1; the web image bakes `WEB_BASE_URL` (Server Action `allowedOrigins`), so there is one image per environment.
@@ -120,6 +122,7 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Framework**: Vitest 5 (projects `unit` and `integration`, forks pool for integration), Playwright for the web journeys (desktop and a 360 x 740 project, axe-core scans, run against the Compose stack with `AUTH_FAKE_OAUTH=true`; not part of `ci`).
 - **Assertion style**: `expect(...)`.
 - **Mocking approach**: dependency injection and test doubles (the `memory` notifier); no DB mocking, integration tests use real PostgreSQL 17.
+- **Injected clocks**: tests that inject a `Clock` advance it between the sequential calls of one operation (admit then settle, issue then verify); a frozen clock hides timestamp-matching bugs.
 
 ### Test Scope Preferences
 - **Emphasis**: balanced; DB constraints are proven against a real database.

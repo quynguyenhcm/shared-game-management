@@ -2,14 +2,16 @@
 slug: auth-and-user-roles
 legacy_id:
 feature: auth-and-user-roles
-status: REFLECTION_COMPLETE
+status: COMPLETE
 ---
 
 # auth-and-user-roles: Auth and User Roles
 
 **Complexity**: Level 3 (inherited from auth-and-user-roles)
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
 **Reflection**: memory-bank/reflection/auth-and-user-roles-reflection.md
+**Archived**: memory-bank/archive/auth-and-user-roles-archive.md
+**Completed**: 2026-10-07
 **Roadmap**: auth-and-user-roles
 **Branch**: feature/auth-and-user-roles
 **Worktree**: ~/yay-wt/shared-game-management/feature-auth-and-user-roles
@@ -369,7 +371,7 @@ Self-registration and sign-in with email/password, Google OAuth and Facebook OAu
 **Priority**: MUST
 **Given** a freshly issued session token and a reset token
 **When** the database, the API responses and the web response headers are inspected
-**Then** each token is at least 256 bits from `crypto.randomBytes`; only its SHA-256 appears in the database (no plaintext column); the API returns the session token only in the JSON body to the web server and never sets cookies; the web sets the cookie `HttpOnly`, `SameSite=Lax`, `Path=/` and, whenever `WEB_BASE_URL` is https (required in production except for a localhost base URL), `Secure` with the `__Host-` prefixed name, so it is never readable by JavaScript; the `/reset-password` page responds with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`
+**Then** each token is at least 256 bits from `crypto.randomBytes`; only its SHA-256 appears in the database (no plaintext column); the API returns the session token only in the JSON body to the web server and never sets cookies; the web sets the cookie `HttpOnly`, `SameSite=Lax`, `Path=/` and, whenever `WEB_BASE_URL` is https (required in production except for a localhost base URL), `Secure` with the `__Host-` prefixed name, so it is never readable by JavaScript; the `/reset-password` page responds with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`; the raw reset token appears in no queue payload (`pgboss.job.data` holds only the sealed email) and no log line *(amended at archive, 2026-10-07, after final-review Important 4)*
 
 #### AC-VERIFY-3: Every route has an explicit authorization policy (default deny)
 **Priority**: MUST
@@ -393,7 +395,7 @@ Self-registration and sign-in with email/password, Google OAuth and Facebook OAu
 **Priority**: MUST
 **Given** the log capture helper (`apps/api/test/helpers/log-capture.ts`) wrapping the logger
 **When** register, login (success and failure), logout, forgot, reset and the OAuth callback all run
-**Then** no log line contains a password, session token, reset token, OAuth `code`, `state`, access token, client secret, `Set-Cookie` value, `x-sgm-internal-auth` value, client address or throttle key hash; the OAuth `code` and `state` query parameters are masked in request logs (exact-name query masking); failed sign-ins log `event: auth.login.failed` with `reason` in `invalid_credentials|throttled_email|throttled_address` and no email address; successes log `auth.login.succeeded` with `userId` and `provider`; every line carries `traceId`
+**Then** no log line contains a password, session token, reset token, OAuth `code`, `state`, access token, client secret, `Set-Cookie` value, `x-sgm-internal-auth` value, client address or throttle key hash; the OAuth `code` and `state` query parameters are masked in request logs (exact-name query masking); failed sign-ins log `event: auth.login.failed` with `reason` in `invalid_credentials|throttled_email|throttled_address` and no email address; successes log `auth.login.succeeded` with `userId` and `provider`; every request- or job-scoped line carries `traceId` (boot and shutdown lines, and runs with `OTEL_SDK_DISABLED=true`, have no span to read) *(amended at archive, 2026-10-07, per the Phase 6 deviation)*
 
 #### AC-VERIFY-7: Auth configuration is validated at boot with no secret leakage
 **Priority**: MUST
@@ -742,9 +744,9 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 ## Execution State
 
 **Build Status**: IDLE
-**Current Phase**: REFLECT → ARCHIVE
+**Current Phase**: COMPLETE
 **Auto-Build Mode**: YES
-**Current Step**: Step 4 - Git Commit - COMPLETE (reflection committed locally; push skipped, 403)
+**Current Step**: Archived 2026-10-07 (learning consolidation additive: 2 rules reinforced, 2 new); push/PR pending GitHub access
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (range 63dbc43..5c62539; verdict: Ready to merge with fixes — 1 Critical, 5 Important, 5 Minor; not addressed autonomously)
 **Final Review Findings** (1-4 fixed in 170bd5f; 5-11 open):
@@ -758,7 +760,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 
 ### Resumption Notes
 **Can Resume**: NO
-**Resume From**: /yay:archive auth-and-user-roles
+**Resume From**: n/a (when GitHub access works: push main and platform-foundation, rebase this branch onto main, push, open PR)
 **Notes**: Local-only run: commit per phase, do not push (GitHub push returns 403 for Quy-Nguyen-1156376; same as platform-foundation). Branch is stacked on feature/platform-foundation (63dbc43); review ranges start at 6e0d753, not the merge-base with origin/main.
 
 ### Guard & Recovery Log

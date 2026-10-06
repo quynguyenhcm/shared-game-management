@@ -45,6 +45,8 @@
 - **Environment Secrets**: 12-factor config via `.env`, validated by zod at boot with fail-fast on invalid values
 - **Credential Redaction**: pino redaction patterns ban logging `authorization`, `cookie`, `set-cookie`, any key ending in `token` (snake or camelCase, e.g. `pendingToken`), `sgm_session|pending|oauth|flash`, `client_secret`, `code_verifier`, `x-sgm-internal-auth`, `x-sgm-client-ip`, `x-pending-signup`, `bank_account_*`, `ird_number`, `akahu_*`, `encryptionKeys`; OAuth `code`/`state` query values and secret query parameters inside error messages are masked
 - **Authentication**: argon2id from `node:crypto` (Node >=24.7, no native addon), `jose` 6.x for Google ID-token verification, opaque Postgres sessions (SHA-256 of a 256-bit token); the web owns the session cookie and calls the API with a bearer token. Variables: `WEB_BASE_URL` (also a **build arg** of the web image), `GOOGLE_OAUTH_CLIENT_ID/_SECRET`, `FACEBOOK_OAUTH_APP_ID/_SECRET`, `AUTH_FAKE_OAUTH`, `AUTH_SESSION_*`, `AUTH_RESET_TOKEN_MINUTES`, `AUTH_LOGIN_*`, `AUTH_FORGOT_MAX_PER_ADDRESS`, `AUTH_REGISTER_MAX_PER_ADDRESS`, `API_INTERNAL_SHARED_SECRET`, `WEB_TRUSTED_PROXY_HOPS` (see `docs/getting-started.md`)
+  - **Compose internal secret**: `docker-compose.yml` uses its own local-only default (`COMPOSE_API_INTERNAL_SHARED_SECRET`). It is for local stacks only; production validation does **not** yet refuse it (open pre-release item, final-review minor 8).
+- **Job payloads**: secret-bearing emails (password reset) are sealed with FieldCrypto before they reach `pgboss.job`; the worker builds `crypto` from the same keyring.
 
 ### Logging & Observability
 - **Logging**: pino 10.3.1 (structured JSON)
