@@ -22,8 +22,10 @@ import type { PasswordHasher } from './password.ts';
 import { checkPasswordForSet, type PasswordBlocklist } from './password-policy.ts';
 import {
   findPasswordIdentity,
+  findPasswordIdentityForUser,
   getUserById,
   insertPasswordUser,
+  lockUserRow,
   recordPasswordLogin,
   toPublicUser,
 } from './repo.ts';
@@ -162,22 +164,36 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         throw new AppError('invalid_credentials');
       }
 
-      await throttle.settleLogin(keys, clock.now());
       const upgradedHash = checked.needsRehash ? await hasher.hash(input.password) : undefined;
       const presented =
         ctx.presentedToken === null ? null : await sessions.resolve(ctx.presentedToken);
-      const { session, replacedSessionId } = await db.transaction().execute(async (trx) => {
+      const outcome = await db.transaction().execute(async (trx) => {
+        // A reset may have committed since the verify above (AC-ERROR-16): lock the user, re-read the
+        // identity, and refuse unless it still carries the very hash that was verified.
+        await lockUserRow(trx, identity.userId);
+        const current = await findPasswordIdentityForUser(trx, identity.userId);
+        if (current === undefined || current.passwordHash !== identity.passwordHash) return null;
         let replaced: string | null = null;
         if (presented?.status === 'valid') {
           const revoked = await sessions.revoke(trx, presented.auth.sessionId, 'replaced');
           replaced = revoked ? presented.auth.sessionId : null;
         }
-        await recordPasswordLogin(trx, identity.identityId, clock.now(), upgradedHash);
+        await recordPasswordLogin(trx, current.identityId, clock.now(), upgradedHash);
         return {
           session: await sessions.issue(trx, identity.userId, ctx.userAgent),
           replacedSessionId: replaced,
         };
       });
+      if (outcome === null) {
+        // Same answer as a wrong password; the reservation already counts as a failure (no settle).
+        ctx.log.warn(
+          { event: 'auth.login.failed', reason: 'invalid_credentials' },
+          'sign-in failed',
+        );
+        throw new AppError('invalid_credentials');
+      }
+      await throttle.settleLogin(keys, clock.now());
+      const { session, replacedSessionId } = outcome;
       const user = await getUserById(db, identity.userId);
       if (user === undefined) throw new Error('user vanished during sign-in');
       if (replacedSessionId !== null) {

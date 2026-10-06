@@ -110,6 +110,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:3000}
     image: sgm-web:dev
     environment:
       API_INTERNAL_URL: http://api:4000

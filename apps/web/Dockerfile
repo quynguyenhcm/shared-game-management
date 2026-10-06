@@ -10,6 +10,9 @@ RUN pnpm install --frozen-lockfile --filter "@sgm/web..."
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/web apps/web
+# next.config.ts reads WEB_BASE_URL at build time for serverActions.allowedOrigins (baked into the server).
+ARG WEB_BASE_URL=http://localhost:3000
+ENV WEB_BASE_URL=${WEB_BASE_URL}
 RUN pnpm --filter @sgm/web build
 
 FROM node:24-slim

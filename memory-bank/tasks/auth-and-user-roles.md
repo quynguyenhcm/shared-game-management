@@ -709,7 +709,7 @@ Each AC is assigned to exactly one phase: the phase that builds its API behaviou
 - [x] Phase 1: Schema, contracts and wiring: the 5 migrations, deviations ledger (D-27 onwards), codegen and enum parity; `packages/shared/src/api/{auth,errors}.ts`, `packages/shared/src/auth/{email,return-to}.ts`; the HTTP error mapper, Origin hook and clock; API and web config vars; `buildApp`/`main.ts` dependency injection; engines bump; `health.ts` policy. ACs: VERIFY-4, VERIFY-5, VERIFY-7.
 - [x] Phase 2: Password auth, sessions, throttle and guards (API): hasher and password policy, tokens, sessions, `auth_throttle` port, internal-auth hook, Origin check; `register`, `login`, `logout`, `me`, `providers`; route policy registry and guards; CLI `users set-role`; log hygiene. ACs: HAPPY-1, HAPPY-2, HAPPY-7, HAPPY-8, HAPPY-9, HAPPY-10, ERROR-1, ERROR-2, ERROR-3, ERROR-4, ERROR-11, ERROR-12, ERROR-15, ASYNC-4, VERIFY-1, VERIFY-3, VERIFY-6, VERIFY-10, INTEGRATION-2.
 - [x] Phase 3: Password reset and cleanup: `password/forgot` (with the address limit) and `password/reset` with R1 eviction (D1) and `removedProviders`, reset email via `enqueueEmail` in the same transaction, `auth-cleanup` queue and schedule (incl. throttle rows). ACs: HAPPY-6, ERROR-5, ERROR-6, ERROR-16, ASYNC-1, ASYNC-2, ASYNC-3, INTEGRATION-1, INTEGRATION-5.
-- [ ] Phase 4: Web password flows: web config, `SiteHeader` and `FlashNotice`, form primitives, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/account` (no OAuth rows yet), Server Actions, cookies, `messages.ts`, `landing.ts`, `proxy.ts`, `/auth/session-expired`, `returnTo` validation, api-client bearer, `traceparent` and internal headers, client-address derivation, `POST /auth/password/reset/check` (COULD). ACs: ENTRY-1, ENTRY-3, ENTRY-4, ENTRY-5, ENTRY-6, ENTRY-7, HAPPY-13, ERROR-13, ERROR-18, ERROR-19, VERIFY-2, VERIFY-11, VERIFY-12, VERIFY-14.
+- [x] Phase 4: Web password flows: web config, `SiteHeader` and `FlashNotice`, form primitives, `/register`, `/login`, `/forgot-password`, `/reset-password`, `/account` (no OAuth rows yet), Server Actions, cookies, `messages.ts`, `landing.ts`, `proxy.ts`, `/auth/session-expired`, `returnTo` validation, api-client bearer, `traceparent` and internal headers, client-address derivation, `POST /auth/password/reset/check` (COULD). ACs: ENTRY-1, ENTRY-3, ENTRY-4, ENTRY-5, ENTRY-6, ENTRY-7, HAPPY-13, ERROR-13, ERROR-18, ERROR-19, VERIFY-2, VERIFY-11, VERIFY-12, VERIFY-14.
 - [ ] Phase 5: OAuth and identity linking: provider adapters, registry, PKCE, fake provider, the pure decision table, authorize/callback/pending/complete, `/auth/callback/[provider]` with the binding cookie, `/register/complete`, provider buttons and in-app hint, identities link and unlink on `/account`, identity-linked email. ACs: ENTRY-2, ENTRY-8, HAPPY-3, HAPPY-4, HAPPY-5, HAPPY-11, HAPPY-12, ERROR-7, ERROR-8, ERROR-9, ERROR-10, ERROR-14, ERROR-17, ERROR-20, ASYNC-5, VERIFY-13, VERIFY-15, INTEGRATION-3.
 - [ ] Phase 6: End-to-end, contract and docs: Playwright `auth.spec.ts` covering every journey on desktop and mobile with axe scans, trace continuity, OpenAPI regeneration, coverage gate, `docs/getting-started.md` (OAuth setup, first admin, production trust settings), ADRs 0013 and 0014, `systemPatterns.md` auth pattern. ACs: INTEGRATION-4, VERIFY-8, VERIFY-9; recheck every MUST AC.
 
@@ -741,14 +741,14 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 2 of 6 (COMPLETE; next Phase 3)
+**Current Phase**: 4 of 6 (COMPLETE; next Phase 5)
 **Auto-Build Mode**: YES
-**Current Step**: Phase 2 committed (review APPROVED, 0 blocking); Phase 3 next
+**Current Step**: Phase 4 committed (review APPROVED, 0 blocking); Phase 5 next
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
 
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 3
+**Resume From**: Phase 5
 **Notes**: Local-only run: commit per phase, do not push (GitHub push returns 403 for Quy-Nguyen-1156376; same as platform-foundation). Branch is stacked on feature/platform-foundation (63dbc43); review ranges start at 6e0d753, not the merge-base with origin/main.
 
 ### Guard & Recovery Log
@@ -758,6 +758,12 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 (none)
 
 ### Deviations
+- Phase 4 | login-vs-reset race (AC-ERROR-16/D1) | fixed at phase start: login txn locks user row, re-reads PASSWORD identity, generic 401 on hash change; throttle settle moved after commit; regression test auth-login-reset-race.int.test.ts. Review follow-up closed.
+- Phase 4 | apps/web/next.config.ts + Dockerfile + docker-compose.yml | `experimental.serverActions.allowedOrigins` (Next 16.3.6) is baked at build time from WEB_BASE_URL; build arg added. Confirmed `src/proxy.ts` is the Next 16 convention.
+- Phase 4 | /account Sign-in methods | stub without GET /auth/identities (Phase 5); /login fetches /auth/providers only for hint wording; no OAuth buttons yet. landing.ts/messages.ts already include OAuth landings for Phase 5.
+- Phase 4 | apps/web/src/lib/log.ts | minimal structured JSON logger added (web had none).
+- Phase 4 | tests | web component tests are node-env HTML-render checks; real focus/axe/mobile layout and no mobile Playwright project deferred to Phase 6. vitest.config.ts unit project now includes **/*.test.tsx. Coverage include list not widened for apps/web/src/lib/**.
+- Phase 4 | review non-blocking | concurrent same-user logins with needsRehash may produce a spurious 401 (fails safe); stale comment in messages.ts (isKnownErrorCode -> urlErrorMessage); sgm_flash not cleared by login page (Phase 5 should clear); WEB_BASE_URL not build-once (document in deploy docs, Phase 6). Phase 4 review APPROVED, security PASS. POST /auth/password/reset/check not built or called.
 - Plan | branch base | `feature/auth-and-user-roles` is stacked on `feature/platform-foundation` (63dbc43), not `origin/main`, because origin/main has only the initial commit (push blocked with a 403). Rebase onto main once platform-foundation merges.
 - Phase 1 | apps/api/src/routes/health.ts | `publicRoute` policy deferred to Phase 2, where the policy registry lands (AC-VERIFY-3); phase review PROCEED.
 - Phase 1 | db/migrations/20261006000100000_users_email_and_role_checks.sql:25-27 (D-32) | the PASSWORD-subject composite FK is `ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE` on a generated `password_email` column (Postgres forbids ON UPDATE CASCADE on generated columns), so an email change must move both rows in one transaction; phase review PROCEED.
@@ -782,6 +788,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 (none)
 
 ### Completed Steps
+- Phase 4 Build (Web password flows): COMPLETE 2026-10-06 - 107 web unit tests + 1 race integration test (341 unit + 154 integration passing, 97% stmt coverage), build/lint/typecheck PASS, review APPROVED (security PASS, 0 deps). Push skipped (local-only run).
 - Phase 3 Build (Password reset and cleanup): COMPLETE 2026-10-06 - 9 unit + 28 integration tests added (244 unit + 153 integration passing), build/lint/typecheck PASS, review APPROVED (security PASS, 0 deps). D1 implemented. Push skipped (local-only run).
 - 2026-10-06 Plan: Spec Writer (Sonnet) drafted 52 ACs; taxonomy lint CLEAN; specification approved by the user as drafted; 6-phase plan written; Architecture and Algorithm creative phases flagged (Level 3 with LOW-confidence questions).
 - Algorithm Creative Design: COMPLETE (2026-10-06) - Output: memory-bank/creative/auth-and-user-roles-algorithm.md (3A′ never auto-link + reset-proves-inbox R1; 4A block Facebook-without-email with rerequest; 7A Postgres sliding-log throttle)

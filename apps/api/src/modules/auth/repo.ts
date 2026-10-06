@@ -55,6 +55,21 @@ export async function findPasswordIdentity(
   return { identityId: row.id, userId: row.user_id, passwordHash: row.password_hash };
 }
 
+/** The user's current PASSWORD identity (fresh read, for re-checking inside a locked transaction). */
+export async function findPasswordIdentityForUser(
+  db: Database,
+  userId: string,
+): Promise<PasswordIdentity | undefined> {
+  const row = await db
+    .selectFrom('auth_identities')
+    .select(['id', 'user_id', 'password_hash'])
+    .where('provider', '=', 'PASSWORD')
+    .where('user_id', '=', userId)
+    .executeTakeFirst();
+  if (row === undefined || row.password_hash === null) return undefined;
+  return { identityId: row.id, userId: row.user_id, passwordHash: row.password_hash };
+}
+
 export async function getUserById(db: Database, userId: string): Promise<UserRow | undefined> {
   const row = await db
     .selectFrom('users')
