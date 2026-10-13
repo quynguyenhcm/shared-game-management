@@ -42,6 +42,24 @@ const AUTHORITATIVE_ERROR_CODES = [
   'provider_already_connected',
   'link_session_mismatch',
   'last_sign_in_method',
+  // team-management (memory-bank/creative/team-management-membership-architecture.md, section 4)
+  'invite_invalid',
+  'already_requested',
+  'already_member',
+  'banned_from_team',
+  'team_admin_cannot_be_banned',
+  'last_team_admin',
+  'membership_state_conflict',
+] as const;
+
+const TEAM_ERROR_STATUSES = [
+  ['invite_invalid', 404],
+  ['already_requested', 409],
+  ['already_member', 409],
+  ['banned_from_team', 403],
+  ['team_admin_cannot_be_banned', 409],
+  ['last_team_admin', 409],
+  ['membership_state_conflict', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];
@@ -114,6 +132,23 @@ describe('ErrorCode list', () => {
     for (const { message } of Object.values(ERROR_DEFAULTS))
       expect(message.length).toBeGreaterThan(0);
   });
+
+  it.each(TEAM_ERROR_STATUSES)(
+    'team code %s answers %i with a safe message and the shared body shape',
+    async (code, status) => {
+      expect(ERROR_DEFAULTS[code].status).toBe(status);
+      expect(ERROR_DEFAULTS[code].message).not.toMatch(/[{}<>]|undefined/);
+      const app = await build();
+      app.get(`/team-error/${code}`, () => {
+        throw new AppError(code);
+      });
+      const response = await app.inject({ method: 'GET', url: `/team-error/${code}` });
+      expect(response.statusCode).toBe(status);
+      expect(ErrorResponse.parse(response.json())).toEqual({
+        error: { code, message: ERROR_DEFAULTS[code].message },
+      });
+    },
+  );
 });
 
 describe('registerErrorHandling', () => {

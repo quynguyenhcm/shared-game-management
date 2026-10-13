@@ -43,6 +43,8 @@ const EXACT_QUERY_NAMES: ReadonlySet<string> = new Set([
   'state',
   'token',
   'error_description',
+  // `/login?returnTo=/teams/join?code=...` carries a team invite code through the sign-in round trip.
+  'returnto',
 ]);
 
 /** Key patterns redacted at any depth (architecture: Observability > Logging > Redaction). */
@@ -64,6 +66,8 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   // OAuth client credentials and PKCE material.
   /client_?secret/i,
   /code_?verifier/i,
+  // Team invite codes (bearer capability to ask to join): inviteCode / invite_code, exact key only.
+  /^invite_?code$/i,
   /^bank_account_/i,
   /^ird_number$/i,
   /^akahu_/i,

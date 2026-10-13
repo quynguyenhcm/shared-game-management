@@ -223,6 +223,45 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
     );
   });
 
+  it('redacts inviteCode and invite_code keys at any depth but not look-alikes (AC-VERIFY-3)', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        inviteCode: 'invite-secret-1',
+        invite_code: 'invite-secret-2',
+        INVITE_CODE: 'invite-secret-3',
+        body: { inviteCode: 'invite-secret-4' },
+        invitedBy: 'visible-user',
+        statusCode: 201,
+      },
+      'invite',
+    );
+    logger.child({ inviteCode: 'invite-secret-5' }).info('child binding');
+    const lines = sink.lines();
+    const serialised = JSON.stringify(lines);
+    for (let i = 1; i <= 5; i += 1) expect(serialised).not.toContain(`invite-secret-${i}`);
+    expect(lines[0]).toMatchObject({ invitedBy: 'visible-user', statusCode: 201 });
+  });
+
+  it('masks the returnTo query parameter so a logged /login?returnTo=...code... URL never shows the code (A7)', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        req: {
+          method: 'GET',
+          url: '/login?returnTo=%2Fteams%2Fjoin%3Fcode%3Dinvite-secret-9&next=2',
+          headers: {},
+        },
+      },
+      'request',
+    );
+    const url = (sink.lines()[0]?.req as { url: string }).url;
+    expect(url).toBe('/login?returnTo=[REDACTED]&next=2');
+    expect(url).not.toContain('invite-secret-9');
+  });
+
   it('redacts the internal-hop headers and set-cookie in logged requests', () => {
     const sink = capture();
     const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);

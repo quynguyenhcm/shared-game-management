@@ -556,7 +556,7 @@ Build teams as the second `modules/<feature>` slice on top of the auth platform.
 - [ ] extend: `packages/shared/src/api/errors.ts`, `packages/shared/src/index.ts`, `apps/api/src/app.ts`, `apps/api/src/jobs/{registry,bootstrap}.ts`, `apps/api/src/lib/logger/logger.ts`, `apps/api/test/helpers/factories.ts`, `apps/api/src/lib/db/types.generated.ts`, `apps/api/openapi.yaml`, `db/schema-deviations.md`, `vitest.config.ts`, `apps/web/src/proxy.ts`, `apps/web/src/lib/api-client.ts`, `apps/web/src/components/site-header-links.tsx`
 
 ### Phases
-- [ ] **Phase 1: Schema invariants and shared contracts**: the migration (D-40 onwards), regenerated types, zod contracts, 7 error codes, logger redaction and the factory update. ACs: AC-VERIFY-2, AC-VERIFY-3 (redaction) and AC-VERIFY-6.
+- [x] **Phase 1: Schema invariants and shared contracts**: the migration (D-40 onwards), regenerated types, zod contracts, 7 error codes, logger redaction and the factory update. ACs: AC-VERIFY-2, AC-VERIFY-3 (redaction) and AC-VERIFY-6.
 - [ ] **Phase 2: Teams API, discovery and joining**: create, find, mine, detail, invite lookup/get/regenerate, join requests, route policies and `team.*` logs. ACs: AC-HAPPY-1 to 5 and 12, AC-ERROR-1 to 5, 10 and 11, AC-VERIFY-1 and 4.
 - [ ] **Phase 3: Moderation API and ban seam** (follows the architecture creative doc): members list, approve/reject/re-request/promote/demote/ban, the `member-banned` queue and job, the handler port, `assertApprovedMember`, and ADR 0015. ACs: AC-HAPPY-6 to 11, AC-ERROR-6 to 9 and 12, AC-ASYNC-1 to 3, AC-INTEGRATION-1 and 2, AC-VERIFY-5.
 - [ ] **Phase 4: Web discovery, create and join pages**: header links, `/teams/find`, `/teams`, `/teams/new`, `/teams/[teamId]`, `/teams/join`, proxy, api-client and Server Actions. ACs: AC-ENTRY-1 to 4, plus the web side of AC-HAPPY-1 to 5.
@@ -609,11 +609,17 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: CREATIVE → BUILD
-**Current Step**: Creative complete; next /yay:build team-management (Phase 1)
+**Build Status**: IDLE (Phase 1 of 5 complete; next /yay:build team-management for Phase 2)
+**Current Phase**: Phase 1 of 5 COMPLETE: Schema invariants and shared contracts
+**Current Step**: Step 11 - committed
 **Step Started**: 2026-10-13
 **Can Resume**: NO
+
+### Phase 1 Build Log
+- TDD: 45 new tests (RED 44 failing, then GREEN); unit 473/473, integration 199/199, lint/typecheck/build PASS (verifier).
+- Code review: APPROVED (0 blocking). Applied rec 1 (Find cursor max length 700). Deferred: logger exact `code` body-key redaction (rec 2) for Phase 2 when lookup route lands; Phase 3 error mapper must key on `err.constraint` for 23000 guards.
+- D-46: `teams.create_idempotency_key uuid NULL` + `UNIQUE (created_by, create_idempotency_key)` (`uq_teams_created_by_idempotency_key`).
+- Guard & Recovery Log: empty (guard PASS first try).
 
 ### Active Sub-Agents
 - User Journey Design (opus): COMPLETE

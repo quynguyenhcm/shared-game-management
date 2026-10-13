@@ -35,6 +35,14 @@ export const ErrorCode = [
   'provider_already_connected',
   'link_session_mismatch',
   'last_sign_in_method',
+  // teams: join, invite and moderation (team-management)
+  'invite_invalid',
+  'already_requested',
+  'already_member',
+  'banned_from_team',
+  'team_admin_cannot_be_banned',
+  'last_team_admin',
+  'membership_state_conflict',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 
