@@ -609,11 +609,19 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 
 ## Execution State
 
-**Build Status**: IDLE (Phase 1 of 5 complete; next /yay:build team-management for Phase 2)
-**Current Phase**: Phase 1 of 5 COMPLETE: Schema invariants and shared contracts
-**Current Step**: Step 11 - committed
+**Build Status**: RUNNING
+**Current Phase**: 2 of 5
+**Auto-Build Mode**: YES
+**Current Step**: Auto-build loop started (Phases 2-5)
 **Step Started**: 2026-10-13
-**Can Resume**: NO
+**Can Resume**: YES
+**Resume From**: Phase 2: Teams API, discovery and joining
+
+### Halt State
+(none)
+
+### Deviations
+<!-- - Phase <N> | <file:line/artifact> | <rationale> -->
 
 ### Phase 1 Build Log
 - TDD: 45 new tests (RED 44 failing, then GREEN); unit 473/473, integration 199/199, lint/typecheck/build PASS (verifier).
