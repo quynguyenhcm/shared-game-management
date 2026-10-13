@@ -2,13 +2,13 @@
 slug: team-management
 legacy_id:
 feature: team-management
-status: CREATIVE_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # team-management: Team Management
 
 **Complexity**: Level 3 (inherited from team-management)
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: team-management
 **Branch**: feature/team-management
 **Worktree**: N/A (main checkout)
@@ -560,7 +560,7 @@ Build teams as the second `modules/<feature>` slice on top of the auth platform.
 - [x] **Phase 2: Teams API, discovery and joining**: create, find, mine, detail, invite lookup/get/regenerate, join requests, route policies and `team.*` logs. ACs: AC-HAPPY-1 to 5 and 12, AC-ERROR-1 to 5, 10 and 11, AC-VERIFY-1 and 4.
 - [x] **Phase 3: Moderation API and ban seam** (follows the architecture creative doc): members list, approve/reject/re-request/promote/demote/ban, the `member-banned` queue and job, the handler port, `assertApprovedMember`, and ADR 0015. ACs: AC-HAPPY-6 to 11, AC-ERROR-6 to 9 and 12, AC-ASYNC-1 to 3, AC-INTEGRATION-1 and 2, AC-VERIFY-5.
 - [x] **Phase 4: Web discovery, create and join pages**: header links, `/teams/find`, `/teams`, `/teams/new`, `/teams/[teamId]`, `/teams/join`, proxy, api-client and Server Actions. ACs: AC-ENTRY-1 to 4, plus the web side of AC-HAPPY-1 to 5.
-- [ ] **Phase 5: Team-admin area, E2E and docs** (follows the UI/UX creative doc): the manage area, Playwright journeys with axe, OpenAPI regeneration, coverage gate, and `systemPatterns.md`/`techContext.md` updates. This phase delivers the complete entry-to-success flow. ACs: AC-ENTRY-5, the web side of AC-HAPPY-6 to 12, AC-VERIFY-7 and 8, AC-INTEGRATION-3.
+- [x] **Phase 5: Team-admin area, E2E and docs** (follows the UI/UX creative doc): the manage area, Playwright journeys with axe, OpenAPI regeneration, coverage gate, and `systemPatterns.md`/`techContext.md` updates. This phase delivers the complete entry-to-success flow. ACs: AC-ENTRY-5, the web side of AC-HAPPY-6 to 12, AC-VERIFY-7 and 8, AC-INTEGRATION-3.
 
 ## Creative Phases
 
@@ -609,13 +609,13 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: 4 of 5
+**Build Status**: COMPLETE
+**Current Phase**: 5 of 5
 **Auto-Build Mode**: YES
-**Current Step**: Phase 4 complete (committed)
+**Current Step**: Phase 5 complete (committed); all phases built
 **Step Started**: 2026-10-13
-**Can Resume**: YES
-**Resume From**: Phase 5: Team-admin area, E2E and docs
+**Can Resume**: NO
+**Resume From**: /yay:reflect team-management
 
 ### Halt State
 (none)
@@ -657,6 +657,17 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 - Code review: APPROVED (0 blocking). Recs (non-blocking): single session resolution on team page; bound q/after in find page; deterministic fieldError order. Server components under app/teams have no unit tests (Phase 5 e2e to cover invite landing and replace-redirect).
 - Built: header links, proxy rules, api-client team methods, Server Actions (createTeamAction, joinTeamAction), labels/validation, pages /teams, /teams/find, /teams/new, /teams/[teamId], /teams/join, components/teams/*. Regenerate client method left for Phase 5.
 - Guard & Recovery Log: see commit guard result.
+
+### Phase 5 Build Log
+- TDD: RED confirmed (27 failing + 2 suites unloadable), then GREEN; ~78 new web unit tests. Verifier: 1038/1038 (763 unit + 275 integration), coverage gate PASS (modules/teams/** and lib/teams included; 97.65% lines), lint/typecheck/build/openapi drift PASS.
+- E2E: apps/web/e2e/teams.spec.ts EXECUTED by the TDD agent, 8/8 pass (desktop + 360x740), run natively (API, worker, prod `next start`, AUTH_FAKE_OAUTH=true, temp DB), not via Compose; not part of `ci`. Not covered in e2e: 5xx keep-panel path and self-demote success (unit-tested only).
+- Code review: APPROVED (0 blocking). Non-blocking recs: extract shared `callManageApi` helper in actions.ts; per-user id for the self-demote InlineConfirm; map manage `detail` 404/403 to notFound().
+- Built: manage layout + People page, manage-areas registry, InlineConfirm, moderation Server Actions, apiClient manage methods, notice auto-focus, systemPatterns/techContext updates.
+- Guard & Recovery Log: see commit guard result.
+
+### Deviations (Phase 5)
+- Phase 5 | apps/web/src/components/teams/* | No jsdom in the repo, so InlineConfirm keyboard/focus behaviour is covered by a pure reducer, static-markup ARIA tests and the Playwright run. Approve/Reject/Make admin are plain form actions; confirm panels and messages need JS. Accepted.
+- Phase 5 | apps/web/src/app/teams/[teamId]/manage | No separate manage/error.tsx; app/teams/error.tsx covers it. Accepted.
 
 ### Active Sub-Agents
 - User Journey Design (opus): COMPLETE

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BANNED_INTRO,
+  BAN_REASON_LABEL,
+  COPY_FAILED,
+  COPIED,
+  EMPTY_BANNED,
+  EMPTY_REQUESTS,
+  LAST_ADMIN_MESSAGE,
+  NO_ACCESS_HEADING,
+  OUTAGE_MESSAGE,
+  REGENERATE_PROMPT,
+  SELF_DEMOTE_PROMPT,
+  STALE_MESSAGE,
+  adminBanBlockedHint,
+  banPrompt,
+  emptyMembersLine,
+  formatManageDate,
+  inviteIntro,
+  manageSubtitle,
+  requestedLine,
+  bannedLine,
   INVITE_INVALID_HEADING,
   NOT_FOUND_HEADING,
   SKILL_OPTIONS,
@@ -224,6 +244,81 @@ describe('sortMyTeams (rows needing the user first, then by name)', () => {
     const input = [row('b'), row('a')];
     sortMyTeams(input);
     expect(input.map((team) => team.name)).toEqual(['b', 'a']);
+  });
+});
+
+describe('manage-area copy deck (UI/UX copy table; the ban copy is the user decision of 2026-10-13)', () => {
+  it('ban prompt promises no cancellation, and the reason label says only team admins see it', () => {
+    expect(banPrompt('Dee Park')).toBe(
+      "Ban Dee Park? They lose access to this team and can't register for its sessions.",
+    );
+    expect(banPrompt('Dee Park')).not.toMatch(/cancel/i);
+    expect(BAN_REASON_LABEL).toBe('Reason (optional, only team admins see this)');
+  });
+
+  it('confirm prompts and blocked-action messages are the exact strings of the spec', () => {
+    expect(REGENERATE_PROMPT).toBe('Generate a new link? The old link stops working immediately.');
+    expect(SELF_DEMOTE_PROMPT).toBe(
+      "Remove your own admin rights? You'll lose access to this page.",
+    );
+    expect(adminBanBlockedHint('Cam Ng')).toBe(
+      'Remove admin rights from Cam Ng before banning them.',
+    );
+    expect(LAST_ADMIN_MESSAGE).toBe(
+      'A team needs at least one admin. Make another member an admin first.',
+    );
+    expect(STALE_MESSAGE).toBe(
+      'Someone else already handled this request. The list has been refreshed.',
+    );
+    expect(OUTAGE_MESSAGE).toBe(
+      'Something went wrong on our side. Your details are still here. Try again in a minute.',
+    );
+    expect(NO_ACCESS_HEADING).toBe("You don't have access to manage this team.");
+    expect(COPIED).toBe('Link copied.');
+    expect(COPY_FAILED).toBe(
+      "Couldn't copy automatically. The link is selected, copy it manually.",
+    );
+  });
+
+  it('empty states and section intros', () => {
+    expect(EMPTY_REQUESTS).toBe('No join requests right now. New requests appear here.');
+    expect(EMPTY_BANNED).toBe('No banned members.');
+    expect(emptyMembersLine()).toBe(
+      "You're the only member so far. Share the invite link to bring people in.",
+    );
+    expect(BANNED_INTRO).toBe(
+      "Banned members lose access to this team and can't ask to join again.",
+    );
+    expect(inviteIntro('PUBLIC')).toBe(
+      'Share this link to invite people. Anyone who opens it can ask to join; you still approve them. This team is also listed in Find a team.',
+    );
+    expect(inviteIntro('PRIVATE')).toBe(
+      'Only people with this link can find and ask to join this team. You still approve them.',
+    );
+  });
+
+  it('formats dates in Pacific/Auckland, NZ style (P3), across the UTC date line', () => {
+    // 2026-10-03T23:30Z is already 4 Oct in Auckland (NZDT, UTC+13).
+    expect(formatManageDate('2026-10-03T23:30:00.000Z')).toBe('4 Oct 2026');
+    expect(formatManageDate('2026-10-03T01:00:00.000Z')).toBe('3 Oct 2026');
+  });
+
+  it('row lines read "{Skill} · requested {date}" and "banned {date} · Reason: ..."', () => {
+    expect(requestedLine('INTERMEDIATE', '2026-10-03T01:00:00.000Z')).toBe(
+      'Intermediate · requested 3 Oct 2026',
+    );
+    expect(bannedLine('2026-10-09T01:00:00.000Z', 'Repeated no-shows')).toBe(
+      'banned 9 Oct 2026 · Reason: Repeated no-shows',
+    );
+    expect(bannedLine('2026-10-09T01:00:00.000Z', null)).toBe(
+      'banned 9 Oct 2026 · No reason given.',
+    );
+    expect(bannedLine(null, null)).toBe('banned · No reason given.');
+  });
+
+  it('subtitle shows visibility and member count', () => {
+    expect(manageSubtitle('PUBLIC', 12)).toBe('Public team · 12 members');
+    expect(manageSubtitle('PRIVATE', 1)).toBe('Private team · 1 member');
   });
 });
 

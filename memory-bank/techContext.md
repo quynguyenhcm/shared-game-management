@@ -28,6 +28,7 @@
   - Retry strategy: `retryLimit: 3`, `retryDelay: 5s`, `retryBackoff: true` (exponential)
   - Deduplication via `singletonKey` (concurrent duplicates removed; handler must be idempotent for at-least-once delivery)
   - Visibility: job state in SQL (`pgboss.job`, `pgboss.archive`); visible failure tracking
+  - **`member-banned` queue** (team-management): policy `exclusive`, `singletonKey = member-banned:<membershipId>`, id-only payload, 7-day retention. Its handler is a no-op until registration-and-waitlist injects the real one via `registerJobs({ memberBannedHandler })`; a permanent failure is logged as `team.member.banned.hook_failed` and re-run with `cli jobs trigger member-banned` (ADR 0015)
 
 ### API & Communication
 - **REST API**: Fastify 5 with zod type provider
@@ -75,7 +76,8 @@
   - **Unit tests**: `**/*.test.ts` (no DB, no network, Node environment)
   - **Integration tests**: `**/*.int.test.ts` against real PostgreSQL 17 (forks pool, SKIP LOCKED job polling)
   - **Coverage provider**: v8, threshold 80% for money/time/invoice/auth shared code, the api platform libraries, `apps/api/src/modules/auth/**` and `apps/web/src/lib/**`; measured over unit and integration tests together (`pnpm run test:coverage`)
-  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
+  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`, `teams.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
+  - **Team journeys** (`teams.spec.ts`): run against a production `next start` build, with the worker running so the `member-banned` queue is drained. Not part of `pnpm run ci`
 - **Linting & Formatting**: ESLint 9.39.5 + TypeScript support, Prettier 3.9.9
   - **Type checking**: `tsc --noEmit` strict mode (no `any`, explicit return types)
   - **Code quality**: `no-console` error in `apps/api/src` (except `cli.ts`); bans on unsafe money operations (parseFloat, toFixed); host-TZ independence rules in `packages/shared/src/time/`
@@ -88,7 +90,7 @@
 | `apps/web` | Next.js App Router | Player and admin UI | `src/app/`, `src/components/`, `src/lib/api-client.ts` (typed Fetch wrapper with `traceparent` injection), `e2e/` (Playwright smoke tests) |
 | `apps/api` | Fastify service | REST API and job orchestration | `src/main.ts` (HTTP process), `src/worker.ts` (background worker), `src/cli.ts` (operator CLI: migrations, job triggers), `src/instrumentation.ts` (OTel setup) |
 | `apps/api/src/lib` | Server platform library | Shared infrastructure for API and worker | `config/` (zod env validation, fail-fast), `db/` (pg Pool, Kysely wrapper, migrations), `logger/` (pino setup, redaction), `crypto/` (AES-256-GCM keyring), `notifications/` (Notifier abstraction, adapters), `jobs/` (pg-boss wrapper, handler registry) |
-| `apps/api/src/modules` | Feature modules | Domain logic and handlers | One dir per feature; `<feature>/{routes.ts, service.ts, repo.ts}` convention (established for future features) |
+| `apps/api/src/modules` | Feature modules | Domain logic and handlers | One dir per feature; `<feature>/{routes.ts, service.ts, repo.ts}` convention (established for future features). `teams/` holds the membership state machine (`transitions.ts`), invite codes, the approved-member gate (`membership.ts`) and the ban port (`ban-hook.ts`) |
 | `apps/api/src/routes` | HTTP handlers | Request/response handlers `health.ts` (GET /health); cross-cutting routes land here, feature routes in modules |
 | `apps/api/src/jobs` | Job handlers | Background job implementations | `registry.ts` (queues), `schedules.ts` (cron slots), `bootstrap.ts`, `heartbeat.ts`, `send-email.ts`; billing/recurrence handlers are no-op placeholders until their features |
 | `apps/api/test` | Integration test harness | Real-DB test environment | `global-setup.ts` (migrations, pg-boss setup), `integration/` (*.int.test.ts files with real connections) |

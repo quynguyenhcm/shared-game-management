@@ -215,6 +215,74 @@ export function sortMyTeams<T extends MyTeamRow>(teams: readonly T[]): T[] {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Team-admin (manage) area copy (UI/UX "Copy" table; the ban copy is the 2026-10-13 user decision)
+// ---------------------------------------------------------------------------------------------
+
+export const NO_ACCESS_HEADING = "You don't have access to manage this team.";
+export const STALE_MESSAGE =
+  'Someone else already handled this request. The list has been refreshed.';
+export const LAST_ADMIN_MESSAGE =
+  'A team needs at least one admin. Make another member an admin first.';
+export const OUTAGE_MESSAGE =
+  'Something went wrong on our side. Your details are still here. Try again in a minute.';
+export const REGENERATE_PROMPT = 'Generate a new link? The old link stops working immediately.';
+export const REGENERATE_SUCCESS = 'New invite link generated. The old link no longer works.';
+export const SELF_DEMOTE_PROMPT = "Remove your own admin rights? You'll lose access to this page.";
+export const BAN_REASON_LABEL = 'Reason (optional, only team admins see this)';
+export const COPIED = 'Link copied.';
+export const COPY_FAILED = "Couldn't copy automatically. The link is selected, copy it manually.";
+export const EMPTY_REQUESTS = 'No join requests right now. New requests appear here.';
+export const EMPTY_BANNED = 'No banned members.';
+export const BANNED_INTRO = "Banned members lose access to this team and can't ask to join again.";
+
+export function banPrompt(fullName: string): string {
+  return `Ban ${fullName}? They lose access to this team and can't register for its sessions.`;
+}
+
+export function adminBanBlockedHint(fullName: string): string {
+  return `Remove admin rights from ${fullName} before banning them.`;
+}
+
+export function emptyMembersLine(): string {
+  return "You're the only member so far. Share the invite link to bring people in.";
+}
+
+export function inviteIntro(visibility: TeamVisibility): string {
+  return visibility === 'PRIVATE'
+    ? 'Only people with this link can find and ask to join this team. You still approve them.'
+    : 'Share this link to invite people. Anyone who opens it can ask to join; you still approve them. This team is also listed in Find a team.';
+}
+
+const MANAGE_DATE = new Intl.DateTimeFormat('en-NZ', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'Pacific/Auckland',
+});
+
+/** Dates are stored in UTC and shown in Pacific/Auckland, NZ style, only at the UI boundary (P3). */
+export function formatManageDate(iso: string): string {
+  return MANAGE_DATE.format(new Date(iso)).replace('Sept', 'Sep');
+}
+
+function skillName(skill: SkillTier): string {
+  return SKILL_OPTIONS.find((option) => option.value === skill)?.label ?? skill;
+}
+
+export function requestedLine(skill: SkillTier, requestedAt: string): string {
+  return `${skillName(skill)} · requested ${formatManageDate(requestedAt)}`;
+}
+
+export function bannedLine(bannedAt: string | null, reason: string | null): string {
+  const when = bannedAt === null ? 'banned' : `banned ${formatManageDate(bannedAt)}`;
+  return `${when} · ${reason === null || reason === '' ? 'No reason given.' : `Reason: ${reason}`}`;
+}
+
+export function manageSubtitle(visibility: TeamVisibility, memberCount: number): string {
+  return `${visibility === 'PRIVATE' ? 'Private' : 'Public'} team · ${memberCountLabel(memberCount)}`;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Form option data (UI/UX Q6)
 // ---------------------------------------------------------------------------------------------
 

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ jar: new Map<string, string>() }));
+const mocks = vi.hoisted(() => ({
+  jar: new Map<string, string>(),
+  revalidate: vi.fn<(path: string) => void>(),
+}));
+
+vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidate }));
 
 vi.mock('next/headers', () => ({
   cookies: () =>
@@ -18,7 +23,17 @@ vi.mock('next/navigation', () => ({
   RedirectType: { replace: 'replace', push: 'push' },
 }));
 
-const { createTeamAction, joinTeamAction } = await import('./actions.ts');
+const {
+  createTeamAction,
+  joinTeamAction,
+  approveMemberAction,
+  rejectMemberAction,
+  promoteMemberAction,
+  demoteMemberAction,
+  demoteSelfAction,
+  banMemberAction,
+  regenerateInviteAction,
+} = await import('./actions.ts');
 
 const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
 const KEY = '2f6c1c1e-7a64-4c0e-9d61-3c1f0c1f0a11';
@@ -54,6 +69,7 @@ async function redirectOf(promise: Promise<unknown>): Promise<string> {
 }
 
 beforeEach(() => {
+  mocks.revalidate.mockClear();
   mocks.jar.clear();
   mocks.jar.set('sgm_session', 'session-token');
 });
@@ -240,5 +256,151 @@ describe('joinTeamAction (AC-HAPPY-4/5, AC-ERROR-2..5)', () => {
       joinTeamAction({}, form({ ...PUBLIC_FIELDS, returnTo: 'https://evil.example' })),
     );
     expect(hostile).toBe('/login:replace');
+  });
+});
+
+describe('moderation Server Actions (AC-HAPPY-6..12, AC-ERROR-6/7/9/11 web side)', () => {
+  const USER_ID = '22222222-2222-4222-8222-222222222222';
+  const MANAGE = `/teams/${TEAM_ID}/manage`;
+  const MEMBER = {
+    userId: USER_ID,
+    fullName: 'Ana Lee',
+    role: 'MEMBER',
+    status: 'APPROVED',
+    skillLevel: 'BEGINNER',
+    requestedAt: '2026-10-03T01:00:00.000Z',
+    approvedAt: '2026-10-04T01:00:00.000Z',
+    bannedAt: null,
+    banReason: null,
+  };
+  const FIELDS = { teamId: TEAM_ID, userId: USER_ID, fullName: 'Ana Lee' };
+  const NONE = null;
+
+  it.each([
+    ['approve', approveMemberAction, 'Ana Lee has been approved.'],
+    ['reject', rejectMemberAction, "Ana Lee's request was declined."],
+    ['promote', promoteMemberAction, 'Ana Lee is now a team admin.'],
+    ['demote', demoteMemberAction, 'Ana Lee is no longer a team admin.'],
+  ] as const)(
+    '%s POSTs with the bearer and no body, reports the name from the API and revalidates the manage page',
+    async (kind, action, message) => {
+      const fetchMock = stubFetch(200, { member: MEMBER });
+      const result = await action(NONE, form(FIELDS));
+      expect(result).toEqual({ ok: true, message, refresh: true });
+      expect(fetchMock.mock.calls[0]?.[0]).toBe(
+        `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/${kind}`,
+      );
+      expect(fetchMock.mock.calls[0]?.[1]?.body).toBeUndefined();
+      const headers = (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
+      expect(headers.authorization).toBe('Bearer session-token');
+      expect(mocks.revalidate).toHaveBeenCalledWith(MANAGE);
+    },
+  );
+
+  it('ban sends the trimmed reason (or none) and reports "{Full name} has been banned."', async () => {
+    const fetchMock = stubFetch(200, { member: { ...MEMBER, status: 'BANNED' } });
+    const result = await banMemberAction(NONE, form({ ...FIELDS, reason: '  Repeated no-shows ' }));
+    expect(result).toMatchObject({ ok: true, message: 'Ana Lee has been banned.' });
+    expect(sentBody(fetchMock)).toEqual({ reason: 'Repeated no-shows' });
+
+    const bare = stubFetch(200, { member: { ...MEMBER, status: 'BANNED' } });
+    await banMemberAction(NONE, form({ ...FIELDS, reason: '   ' }));
+    expect(sentBody(bare)).toEqual({});
+  });
+
+  it('a 409 conflict reloads the list with the stale banner (AC-ERROR-9)', async () => {
+    stubFetch(409, { error: { code: 'membership_state_conflict', message: 'x' } });
+    const result = await approveMemberAction(NONE, form(FIELDS));
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'Someone else already handled this request. The list has been refreshed.',
+      refresh: true,
+    });
+    expect(mocks.revalidate).toHaveBeenCalledWith(MANAGE);
+  });
+
+  it('a 409 team_admin_cannot_be_banned uses the name from the form (AC-ERROR-6)', async () => {
+    stubFetch(409, { error: { code: 'team_admin_cannot_be_banned', message: 'x' } });
+    const result = await banMemberAction(NONE, form({ ...FIELDS, fullName: 'Cam Ng' }));
+    expect(result.message).toBe('Remove admin rights from Cam Ng before banning them.');
+  });
+
+  it('a 5xx changes nothing: no revalidate, no sign-out redirect, the outage copy (AC-ERROR-11)', async () => {
+    stubFetch(503, { error: { code: 'service_unavailable', message: 'down' } });
+    const result = await banMemberAction(NONE, form({ ...FIELDS, reason: 'typed' }));
+    expect(result).toEqual({
+      ok: false,
+      code: 'service_unavailable',
+      message:
+        'Something went wrong on our side. Your details are still here. Try again in a minute.',
+      refresh: false,
+    });
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('fetch failed'))),
+    );
+    expect((await approveMemberAction(NONE, form(FIELDS))).code).toBe('service_unavailable');
+  });
+
+  it('a 401 goes through the session-expired round trip back to the manage page', async () => {
+    stubFetch(401, { error: { code: 'unauthenticated', message: 'no' } });
+    const target = await redirectOf(approveMemberAction(NONE, form(FIELDS)));
+    expect(target).toBe(`/auth/session-expired?returnTo=${encodeURIComponent(MANAGE)}:replace`);
+  });
+
+  it('no session cookie sends the visitor to sign in without calling the API', async () => {
+    mocks.jar.clear();
+    const fetchMock = stubFetch(200, { member: MEMBER });
+    const target = await redirectOf(approveMemberAction(NONE, form(FIELDS)));
+    expect(target).toBe(`/login?returnTo=${encodeURIComponent(MANAGE)}:replace`);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('non-UUID ids never reach an API path: they are the stale-list answer', async () => {
+    const fetchMock = stubFetch(200, { member: MEMBER });
+    const result = await approveMemberAction(NONE, form({ teamId: TEAM_ID, userId: '../x' }));
+    expect(result).toMatchObject({ ok: false, refresh: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const badTeam = await approveMemberAction(NONE, form({ teamId: 'nope', userId: USER_ID }));
+    expect(badTeam.ok).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('self-demote redirects (replace) to the team page with the self_demoted notice', async () => {
+    const fetchMock = stubFetch(200, { member: { ...MEMBER, role: 'MEMBER' } });
+    const target = await redirectOf(demoteSelfAction(NONE, form(FIELDS)));
+    expect(target).toBe(`/teams/${TEAM_ID}?notice=self_demoted:replace`);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/demote`,
+    );
+  });
+
+  it('self-demote as the sole admin stays on the page with the last-admin banner (AC-ERROR-7)', async () => {
+    stubFetch(409, { error: { code: 'last_team_admin', message: 'x' } });
+    const result = await demoteSelfAction(NONE, form(FIELDS));
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'A team needs at least one admin. Make another member an admin first.',
+    });
+  });
+
+  it('regenerate POSTs with no body, reports the new-link copy and revalidates so the page shows the new URL', async () => {
+    const fetchMock = stubFetch(200, { inviteCode: 'NEWCODE' });
+    const result = await regenerateInviteAction(NONE, form({ teamId: TEAM_ID }));
+    expect(result).toEqual({
+      ok: true,
+      message: 'New invite link generated. The old link no longer works.',
+      refresh: true,
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/invite-code/regenerate`,
+    );
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBeUndefined();
+    const headers = (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
+    expect(headers['content-type']).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('NEWCODE');
+    expect(mocks.revalidate).toHaveBeenCalledWith(MANAGE);
   });
 });

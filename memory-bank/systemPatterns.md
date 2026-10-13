@@ -71,6 +71,29 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Testing**: DB-backed behaviour via `app.inject` over a cloned Postgres (`buildAuthTestApp`), pure rules as table-driven unit tests, browser journeys and axe scans in Playwright on desktop and a 360 px project with `AUTH_FAKE_OAUTH=true` (the fake provider answers `oauth.fake.invalid`).
 - **Trade-offs**: we own security-sensitive code (small surfaces, recorded fixtures, tampered-token tests); no MFA, passkeys or session list in v1; the web image bakes `WEB_BASE_URL` (Server Action `allowedOrigins`), so there is one image per environment.
 
+### Team membership state machine and DB invariants (team-management)
+- **Implementation**: migration `db/migrations/20261013000100000_team_membership_invariants.sql` (ledger D-40..D-46): admin implies APPROVED; stamp CHECKs for approval and ban; `ban_reason` 1-500 trimmed; a `BEFORE UPDATE` trigger allowing only PENDING to APPROVED or REJECTED, REJECTED to PENDING, and APPROVED to BANNED (BANNED is terminal in v1) and making `team_id`/`user_id` immutable; deferred constraint triggers that require one approved admin at COMMIT (`team_members_last_admin`); team name, description and invite-code format CHECKs; a unique `(created_by, create_idempotency_key)` for create replays. The pure table `modules/teams/transitions.ts` (`decide`) gives the precise 409 on the normal path and is kept aligned with the trigger by a shared matrix fixture.
+- **Lock order**: the team row first, then `team_members` rows. Every moderation takes the team row `FOR NO KEY UPDATE` (the per-team mutex), re-checks under that lock that the actor is still an approved admin (the route guard ran outside the transaction), then locks the target by `(team_id, user_id)` and writes with a guarded `UPDATE ... WHERE status = $expected`. The service maps DB violations by `err.constraint` (last admin: 409 `last_team_admin`).
+- **Policy**: all admins are equal; ban only an APPROVED `MEMBER` (an admin is refused with `team_admin_cannot_be_banned` until demoted); re-request after rejection returns the same row to PENDING. Decision record: `docs/adr/0015-team-membership-and-ban-seam.md`.
+- **Trade-offs**: the rules live in two encodings (SQL and TypeScript) that must be kept in step; the database is the backstop, the TypeScript table only shapes the error.
+
+### Ban seam (member-banned)
+- **Implementation**: a ban commits `status = 'BANNED'` and enqueues a `member-banned` job in the same transaction (P5), so a rolled-back ban leaves no job. Queue policy `exclusive`, `singletonKey = member-banned:<membershipId>`, `retryLimit 3`, 7-day retention. The payload is ids plus one UTC timestamp (`MemberBannedPayload` in `modules/teams/ban-hook.ts`); no name, email, invite code or ban reason reaches `pgboss.job` or a log line.
+- **Port**: `MemberBannedHandler` with a no-op default (logs `team.member.banned.hook_noop`). The real handler is injected only through `registerJobs({ memberBannedHandler })` in `jobs/bootstrap.ts` and `worker.ts`, never through an environment variable. The job (`jobs/member-banned.ts`) re-reads the membership by id: gone is a no-op (`team.member.banned.stale`), and mismatched ids or status fail without retries.
+- **Failure rules**: access is revoked by the committed row, so a failing handler never undoes or delays the ban. Transient errors retry with backoff; permanent ones (`NonRetryableJobError`, or retries exhausted) end in `failed` with `team.member.banned.hook_failed`. The re-run is `cli jobs trigger member-banned '<json>'`.
+- **Approved-member gate**: `assertApprovedMember(trx, teamId, userId)` (`modules/teams/membership.ts`) reads the `team_members` row `FOR SHARE` and throws `forbidden` unless APPROVED. Registration calls it inside its transaction before any `game_sessions` lock. Canonical lock order for all features: `teams`, `team_members`, `game_sessions`, `registrations`, `registration_guests`, payments.
+- **Status**: the handler is a no-op until registration-and-waitlist ships. The ban confirmation copy promises no cancellation until then. ADR 0015 holds the handler contract (idempotent, state-based selection, one session per transaction) and the reconciliation sweep that registration-and-waitlist must ship.
+
+### Invite codes (team-management)
+- **Implementation**: `modules/teams/invite-code.ts`. 256 random bits from `crypto.randomBytes`, base64url (43 characters, inside the `teams_invite_code_format` CHECK). A unique-constraint collision is retried with a new code up to 3 attempts (`withInviteCodeRetry`), each attempt in its own transaction.
+- **Capability handling**: the code is a bearer capability to ask to join. It is compared in constant time (`timingSafeEqual`), is never logged, and is sent by `POST` so it never appears in a URL. Only `getInviteCode`, `lockTeam` and the lookup-by-code query select it (`repo.ts`), so list and detail responses cannot leak it. It is returned only by the admin invite-code endpoints and regenerate.
+- **Rotation race**: a join holds the team row `FOR SHARE` and a regenerate holds it `FOR UPDATE`, so a join either sees the rotated code or waits; a join with the old code after a committed rotation fails.
+
+### Manage area registry and inline confirm (web)
+- **Area registry**: `apps/web/src/lib/teams/manage-areas.ts` (`MANAGE_AREAS`). Today there is one area ("People"), so `manageAreaLinks` returns no nav. A later feature appends one entry and the area nav appears when there are two or more.
+- **InlineConfirm**: `apps/web/src/components/teams/inline-confirm.tsx` is the one confirmation pattern. It is a disclosure (`aria-expanded`, `aria-controls`) with a non-modal `role="group"` under the row. Focus moves to the prompt, Cancel and Escape return it to the trigger, and only one confirm is open per section (`manage-state.ts` reducer). No native `confirm()` or `<dialog>`, because a native browser dialog blocks the flow in UAT. It needs JavaScript; the safe failure is that the destructive action cannot be taken.
+- **Moderation Server Actions**: `apps/web/src/lib/teams/actions.ts` (`'use server'`) calls the API with the bearer token. `moderation.ts` maps each API answer to its copy and `refresh` flag. Actions are never optimistic: the manage page is revalidated only after a successful change, and a 5xx keeps the panel open with no change.
+
 ## Integration Patterns
 
 ### Email
@@ -147,6 +170,12 @@ To populate this section, run `/yay:c4`. The command builds a complete bottom-up
 <!-- AUTO-MANAGED: c4-architecture-end -->
 
 ## Recent Architecture Changes
+
+### 2026-10-13 - Team management (team-management)
+- **What Changed**: `modules/teams` (routes, service, repo, transitions, invite code, membership gate, ban hook) with a DB-enforced membership state machine (migration `20261013000100000`); the `member-banned` job and its no-op handler port; invite-code rotation; the team-admin manage area with Server Actions for moderation, the area registry and the InlineConfirm disclosure.
+- **Reason**: Team admins need to approve, moderate and ban members, and registration-and-waitlist needs a race-free ban signal without the ban depending on that feature (see `docs/adr/0015`).
+- **Trade-offs**: a ban revokes team access synchronously but releases seats only eventually (via the job); the handler is a no-op until registration-and-waitlist ships; moderation is serialised per team by the team row lock.
+- **Affected Components**: `apps/api` (`modules/teams`, `jobs/member-banned.ts`, `jobs/bootstrap.ts`, `worker.ts`, `cli.ts`), `apps/web` (`app/teams`, `components/teams`, `lib/teams`, `e2e/teams.spec.ts`), `packages/shared` (team DTOs), `db/migrations`.
 
 ### 2026-10-06 - Authentication and user roles (auth-and-user-roles)
 - **What Changed**: Email/password, Google and Facebook sign-in; opaque Postgres sessions relayed by the web as a bearer token; default-deny route policies with global and per-team role guards; Postgres sliding-log throttling; password reset that evicts OAuth identities; the shared HTTP error shape; web `SiteHeader`, auth pages, `proxy.ts`; Playwright journeys on two viewports.

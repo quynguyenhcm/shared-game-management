@@ -7,10 +7,13 @@ import {
   ForgotPasswordResponse,
   HealthResponse,
   IdentitiesResponse,
+  InviteCodeResponse,
   InviteLookupResponse,
   JoinRequestResponse,
   MeResponse,
+  MembersResponse,
   MineTeamsResponse,
+  ModerationResponse,
   OAuthAuthorizeResponse,
   OAuthCallbackResponse,
   OAuthCompleteResponse,
@@ -18,8 +21,10 @@ import {
   ProvidersResponse,
   ResetPasswordResponse,
   TeamDetailResponse,
+  type BanMemberRequest,
   type CreateTeamRequest,
   type FindTeamsQuery,
+  type MembersQuery,
   type ForgotPasswordRequest,
   type InviteLookupRequest,
   type JoinRequestRequest,
@@ -382,5 +387,70 @@ export const apiClient = {
       method: 'POST',
       body,
       schema: JoinRequestResponse,
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Team-admin area (`TEAM_ADMIN` routes: the API answers 403 to everyone else, before validation).
+  // -------------------------------------------------------------------------------------------
+
+  /** One section per call (`status`), 50 per page, `after` is the opaque cursor of that section. */
+  teamMembers: (
+    teamId: string,
+    query: Pick<MembersQuery, 'status' | 'after'>,
+    options: ApiCallOptions = {},
+  ) => {
+    const params = new URLSearchParams({ status: query.status });
+    if (query.after) params.set('after', query.after);
+    return apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members?${params.toString()}`,
+      method: 'GET',
+      schema: MembersResponse,
+    });
+  },
+
+  /** Approve, reject, promote and demote take no body: sending JSON content-type with none is a 422. */
+  moderateMember: (
+    teamId: string,
+    userId: string,
+    action: 'approve' | 'reject' | 'promote' | 'demote',
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/${action}`,
+      method: 'POST',
+      schema: ModerationResponse,
+    }),
+
+  banMember: (
+    teamId: string,
+    userId: string,
+    body: BanMemberRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/ban`,
+      method: 'POST',
+      body,
+      schema: ModerationResponse,
+    }),
+
+  teamInviteCode: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/invite-code`,
+      method: 'GET',
+      schema: InviteCodeResponse,
+    }),
+
+  /** POST with NO body and no JSON content-type (the route takes none; an empty JSON body is a 422). */
+  regenerateInviteCode: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/invite-code/regenerate`,
+      method: 'POST',
+      schema: InviteCodeResponse,
     }),
 };

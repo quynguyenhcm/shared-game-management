@@ -65,7 +65,7 @@ export default async function TeamPage({
     <TeamShell>
       <title>{`${team.name} – Shared Game Management`}</title>
       <StripAuthParams />
-      {notice === null ? null : <FormBanner kind="notice" lines={[notice]} />}
+      {notice === null ? null : <FormBanner kind="notice" lines={[notice]} focusOnMount />}
       <h1 className="min-w-0 break-words text-2xl font-semibold">{team.name}</h1>
       <p className="flex flex-wrap items-center gap-x-3 text-base">
         <Tag>{team.visibility === 'PRIVATE' ? 'Private team' : 'Public team'}</Tag>
