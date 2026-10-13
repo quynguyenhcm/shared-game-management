@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  BanMemberRequest,
   CreateTeamRequest,
   CreateTeamResponse,
   ErrorResponse,
@@ -11,12 +12,17 @@ import {
   InviteLookupResponse,
   JoinRequestRequest,
   JoinRequestResponse,
+  MembersQuery,
+  MembersResponse,
   MineTeamsResponse,
+  ModerationResponse,
   TeamDetailResponse,
   TeamIdParams,
+  TeamMemberParams,
 } from '@sgm/shared';
 import { authenticated, optionalSession, requireTeamRole } from '../../lib/auth/policy.ts';
 import { requireAuth } from '../../lib/auth/request-auth.ts';
+import { AppError } from '../../lib/http/errors.ts';
 import type { TeamsContext, TeamsService } from './service.ts';
 
 export interface TeamsRoutesOptions {
@@ -25,13 +31,68 @@ export interface TeamsRoutesOptions {
 
 const contextOf = (request: FastifyRequest): TeamsContext => ({ log: request.log });
 
+/** The moderation actions that take no body; ban takes an optional `{ reason }`. */
+const SIMPLE_MODERATIONS = [
+  {
+    action: 'approve',
+    summary: 'Approve a join request',
+    description:
+      'PENDING to APPROVED, stamping approver and time; the self-assessed skill level is unchanged. The requester passes `requireTeamRole(MEMBER)` on their very next request.',
+  },
+  {
+    action: 'reject',
+    summary: 'Reject a join request',
+    description:
+      'PENDING to REJECTED. The person keeps no access and may ask again later (the same row returns to PENDING).',
+  },
+  {
+    action: 'promote',
+    summary: 'Make a member a team admin',
+    description:
+      'An APPROVED MEMBER becomes TEAM_ADMIN (status stays APPROVED). All admins are equal.',
+  },
+  {
+    action: 'demote',
+    summary: 'Remove admin rights',
+    description:
+      'An approved TEAM_ADMIN becomes a MEMBER; allowed on oneself. 409 `last_team_admin` when it would leave the team with no admin.',
+  },
+] as const;
+
 /**
- * `/teams/*` Phase 2 endpoints (the moderation routes arrive in Phase 3). The invite code is in no response except
- * the two `TEAM_ADMIN` invite-code routes and travels in the lookup and join request bodies only.
+ * `/teams/*` endpoints. The invite code is in no response except the two `TEAM_ADMIN` invite-code routes and
+ * travels in the lookup and join request bodies only. Moderation routes are `TEAM_ADMIN` of the team in the path
+ * (no global-admin override): the guard answers 401/403 in `onRequest`, before the body is parsed or validated.
  */
 export const teamsRoutes: FastifyPluginAsync<TeamsRoutesOptions> = (app, options) => {
   const { service } = options;
   const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  // A guard refusal never reaches a handler, so the service cannot log it: record `team.action.refused` here for the
+  // admin routes (ids and the route template only, never the body). A 401 has no actor and is not logged.
+  app.addHook('onError', (request, _reply, error, done) => {
+    const policy = request.routeOptions.config.policy;
+    if (
+      policy?.kind === 'teamRole' &&
+      error instanceof AppError &&
+      error.code === 'forbidden' &&
+      request.auth !== null
+    ) {
+      const params = request.params as Record<string, unknown> | undefined;
+      const teamId = params?.[policy.teamIdParam];
+      request.log.warn(
+        {
+          event: 'team.action.refused',
+          action: `${request.method} ${request.routeOptions.url ?? ''}`,
+          actorId: request.auth.userId,
+          ...(typeof teamId === 'string' && /^[0-9a-f-]{36}$/i.test(teamId) ? { teamId } : {}),
+          reason: 'forbidden',
+        },
+        'team action refused',
+      );
+    }
+    done();
+  });
 
   typed.post(
     '',
@@ -197,6 +258,89 @@ export const teamsRoutes: FastifyPluginAsync<TeamsRoutesOptions> = (app, options
       return service.regenerateInviteCode(
         request.params.teamId,
         requireAuth(request).userId,
+        contextOf(request),
+      );
+    },
+  );
+
+  typed.get(
+    '/:teamId/members',
+    {
+      config: { policy: requireTeamRole('TEAM_ADMIN') },
+      schema: {
+        summary: 'List team members for admins',
+        description:
+          'One section per call (`status` is PENDING, APPROVED or BANNED), 50 per page with an opaque keyset cursor for the same section. PENDING: oldest request first. APPROVED: admins first, then by name. BANNED: newest first, with the ban reason (admins only). Full name and self-assessed skill only; never an email. `adminCount` counts approved admins and drives the last-admin hint.',
+        operationId: 'listTeamMembers',
+        params: TeamIdParams,
+        querystring: MembersQuery,
+        response: { 200: MembersResponse, 422: ErrorResponse },
+      },
+    },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      return service.listMembers(request.params.teamId, request.query);
+    },
+  );
+
+  for (const { action, summary, description } of SIMPLE_MODERATIONS) {
+    typed.post(
+      `/:teamId/members/:userId/${action}`,
+      {
+        config: { policy: requireTeamRole('TEAM_ADMIN') },
+        schema: {
+          summary,
+          description: `${description} The target is always looked up by (team, user): a user with no row in this team is 404 \`not_found\`. An action that no longer matches the row's current state is 409 \`membership_state_conflict\`. The actor is re-checked as an approved admin under the team-row lock.`,
+          operationId: `${action}TeamMember`,
+          params: TeamMemberParams,
+          response: {
+            200: ModerationResponse,
+            404: ErrorResponse,
+            409: ErrorResponse,
+            422: ErrorResponse,
+          },
+        },
+      },
+      async (request, reply) => {
+        void reply.header('cache-control', 'no-store');
+        return service.moderate(
+          request.params.teamId,
+          requireAuth(request).userId,
+          request.params.userId,
+          action,
+          contextOf(request),
+        );
+      },
+    );
+  }
+
+  typed.post(
+    '/:teamId/members/:userId/ban',
+    {
+      config: { policy: requireTeamRole('TEAM_ADMIN') },
+      schema: {
+        summary: 'Ban a member',
+        description:
+          "An APPROVED MEMBER becomes BANNED (terminal in v1) and a `member-banned` job is enqueued in the same transaction. Access and new registrations are blocked at commit; cancelling existing registrations is the job handler's business (registration-and-waitlist). `reason` is optional, at most 500 characters, visible to team admins only. An approved admin cannot be banned until demoted (409 `team_admin_cannot_be_banned`).",
+        operationId: 'banTeamMember',
+        params: TeamMemberParams,
+        // Nullish: a body-less POST reaches validation as `null`.
+        body: BanMemberRequest.nullish(),
+        response: {
+          200: ModerationResponse,
+          404: ErrorResponse,
+          409: ErrorResponse,
+          422: ErrorResponse,
+        },
+      },
+    },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      return service.ban(
+        request.params.teamId,
+        requireAuth(request).userId,
+        request.params.userId,
+        request.body?.reason,
         contextOf(request),
       );
     },

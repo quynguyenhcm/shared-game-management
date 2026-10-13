@@ -195,3 +195,106 @@ describe('team routes leave no secret or PII in the logs', () => {
     }
   });
 });
+
+describe('moderation leaves one structured event per action and no PII in the logs (AC-VERIFY-5)', () => {
+  it('logs team.member.approved|promoted|demoted|banned and team.action.refused (guard 403 included) with ids and traceId only', async () => {
+    const owner = await person('Octavia Ironbark');
+    const joiner = await person('Percival Tidewater');
+    const victim = await person('Rosalind Harbourlight');
+    const intruder = await person('Sebastian Outsider');
+    const banReason = 'sensitive reason: shouted at the coach';
+
+    const created = await call('POST', '/teams', owner, {
+      name: 'Ironbark Moderation Club',
+      visibility: 'PUBLIC',
+      skillLevel: 'ADVANCED',
+      idempotencyKey: randomUUID(),
+    });
+    const teamId = created.json<{ team: { id: string } }>().team.id;
+    for (const who of [joiner, victim]) {
+      expect(
+        (await call('POST', `/teams/${teamId}/join-requests`, who, { skillLevel: 'BEGINNER' }))
+          .statusCode,
+      ).toBe(201);
+    }
+    const act = (who: Person, user: Person, action: string, body?: Record<string, unknown>) =>
+      call('POST', `/teams/${teamId}/members/${user.id}/${action}`, who, body);
+
+    expect((await act(owner, joiner, 'approve')).statusCode).toBe(200);
+    expect((await act(owner, victim, 'approve')).statusCode).toBe(200);
+    expect((await act(owner, joiner, 'promote')).statusCode).toBe(200);
+    expect((await act(owner, joiner, 'demote')).statusCode).toBe(200);
+    // Refusals: a stale approve, a ban of an admin, an unknown target, and a guard 403 (and a 401, which has no actor).
+    expect((await act(owner, joiner, 'approve')).statusCode).toBe(409);
+    expect((await act(owner, owner, 'ban')).statusCode).toBe(409);
+    expect((await act(owner, intruder, 'reject')).statusCode).toBe(404);
+    expect((await act(intruder, victim, 'ban', { reason: 'x'.repeat(900) })).statusCode).toBe(403);
+    expect((await act(joiner, victim, 'ban')).statusCode).toBe(403);
+    const anonymous = await h.app.inject({
+      method: 'POST',
+      url: `/teams/${teamId}/members/${victim.id}/ban`,
+    });
+    expect(anonymous.statusCode).toBe(401);
+    expect((await act(owner, victim, 'ban', { reason: banReason })).statusCode).toBe(200);
+
+    const lines = h.logs.lines();
+    const mine = lines.filter(
+      (line) =>
+        typeof line.event === 'string' && line.event.startsWith('team.') && line.teamId === teamId,
+    );
+    const only = (name: string) => mine.filter((line) => line.event === name);
+    expect(only('team.member.approved').map((l) => l.userId)).toEqual([joiner.id, victim.id]);
+    expect(only('team.member.promoted').map((l) => l.userId)).toEqual([joiner.id]);
+    expect(only('team.member.demoted').map((l) => l.userId)).toEqual([joiner.id]);
+    expect(only('team.member.banned').map((l) => l.userId)).toEqual([victim.id]);
+    for (const name of [
+      'team.member.approved',
+      'team.member.promoted',
+      'team.member.demoted',
+      'team.member.banned',
+    ]) {
+      for (const line of only(name)) {
+        expect(line, name).toMatchObject({ actorId: owner.id, teamId, traceId: TRACE_ID });
+      }
+    }
+
+    const refused = only('team.action.refused');
+    expect(refused.map((line) => line.reason).sort()).toEqual(
+      [
+        'forbidden',
+        'forbidden',
+        'membership_state_conflict',
+        'not_found',
+        'team_admin_cannot_be_banned',
+      ].sort(),
+    );
+    for (const line of refused) {
+      expect(line.traceId).toBe(TRACE_ID);
+      expect(line.actorId, JSON.stringify(line)).toEqual(expect.any(String));
+      expect(line.action).toEqual(expect.any(String));
+    }
+    expect(
+      refused
+        .filter((l) => l.reason === 'forbidden')
+        .map((l) => l.actorId)
+        .sort(),
+    ).toEqual([intruder.id, joiner.id].sort());
+
+    const serialised = JSON.stringify(lines);
+    for (const secret of [
+      banReason,
+      'shouted at the coach',
+      'Ironbark Moderation Club',
+      ...[owner, joiner, victim, intruder].flatMap((p) => [p.email, p.fullName, p.token]),
+    ]) {
+      expect(serialised, secret.slice(0, 14)).not.toContain(secret);
+    }
+    for (const line of mine) {
+      expect(
+        Object.keys(line).filter(
+          (key) => /email|name|code|token|banReason/i.test(key) && key !== 'reason',
+        ),
+      ).toEqual([]);
+    }
+  });
+});

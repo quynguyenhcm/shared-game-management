@@ -3,16 +3,20 @@
  * The invite code is selected only by `getInviteCode`, `lockTeam` (the join and regenerate checks) and the lookup
  * by code; no list or detail query ever selects it, so a response cannot leak it by accident.
  */
-import { sql, type RawBuilder } from 'kysely';
+import { sql, type RawBuilder, type UpdateResult } from 'kysely';
 import {
   FIND_PAGE_SIZE,
+  MEMBERS_PAGE_SIZE,
   type FindCursorPayload,
+  type MemberListStatus,
   type MembershipStatus,
   type SkillTier,
+  type TeamMemberRow,
   type TeamRole,
   type TeamVisibility,
 } from '@sgm/shared';
 import type { Database } from '../../lib/db/kysely.ts';
+import type { MembersCursor } from './members-cursor.ts';
 
 export interface TeamRow {
   readonly id: string;
@@ -289,18 +293,26 @@ export interface LockedTeam {
 
 /**
  * Locks the team row for the rest of the transaction and reads its current code under that lock. `share` (join)
- * conflicts with `update` (regenerate), so a join either sees the rotated code or makes the rotation wait.
+ * conflicts with `update` (regenerate) and with `noKeyUpdate` (moderation), so a join either sees the rotated code
+ * or makes the rotation wait. `noKeyUpdate` is the per-team moderation mutex: it does not block foreign-key
+ * inserts that reference the team (which take KEY SHARE), unlike `update`.
  */
 export async function lockTeam(
   trx: Database,
   teamId: string,
-  mode: 'share' | 'update',
+  mode: 'share' | 'update' | 'noKeyUpdate',
 ): Promise<LockedTeam | undefined> {
   const query = trx
     .selectFrom('teams')
     .select(['id', 'visibility', 'invite_code'])
     .where('id', '=', teamId);
-  const row = await (mode === 'share' ? query.forShare() : query.forUpdate()).executeTakeFirst();
+  const locked =
+    mode === 'share'
+      ? query.forShare()
+      : mode === 'update'
+        ? query.forUpdate()
+        : query.forNoKeyUpdate();
+  const row = await locked.executeTakeFirst();
   return row === undefined
     ? undefined
     : { id: row.id, visibility: row.visibility, inviteCode: row.invite_code };
@@ -369,4 +381,254 @@ export async function getInviteCode(db: Database, teamId: string): Promise<strin
 
 export async function setInviteCode(db: Database, teamId: string, code: string): Promise<void> {
   await db.updateTable('teams').set({ invite_code: code }).where('id', '=', teamId).execute();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Moderation (Phase 3). Lock order everywhere: teams, then team_members.
+// ---------------------------------------------------------------------------------------------
+
+export interface LockedTarget {
+  readonly id: string;
+  readonly role: TeamRole;
+  readonly status: MembershipStatus;
+}
+
+/**
+ * The target's row `FOR UPDATE`, always looked up by `(team_id, user_id)` and never by user id alone, so another
+ * team's member is simply absent (IDOR-safe).
+ */
+export async function lockTarget(
+  trx: Database,
+  teamId: string,
+  userId: string,
+): Promise<LockedTarget | undefined> {
+  return trx
+    .selectFrom('team_members')
+    .select(['id', 'role', 'status'])
+    .where('team_id', '=', teamId)
+    .where('user_id', '=', userId)
+    .forUpdate()
+    .executeTakeFirst();
+}
+
+/** Approved admins of the team; exact under the team lock. */
+export async function countApprovedAdmins(db: Database, teamId: string): Promise<number> {
+  const row = await db
+    .selectFrom('team_members')
+    .select((eb) => eb.fn.countAll<string>().as('n'))
+    .where('team_id', '=', teamId)
+    .where('role', '=', 'TEAM_ADMIN')
+    .where('status', '=', 'APPROVED')
+    .executeTakeFirstOrThrow();
+  return Number(row.n);
+}
+
+/** What a guarded moderation UPDATE changes; stamps are written from the injected clock, not by a trigger. */
+export type MembershipChange =
+  | { readonly kind: 'approve'; readonly actorId: string; readonly now: Date }
+  | { readonly kind: 'reject' }
+  | { readonly kind: 'promote' }
+  | { readonly kind: 'demote' }
+  | {
+      readonly kind: 'ban';
+      readonly actorId: string;
+      readonly now: Date;
+      readonly reason: string | null;
+    };
+
+/**
+ * One guarded `UPDATE ... WHERE id = $id AND status = $expected [AND role = $expected]`. Returns false when the row
+ * no longer matches (defensive: the row lock makes that unreachable while the caller holds it).
+ */
+export async function applyMembershipChange(
+  trx: Database,
+  membershipId: string,
+  change: MembershipChange,
+): Promise<boolean> {
+  const base = trx.updateTable('team_members').where('id', '=', membershipId);
+  let result: UpdateResult;
+  switch (change.kind) {
+    case 'approve':
+      result = await base
+        .set({ status: 'APPROVED', approved_at: change.now, approved_by: change.actorId })
+        .where('status', '=', 'PENDING')
+        .executeTakeFirst();
+      break;
+    case 'reject':
+      result = await base
+        .set({ status: 'REJECTED' })
+        .where('status', '=', 'PENDING')
+        .executeTakeFirst();
+      break;
+    case 'promote':
+      result = await base
+        .set({ role: 'TEAM_ADMIN' })
+        .where('status', '=', 'APPROVED')
+        .where('role', '=', 'MEMBER')
+        .executeTakeFirst();
+      break;
+    case 'demote':
+      result = await base
+        .set({ role: 'MEMBER' })
+        .where('status', '=', 'APPROVED')
+        .where('role', '=', 'TEAM_ADMIN')
+        .executeTakeFirst();
+      break;
+    case 'ban':
+      result = await base
+        .set({
+          status: 'BANNED',
+          banned_at: change.now,
+          banned_by: change.actorId,
+          ban_reason: change.reason,
+        })
+        .where('status', '=', 'APPROVED')
+        .where('role', '=', 'MEMBER')
+        .executeTakeFirst();
+      break;
+  }
+  return result.numUpdatedRows > 0n;
+}
+
+interface MemberSqlRow {
+  readonly user_id: string;
+  readonly full_name: string;
+  readonly role: TeamRole;
+  readonly status: MembershipStatus;
+  readonly skill_level: SkillTier;
+  readonly requested_at: Date;
+  readonly approved_at: Date | null;
+  readonly banned_at: Date | null;
+  readonly ban_reason: string | null;
+}
+
+function toMemberRow(row: MemberSqlRow): TeamMemberRow {
+  return {
+    userId: row.user_id,
+    fullName: row.full_name,
+    role: row.role,
+    status: row.status,
+    skillLevel: row.skill_level,
+    requestedAt: row.requested_at.toISOString(),
+    approvedAt: row.approved_at === null ? null : row.approved_at.toISOString(),
+    bannedAt: row.banned_at === null ? null : row.banned_at.toISOString(),
+    banReason: row.ban_reason,
+  };
+}
+
+/** One person as the admin lists show them (full name and self-assessed skill; never an email). */
+export async function getMemberRow(
+  db: Database,
+  teamId: string,
+  userId: string,
+): Promise<TeamMemberRow | undefined> {
+  const row = await db
+    .selectFrom('team_members as m')
+    .innerJoin('users as u', 'u.id', 'm.user_id')
+    .select([
+      'm.user_id',
+      'u.full_name',
+      'm.role',
+      'm.status',
+      'm.skill_level',
+      'm.requested_at',
+      'm.approved_at',
+      'm.banned_at',
+      'm.ban_reason',
+    ])
+    .where('m.team_id', '=', teamId)
+    .where('m.user_id', '=', userId)
+    .executeTakeFirst();
+  return row === undefined ? undefined : toMemberRow(row);
+}
+
+export interface MemberListPage {
+  readonly members: readonly TeamMemberRow[];
+  /** The cursor for the row after the last one returned, or `null` when this is the last page. */
+  readonly next: MembersCursor | null;
+}
+
+/**
+ * One section of the admin lists, 50 rows (51 fetched; the extra one only signals "more"), keyset-paged:
+ *  PENDING  oldest request first      (requested_at, user_id)
+ *  APPROVED admins first, then name   (role rank, lower(full_name), user_id)
+ *  BANNED   newest ban first          (banned_at, user_id) descending
+ * Sort keys are read and compared as text/typed parameters so microsecond timestamps and the database collation
+ * are exact. `ban_reason` is selected only for BANNED rows.
+ */
+export async function listMembers(
+  db: Database,
+  teamId: string,
+  status: MemberListStatus,
+  cursor: MembersCursor | null,
+): Promise<MemberListPage> {
+  const filters: RawBuilder<unknown>[] = [
+    sql`m.team_id = ${teamId}::uuid`,
+    sql`m.status = ${status}::membership_status`,
+  ];
+  let order: RawBuilder<unknown>;
+  if (status === 'PENDING') {
+    if (cursor?.s === 'PENDING') {
+      filters.push(
+        sql`(m.requested_at, m.user_id) > (${cursor.t}::timestamptz, ${cursor.i}::uuid)`,
+      );
+    }
+    order = sql`m.requested_at ASC, m.user_id ASC`;
+  } else if (status === 'BANNED') {
+    if (cursor?.s === 'BANNED') {
+      filters.push(sql`(m.banned_at, m.user_id) < (${cursor.t}::timestamptz, ${cursor.i}::uuid)`);
+    }
+    order = sql`m.banned_at DESC, m.user_id DESC`;
+  } else {
+    if (cursor?.s === 'APPROVED') {
+      filters.push(
+        sql`(CASE WHEN m.role = 'TEAM_ADMIN' THEN 0 ELSE 1 END, lower(u.full_name), m.user_id) > (${cursor.r}::int, ${cursor.n}::text, ${cursor.i}::uuid)`,
+      );
+    }
+    order = sql`CASE WHEN m.role = 'TEAM_ADMIN' THEN 0 ELSE 1 END ASC, lower(u.full_name) ASC, m.user_id ASC`;
+  }
+  const { rows } = await sql<
+    MemberSqlRow & { sort_time: string; sort_name: string; sort_rank: number }
+  >`
+    SELECT m.user_id, u.full_name, m.role, m.status, m.skill_level, m.requested_at, m.approved_at,
+           m.banned_at, ${status === 'BANNED' ? sql`m.ban_reason` : sql`NULL::text`} AS ban_reason,
+           ${status === 'BANNED' ? sql`m.banned_at::text` : sql`m.requested_at::text`} AS sort_time,
+           lower(u.full_name) AS sort_name,
+           CASE WHEN m.role = 'TEAM_ADMIN' THEN 0 ELSE 1 END AS sort_rank
+      FROM team_members m
+      JOIN users u ON u.id = m.user_id
+     WHERE ${sql.join(filters, sql` AND `)}
+     ORDER BY ${order}
+     LIMIT ${MEMBERS_PAGE_SIZE + 1}`.execute(db);
+  const page = rows.slice(0, MEMBERS_PAGE_SIZE);
+  const last = page.at(-1);
+  let next: MembersCursor | null = null;
+  if (rows.length > MEMBERS_PAGE_SIZE && last !== undefined) {
+    next =
+      status === 'APPROVED'
+        ? {
+            v: 1,
+            s: 'APPROVED',
+            r: last.sort_rank === 0 ? 0 : 1,
+            n: last.sort_name,
+            i: last.user_id,
+          }
+        : { v: 1, s: status, t: last.sort_time, i: last.user_id };
+  }
+  return { members: page.map(toMemberRow), next };
+}
+
+/** The ban job's re-read: just enough of the row to check it still matches the payload. */
+export async function findMembershipById(
+  db: Database,
+  membershipId: string,
+): Promise<{ teamId: string; userId: string; status: MembershipStatus } | undefined> {
+  const row = await db
+    .selectFrom('team_members')
+    .select(['team_id', 'user_id', 'status'])
+    .where('id', '=', membershipId)
+    .executeTakeFirst();
+  return row === undefined
+    ? undefined
+    : { teamId: row.team_id, userId: row.user_id, status: row.status };
 }

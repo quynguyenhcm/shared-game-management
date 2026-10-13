@@ -1,11 +1,14 @@
 /**
- * Team use cases for Phase 2: create (idempotent), Find, My teams, detail, invite lookup, join requests and the
- * invite-code admin actions. Handlers stay thin; the rules live here. Decisions: Architecture Q4 and Q5, the task
- * file's "Creative Reconciliation" (create idempotency, invite rotation race) and Journey A2, A3, A4, A17.
+ * Team use cases: create (idempotent), Find, My teams, detail, invite lookup, join requests, the invite-code admin
+ * actions and (Phase 3) the admin member lists and moderation. Handlers stay thin; the rules live here. Decisions:
+ * Architecture Q3, Q4 and Q5, the task file's "Creative Reconciliation" (create idempotency, invite rotation race)
+ * and Journey A2, A3, A4, A9, A17.
  *
- * Lock order (shared with Phase 3's moderation): the team row first, then team_members rows. A join holds the team
- * row `FOR SHARE`, a regenerate holds it `FOR UPDATE`, so a rotation and a join serialise: the join compares the
- * supplied code to the stored one under the lock and a rotation that committed first makes the old code fail.
+ * Lock order everywhere: the team row first, then team_members rows. A join holds the team row `FOR SHARE`, a
+ * regenerate holds it `FOR UPDATE`, so a rotation and a join serialise: the join compares the supplied code to the
+ * stored one under the lock and a rotation that committed first makes the old code fail. Every moderation holds it
+ * `FOR NO KEY UPDATE` (the per-team mutex), re-checks that the actor is still an approved admin under that lock
+ * (Architecture A10: the guard ran outside the transaction), then locks the target row.
  */
 import type { FastifyBaseLogger } from 'fastify';
 import {
@@ -20,15 +23,25 @@ import {
   type InviteLookupResponse,
   type JoinRequestRequest,
   type JoinRequestResponse,
+  type MembersQuery,
+  type MembersResponse,
   type MineTeamsResponse,
+  type ModerationResponse,
   type TeamDetailResponse,
+  type TeamMemberRow,
+  TEAM_FIELD_MESSAGES,
 } from '@sgm/shared';
 import type { Clock } from '../../lib/clock.ts';
 import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
+import type { JobRunner } from '../../lib/jobs/jobs.ts';
+import { enqueueMemberBanned } from './ban-hook.ts';
 import { inviteCodesMatch, isWellFormedInviteCode, withInviteCodeRetry } from './invite-code.ts';
+import { decodeMembersCursor, encodeMembersCursor } from './members-cursor.ts';
+import { mapMembershipDbError } from './membership-errors.ts';
 import * as repo from './repo.ts';
 import { containsPattern } from './search.ts';
+import { decide, type ModerationAction } from './transitions.ts';
 
 /** The subset of the request logger the service uses (`request.log`, which carries the trace ids). */
 export type TeamsLogger = Pick<FastifyBaseLogger, 'info' | 'warn'>;
@@ -40,6 +53,26 @@ export interface TeamsContext {
 export interface TeamsServiceDeps {
   readonly db: Database;
   readonly clock: Clock;
+  /** Job producer: the ban enqueues its `member-banned` job through it, inside the ban's transaction. */
+  readonly jobs: Pick<JobRunner, 'enqueue'>;
+}
+
+/** The `team.member.*` event each moderation emits after it commits. */
+const MODERATION_EVENTS: Record<ModerationAction, string> = {
+  approve: 'team.member.approved',
+  reject: 'team.member.rejected',
+  promote: 'team.member.promoted',
+  demote: 'team.member.demoted',
+  ban: 'team.member.banned',
+};
+
+interface ModerationInput {
+  readonly teamId: string;
+  readonly actorId: string;
+  readonly userId: string;
+  readonly action: ModerationAction;
+  /** Ban only: the trimmed reason, or null. Never logged, never put in a job. */
+  readonly reason?: string | null;
 }
 
 export interface CreateOutcome {
@@ -66,6 +99,22 @@ export interface TeamsService {
     actorId: string,
     ctx: TeamsContext,
   ): Promise<InviteCodeResponse>;
+  listMembers(teamId: string, query: MembersQuery): Promise<MembersResponse>;
+  /** Approve, reject, promote or demote `userId`; self-demotion is allowed (the last-admin rule applies). */
+  moderate(
+    teamId: string,
+    actorId: string,
+    userId: string,
+    action: Exclude<ModerationAction, 'ban'>,
+    ctx: TeamsContext,
+  ): Promise<ModerationResponse>;
+  ban(
+    teamId: string,
+    actorId: string,
+    userId: string,
+    reason: string | undefined,
+    ctx: TeamsContext,
+  ): Promise<ModerationResponse>;
 }
 
 /**
@@ -96,7 +145,69 @@ function cursorOf(row: repo.FindRow, direction: 'f' | 'b'): string {
 }
 
 export function createTeamsService(deps: TeamsServiceDeps): TeamsService {
-  const { db, clock } = deps;
+  const { db, clock, jobs } = deps;
+
+  /** One moderation: a single transaction under the team lock (Architecture "moderation transaction shape"). */
+  function runModeration(input: ModerationInput, ctx: TeamsContext): Promise<ModerationResponse> {
+    const { teamId, actorId, userId, action } = input;
+    return refusing(ctx, { action, actorId, teamId }, async () => {
+      const now = clock.now();
+      let member: TeamMemberRow;
+      try {
+        member = await db.transaction().execute(async (trx) => {
+          // 1. Per-team mutex. 2. Authority re-check under it. 3. Target row lock, by (team_id, user_id).
+          if ((await repo.lockTeam(trx, teamId, 'noKeyUpdate')) === undefined) {
+            throw new AppError('forbidden');
+          }
+          if ((await repo.findApprovedRole(trx, teamId, actorId)) !== 'TEAM_ADMIN') {
+            throw new AppError('forbidden');
+          }
+          const target = await repo.lockTarget(trx, teamId, userId);
+          if (target === undefined) throw new AppError('not_found');
+          const decision = decide(action, target, {
+            approvedAdminCount:
+              action === 'demote' ? await repo.countApprovedAdmins(trx, teamId) : 0,
+          });
+          if (!decision.ok) throw new AppError(decision.error);
+          const change: repo.MembershipChange =
+            action === 'approve'
+              ? { kind: 'approve', actorId, now }
+              : action === 'ban'
+                ? { kind: 'ban', actorId, now, reason: input.reason ?? null }
+                : { kind: action };
+          if (!(await repo.applyMembershipChange(trx, target.id, change))) {
+            throw new AppError('membership_state_conflict');
+          }
+          if (action === 'ban') {
+            // Same transaction (P5): the job exists exactly when the BANNED row commits.
+            await enqueueMemberBanned(
+              jobs,
+              {
+                teamId,
+                userId,
+                membershipId: target.id,
+                bannedBy: actorId,
+                bannedAt: now.toISOString(),
+              },
+              { trx },
+            );
+          }
+          const row = await repo.getMemberRow(trx, teamId, userId);
+          if (row === undefined) throw new Error('membership vanished inside its own transaction');
+          return row;
+        });
+      } catch (error) {
+        // Includes the deferred last-admin trigger, which only raises at COMMIT.
+        throw mapMembershipDbError(error);
+      }
+      // Ids only: no name, no reason.
+      ctx.log.info(
+        { event: MODERATION_EVENTS[action], teamId, actorId, userId },
+        'team member moderated',
+      );
+      return { member };
+    });
+  }
 
   return {
     async create(actorId, input, ctx) {
@@ -324,6 +435,33 @@ export function createTeamsService(deps: TeamsServiceDeps): TeamsService {
         );
         return { inviteCode };
       });
+    },
+
+    async listMembers(teamId, query) {
+      const cursor =
+        query.after === undefined ? null : decodeMembersCursor(query.after, query.status);
+      if (query.after !== undefined && cursor === null) {
+        throw new AppError('validation_failed', {
+          fieldErrors: { after: [TEAM_FIELD_MESSAGES.cursorInvalid] },
+        });
+      }
+      const [page, adminCount] = await Promise.all([
+        repo.listMembers(db, teamId, query.status, cursor),
+        repo.countApprovedAdmins(db, teamId),
+      ]);
+      return {
+        members: [...page.members],
+        nextCursor: page.next === null ? null : encodeMembersCursor(page.next),
+        adminCount,
+      };
+    },
+
+    moderate(teamId, actorId, userId, action, ctx) {
+      return runModeration({ teamId, actorId, userId, action }, ctx);
+    },
+
+    ban(teamId, actorId, userId, reason, ctx) {
+      return runModeration({ teamId, actorId, userId, action: 'ban', reason: reason ?? null }, ctx);
     },
   };
 }

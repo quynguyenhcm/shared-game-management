@@ -159,7 +159,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   await app.register(teamsRoutes, {
     prefix: '/teams',
-    service: createTeamsService({ db: deps.db, clock: deps.clock }),
+    service: createTeamsService({ db: deps.db, clock: deps.clock, jobs: deps.jobs }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);
   await app.ready();

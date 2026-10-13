@@ -3,7 +3,12 @@ import { randomBytes } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseSetRoleArgs, resetRefusal, rollbackRefusal } from './cli-guards.ts';
+import {
+  parseMemberBannedTrigger,
+  parseSetRoleArgs,
+  resetRefusal,
+  rollbackRefusal,
+} from './cli-guards.ts';
 
 const local = 'postgres://sgm:sgm@localhost:5432/sgm';
 
@@ -96,5 +101,34 @@ describe('users set-role arguments (AC-HAPPY-10)', () => {
     expect(parseSetRoleArgs(['aroha@example.com'])).toHaveProperty('error');
     expect(parseSetRoleArgs([])).toHaveProperty('error');
     expect(parseSetRoleArgs(['not-an-email', 'PLAYER'])).toHaveProperty('error');
+  });
+});
+
+describe('jobs trigger member-banned payload (AC-ERROR-12 operator re-run)', () => {
+  const ids = {
+    teamId: '0f0e0d0c-0b0a-4908-8706-050403020100',
+    userId: '1f1e1d1c-1b1a-4918-8716-151413121110',
+    membershipId: '2f2e2d2c-2b2a-4928-8726-252423222120',
+    bannedBy: '3f3e3d3c-3b3a-4938-8736-353433323130',
+    bannedAt: '2026-10-13T01:02:03.000Z',
+  };
+
+  it('accepts a payload that satisfies the strict MemberBannedPayload and keys it by membership', () => {
+    expect(parseMemberBannedTrigger(JSON.stringify(ids))).toEqual({
+      payload: ids,
+      singletonKey: `member-banned:${ids.membershipId}`,
+    });
+  });
+
+  it('rejects a missing payload, invalid JSON, a non-object and a payload with extra or missing fields', () => {
+    expect(parseMemberBannedTrigger(undefined)).toHaveProperty('error');
+    expect(parseMemberBannedTrigger('{nope')).toHaveProperty('error');
+    expect(parseMemberBannedTrigger('[]')).toHaveProperty('error');
+    expect(parseMemberBannedTrigger(JSON.stringify({ ...ids, email: 'x@y.test' }))).toHaveProperty(
+      'error',
+    );
+    expect(parseMemberBannedTrigger(JSON.stringify({ teamId: ids.teamId }))).toHaveProperty(
+      'error',
+    );
   });
 });

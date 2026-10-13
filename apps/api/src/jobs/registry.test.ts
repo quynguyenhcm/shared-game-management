@@ -8,6 +8,7 @@ describe('queue registry', () => {
         'auth-cleanup',
         'daily-overdue',
         'heartbeat',
+        'member-banned',
         'post-game-billing',
         'recurrence-materialisation',
         'send-email',
@@ -29,6 +30,7 @@ describe('queue registry', () => {
       dailyOverdue: 'daily-overdue',
       sendEmail: 'send-email',
       authCleanup: 'auth-cleanup',
+      memberBanned: 'member-banned',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -39,6 +41,8 @@ describe('queue registry', () => {
     expect(getQueue('post-game-billing').policy).toBe('exclusive');
     // One cleanup run at a time: two overlapping runs would only fight over the same rows.
     expect(getQueue('auth-cleanup').policy).toBe('exclusive');
+    // One ban job per membership (`singletonKey = member-banned:<membershipId>`), enqueued in the ban transaction.
+    expect(getQueue('member-banned').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {

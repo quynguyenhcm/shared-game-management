@@ -188,4 +188,32 @@ describe('registerJobs', () => {
       ['auth-cleanup', 'daily-overdue', 'post-game-billing', 'recurrence-materialisation'].sort(),
     );
   });
+
+  it('wires the injected MemberBannedHandler into the member-banned queue, and the no-op by default', async () => {
+    const handlers = new Map<string, unknown>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: unknown) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    const base = {
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+    };
+    await registerJobs(base);
+    const defaultHandler = handlers.get('member-banned');
+    expect(defaultHandler).toBeTypeOf('function');
+    await registerJobs({
+      ...base,
+      memberBannedHandler: { name: 'custom', handle: () => Promise.resolve({ affected: 0 }) },
+    });
+    expect(handlers.get('member-banned')).toBeTypeOf('function');
+    expect(handlers.get('member-banned')).not.toBe(defaultHandler);
+  });
 });

@@ -1,5 +1,10 @@
 // Console output is allowed here (see eslint.config.mjs): the CLI talks to a terminal, not the logger.
-import { parseSetRoleArgs, resetRefusal, rollbackRefusal } from './cli-guards.ts';
+import {
+  parseMemberBannedTrigger,
+  parseSetRoleArgs,
+  resetRefusal,
+  rollbackRefusal,
+} from './cli-guards.ts';
 import { loadConfigOrExit, type Config } from './lib/config/config.ts';
 import { QUEUE_NAMES } from './jobs/registry.ts';
 import { SCHEDULES } from './jobs/schedules.ts';
@@ -24,6 +29,7 @@ function usage(): string {
     '  db rollback [--count N | --all]   (default: one step; refused in production)',
     '  db reset [--force]                (refused in production or on a non-local host)',
     '  jobs trigger <slot|heartbeat> [json]   (manually enqueue a slot or the heartbeat job)',
+    "  jobs trigger member-banned '<json>'    (re-run a ban's side effect; payload as in ADR 0015)",
     '  jobs schedules                         (list registered cron schedules)',
     '  users set-role <email> <GLOBAL_ADMIN|PLAYER>   (grant or revoke the global admin role)',
   ].join('\n');
@@ -69,6 +75,7 @@ async function runDb(subcommand: string, flags: readonly string[], config: Confi
 
 const TRIGGERABLE: readonly string[] = [
   QUEUE_NAMES.heartbeat,
+  QUEUE_NAMES.memberBanned,
   ...SCHEDULES.map((slot) => slot.name),
 ];
 
@@ -98,6 +105,20 @@ async function runJobs(subcommand: string, args: readonly string[], config: Conf
     const [name, rawPayload] = args;
     if (name === undefined || !TRIGGERABLE.includes(name)) {
       fail(`jobs trigger: expected one of ${TRIGGERABLE.join(', ')}`);
+    }
+    if (name === QUEUE_NAMES.memberBanned) {
+      // Validated with the handler's own strict schema and keyed like the job a ban enqueues.
+      const trigger = parseMemberBannedTrigger(rawPayload);
+      if ('error' in trigger) fail(trigger.error);
+      const jobId = await runner.enqueue(name, trigger.payload, {
+        singletonKey: trigger.singletonKey,
+      });
+      console.log(
+        jobId === null
+          ? `${name}: a job is already queued or active for this membership; nothing enqueued`
+          : `enqueued ${name} job ${jobId}`,
+      );
+      return;
     }
     let payload: object = { source: 'cli' };
     if (rawPayload !== undefined) {

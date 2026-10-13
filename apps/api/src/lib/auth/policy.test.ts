@@ -93,7 +93,7 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     await app.close();
   });
 
-  it('declares the documented policy on every Phase 2 /teams route and no team route is public (AC-VERIFY-1)', async () => {
+  it('declares the documented policy on every /teams route and no team route is public (AC-VERIFY-1)', async () => {
     const app = await buildApp(inertAppDeps(logger));
     const teamRoutes = listRoutePolicies(app).filter(
       (entry) => entry.method !== 'HEAD' && entry.url.startsWith('/teams'),
@@ -115,6 +115,12 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     for (const route of [
       'GET /teams/:teamId/invite-code',
       'POST /teams/:teamId/invite-code/regenerate',
+      'GET /teams/:teamId/members',
+      'POST /teams/:teamId/members/:userId/approve',
+      'POST /teams/:teamId/members/:userId/reject',
+      'POST /teams/:teamId/members/:userId/promote',
+      'POST /teams/:teamId/members/:userId/demote',
+      'POST /teams/:teamId/members/:userId/ban',
     ]) {
       expect(byRoute.get(route), route).toEqual({
         kind: 'teamRole',
@@ -123,7 +129,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Phase 3 adds the moderation routes; whatever is registered, none may be public.
+    // Exactly the 14 documented team routes exist, and none of them is public.
+    expect(byRoute.size).toBe(14);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });

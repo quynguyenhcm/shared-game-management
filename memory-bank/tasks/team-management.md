@@ -558,7 +558,7 @@ Build teams as the second `modules/<feature>` slice on top of the auth platform.
 ### Phases
 - [x] **Phase 1: Schema invariants and shared contracts**: the migration (D-40 onwards), regenerated types, zod contracts, 7 error codes, logger redaction and the factory update. ACs: AC-VERIFY-2, AC-VERIFY-3 (redaction) and AC-VERIFY-6.
 - [x] **Phase 2: Teams API, discovery and joining**: create, find, mine, detail, invite lookup/get/regenerate, join requests, route policies and `team.*` logs. ACs: AC-HAPPY-1 to 5 and 12, AC-ERROR-1 to 5, 10 and 11, AC-VERIFY-1 and 4.
-- [ ] **Phase 3: Moderation API and ban seam** (follows the architecture creative doc): members list, approve/reject/re-request/promote/demote/ban, the `member-banned` queue and job, the handler port, `assertApprovedMember`, and ADR 0015. ACs: AC-HAPPY-6 to 11, AC-ERROR-6 to 9 and 12, AC-ASYNC-1 to 3, AC-INTEGRATION-1 and 2, AC-VERIFY-5.
+- [x] **Phase 3: Moderation API and ban seam** (follows the architecture creative doc): members list, approve/reject/re-request/promote/demote/ban, the `member-banned` queue and job, the handler port, `assertApprovedMember`, and ADR 0015. ACs: AC-HAPPY-6 to 11, AC-ERROR-6 to 9 and 12, AC-ASYNC-1 to 3, AC-INTEGRATION-1 and 2, AC-VERIFY-5.
 - [ ] **Phase 4: Web discovery, create and join pages**: header links, `/teams/find`, `/teams`, `/teams/new`, `/teams/[teamId]`, `/teams/join`, proxy, api-client and Server Actions. ACs: AC-ENTRY-1 to 4, plus the web side of AC-HAPPY-1 to 5.
 - [ ] **Phase 5: Team-admin area, E2E and docs** (follows the UI/UX creative doc): the manage area, Playwright journeys with axe, OpenAPI regeneration, coverage gate, and `systemPatterns.md`/`techContext.md` updates. This phase delivers the complete entry-to-success flow. ACs: AC-ENTRY-5, the web side of AC-HAPPY-6 to 12, AC-VERIFY-7 and 8, AC-INTEGRATION-3.
 
@@ -610,12 +610,12 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 2 of 5
+**Current Phase**: 3 of 5
 **Auto-Build Mode**: YES
-**Current Step**: Auto-build loop started (Phases 2-5)
+**Current Step**: Phase 3 complete (committed)
 **Step Started**: 2026-10-13
 **Can Resume**: YES
-**Resume From**: Phase 3: Moderation API and ban seam
+**Resume From**: Phase 4: Web discovery, create and join pages
 
 ### Halt State
 (none)
@@ -623,6 +623,9 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 ### Deviations
 <!-- - Phase <N> | <file:line/artifact> | <rationale> -->
 - Phase 2 | apps/api/src/modules/teams/service.ts (join) | The banned check runs before the private-team code check, so a BANNED caller with no code gets 403 `banned_from_team`, not 404. Accepted: AC-ERROR-5 says "with or without a valid invite code", and a banned user already knows the team.
+- Phase 3 | apps/api/src/modules/teams/service.ts (moderate) | AC-ERROR-7 vs Amendment A10: for two admins demoting each other at the same instant, A10 wins; the loser's in-transaction actor re-check gives 403 `forbidden`, not 409. Sole-admin and self-demote races still give 409 `last_team_admin`. Accepted.
+- Phase 3 | apps/api/src/modules/teams/membership-errors.ts | `keys_immutable` (unreachable via API) maps to 409 `membership_state_conflict`. Accepted as defensive.
+- Phase 3 | apps/api/src/jobs/member-banned.ts | Payload/row mismatch logs `team.member.banned.hook_failed` (reason membership_mismatch) and throws NonRetryableJobError; small addition beyond the architecture doc. Accepted.
 - Phase 2 | apps/api/src/modules/teams/service.ts (regenerate) | Adds a team-row lock and an approved-admin re-check inside the transaction, which goes beyond the spec. Accepted as hardening that follows the lock-order rule.
 
 ### Phase 1 Build Log
@@ -636,6 +639,12 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 - Code review: APPROVED (0 blocking). Recs: R1 pin create-replay-with-different-body behaviour; R2 private-team member posting join without code gets 404 not_found (Phase 4 web must not rely on 409); R3 optional throttle on lookup/join.
 - Carry-overs done: AC-ERROR-15 idempotency + race tests; join FOR SHARE vs regenerate FOR UPDATE with deterministic race tests; mine.pendingRequestCount, detail.myStatus/myRole; banned lookup 403; logger exact `code` redaction (log field renamed errorCode in errors.ts); 100-char non-ASCII cursor round trip.
 - Notes for later phases: regenerate must be POSTed with no body/content-type (Fastify 422 on empty JSON); malformed non-UUID teamId on public route is 422; team.action.refused for guard 403s on admin routes to be finished in Phase 3; Phase 3 error mapper keys on err.constraint; Phase 3 policy test to add teamRole expectations.
+- Guard & Recovery Log: see commit guard result.
+
+### Phase 3 Build Log
+- TDD: RED confirmed (12 failing unit entries, 3 failing integration files), then GREEN; unit 605/605, integration 275/275, lint/typecheck/build PASS (verifier, sequential re-run; first parallel run had load-related timing timeouts in DST/previewSchedule tests, not phase-related). Coverage gate passes.
+- Code review: APPROVED (0 blocking). Applied rec 1 (guard-403 log only logs UUID-shaped teamId). Open recs: extract listMembers SQL builder when next touched; openapi.yaml was regenerated by `pnpm run openapi` (confirm Phase 5 only re-runs it).
+- Built: members list (50/page, adminCount), approve/reject/promote/demote/ban routes, `member-banned` queue + job, `MemberBannedHandler` port (no-op), `assertApprovedMember`, `cli jobs trigger member-banned`, ADR 0015, guard-403 `team.action.refused` events.
 - Guard & Recovery Log: see commit guard result.
 
 ### Active Sub-Agents
