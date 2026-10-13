@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { HealthResponse } from '@sgm/shared';
+import { publicRoute } from '../lib/auth/policy.ts';
 
 export interface HealthDeps {
   readonly version: string;
@@ -12,6 +13,7 @@ export function registerHealthRoute(app: FastifyInstance, deps: HealthDeps): voi
   app.withTypeProvider<ZodTypeProvider>().get(
     '/health',
     {
+      config: { policy: publicRoute() },
       schema: {
         summary: 'Service and database health',
         operationId: 'getHealth',

@@ -14,6 +14,7 @@ const REQUIRED_TARGETS = [
   'typecheck',
   'test',
   'test:integration',
+  'test:coverage',
   'db:migrate',
   'db:rollback',
   'db:reset',
@@ -34,9 +35,11 @@ describe('root package.json targets (AC-VERIFY-1)', () => {
 
   it('pins pnpm 10 and Node 24 and keeps ci equal to the local gates', () => {
     expect(pkg.packageManager).toMatch(/^pnpm@10\./);
-    expect(pkg.engines.node).toBe('>=24 <25');
+    expect(pkg.engines.node).toBe('>=24.7 <25');
+    // `test:coverage` runs the unit and integration projects in one vitest run, so the 80% gate sees the
+    // DB-backed auth code that only the integration tests exercise (AC-VERIFY-9).
     expect(pkg.scripts.ci).toBe(
-      'pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:integration && pnpm run build',
+      'pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run build',
     );
   });
 });

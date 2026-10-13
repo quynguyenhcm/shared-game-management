@@ -3,6 +3,7 @@ import Fastify, { type FastifyBaseLogger } from 'fastify';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp, registerRequestTracing } from '../../app.ts';
+import { inertAppDeps } from '../../../test/helpers/app-deps.ts';
 import { createJobRunner, type BossLike } from '../jobs/jobs.ts';
 import { createLogger, type Logger } from '../logger/logger.ts';
 import { resolveTraceExporter, startTelemetry, type Telemetry } from './telemetry.ts';
@@ -97,7 +98,7 @@ describe('trace propagation (web -> API -> job)', () => {
   it('an API request carrying traceparent logs that traceId and records a child server span', async () => {
     expect(telemetry.enabled).toBe(true);
     const { logger, lines } = captureLogger();
-    const app = await buildApp({ logger, version: 't', checkDb: () => Promise.resolve(true) });
+    const app = await buildApp(inertAppDeps(logger, { version: 't' }));
     const response = await app.inject({
       method: 'GET',
       url: '/health',

@@ -6,6 +6,14 @@
 import type { Ciphertext, LocalDate, LocalTime, MoneyString } from "@sgm/shared";
 import type { ColumnType } from "kysely";
 
+export type ArrayType<T> = ArrayTypeImpl<T> extends (infer U)[]
+  ? U[]
+  : ArrayTypeImpl<T>;
+
+export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
+  ? ColumnType<S[], I[], U[]>
+  : T[];
+
 export type AuthProvider = "FACEBOOK" | "GOOGLE" | "PASSWORD";
 
 export type BillingType = "MONTHLY_SUBSCRIPTION" | "PER_GAME" | "PREPAID_CREDIT" | "QUARTERLY_SUBSCRIPTION";
@@ -46,10 +54,31 @@ export interface AuthIdentities {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   last_used_at: Timestamp | null;
+  password_email: ColumnType<string | null, never, never>;
   password_hash: string | null;
   provider: AuthProvider;
   provider_subject: string;
   user_id: string;
+}
+
+export interface AuthSessions {
+  absolute_expires_at: Timestamp;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  last_seen_at: Timestamp;
+  revoked_at: Timestamp | null;
+  revoked_reason: string | null;
+  token_hash: Buffer;
+  user_agent: string | null;
+  user_id: string;
+}
+
+export interface AuthThrottle {
+  attempts: Generated<ArrayType<Timestamp>>;
+  key_hash: Buffer;
+  scope: string;
+  updated_at: Timestamp;
 }
 
 export interface CreditTransactions {
@@ -91,6 +120,43 @@ export interface GameSessions {
   status: Generated<SessionStatus>;
   team_id: string;
   total_court_cost: Generated<MoneyString | null>;
+}
+
+export interface OauthPendingSignups {
+  created_at: Generated<Timestamp>;
+  email: string;
+  email_verified: boolean;
+  expires_at: Timestamp;
+  full_name: string | null;
+  id: Generated<string>;
+  provider: AuthProvider;
+  provider_subject: string;
+  return_to: string | null;
+  token_hash: Buffer;
+  used_at: Timestamp | null;
+}
+
+export interface OauthStates {
+  code_verifier_enc: Ciphertext | null;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  intent: string;
+  link_user_id: string | null;
+  nonce: string | null;
+  provider: AuthProvider;
+  return_to: string | null;
+  state_hash: Buffer;
+  used_at: Timestamp | null;
+}
+
+export interface PasswordResetTokens {
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  token_hash: Buffer;
+  used_at: Timestamp | null;
+  user_id: string;
 }
 
 export interface PaymentLineItems {
@@ -244,6 +310,7 @@ export interface Teams {
 export interface Users {
   created_at: Generated<Timestamp>;
   email: string;
+  email_verified_at: Timestamp | null;
   full_name: string;
   id: Generated<string>;
   role: Generated<GlobalRole>;
@@ -252,8 +319,13 @@ export interface Users {
 
 export interface DB {
   auth_identities: AuthIdentities;
+  auth_sessions: AuthSessions;
+  auth_throttle: AuthThrottle;
   credit_transactions: CreditTransactions;
   game_sessions: GameSessions;
+  oauth_pending_signups: OauthPendingSignups;
+  oauth_states: OauthStates;
+  password_reset_tokens: PasswordResetTokens;
   payment_line_items: PaymentLineItems;
   payments: Payments;
   player_credits: PlayerCredits;

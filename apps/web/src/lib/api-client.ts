@@ -1,7 +1,31 @@
 import { context, propagation } from '@opentelemetry/api';
-import { HealthResponse } from '@sgm/shared';
+import {
+  AuthSuccessResponse,
+  ErrorResponse,
+  ForgotPasswordResponse,
+  HealthResponse,
+  IdentitiesResponse,
+  MeResponse,
+  OAuthAuthorizeResponse,
+  OAuthCallbackResponse,
+  OAuthCompleteResponse,
+  OAuthPendingResponse,
+  ProvidersResponse,
+  ResetPasswordResponse,
+  type ForgotPasswordRequest,
+  type LoginRequest,
+  type OAuthAuthorizeRequest,
+  type OAuthCallbackRequest,
+  type OAuthCompleteRequest,
+  type RegisterRequest,
+  type ResetPasswordRequest,
+} from '@sgm/shared';
+import type { z } from 'zod';
+import { deriveClientAddress } from './auth/client-address.ts';
+import { loadWebConfig } from './config.ts';
 
 const REQUEST_TIMEOUT_MS = 2000;
+const AUTH_TIMEOUT_MS = 5000;
 
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/;
 
@@ -16,25 +40,28 @@ function isValidTraceparent(value: string | undefined): value is string {
   return match !== null && !/^0+$/.test(match[1] ?? '') && !/^0+$/.test(match[2] ?? '');
 }
 
+/** Anything with `get` (a `Headers` or Next's read-only `headers()`), or a plain record. */
+export type IncomingHeaders = Pick<Headers, 'get'> | Record<string, string | undefined>;
+
+function readHeader(incoming: IncomingHeaders | undefined, name: string): string | undefined {
+  if (incoming === undefined) return undefined;
+  return typeof incoming.get === 'function'
+    ? ((incoming as Pick<Headers, 'get'>).get(name) ?? undefined)
+    : (incoming as Record<string, string | undefined>)[name];
+}
+
 /**
  * W3C trace context for a server-side API call (web -> API). Order: the active OpenTelemetry span
  * (when an SDK is registered), else the incoming request's `traceparent` continued with a new span
  * id, else a fresh root trace. Every API call therefore carries a `traceparent`.
  */
-/** Anything with `get` (a `Headers` or Next's read-only `headers()`), or a plain record. */
-export type IncomingHeaders = Pick<Headers, 'get'> | Record<string, string | undefined>;
-
 export function traceHeaders(incoming?: IncomingHeaders): Record<string, string> {
   const headers: Record<string, string> = {};
   propagation.inject(context.active(), headers);
   if (isValidTraceparent(headers.traceparent)) return headers;
 
-  const read = (name: string): string | undefined =>
-    incoming !== undefined && typeof incoming.get === 'function'
-      ? ((incoming as Pick<Headers, 'get'>).get(name) ?? undefined)
-      : (incoming as Record<string, string | undefined> | undefined)?.[name];
-  const traceparent = read('traceparent');
-  const tracestate = read('tracestate');
+  const traceparent = readHeader(incoming, 'traceparent');
+  const tracestate = readHeader(incoming, 'tracestate');
   if (isValidTraceparent(traceparent)) {
     const [, traceId, , flags] = TRACEPARENT.exec(traceparent) ?? [];
     const result: Record<string, string> = {
@@ -46,8 +73,103 @@ export function traceHeaders(incoming?: IncomingHeaders): Record<string, string>
   return { traceparent: `00-${randomHex(16)}-${randomHex(8)}-01` };
 }
 
-function baseUrl(): string {
-  return process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
+/** A failed call: the API's error body, or a synthetic one for network failures, timeouts and bad bodies. */
+export type ApiResult<T> =
+  | { ok: true; status: number; data: T }
+  | {
+      ok: false;
+      /** HTTP status, or 0 when no response arrived (network error, timeout). */
+      status: number;
+      error: ErrorResponse['error'];
+      retryAfterSeconds?: number;
+    };
+
+export interface ApiCallOptions {
+  /** Session token for `Authorization: Bearer`. */
+  session?: string | null;
+  /** The incoming request's headers: only `traceparent`, `tracestate`, `user-agent` and `x-forwarded-for` are read. */
+  incoming?: IncomingHeaders;
+}
+
+interface ApiRequest<T> extends ApiCallOptions {
+  path: string;
+  method: 'GET' | 'POST' | 'DELETE';
+  body?: unknown;
+  schema?: z.ZodType<T>;
+  /** Extra request headers (an allowlisted few, set by `apiClient` only; never copied from the browser). */
+  extraHeaders?: Record<string, string>;
+}
+
+/** The lower-case path spelling of an OAuth provider (`/auth/oauth/:provider/*`). */
+export type OAuthProviderPath = 'google' | 'facebook';
+
+function failure<T>(
+  status: number,
+  code: ErrorResponse['error']['code'],
+  message: string,
+): ApiResult<T> {
+  return { ok: false, status, error: { code, message } };
+}
+
+/**
+ * The one way the web talks to the API. Outgoing headers are built from an allowlist and never copied
+ * from the incoming request: `x-sgm-internal-auth` comes from config and `x-sgm-client-ip` is derived
+ * from `X-Forwarded-For` with the trusted hop count (or omitted). Never throws on 4xx, 5xx, a network
+ * error or a timeout.
+ */
+export async function apiFetch<T>(request: ApiRequest<T>): Promise<ApiResult<T>> {
+  try {
+    const config = loadWebConfig();
+    const headers: Record<string, string> = { ...traceHeaders(request.incoming) };
+    const userAgent = readHeader(request.incoming, 'user-agent');
+    if (userAgent) headers['user-agent'] = userAgent;
+    if (config.internalAuthSecret !== null)
+      headers['x-sgm-internal-auth'] = config.internalAuthSecret;
+    const clientAddress = deriveClientAddress(
+      readHeader(request.incoming, 'x-forwarded-for'),
+      config.trustedProxyHops,
+    );
+    if (clientAddress !== null) headers['x-sgm-client-ip'] = clientAddress;
+    if (request.session) headers.authorization = `Bearer ${request.session}`;
+    Object.assign(headers, request.extraHeaders);
+    if (request.body !== undefined) headers['content-type'] = 'application/json';
+
+    const response = await fetch(`${config.apiInternalUrl}${request.path}`, {
+      method: request.method,
+      headers,
+      body: request.body === undefined ? undefined : JSON.stringify(request.body),
+      cache: 'no-store',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+    });
+
+    if (response.ok) {
+      if (request.schema === undefined)
+        return { ok: true, status: response.status, data: undefined as T };
+      const parsed = request.schema.safeParse(await response.json());
+      return parsed.success
+        ? { ok: true, status: response.status, data: parsed.data }
+        : failure(response.status, 'internal_error', 'Unexpected response from the API.');
+    }
+
+    const retryAfter = Number(response.headers.get('retry-after'));
+    const body = ErrorResponse.safeParse(await response.json().catch(() => null));
+    const error = body.success
+      ? body.data.error
+      : {
+          code:
+            response.status >= 500 ? ('service_unavailable' as const) : ('internal_error' as const),
+          message: 'Unexpected response from the API.',
+        };
+    return {
+      ok: false,
+      status: response.status,
+      error,
+      ...(Number.isFinite(retryAfter) && retryAfter > 0 ? { retryAfterSeconds: retryAfter } : {}),
+    };
+  } catch {
+    return failure(0, 'service_unavailable', 'The API could not be reached.');
+  }
 }
 
 export const apiClient = {
@@ -57,7 +179,7 @@ export const apiClient = {
    */
   async health(incoming?: IncomingHeaders): Promise<HealthResponse | null> {
     try {
-      const response = await fetch(`${baseUrl()}/health`, {
+      const response = await fetch(`${loadWebConfig().apiInternalUrl}/health`, {
         headers: traceHeaders(incoming),
         cache: 'no-store',
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -69,4 +191,129 @@ export const apiClient = {
       return null;
     }
   },
+
+  register: (body: RegisterRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/register',
+      method: 'POST',
+      body,
+      schema: AuthSuccessResponse,
+    }),
+
+  login: (body: LoginRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/login',
+      method: 'POST',
+      body,
+      schema: AuthSuccessResponse,
+    }),
+
+  logout: (options: ApiCallOptions = {}) =>
+    apiFetch<undefined>({ ...options, path: '/auth/logout', method: 'POST' }),
+
+  me: (session: string, options: Omit<ApiCallOptions, 'session'> = {}) =>
+    apiFetch({ ...options, session, path: '/auth/me', method: 'GET', schema: MeResponse }),
+
+  providers: (options: ApiCallOptions = {}) =>
+    apiFetch({ ...options, path: '/auth/providers', method: 'GET', schema: ProvidersResponse }),
+
+  forgotPassword: (body: ForgotPasswordRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/password/forgot',
+      method: 'POST',
+      body,
+      schema: ForgotPasswordResponse,
+    }),
+
+  resetPassword: (body: ResetPasswordRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/password/reset',
+      method: 'POST',
+      body,
+      schema: ResetPasswordResponse,
+    }),
+
+  oauthAuthorize: (
+    provider: OAuthProviderPath,
+    body: OAuthAuthorizeRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/auth/oauth/${provider}/authorize`,
+      method: 'POST',
+      body,
+      schema: OAuthAuthorizeResponse,
+    }),
+
+  /** Forward the session (when there is one) so a connect flow can prove it is the same user. */
+  oauthCallback: (
+    provider: OAuthProviderPath,
+    body: OAuthCallbackRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/auth/oauth/${provider}/callback`,
+      method: 'POST',
+      body,
+      schema: OAuthCallbackResponse,
+    }),
+
+  /** The pending sign-up handle travels in a header, never in the URL. */
+  oauthPending: (pendingToken: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/oauth/pending',
+      method: 'GET',
+      extraHeaders: { 'x-pending-signup': pendingToken },
+      schema: OAuthPendingResponse,
+    }),
+
+  oauthComplete: (body: OAuthCompleteRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/auth/oauth/complete',
+      method: 'POST',
+      body,
+      schema: OAuthCompleteResponse,
+    }),
+
+  identities: (session: string, options: Omit<ApiCallOptions, 'session'> = {}) =>
+    apiFetch({
+      ...options,
+      session,
+      path: '/auth/identities',
+      method: 'GET',
+      schema: IdentitiesResponse,
+    }),
+
+  startLink: (
+    provider: OAuthProviderPath,
+    session: string,
+    options: Omit<ApiCallOptions, 'session'> = {},
+  ) =>
+    apiFetch({
+      ...options,
+      session,
+      path: `/auth/identities/${provider}/link`,
+      method: 'POST',
+      schema: OAuthAuthorizeResponse,
+    }),
+
+  unlink: (
+    provider: OAuthProviderPath,
+    session: string,
+    options: Omit<ApiCallOptions, 'session'> = {},
+  ) =>
+    apiFetch<undefined>({
+      ...options,
+      session,
+      path: `/auth/identities/${provider}`,
+      method: 'DELETE',
+    }),
 };

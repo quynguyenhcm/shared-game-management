@@ -42,6 +42,7 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Trigger**: a domain change or a cron slot in `apps/api/src/jobs/schedules.ts` (Pacific/Auckland).
 - **Guarantee**: at-least-once; handlers are idempotent through a unique constraint or guarded status transition.
 - **Output**: job state visible in `pgboss.job` (failed jobs stay visible after 3 retries with backoff).
+- **Secrets in payloads**: job data is kept for days, so any message carrying a secret (reset link, token) is enqueued with `enqueueEmail(..., { crypto })`; `pgboss.job.data` then holds only `{ idempotencyKey, sealed }` (FieldCrypto envelope bound to the idempotency key) and the handler opens it.
 
 ## Design Patterns Used
 
@@ -58,13 +59,28 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 ### Keyed envelope encryption (P4)
 - **Implementation**: `apps/api/src/lib/crypto/crypto.ts`, AES-256-GCM, AAD = `sgm:v1:<table>.<column>:<rowId>`, envelope CHECK on each encrypted column.
 
+### Authentication and authorization (auth pattern)
+- **Implementation**: `apps/api/src/modules/auth/` (own Fastify module: `service`, `reset-service`, `oauth-service`, pure `oauth-decision`, `repo`, `sessions`, `throttle`, `providers/`), platform pieces in `apps/api/src/lib/auth/` (`policy.ts`, `guards.ts`, `request-auth.ts`) and `apps/api/src/lib/http/` (`errors.ts`, `origin.ts`, `internal-auth.ts`). Web side: `apps/web/src/lib/auth/`, `proxy.ts`, `SiteHeader`. Shared contracts: `packages/shared/src/{api,auth}/`. Decisions: `docs/adr/0013` and `0014`.
+- **Sessions**: opaque 256-bit tokens, only the SHA-256 stored in `auth_sessions`; 7-day idle and 30-day absolute expiry; the role is read from `users` on every request (no role claim). The **web owns the cookie** (`sgm_session`, HttpOnly, SameSite=Lax, `__Host-` and Secure when `WEB_BASE_URL` is https) and calls the API with `Authorization: Bearer`; the API never sets a cookie.
+- **Default-deny route policy**: every route declares `config: { policy }` with `publicRoute()`, `optionalSession()`, `authenticated()`, `requireGlobalRole(...)` or `requireTeamRole(role, { teamIdParam?, allowGlobalAdmin? })` (`lib/auth/policy.ts`). A route without one makes `buildApp` fail. Handlers read `requireAuth(request)`; team roles come from `team_members` with `status = 'APPROVED'`, read fresh each request. New features must follow this for every route.
+- **Errors and contracts**: the shared `{ error: { code, message, fieldErrors? } }` shape and one `ErrorCode` list in `packages/shared/src/api/errors.ts`; zod request schemas are strict (an unknown field such as `role` is a 422); the web `api-client` and the Fastify routes import the same schemas.
+- **Trust boundary for the client address**: the web derives it from `WEB_TRUSTED_PROXY_HOPS` counted from the right of `X-Forwarded-For` and sends `x-sgm-client-ip` only with `x-sgm-internal-auth` (`API_INTERNAL_SHARED_SECRET`, constant-time compare); production refuses to boot without both.
+- **Account linking and throttling**: never auto-link and never sign in on an email match; a completed password reset evicts every Google and Facebook identity (rule R1); sign-in, forgot-password and registration are throttled by the Postgres sliding-log functions `auth_throttle_admit` / `auth_throttle_settle` with HMAC-keyed counters (no email or address in clear). One login uses one timestamp for both admit and settle (the refund matches it exactly).
+- **Session-issuance invariant (D1)**: every path that issues a session or attaches a credential (password login, OAuth sign-in, sign-up completion, identity link) locks the user row (`lockUserRow`) and re-checks the credential or identity, and for links the linking session, inside the issuing transaction, so a concurrent password reset always wins.
+- **Logging**: `auth.*` events with `userId`/`provider`/`reason` and no email; every request line (including Fastify's "incoming request") carries `traceId`; redaction covers `*token` keys, `sgm_*` cookie names, client secrets, `code`/`state` query values and secret query parameters inside error messages; provider transport errors are never kept as `cause`.
+- **Testing**: DB-backed behaviour via `app.inject` over a cloned Postgres (`buildAuthTestApp`), pure rules as table-driven unit tests, browser journeys and axe scans in Playwright on desktop and a 360 px project with `AUTH_FAKE_OAUTH=true` (the fake provider answers `oauth.fake.invalid`).
+- **Trade-offs**: we own security-sensitive code (small surfaces, recorded fixtures, tampered-token tests); no MFA, passkeys or session list in v1; the web image bakes `WEB_BASE_URL` (Server Action `allowedOrigins`), so there is one image per environment.
+
 ## Integration Patterns
 
 ### Email
 - **Type**: outbound, via the `send-email` job. **Protocol**: SMTP (Mailpit in dev and CI; provider TBD, likely Postmark). **Contract**: `EmailMessage` with a required `idempotencyKey`.
 
 ### Web to API
-- **Type**: HTTP/JSON, zod contracts in `packages/shared/src/api/`; OpenAPI at `apps/api/openapi.yaml` (drift-checked).
+- **Type**: HTTP/JSON, zod contracts in `packages/shared/src/api/`; OpenAPI at `apps/api/openapi.yaml` (drift-checked, documents the `sessionToken` bearer scheme). The web calls the API only server-side (`API_INTERNAL_URL`) with the session token as a bearer, a `traceparent`, and the internal hop headers described above.
+
+### Google and Facebook OAuth
+- **Type**: outbound, authorization-code flow through the web-owned callback `/auth/callback/<provider>`; thin adapters (`providers/google.ts` with PKCE and `jose` ID-token verification, `providers/facebook.ts` with `appsecret_proof` and a pinned Graph version). Single-use state and pending sign-ups live in Postgres. No provider token is stored. `AUTH_FAKE_OAUTH=true` swaps in fakes (refused in production).
 
 ## Code Organization Patterns
 
@@ -103,13 +119,14 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Setup sharing**: factory functions (`test/helpers/factories.ts`); each integration file clones a migrated template database (`createTestDatabase()`), so tests may COMMIT freely. Deferred-constraint tests use `SET CONSTRAINTS ALL IMMEDIATE`.
 
 ### Test Framework & Style
-- **Framework**: Vitest 5 (projects `unit` and `integration`, forks pool for integration), Playwright for the web smoke test.
+- **Framework**: Vitest 5 (projects `unit` and `integration`, forks pool for integration), Playwright for the web journeys (desktop and a 360 x 740 project, axe-core scans, run against the Compose stack with `AUTH_FAKE_OAUTH=true`; not part of `ci`).
 - **Assertion style**: `expect(...)`.
 - **Mocking approach**: dependency injection and test doubles (the `memory` notifier); no DB mocking, integration tests use real PostgreSQL 17.
+- **Injected clocks**: tests that inject a `Clock` advance it between the sequential calls of one operation (admit then settle, issue then verify); a frozen clock hides timestamp-matching bugs.
 
 ### Test Scope Preferences
 - **Emphasis**: balanced; DB constraints are proven against a real database.
-- **Coverage gate**: 80% lines/functions/branches/statements on `packages/shared/src/{money,time,invoice}` and `apps/api/src/lib/{crypto,config,notifications,jobs}`.
+- **Coverage gate**: 80% lines/functions/branches/statements, measured over unit **and** integration tests (`pnpm run test:coverage`, used by `ci`), on `packages/shared/src/{money,time,invoice,auth}`, `apps/api/src/lib/{crypto,config,notifications,jobs,logger,telemetry,http,auth}`, `apps/api/src/modules/auth/**` and `apps/web/src/lib/**`. New feature modules should be added to the list.
 - **Not tested**: generated types (`types.generated.ts`, checked by tsc and drift tests), framework boilerplate, real external providers (Postmark, Akahu) until their features land.
 
 <!-- AUTO-MANAGED: c4-architecture-start -->
@@ -130,6 +147,12 @@ To populate this section, run `/yay:c4`. The command builds a complete bottom-up
 <!-- AUTO-MANAGED: c4-architecture-end -->
 
 ## Recent Architecture Changes
+
+### 2026-10-06 - Authentication and user roles (auth-and-user-roles)
+- **What Changed**: Email/password, Google and Facebook sign-in; opaque Postgres sessions relayed by the web as a bearer token; default-deny route policies with global and per-team role guards; Postgres sliding-log throttling; password reset that evicts OAuth identities; the shared HTTP error shape; web `SiteHeader`, auth pages, `proxy.ts`; Playwright journeys on two viewports.
+- **Reason**: Players need to get in quickly and every later feature needs a trustworthy `request.auth` and guards (see `docs/adr/0013` and `0014`).
+- **Trade-offs**: own security-sensitive code instead of a framework; per-environment web image because `WEB_BASE_URL` is baked into Server Action origins; coverage is now measured over unit and integration tests together.
+- **Affected Components**: `apps/api` (`modules/auth`, `lib/auth`, `lib/http`, jobs `auth-cleanup`), `apps/web` (pages, `lib/auth`, `proxy.ts`), `packages/shared`, `db/migrations` (D-27 onwards), `docker-compose.yml`, `vitest.config.ts`.
 
 ### 2026-09-29 - Platform foundation established
 - **What Changed**: Greenfield monorepo built: pnpm workspaces (`apps/web`, `apps/api` with worker entrypoint, `packages/shared`), Fastify + Kysely + node-pg-migrate + pg-boss on PostgreSQL 17, AES-256-GCM field encryption, exact money and DST-safe time primitives, notifier abstraction, Docker Compose stack and CI gates.

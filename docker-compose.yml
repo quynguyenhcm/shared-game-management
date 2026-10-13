@@ -10,6 +10,10 @@ x-app-env: &app-env # Container-network hostnames override the host-oriented val
   NODE_ENV: development
   LOG_FORMAT: json
   LOG_OUTPUT: stdout
+  # Same value for api and web (at least 32 characters). The web container runs the production build, which
+  # refuses the .env.example placeholder, so Compose has its own local-only value (override with
+  # COMPOSE_API_INTERNAL_SHARED_SECRET) instead of reading API_INTERNAL_SHARED_SECRET from .env.
+  API_INTERNAL_SHARED_SECRET: ${COMPOSE_API_INTERNAL_SHARED_SECRET:-compose-local-internal-secret-0123456789abcdef}
 
 services:
   postgres:
@@ -57,6 +61,8 @@ services:
     environment:
       <<: *app-env
       OTEL_SERVICE_NAME: sgm-api
+      # `true` (from .env) swaps in fake Google/Facebook providers for `pnpm run test:e2e`.
+      AUTH_FAKE_OAUTH: ${AUTH_FAKE_OAUTH:-false}
     ports:
       - '127.0.0.1:4000:4000'
     depends_on:
@@ -106,9 +112,15 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:3000}
     image: sgm-web:dev
     environment:
       API_INTERNAL_URL: http://api:4000
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:3000}
+      API_INTERNAL_SHARED_SECRET: ${COMPOSE_API_INTERNAL_SHARED_SECRET:-compose-local-internal-secret-0123456789abcdef}
+      # No reverse proxy in the local stack. Production sets the real hop count (see docs/getting-started.md).
+      WEB_TRUSTED_PROXY_HOPS: '0'
     ports:
       - '127.0.0.1:3000:3000'
     depends_on:

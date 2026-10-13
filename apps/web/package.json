@@ -17,6 +17,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",

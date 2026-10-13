@@ -1,0 +1,7 @@
+{
+  "iss": "https://accounts.google.com",
+  "sub": "110169484474386279999",
+  "email": "unverified.person@example.com",
+  "email_verified": false,
+  "name": "Unverified Person"
+}

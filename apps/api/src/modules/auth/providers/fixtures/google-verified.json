@@ -1,0 +1,10 @@
+{
+  "iss": "https://accounts.google.com",
+  "sub": "110169484474386276334",
+  "email": "aroha.ngata@example.com",
+  "email_verified": true,
+  "name": "Aroha Ngata",
+  "given_name": "Aroha",
+  "family_name": "Ngata",
+  "picture": "https://lh3.googleusercontent.com/a/example"
+}

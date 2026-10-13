@@ -10,6 +10,17 @@ RUN pnpm install --frozen-lockfile --filter "@sgm/web..."
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/web apps/web
+# next.config.ts reads WEB_BASE_URL at build time for serverActions.allowedOrigins (baked into the server).
+# There is deliberately NO default: an image built for the wrong origin rejects every form submission, so the
+# build fails unless the environment's public origin is passed:  --build-arg WEB_BASE_URL=https://games.example.nz
+# (docker-compose.yml supplies the local http://localhost:3000 for development only). At boot the server
+# refuses to start when the runtime WEB_BASE_URL host differs from the host baked in here.
+ARG WEB_BASE_URL
+RUN case "${WEB_BASE_URL}" in \
+      http://?*|https://?*) ;; \
+      *) echo "ERROR: build arg WEB_BASE_URL is required (an http(s) origin, e.g. https://games.example.nz)" >&2; exit 1 ;; \
+    esac
+ENV WEB_BASE_URL=${WEB_BASE_URL}
 RUN pnpm --filter @sgm/web build
 
 FROM node:24-slim

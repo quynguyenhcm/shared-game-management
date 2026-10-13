@@ -1,15 +1,19 @@
 // Console output is allowed here (see eslint.config.mjs): the CLI talks to a terminal, not the logger.
-import { resetRefusal, rollbackRefusal } from './cli-guards.ts';
+import { parseSetRoleArgs, resetRefusal, rollbackRefusal } from './cli-guards.ts';
 import { loadConfigOrExit, type Config } from './lib/config/config.ts';
 import { QUEUE_NAMES } from './jobs/registry.ts';
 import { SCHEDULES } from './jobs/schedules.ts';
+import { createKysely } from './lib/db/kysely.ts';
 import { migrateToLatest, resetDatabase, rollbackMigrations } from './lib/db/migrate.ts';
+import { createPool } from './lib/db/pool.ts';
+import { setUserRole } from './modules/auth/repo.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
 
 const COMMANDS: Record<string, { subcommands: readonly string[] }> = {
   db: { subcommands: ['migrate', 'rollback', 'reset'] },
   jobs: { subcommands: ['trigger', 'schedules'] },
+  users: { subcommands: ['set-role'] },
 };
 
 function usage(): string {
@@ -21,6 +25,7 @@ function usage(): string {
     '  db reset [--force]                (refused in production or on a non-local host)',
     '  jobs trigger <slot|heartbeat> [json]   (manually enqueue a slot or the heartbeat job)',
     '  jobs schedules                         (list registered cron schedules)',
+    '  users set-role <email> <GLOBAL_ADMIN|PLAYER>   (grant or revoke the global admin role)',
   ].join('\n');
 }
 
@@ -113,6 +118,22 @@ async function runJobs(subcommand: string, args: readonly string[], config: Conf
   }
 }
 
+/** `users set-role <email> <GLOBAL_ADMIN|PLAYER>`: the operator's way to create the first GLOBAL_ADMIN. */
+async function runUsers(args: readonly string[], config: Config): Promise<void> {
+  const parsed = parseSetRoleArgs(args);
+  if ('error' in parsed) fail(parsed.error);
+  const pool = createPool({ connectionString: config.databaseUrl, max: 1 });
+  const db = createKysely(pool);
+  try {
+    const updated = await setUserRole(db, parsed.email, parsed.role);
+    if (updated === null) fail(`users set-role: no user with that email; nothing changed`, 1);
+    // Id and role only: no email echo of other data, no secrets.
+    console.log(`user ${updated.id} role is now ${updated.role}`);
+  } finally {
+    await db.destroy();
+  }
+}
+
 // `pnpm run db:rollback -- --all` may forward a literal `--`.
 const [group, subcommand, ...flags] = process.argv.slice(2).filter((arg) => arg !== '--');
 const entry = group === undefined ? undefined : COMMANDS[group];
@@ -125,6 +146,8 @@ const config = loadConfigOrExit();
 try {
   if (group === 'jobs') {
     await runJobs(subcommand, flags, config);
+  } else if (group === 'users') {
+    await runUsers(flags, config);
   } else {
     await runDb(subcommand, flags, config);
   }
