@@ -622,6 +622,8 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 
 ### Deviations
 <!-- - Phase <N> | <file:line/artifact> | <rationale> -->
+- Phase 2 | apps/api/src/modules/teams/service.ts (join) | The banned check runs before the private-team code check, so a BANNED caller with no code gets 403 `banned_from_team`, not 404. Accepted: AC-ERROR-5 says "with or without a valid invite code", and a banned user already knows the team.
+- Phase 2 | apps/api/src/modules/teams/service.ts (regenerate) | Adds a team-row lock and an approved-admin re-check inside the transaction, which goes beyond the spec. Accepted as hardening that follows the lock-order rule.
 
 ### Phase 1 Build Log
 - TDD: 45 new tests (RED 44 failing, then GREEN); unit 473/473, integration 199/199, lint/typecheck/build PASS (verifier).
