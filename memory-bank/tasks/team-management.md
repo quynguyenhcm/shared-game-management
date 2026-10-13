@@ -558,21 +558,55 @@ Build teams as the second `modules/<feature>` slice on top of the auth platform.
 
 ## Creative Phases
 
-- [ ] **Architecture Design** (required): the ban side-effect seam (Q1: in-transaction hook, job, or hybrid; ADR 0015; backfill sweeper; cancellation status and fee semantics agreed with registration-and-waitlist). It also settles the membership state machine policy (Q3), the invite-code design (Q4) and the search semantics (Q5). Status: pending.
-- [ ] **UI/UX Design** (required): the team-admin area information architecture, with one page versus sub-routes and future plug-in points for banking, skills and sessions (Q2). It also covers the inline confirmation pattern, header navigation and creator skill capture (Q6). Status: pending.
+- [x] **User Journey Design**: `memory-bank/creative/team-management-teams-user-journey.md`. Chosen: dedicated, status-driven pages. One status table drives the team page, the invite page, Find and My teams. My teams stands in for notifications. Create and join redirect after posting; moderation reports in place. Spec amendments: A1–A17.
+- [x] **Architecture Design**: `memory-bank/creative/team-management-membership-architecture.md`. Chosen:
+  - Q1 1B: the BANNED row and the `member-banned` job commit together. The `MemberBannedHandler` port is a no-op for now, and the `assertApprovedMember` FOR SHARE gate blocks new registrations. No sweeper in this feature; registration-and-waitlist owns reconciliation. Cancellation sets `WITHDRAWN` and charges no fee.
+  - Q3 3B: the state machine is enforced by the DB, through CHECKs, a transition trigger and deferred last-admin triggers (D-40 to D-45). The team row is locked first.
+  - Q4 4A: one rotating 256-bit code. `returnTo` is masked in logs.
+  - Q5 5A: ILIKE over a partial `(lower(name), id)` index, with a two-way cursor.
+  - Spec amendments: A1–A13.
+- [x] **UI/UX Design**: `memory-bank/creative/team-management-team-admin-uiux.md`. Chosen:
+  - Q2: one "People" manage page with a jump list, inside `manage/layout.tsx`, plus a `manage-areas.ts` registry where later areas plug in. An `InlineConfirm` disclosure pattern replaces native dialogs.
+  - Q6: a shared `SkillLevelField` with none preselected and per-option help text.
+  - Spec amendments: 1–11.
+
+### Creative Reconciliation (binding for build)
+Where the three docs disagree, these rulings apply. The build reads all three docs' amendment tables as part of the spec.
+- **Manage list page size**: 50 rows per section, from Architecture A13, which owns the API contract. This replaces UI/UX's 25.
+- **List order**: pending oldest first; members admins first, then by name; banned newest first. All three docs agree.
+- **Find pagination**: keep "Previous" and "Next". Architecture A8 adds `prevCursor`, so Journey A6's "Back to first page" does not apply to Find. Manage-section pagers keep UI/UX's "Next" / "Back to start".
+- **Self-demote**: inline confirm, then redirect to `/teams/[teamId]` (the caller is still a member) with the notice "You're no longer an admin of {Team name}." This merges Journey A8's target with UI/UX's copy.
+- **Manage section order**: Join requests, Members, Invite link, Banned members (UI/UX amendment 1).
+- **Response fields**:
+  - `GET /teams/mine` adds `pendingRequestCount` (Journey A4).
+  - `GET /teams/:teamId` adds `myStatus` and `myRole` (Journey A17).
+  - The members list adds `adminCount` (UI/UX amendment 3), which drives the proactive last-admin hint.
+  - Moderation responses include `fullName` (Journey A9).
+- **Banned-caller invite lookup**: 403 `banned_from_team` with no preview (Journey A3). This is consistent with Architecture.
+- **Private-team joining**: only through the invite link (Journey A2, Architecture A9).
+- **No-store pages**: `/teams/join` and `/teams/[teamId]/manage` (UI/UX amendment 6).
+- **File names**: from Architecture A1, so `modules/teams/ban-hook.ts`, `modules/teams/membership.ts` and `jobs/member-banned.ts`. Add UI/UX amendment 2's extra web files to the New Source Files list at build.
+- **Event names**: dotted `team.*` names from Architecture A11, which replace the underscore list in the Observability section.
 
 ---
 
 ## Execution State
 
-**Build Status**: IDLE
+**Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Can Resume**: NO
+**Current Step**: Dispatching creative agents (User Journey, Architecture, UI/UX)
+**Step Started**: 2026-10-13
+**Can Resume**: YES
 
 ### Active Sub-Agents
-(none)
+- User Journey Design (opus): COMPLETE
+- Architecture Design (opus): COMPLETE
+- UI/UX Design (sonnet): COMPLETE
 
 ### Completed Steps
+- User Journey Creative Design: COMPLETE (2026-10-13) - Output: memory-bank/creative/team-management-teams-user-journey.md
+- Architecture Creative Design: COMPLETE (2026-10-13) - Output: memory-bank/creative/team-management-membership-architecture.md
+- UI/UX Creative Design: COMPLETE (2026-10-13) - Output: memory-bank/creative/team-management-team-admin-uiux.md
 - Step 0.1: Task provisioned on feature/team-management
 - Step 3: Spec Writer Agent (sonnet) - COMPLETE; taxonomy lint CLEAN; human approved 2026-10-13
 - Step 4-5: Codebase analysis and implementation plan - COMPLETE (5 phases)
