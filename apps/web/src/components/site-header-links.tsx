@@ -55,6 +55,12 @@ export function SiteHeaderLinks({ state }: { state: HeaderState }) {
     </a>
   );
 
+  const findTeam = (
+    <a href="/teams/find" aria-current={current('/teams/find')} className={LINK_CLASS}>
+      Find a team
+    </a>
+  );
+
   if (state.kind === 'anonymous') {
     return (
       <nav aria-label="Main" className="flex flex-wrap items-center justify-between gap-x-4">
@@ -66,13 +72,12 @@ export function SiteHeaderLinks({ state }: { state: HeaderState }) {
         >
           Create account
         </a>
-        <a
-          href={loginUrl({ returnTo })}
-          aria-current={current('/login')}
-          className={`${LINK_CLASS} order-3 basis-full sm:order-2 sm:basis-auto`}
-        >
-          Sign in
-        </a>
+        <div className="order-3 flex basis-full flex-wrap items-center gap-x-4 sm:order-2 sm:basis-auto">
+          {findTeam}
+          <a href={loginUrl({ returnTo })} aria-current={current('/login')} className={LINK_CLASS}>
+            Sign in
+          </a>
+        </div>
       </nav>
     );
   }
@@ -81,24 +86,35 @@ export function SiteHeaderLinks({ state }: { state: HeaderState }) {
     return (
       <nav aria-label="Main" className="flex flex-wrap items-center justify-between gap-x-4">
         {brand}
-        <a href="/account" aria-current={current('/account')} className={LINK_CLASS}>
-          Account
-        </a>
+        <div className="flex flex-wrap items-center gap-x-4">
+          {findTeam}
+          <a href="/account" aria-current={current('/account')} className={LINK_CLASS}>
+            Account
+          </a>
+        </div>
       </nav>
     );
   }
 
+  // Signed in. Tab order: brand, links, signed-in text, Sign out. At 360 px: row 1 brand and Sign out,
+  // row 2 the links (they wrap), row 3 the truncated name; from `sm` everything shares one wrapping row.
   return (
-    <nav aria-label="Main" className="flex flex-wrap items-center justify-between gap-x-4">
+    <nav aria-label="Main" className="flex flex-wrap items-center gap-x-4">
       {brand}
-      <div className="order-2 sm:order-3">
-        <SignOutButton />
-      </div>
-      <div className="order-3 flex min-w-0 basis-full items-center gap-4 sm:order-2 sm:basis-auto">
-        <span className="min-w-0 truncate text-base">Signed in as {state.fullName}</span>
+      <div className="order-3 flex basis-full flex-wrap items-center gap-x-4 sm:order-2 sm:basis-auto">
+        {findTeam}
+        <a href="/teams" aria-current={current('/teams')} className={LINK_CLASS}>
+          My teams
+        </a>
         <a href="/account" aria-current={current('/account')} className={LINK_CLASS}>
           Account
         </a>
+      </div>
+      <span className="order-4 min-w-0 basis-full truncate text-base sm:order-3 sm:ml-auto sm:basis-auto">
+        Signed in as {state.fullName}
+      </span>
+      <div className="order-2 ml-auto sm:order-4 sm:ml-0">
+        <SignOutButton />
       </div>
     </nav>
   );

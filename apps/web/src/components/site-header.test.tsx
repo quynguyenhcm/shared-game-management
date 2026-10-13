@@ -75,3 +75,52 @@ describe('SiteHeader states', () => {
     expect(html).not.toContain('Create account');
   });
 });
+
+describe('SiteHeader team links (AC-ENTRY-1)', () => {
+  it('anonymous: "Find a team" is a link to /teams/find and there is no "My teams"', () => {
+    const html = render({ kind: 'anonymous' });
+    expect(html).toMatch(/<a[^>]*href="\/teams\/find"[^>]*>Find a team<\/a>/);
+    expect(html).not.toContain('My teams');
+  });
+
+  it('signed in: Find a team, My teams and Account, in tab order before the signed-in text and Sign out', () => {
+    const html = render({ kind: 'signed_in', fullName: 'Aroha Ngata' });
+    expect(html).toMatch(/<a[^>]*href="\/teams\/find"[^>]*>Find a team<\/a>/);
+    expect(html).toMatch(/<a[^>]*href="\/teams"[^>]*>My teams<\/a>/);
+    const order = ['Find a team', 'My teams', 'Account', 'Signed in as', 'Sign out'].map((text) =>
+      html.indexOf(text),
+    );
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('unavailable: keeps Find a team (a public page) but not My teams', () => {
+    const html = render({ kind: 'unavailable' });
+    expect(html).toMatch(/<a[^>]*href="\/teams\/find"[^>]*>Find a team<\/a>/);
+    expect(html).not.toContain('My teams');
+  });
+
+  it('marks only the exact current page with aria-current', () => {
+    const onFind = render({ kind: 'signed_in', fullName: 'A' }, '/teams/find');
+    expect(onFind).toMatch(/aria-current="page"[^>]*>Find a team</);
+    expect(onFind).not.toMatch(/aria-current="page"[^>]*>My teams</);
+    const onMine = render({ kind: 'signed_in', fullName: 'A' }, '/teams');
+    expect(onMine).toMatch(/aria-current="page"[^>]*>My teams</);
+    expect(onMine).not.toMatch(/aria-current="page"[^>]*>Find a team</);
+  });
+
+  it('keeps 44 px tap targets and a wrapping layout so 360 px never scrolls sideways', () => {
+    for (const state of [
+      { kind: 'anonymous' },
+      { kind: 'signed_in', fullName: 'Aroha Ngata' },
+      { kind: 'unavailable' },
+    ] as const) {
+      const html = render(state);
+      expect(html).toContain('flex-wrap');
+      expect(html).toMatch(/<a[^>]*class="[^"]*min-h-11[^"]*"[^>]*>Find a team<\/a>/);
+    }
+    const signedIn = render({ kind: 'signed_in', fullName: 'A very long name '.repeat(5) });
+    expect(signedIn).toContain('truncate');
+    expect(signedIn).toMatch(/<a[^>]*class="[^"]*min-h-11[^"]*"[^>]*>My teams<\/a>/);
+  });
+});

@@ -86,6 +86,66 @@ describe('proxy.ts (Next 16 file convention; runs before every page)', () => {
     expect(flashClear.status).toBe(403);
   });
 
+  describe('team pages (AC-ENTRY-3, AC-ENTRY-4)', () => {
+    const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+    const CODE = 'Zk3hQ9mXw2Lr8TfVb1NcY7uPaE4sJd6GoI0yHtKqRnA';
+    const withCookie = { headers: { cookie: 'sgm_session=x' } };
+
+    it.each([
+      ['/teams', '%2Fteams'],
+      ['/teams/new', '%2Fteams%2Fnew'],
+      [`/teams/${TEAM_ID}/manage`, `%2Fteams%2F${TEAM_ID}%2Fmanage`],
+    ])('redirects anonymous %s to /login with returnTo', (path, encoded) => {
+      const response = proxy(request(path));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encoded}`,
+      );
+    });
+
+    it('keeps the invite code in returnTo through the sign-in redirect', () => {
+      const response = proxy(request(`/teams/join?code=${CODE}`));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encodeURIComponent(`/teams/join?code=${CODE}`)}`,
+      );
+    });
+
+    it('leaves the public pages (Find, a team page, a non-UUID manage path) unprotected', () => {
+      for (const path of [
+        '/teams/find',
+        '/teams/find?q=bad',
+        `/teams/${TEAM_ID}`,
+        '/teams/x/manage',
+      ]) {
+        const response = proxy(request(path));
+        expect(response.headers.get('location'), path).toBeNull();
+      }
+    });
+
+    it('marks the invite page no-store and no-referrer so the code never leaks (AC-ENTRY-4)', () => {
+      const response = proxy(request(`/teams/join?code=${CODE}`, withCookie));
+      expect(response.headers.get('cache-control')).toContain('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    });
+
+    it('marks the manage page (it embeds the invite code), My teams and Create no-store', () => {
+      for (const path of [`/teams/${TEAM_ID}/manage`, '/teams', '/teams/new']) {
+        const response = proxy(request(path, withCookie));
+        expect(response.headers.get('cache-control'), path).toContain('no-store');
+        expect(response.headers.get('referrer-policy'), path).toBeNull();
+      }
+    });
+
+    it('does not make the public team pages uncacheable or change their referrer policy', () => {
+      for (const path of ['/teams/find', `/teams/${TEAM_ID}`]) {
+        const response = proxy(request(path));
+        expect(response.headers.get('cache-control'), path).toBeNull();
+        expect(response.headers.get('referrer-policy'), path).toBeNull();
+      }
+    });
+  });
+
   it('matches pages but not static assets', () => {
     expect(config.matcher).toEqual(['/((?!_next/static|_next/image|favicon.ico).*)']);
   });
