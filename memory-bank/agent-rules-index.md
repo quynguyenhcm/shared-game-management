@@ -1,15 +1,15 @@
 # Agent Rules Index
 
-Generated: 2026-10-07T00:00:00+13:00
-Indexed: 6 rules (0 human-authored, 6 learned) | Rejected: 0 (unsafe) | Warnings: 0
+Generated: 2026-10-13T00:00:00+13:00
+Indexed: 7 rules (0 human-authored, 7 learned) | Rejected: 0 (unsafe) | Warnings: 0
 
 ## Validation Summary
 
 ### Health Check
-- Total rules: 6
+- Total rules: 7
 - Human-authored rules: 0
-- Learned rules (auto-generated): 6
-- Estimated max context: ~70 lines (OK; at most 4 rules match one file, e.g. an auth integration test)
+- Learned rules (auto-generated): 7
+- Estimated max context: ~90 lines (OK; at most 5 rules match one file, e.g. an auth integration test)
 - Conflicts detected: 0
 
 ### ⚠️ Warnings
@@ -24,9 +24,10 @@ None.
 
 | Pattern | Rule | Priority | Lines |
 |---------|------|----------|-------|
-| `memory-bank/tasks/*.md`, `memory-bank/techContext.md`, `memory-bank/systemPatterns.md` | [review-process-plan-claims.md](agent-rules/_learned/review-process-plan-claims.md) | low | 18 |
+| `memory-bank/tasks/*.md`, `memory-bank/techContext.md`, `memory-bank/systemPatterns.md` | [review-process-plan-claims.md](agent-rules/_learned/review-process-plan-claims.md) | medium | 22 |
 | `**/*.int.test.ts`, `apps/api/test/**` | [testing-integration-db-isolation.md](agent-rules/_learned/testing-integration-db-isolation.md) | low | 18 |
-| `**/*.test.ts`, `**/*.int.test.ts`, `apps/api/test/**` | [testing-injected-clock.md](agent-rules/_learned/testing-injected-clock.md) | low | 16 |
+| `**/*.test.ts`, `**/*.int.test.ts`, `apps/api/test/**` | [testing-injected-clock.md](agent-rules/_learned/testing-injected-clock.md) | low | 17 |
+| `apps/api/src/lib/logger/**`, `apps/api/src/**/*.ts`, `**/*.int.test.ts` | [logging-redaction-global.md](agent-rules/_learned/logging-redaction-global.md) | low | 16 |
 | `apps/api/src/lib/jobs/**`, `apps/api/src/jobs/**` | [job-queues-pgboss.md](agent-rules/_learned/job-queues-pgboss.md) | low | 20 |
 | `apps/api/src/modules/auth/**` | [auth-session-issuance.md](agent-rules/_learned/auth-session-issuance.md) | low | 17 |
 
@@ -34,9 +35,10 @@ None.
 
 | Path Contains | Rule | Priority | Lines |
 |---------------|------|----------|-------|
-| `memory-bank/` | [review-process-plan-claims.md](agent-rules/_learned/review-process-plan-claims.md) | low | 18 |
+| `memory-bank/` | [review-process-plan-claims.md](agent-rules/_learned/review-process-plan-claims.md) | medium | 22 |
 | `apps/api/test/` | [testing-integration-db-isolation.md](agent-rules/_learned/testing-integration-db-isolation.md) | low | 18 |
-| `apps/api/test/`, `apps/api/src/modules/` | [testing-injected-clock.md](agent-rules/_learned/testing-injected-clock.md) | low | 16 |
+| `apps/api/test/`, `apps/api/src/modules/` | [testing-injected-clock.md](agent-rules/_learned/testing-injected-clock.md) | low | 17 |
+| `apps/api/src/lib/logger/`, `apps/api/src/modules/`, `apps/api/test/` | [logging-redaction-global.md](agent-rules/_learned/logging-redaction-global.md) | low | 16 |
 | `yay-wt/` | [git-worktree-attached-head.md](agent-rules/_learned/git-worktree-attached-head.md) | low | 16 |
 | `apps/api/src/lib/jobs/`, `apps/api/src/jobs/` | [job-queues-pgboss.md](agent-rules/_learned/job-queues-pgboss.md) | low | 20 |
 | `apps/api/src/modules/auth/` | [auth-session-issuance.md](agent-rules/_learned/auth-session-issuance.md) | low | 17 |
@@ -45,9 +47,10 @@ None.
 
 | Keywords | Rule | Priority |
 |----------|------|----------|
-| review, phase review, observability, documentation, plan, invariants, cross-phase | [review-process-plan-claims.md](agent-rules/_learned/review-process-plan-claims.md) | low |
+| review, phase review, observability, documentation, plan, invariants, cross-phase, cross-feature, creative, critique | [review-process-plan-claims.md](agent-rules/_learned/review-process-plan-claims.md) | medium |
 | integration tests, postgres, isolation, concurrency, vitest | [testing-integration-db-isolation.md](agent-rules/_learned/testing-integration-db-isolation.md) | low |
-| testing, clock, time, throttle, timestamps | [testing-injected-clock.md](agent-rules/_learned/testing-injected-clock.md) | low |
+| testing, clock, time, throttle, timestamps, flaky, timeouts, DST | [testing-injected-clock.md](agent-rules/_learned/testing-injected-clock.md) | low |
+| logging, redaction, observability, pino, testing, cross-feature | [logging-redaction-global.md](agent-rules/_learned/logging-redaction-global.md) | low |
 | git, worktree, build, commit, detached head | [git-worktree-attached-head.md](agent-rules/_learned/git-worktree-attached-head.md) | low |
 | pg-boss, jobs, queue, retry, dedupe, worker, secrets, encryption | [job-queues-pgboss.md](agent-rules/_learned/job-queues-pgboss.md) | low |
 | auth, sessions, concurrency, race condition, password reset, oauth | [auth-session-issuance.md](agent-rules/_learned/auth-session-issuance.md) | low |
