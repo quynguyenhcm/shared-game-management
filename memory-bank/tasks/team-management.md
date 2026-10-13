@@ -668,7 +668,7 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 ### Final Review
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
 - **Verdict**: ready to merge with fixes; 0 Critical, 0 Important.
-- **Minor 1, recommended before merge**: `logger.ts` now redacts any field named exactly `code`. That hides the error code on the `auth.oauth.link_conflict` events at `oauth-service.ts:364` and `:427`. Rename those fields to `errorCode`.
+- **Minor 1, FIXED post-build**: `logger.ts` now redacts any field named exactly `code`. That hides the error code on the `auth.oauth.link_conflict` events at `oauth-service.ts:364` and `:427`. Rename those fields to `errorCode`. Fixed: both fields renamed to `errorCode`; the `auth-oauth.int.test.ts` link-conflict test now asserts `errorCode` (fails without the fix, passes with it).
 - **Minor 2**: a refusal from the in-transaction actor re-check (A10), or from `lockTeam` finding no team, logs `team.action.refused` twice: once from the routes.ts `onError` hook and once from the service's `refusing()`.
 - **Minor 3**: carried-over review notes:
   - A create replay with the same key but a different body returns the original team.

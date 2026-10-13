@@ -361,7 +361,7 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
             event: 'auth.oauth.link_conflict',
             provider: profile.provider,
             userId: state.linkUserId,
-            code: decision.code,
+            errorCode: decision.code,
           },
           'oauth link refused',
         );
@@ -424,7 +424,7 @@ export function createOAuthService(deps: OAuthServiceDeps): OAuthService {
             event: 'auth.oauth.link_conflict',
             provider: profile.provider,
             userId: state.linkUserId,
-            code,
+            errorCode: code,
           },
           'oauth link refused',
         );
