@@ -1,0 +1,17 @@
+pnpm-lock.yaml
+node_modules
+dist
+.next
+coverage
+.agent-logs
+test-results
+playwright-report
+*.tsbuildinfo
+next-env.d.ts
+**/types.generated.ts
+db/migrations
+# Pre-existing product specs and process docs are not reformatted by tooling
+memory-bank
+/*.md
+CLAUDE.md
+apps/api/openapi.yaml

@@ -1,0 +1,17 @@
+{
+  "name": "@sgm/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./money": "./src/money/money.ts",
+    "./money/zod": "./src/money/zod.ts",
+    "./time": "./src/time/time.ts",
+    "./time/dst-vectors": "./src/time/dst-vectors.ts",
+    "./invoice": "./src/invoice/invoice.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

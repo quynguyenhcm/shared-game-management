@@ -1,0 +1,31 @@
+{
+  "dialect": "postgres",
+  "defaultSchemas": ["public"],
+  "includePattern": "public.*",
+  "excludePattern": "public.pgmigrations",
+  "outFile": "src/lib/db/types.generated.ts",
+  "typeOnlyImports": true,
+  "customImports": {
+    "Ciphertext": "@sgm/shared#Ciphertext",
+    "MoneyString": "@sgm/shared#MoneyString",
+    "LocalDate": "@sgm/shared#LocalDate",
+    "LocalTime": "@sgm/shared#LocalTime"
+  },
+  "typeMapping": {
+    "numeric": "MoneyString",
+    "date": "LocalDate",
+    "time": "LocalTime"
+  },
+  "overrides": {
+    "columns": {
+      "game_sessions.starts_at": "ColumnType<Date | null, never, never>",
+      "game_sessions.ends_at": "ColumnType<Date | null, never, never>",
+      "payments.gst_amount": "ColumnType<MoneyString, never, never>",
+      "payments.subtotal_amount": "ColumnType<MoneyString, never, never>",
+      "teams.bank_account_number": "Ciphertext | null",
+      "teams.akahu_app_token": "Ciphertext | null",
+      "teams.bank_account_name": "Ciphertext | null",
+      "teams.ird_number": "Ciphertext | null"
+    }
+  }
+}

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sgm
+          POSTGRES_PASSWORD: sgm
+          POSTGRES_DB: sgm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sgm -d sgm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://sgm:sgm@localhost:5432/sgm
+      # CI-only throwaway key (32 bytes, base64); never used outside this workflow.
+      ENCRYPTION_KEYS: ci1:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+      ENCRYPTION_ACTIVE_KEY_ID: ci1
+      SMTP_URL: smtp://localhost:1025
+      MAILPIT_API_URL: http://localhost:8025
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint GitHub workflows
+        uses: docker://rhysd/actionlint:latest
+        with:
+          args: -color
+      # Same gate developers run locally: lint, typecheck, unit, integration, build.
+      - run: pnpm run ci

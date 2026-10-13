@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: Shared Game Management API
+  version: 0.1.0
+components:
+  schemas: {}
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Service and database health
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                      - degraded
+                  db:
+                    type: string
+                    enum:
+                      - ok
+                      - unreachable
+                  version:
+                    type: string
+                required:
+                  - status
+                  - db
+                  - version
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                      - degraded
+                  db:
+                    type: string
+                    enum:
+                      - ok
+                      - unreachable
+                  version:
+                    type: string
+                required:
+                  - status
+                  - db
+                  - version
+                additionalProperties: false
