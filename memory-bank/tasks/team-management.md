@@ -665,6 +665,19 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 - Built: manage layout + People page, manage-areas registry, InlineConfirm, moderation Server Actions, apiClient manage methods, notice auto-focus, systemPatterns/techContext updates.
 - Guard & Recovery Log: see commit guard result.
 
+### Final Review
+**Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
+- **Verdict**: ready to merge with fixes; 0 Critical, 0 Important.
+- **Minor 1, recommended before merge**: `logger.ts` now redacts any field named exactly `code`. That hides the error code on the `auth.oauth.link_conflict` events at `oauth-service.ts:364` and `:427`. Rename those fields to `errorCode`.
+- **Minor 2**: a refusal from the in-transaction actor re-check (A10), or from `lockTeam` finding no team, logs `team.action.refused` twice: once from the routes.ts `onError` hook and once from the service's `refusing()`.
+- **Minor 3**: carried-over review notes:
+  - A create replay with the same key but a different body returns the original team.
+  - `callManageApi` duplication in actions.ts.
+  - The self-demote InlineConfirm has no per-user id.
+  - The `listMembers` SQL builder could be extracted.
+- **Minor 4**: a team name made of control characters can produce a Find cursor longer than `CURSOR_MAX_LENGTH` (700).
+- **Minor 5**: the admin routes' OpenAPI responses don't list 401/403.
+
 ### Deviations (Phase 5)
 - Phase 5 | apps/web/src/components/teams/* | No jsdom in the repo, so InlineConfirm keyboard/focus behaviour is covered by a pure reducer, static-markup ARIA tests and the Playwright run. Approve/Reject/Make admin are plain form actions; confirm panels and messages need JS. Accepted.
 - Phase 5 | apps/web/src/app/teams/[teamId]/manage | No separate manage/error.tsx; app/teams/error.tsx covers it. Accepted.
