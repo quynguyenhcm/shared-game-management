@@ -400,7 +400,7 @@ Notes:
 | Promote | "{Name} is now a team admin." |
 | Demote | "{Name} is no longer a team admin." |
 | Self-demote notice on `/teams` | "You're no longer an admin of {Team name}." |
-| Ban prompt | "Ban {Name}? They lose access to this team and their upcoming registrations are cancelled." |
+| Ban prompt | "Ban {Name}? They lose access to this team and can't register for its sessions." |
 | Ban reason label | "Reason (optional, only team admins see this)" |
 | Ban buttons | trigger "Ban", confirm "Ban member", "Cancel" |
 | Ban success | "{Name} has been banned." |

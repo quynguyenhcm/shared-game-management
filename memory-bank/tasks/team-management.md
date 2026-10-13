@@ -2,13 +2,13 @@
 slug: team-management
 legacy_id:
 feature: team-management
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # team-management: Team Management
 
 **Complexity**: Level 3 (inherited from team-management)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: team-management
 **Branch**: feature/team-management
 **Worktree**: N/A (main checkout)
@@ -170,7 +170,7 @@ Team creation, discovery, membership and moderation (PRODDUCT-OVERVIEW §2).
 #### AC-HAPPY-11: Admin bans a member
 **Priority**: MUST
 **Given** an approved `MEMBER` under "Members"
-**When** an admin clicks "Ban", optionally types a reason in "Reason (optional, only team admins see this)" (at most 500 characters) and clicks "Ban member" in the inline confirmation "Ban {Full name}? They lose access to this team and their upcoming registrations are cancelled." (no native browser dialog)
+**When** an admin clicks "Ban", optionally types a reason in "Reason (optional, only team admins see this)" (at most 500 characters) and clicks "Ban member" in the inline confirmation "Ban {Full name}? They lose access to this team and can't register for its sessions." (no native browser dialog)
 **Then** in one transaction the row becomes `status='BANNED'` with `banned_at` = now, `banned_by` = the admin, `ban_reason` = the trimmed text or null, and a `member-banned` job is enqueued (AC-ASYNC-1); the admin sees "{Full name} has been banned." and the person appears under "Banned members" (name, banned date, reason); the banned user's next call to any `requireTeamRole` route for T returns 403, `/teams` no longer lists T for them, and `GET /teams/[T]` shows them the public team page (if public) with no join form and "You can't join this team."
 
 #### AC-HAPPY-12: Admin regenerates the invite link
@@ -252,6 +252,12 @@ Team creation, discovery, membership and moderation (PRODDUCT-OVERVIEW §2).
 **Given** a ban has committed and the `member-banned` handler throws (transient error, then in a second run a permanent error)
 **When** the worker runs the job
 **Then** the membership stays `BANNED` and access stays revoked; a transient failure is retried with the existing backoff (`retryLimit 3`); a permanent failure ends the job in `failed` with an error log (`event: team.member.banned.hook_failed`, `teamId`, `userId`, no PII) so an operator can see it and re-run it; the admin's ban response was already 200
+
+#### AC-ERROR-15: Retrying a create whose response was lost never makes a second team
+**Priority**: MUST
+**Given** the create form rendered a hidden `idempotencyKey` (UUID v4, new per form render), and a `POST /teams` with that key has committed but the response never reached the browser
+**When** the same player resubmits the same form (same key)
+**Then** the API returns 200 with the team already created and its membership, and no second `teams` row exists. The key is stored as `teams.create_idempotency_key` (unique on `(created_by, create_idempotency_key)`, migration D-46). A concurrent double submit with one key yields exactly one team, proven by a race test. The same key sent by a different user is an ordinary new create. A missing or malformed key is 422.
 
 **Async behaviour and the registration seam**
 
@@ -587,16 +593,27 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 - **No-store pages**: `/teams/join` and `/teams/[teamId]/manage` (UI/UX amendment 6).
 - **File names**: from Architecture A1, so `modules/teams/ban-hook.ts`, `modules/teams/membership.ts` and `jobs/member-banned.ts`. Add UI/UX amendment 2's extra web files to the New Source Files list at build.
 - **Event names**: dotted `team.*` names from Architecture A11, which replace the underscore list in the Observability section.
+- **Ban copy** (user decision, 2026-10-13, from critique finding 1): the confirmation reads "Ban {Full name}? They lose access to this team and can't register for its sessions." The "are cancelled" wording in the UI/UX wireframe and the Journey rationale is superseded. registration-and-waitlist adds cancellation wording when it ships the real `MemberBannedHandler` and the reconciliation sweep that re-enqueues bans the no-op handled (Architecture A4). This must go into that feature's plan.
+- **Invite rotation race** (critique finding 2): this reverses the Architecture Q4 rule that a join racing a regenerate may succeed. The join transaction locks the team row `FOR SHARE` (which conflicts with regenerate's `FOR UPDATE`) and compares `inviteCode` to `teams.invite_code` under that lock. A rotation that commits first therefore makes the old code fail (`invite_invalid` or `not_found`, per A9). Add a deterministic join-versus-regenerate race test to `teams-api.int.test.ts` (Phase 2).
+- **Create idempotency** (user decision, from critique finding 3): AC-ERROR-15. The create form carries a hidden `idempotencyKey`, and `POST /teams` returns the existing team on a replay. Add the column, the unique index and ledger D-46 in the Phase 1 migration; add the replay and race tests in Phase 2. Journey A13's "check My teams" copy stays only as a fallback for a 5xx with no reply.
+
+### Design Critique (advisory)
+- **Backend**: codex, run with `adversarial-review --base origin/main --scope branch`. Verdict: needs-attention.
+- **Summary**: the ban over-promised cancellation, invite rotation had a race window, and create was not retry-safe.
+- **Findings, all resolved by the rulings above**:
+  - [high] The ban said registrations are cancelled while the shipped handler does nothing. Resolved with honest copy.
+  - [high] Invite regeneration had a TOCTOU hole against immediate invalidation. Resolved with the `FOR SHARE` lock and a race test.
+  - [medium] A lost create response could produce a permanent duplicate team. Resolved with an idempotency key (AC-ERROR-15).
 
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Dispatching creative agents (User Journey, Architecture, UI/UX)
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete; next /yay:build team-management (Phase 1)
 **Step Started**: 2026-10-13
-**Can Resume**: YES
+**Can Resume**: NO
 
 ### Active Sub-Agents
 - User Journey Design (opus): COMPLETE
@@ -607,6 +624,7 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 - User Journey Creative Design: COMPLETE (2026-10-13) - Output: memory-bank/creative/team-management-teams-user-journey.md
 - Architecture Creative Design: COMPLETE (2026-10-13) - Output: memory-bank/creative/team-management-membership-architecture.md
 - UI/UX Creative Design: COMPLETE (2026-10-13) - Output: memory-bank/creative/team-management-team-admin-uiux.md
+- Design Critique: CREATIVE CRITIQUE: codex — usable; verdict needs-attention, 3 findings resolved (ban copy, invite race lock, create idempotency AC-ERROR-15)
 - Step 0.1: Task provisioned on feature/team-management
 - Step 3: Spec Writer Agent (sonnet) - COMPLETE; taxonomy lint CLEAN; human approved 2026-10-13
 - Step 4-5: Codebase analysis and implementation plan - COMPLETE (5 phases)
