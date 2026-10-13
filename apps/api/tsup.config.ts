@@ -1,6 +1,11 @@
+import { copyFile } from 'node:fs/promises';
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
+  // The password blocklist is read at runtime from beside the bundle (modules/auth/password-policy.ts).
+  onSuccess: async () => {
+    await copyFile('src/modules/auth/common-passwords.txt', 'dist/common-passwords.txt');
+  },
   entry: {
     main: 'src/main.ts',
     worker: 'src/worker.ts',

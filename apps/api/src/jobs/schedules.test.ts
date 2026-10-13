@@ -30,12 +30,13 @@ const runner = createJobRunner({
 const preview = runner.previewSchedule.bind(runner);
 
 describe('schedule slots', () => {
-  it('registers the three binding slots in Pacific/Auckland', () => {
+  it('registers the binding slots (plus auth-cleanup at 05:00) in Pacific/Auckland', () => {
     expect(SCHEDULE_TZ).toBe('Pacific/Auckland');
     expect(SCHEDULES.map(({ name, cron, tz }) => ({ name, cron, tz }))).toEqual([
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
+      { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
     ]);
   });
 
@@ -79,6 +80,7 @@ describe('schedule slots', () => {
       ['recurrence-materialisation', '0 3 * * *'],
       ['post-game-billing', '*/5 * * * *'],
       ['daily-overdue', '0 4 * * *'],
+      ['auth-cleanup', '0 5 * * *'],
     ]);
     expect(calls.every((call) => (call[3] as { tz: string }).tz === 'Pacific/Auckland')).toBe(true);
     calls.length = 0;

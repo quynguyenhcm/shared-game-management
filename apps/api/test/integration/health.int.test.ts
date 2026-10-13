@@ -4,6 +4,7 @@ import { buildApp } from '../../src/app.ts';
 import { loadConfig } from '../../src/lib/config/config.ts';
 import { checkDatabase, createPool } from '../../src/lib/db/pool.ts';
 import { createLogger } from '../../src/lib/logger/logger.ts';
+import { inertAppDeps } from '../helpers/app-deps.ts';
 
 const config = loadConfig();
 const logger = createLogger({
@@ -29,11 +30,9 @@ afterAll(async () => {
 describe('GET /health against a real database', () => {
   it('returns 200 with db ok when PostgreSQL answers', async () => {
     const pool = poolFor(config.databaseUrl);
-    const app = await buildApp({
-      logger,
-      version: 'int-test',
-      checkDb: () => checkDatabase(pool),
-    });
+    const app = await buildApp(
+      inertAppDeps(logger, { version: 'int-test', checkDb: () => checkDatabase(pool) }),
+    );
     const response = await app.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(200);
     expect(HealthResponse.parse(response.json())).toEqual({
@@ -50,11 +49,9 @@ describe('GET /health against a real database', () => {
     unreachable.hostname = '127.0.0.1';
     unreachable.port = '1';
     const pool = poolFor(unreachable.toString());
-    const app = await buildApp({
-      logger,
-      version: 'int-test',
-      checkDb: () => checkDatabase(pool),
-    });
+    const app = await buildApp(
+      inertAppDeps(logger, { version: 'int-test', checkDb: () => checkDatabase(pool) }),
+    );
     const startedAt = Date.now();
     const response = await app.inject({ method: 'GET', url: '/health' });
     expect(Date.now() - startedAt).toBeLessThan(3000);

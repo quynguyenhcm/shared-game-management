@@ -27,6 +27,8 @@ export const SCHEDULES: readonly ScheduleSlot[] = [
   // Sweep: a later feature enqueues one `bill-session:<session_id>` job per due session.
   { name: QUEUE_NAMES.postGameBilling, cron: '*/5 * * * *', tz: SCHEDULE_TZ, intervalSweep: true },
   { name: QUEUE_NAMES.dailyOverdue, cron: '0 4 * * *', tz: SCHEDULE_TZ },
+  // 05:00 local: after the 02:00-02:59 DST window and after the 03:00/04:00 slots above.
+  { name: QUEUE_NAMES.authCleanup, cron: '0 5 * * *', tz: SCHEDULE_TZ },
 ];
 
 export type PreviewFn = (

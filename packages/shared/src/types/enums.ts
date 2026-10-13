@@ -14,6 +14,17 @@ export type SkillTier = (typeof SkillTier)[number];
 export const GlobalRole = ['GLOBAL_ADMIN', 'TEAM_ADMIN', 'PLAYER'] as const;
 export type GlobalRole = (typeof GlobalRole)[number];
 
+/**
+ * The global roles auth code may assign or expose. `TEAM_ADMIN` stays in the database enum (the draft
+ * has it) but is per-team only: a CHECK keeps it out of `users.role` (AC-VERIFY-4) and the team role is
+ * derived from `team_members`.
+ */
+export const AssignableGlobalRole = [
+  'GLOBAL_ADMIN',
+  'PLAYER',
+] as const satisfies readonly GlobalRole[];
+export type AssignableGlobalRole = (typeof AssignableGlobalRole)[number];
+
 export const TeamVisibility = ['PUBLIC', 'PRIVATE'] as const;
 export type TeamVisibility = (typeof TeamVisibility)[number];
 

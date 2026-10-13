@@ -1,4 +1,29 @@
+import { AssignableGlobalRole, normaliseEmail } from '@sgm/shared';
 import type { Config } from './lib/config/config.ts';
+
+export type SetRoleArgs =
+  { readonly email: string; readonly role: AssignableGlobalRole } | { readonly error: string };
+
+/**
+ * Validates `users set-role <email> <GLOBAL_ADMIN|PLAYER>` before any database access. `TEAM_ADMIN` is a
+ * per-team role (derived from `team_members`) and is never a global role, so it is refused by name.
+ */
+export function parseSetRoleArgs(args: readonly string[]): SetRoleArgs {
+  const [rawEmail, rawRole, ...extra] = args;
+  const usage = 'Usage: users set-role <email> <GLOBAL_ADMIN|PLAYER>';
+  if (rawEmail === undefined || rawRole === undefined || extra.length > 0) return { error: usage };
+  if (rawRole === 'TEAM_ADMIN') {
+    return {
+      error:
+        'TEAM_ADMIN is a per-team role (team_members) and cannot be assigned globally. Use GLOBAL_ADMIN or PLAYER.',
+    };
+  }
+  const role = AssignableGlobalRole.find((candidate) => candidate === rawRole);
+  if (role === undefined) return { error: `Unknown role "${rawRole}". ${usage}` };
+  const email = normaliseEmail(rawEmail);
+  if (email === null) return { error: `"${rawEmail}" is not a valid email address.` };
+  return { email, role };
+}
 
 /** Hosts `db reset` may target without `--force`. A leading `/` is a local Unix-socket directory. */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', 'postgres']);

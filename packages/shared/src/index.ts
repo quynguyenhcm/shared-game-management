@@ -1,4 +1,9 @@
+export * from './api/auth.ts';
+export * from './api/errors.ts';
 export { HealthResponse } from './api/health.ts';
+export * from './auth/email.ts';
+export * from './auth/oauth-binding.ts';
+export * from './auth/return-to.ts';
 export * from './invoice/invoice.ts';
 export * from './money/money.ts';
 export * from './money/zod.ts';

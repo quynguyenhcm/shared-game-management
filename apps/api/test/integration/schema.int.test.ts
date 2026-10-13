@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EXPECTED_ENUMS, EXPECTED_INDEXES, EXPECTED_TABLES } from '../fixtures/expected-schema.ts';
 import {
+  insertPasswordIdentity,
   insertPayment,
   insertRegistration,
   insertSession,
@@ -60,6 +61,23 @@ describe('migrations (AC-VERIFY-5)', () => {
       const afterFirst = await catalogSnapshot(empty.pool);
       const dumpFirst = pgDumpSnapshot(empty.url, empty.name);
       expect(afterFirst.some((line) => line.startsWith('column payments.team_id'))).toBe(true);
+      // The five auth migrations (AC-VERIFY-5) are part of the round trip.
+      for (const prefix of [
+        'column auth_sessions.token_hash',
+        'column password_reset_tokens.used_at',
+        'column oauth_states.link_user_id',
+        'column oauth_pending_signups.full_name',
+        'column auth_throttle.attempts',
+        'column users.email_verified_at',
+      ]) {
+        expect(
+          afterFirst.some((line) => line.startsWith(prefix)),
+          prefix,
+        ).toBe(true);
+      }
+      expect(
+        afterFirst.filter((line) => line.includes('FUNCTION public.auth_throttle_')),
+      ).toHaveLength(2);
       // Core gen_random_uuid(), never uuid-ossp.
       expect(afterFirst).not.toContain('extension uuid-ossp');
 
@@ -204,12 +222,12 @@ describe('auth identities (AC-VERIFY-6)', () => {
   it('lets one user hold PASSWORD, GOOGLE and FACEBOOK identities; a reused provider subject is 23505', async () => {
     const userId = await insertUser(db.pool);
     const subject = `google-${userId}`;
+    await insertPasswordIdentity(db.pool, userId);
     await db.pool.query(
-      `INSERT INTO auth_identities (user_id, provider, provider_subject, password_hash) VALUES
-         ($1, 'PASSWORD', $2, '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$aGFzaA'),
-         ($1, 'GOOGLE', $3, NULL),
-         ($1, 'FACEBOOK', $4, NULL)`,
-      [userId, `player-${userId}@example.test`, subject, `fb-${userId}`],
+      `INSERT INTO auth_identities (user_id, provider, provider_subject) VALUES
+         ($1, 'GOOGLE', $2),
+         ($1, 'FACEBOOK', $3)`,
+      [userId, subject, `fb-${userId}`],
     );
     const { rows } = await db.pool.query<{ provider: string }>(
       `SELECT provider FROM auth_identities WHERE user_id = $1 ORDER BY provider`,
@@ -229,14 +247,17 @@ describe('auth identities (AC-VERIFY-6)', () => {
 
   it('ties password_hash to the PASSWORD provider (23514), requires a user (23502) and fits a 255+ char hash', async () => {
     const userId = await insertUser(db.pool);
+    const { rows: emailRows } = await db.pool.query<{ email: string }>(
+      `SELECT email FROM users WHERE id = $1`,
+      [userId],
+    );
+    const email = emailRows[0]?.email ?? '';
     await inRollback(db.pool, async (client) => {
       const insert = `INSERT INTO auth_identities (user_id, provider, provider_subject, password_hash)
                       VALUES ($1, $2, $3, $4)`;
-      expect(await trySql(client, insert, [userId, 'PASSWORD', `p-${userId}`, null])).toMatchObject(
-        {
-          code: '23514',
-        },
-      );
+      expect(await trySql(client, insert, [userId, 'PASSWORD', email, null])).toMatchObject({
+        code: '23514',
+      });
       expect(await trySql(client, insert, [userId, 'GOOGLE', `g-${userId}`, 'hash'])).toMatchObject(
         {
           code: '23514',
@@ -251,7 +272,7 @@ describe('auth identities (AC-VERIFY-6)', () => {
         code: '23502',
       });
       expect(
-        await trySql(client, insert, [userId, 'PASSWORD', `p2-${userId}`, 'x'.repeat(255)]),
+        await trySql(client, insert, [userId, 'PASSWORD', email, 'x'.repeat(255)]),
       ).toBeUndefined();
     });
   });

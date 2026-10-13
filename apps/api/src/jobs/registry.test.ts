@@ -5,6 +5,7 @@ describe('queue registry', () => {
   it('declares every foundation queue once with the plan-level defaults', () => {
     expect(QUEUES.map((queue) => queue.name).sort()).toEqual(
       [
+        'auth-cleanup',
         'daily-overdue',
         'heartbeat',
         'post-game-billing',
@@ -27,6 +28,7 @@ describe('queue registry', () => {
       postGameBilling: 'post-game-billing',
       dailyOverdue: 'daily-overdue',
       sendEmail: 'send-email',
+      authCleanup: 'auth-cleanup',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -35,6 +37,8 @@ describe('queue registry', () => {
   it('uses exclusive policy where a singletonKey must suppress concurrent duplicates', () => {
     expect(getQueue('send-email').policy).toBe('exclusive');
     expect(getQueue('post-game-billing').policy).toBe('exclusive');
+    // One cleanup run at a time: two overlapping runs would only fight over the same rows.
+    expect(getQueue('auth-cleanup').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {

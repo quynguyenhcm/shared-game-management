@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FieldCrypto } from '../lib/crypto/crypto.ts';
 import {
   NonRetryableJobError,
   type JobHandler,
@@ -30,8 +31,40 @@ export const SendEmailPayload = z.strictObject({
   tags: z.record(z.string(), z.string()).optional(),
 });
 
-export function createSendEmailHandler(notifier: Notifier): JobHandler<EmailMessage> {
-  return async (payload, context) => {
+/**
+ * A message sealed for the queue: `pgboss.job.data` is retained for days, so a message that carries a secret
+ * (the reset link) is stored as one `FieldCrypto` envelope. The idempotency key stays readable (it names the
+ * job, never a secret) and is bound into the envelope as its row id, so a payload moved to another job fails.
+ */
+const SealedEmailPayload = z.strictObject({ idempotencyKey: z.string(), sealed: z.string() });
+
+const sealContext = (idempotencyKey: string) => ({
+  table: 'pgboss.job',
+  column: 'data.send-email',
+  rowId: idempotencyKey,
+});
+
+/** The plain message from a sealed payload, or the payload itself when it was never sealed. */
+function openPayload(payload: unknown, crypto: FieldCrypto): unknown {
+  const sealed = SealedEmailPayload.safeParse(payload);
+  if (!sealed.success) return payload;
+  try {
+    const message: unknown = JSON.parse(
+      crypto.decrypt(sealed.data.sealed, sealContext(sealed.data.idempotencyKey)),
+    );
+    return message;
+  } catch {
+    // Never echo the cause: a decryption error must not become a place the ciphertext or key id leaks to.
+    return { unreadable: true };
+  }
+}
+
+export function createSendEmailHandler(
+  notifier: Notifier,
+  crypto: FieldCrypto,
+): JobHandler<EmailMessage> {
+  return async (rawPayload, context) => {
+    const payload = openPayload(rawPayload, crypto);
     const parsed = SendEmailPayload.safeParse(payload);
     if (!parsed.success) {
       // Field paths only: the payload itself may contain personal data.
@@ -80,9 +113,20 @@ export function createSendEmailHandler(notifier: Notifier): JobHandler<EmailMess
 export function enqueueEmail(
   runner: Pick<JobRunner, 'enqueue'>,
   message: EmailMessage,
-  options: { trx?: TransactionLike } = {},
+  options: { trx?: TransactionLike; crypto?: FieldCrypto } = {},
 ): Promise<string | null> {
-  return runner.enqueue(QUEUE_NAMES.sendEmail, message, {
+  // Pass `crypto` for a message that carries a secret: only its envelope reaches the job table.
+  const data =
+    options.crypto === undefined
+      ? message
+      : {
+          idempotencyKey: message.idempotencyKey,
+          sealed: options.crypto.encrypt(
+            JSON.stringify(message),
+            sealContext(message.idempotencyKey),
+          ),
+        };
+  return runner.enqueue(QUEUE_NAMES.sendEmail, data, {
     singletonKey: `notify:${message.idempotencyKey}`,
     ...(options.trx === undefined ? {} : { trx: options.trx }),
   });

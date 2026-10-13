@@ -3,6 +3,10 @@ info:
   title: Shared Game Management API
   version: 0.1.0
 components:
+  securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
   schemas: {}
 paths:
   /health:
@@ -57,4 +61,2988 @@ paths:
                   - status
                   - db
                   - version
+                additionalProperties: false
+  /auth/register:
+    post:
+      operationId: registerWithPassword
+      summary: Register with email and password
+      description: "Creates the player account and signs it in. The body is strict: an
+        unknown field such as `role` is a 422."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                email:
+                  type: string
+                password:
+                  type: string
+                sex:
+                  type: string
+                  enum:
+                    - MALE
+                    - FEMALE
+                    - OTHER
+              required:
+                - fullName
+                - email
+                - password
+                - sex
+              additionalProperties: false
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                      sex:
+                        type: string
+                        enum:
+                          - MALE
+                          - FEMALE
+                          - OTHER
+                      role:
+                        type: string
+                        enum:
+                          - GLOBAL_ADMIN
+                          - PLAYER
+                    required:
+                      - id
+                      - email
+                      - fullName
+                      - sex
+                      - role
+                    additionalProperties: false
+                  session:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - token
+                      - expiresAt
+                    additionalProperties: false
+                required:
+                  - user
+                  - session
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/login:
+    post:
+      operationId: loginWithPassword
+      summary: Sign in with email and password
+      description: Every failure (unknown email, wrong password, account without a
+        password) is the same 401. After 5 failures per email or 20 per client
+        address in 15 minutes the answer is 429 with Retry-After, even for the
+        right password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  minLength: 1
+                  maxLength: 320
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+              required:
+                - email
+                - password
+              additionalProperties: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                      sex:
+                        type: string
+                        enum:
+                          - MALE
+                          - FEMALE
+                          - OTHER
+                      role:
+                        type: string
+                        enum:
+                          - GLOBAL_ADMIN
+                          - PLAYER
+                    required:
+                      - id
+                      - email
+                      - fullName
+                      - sex
+                      - role
+                    additionalProperties: false
+                  session:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - token
+                      - expiresAt
+                    additionalProperties: false
+                required:
+                  - user
+                  - session
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Sign out
+      description: Revokes the presented session. Answers 204 for an already dead or
+        absent session too.
+      security:
+        - sessionToken: []
+        - {}
+      responses:
+        "204":
+          description: Signed out
+  /auth/me:
+    get:
+      operationId: getMe
+      summary: The signed-in user
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                      sex:
+                        type: string
+                        enum:
+                          - MALE
+                          - FEMALE
+                          - OTHER
+                      role:
+                        type: string
+                        enum:
+                          - GLOBAL_ADMIN
+                          - PLAYER
+                    required:
+                      - id
+                      - email
+                      - fullName
+                      - sex
+                      - role
+                    additionalProperties: false
+                required:
+                  - user
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/providers:
+    get:
+      operationId: getAuthProviders
+      summary: Which OAuth providers are enabled
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  google:
+                    type: boolean
+                  facebook:
+                    type: boolean
+                required:
+                  - google
+                  - facebook
+                additionalProperties: false
+  /auth/password/forgot:
+    post:
+      operationId: forgotPassword
+      summary: Request a password reset link
+      description: Always 202 with the same body, whether or not an account exists for
+        the email, so it cannot be used to discover accounts. The email is sent
+        by the worker, not inline. At most one new link per user per 60 seconds;
+        more requests from one client address per hour than the configured limit
+        (default 10) are a 429.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  minLength: 1
+                  maxLength: 320
+              required:
+                - email
+              additionalProperties: false
+      responses:
+        "202":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - accepted
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/password/reset:
+    post:
+      operationId: resetPassword
+      summary: Set a new password with a reset link token
+      description: "Single use. In one transaction: consumes the token, sets the
+        PASSWORD identity, deletes every Google and Facebook identity of the
+        user (reported in `removedProviders`), revokes all sessions, invalidates
+        other reset tokens and records the inbox proof. An expired, used or
+        unknown token is 400 and never hashes; a password that breaks the rules
+        is 422 and leaves the token usable."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                password:
+                  type: string
+              required:
+                - token
+                - password
+              additionalProperties: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removedProviders:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - GOOGLE
+                        - FACEBOOK
+                required:
+                  - removedProviders
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/oauth/{provider}/authorize:
+    post:
+      operationId: oauthAuthorize
+      summary: Start a Google or Facebook sign-in
+      description: Stores a single-use state (10 minutes) and returns the provider URL
+        and the raw state, which the web keeps in its `sgm_oauth` binding
+        cookie. `rerequest` is honoured for Facebook only
+        (`auth_type=rerequest`). 404 `provider_not_enabled` when the provider
+        has no credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                returnTo:
+                  type: string
+                  maxLength: 512
+                rerequest:
+                  type: boolean
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - google
+              - facebook
+          in: path
+          name: provider
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorizationUrl:
+                    type: string
+                    format: uri
+                  state:
+                    type: string
+                required:
+                  - authorizationUrl
+                  - state
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/oauth/{provider}/callback:
+    post:
+      operationId: oauthCallback
+      summary: Finish a Google or Facebook sign-in or connect
+      description: "Consumes the state exactly once. Outcomes: `signed_in` (a
+        session), `pending_signup` (first-time user; nothing is created until
+        `/auth/oauth/complete`), `linked` and `already_linked` (connect flow,
+        needs the same user's bearer token). An email that matches an existing
+        account is never signed in or linked: 409 `oauth_account_exists`."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties:
+                    state:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                    code:
+                      type: string
+                      minLength: 1
+                      maxLength: 2048
+                  required:
+                    - state
+                    - code
+                  additionalProperties: false
+                - type: object
+                  properties:
+                    state:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                    error:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                  required:
+                    - state
+                    - error
+                  additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - google
+              - facebook
+          in: path
+          name: provider
+          required: true
+      security:
+        - sessionToken: []
+        - {}
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      outcome:
+                        type: string
+                        enum:
+                          - signed_in
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          email:
+                            type: string
+                          fullName:
+                            type: string
+                          sex:
+                            type: string
+                            enum:
+                              - MALE
+                              - FEMALE
+                              - OTHER
+                          role:
+                            type: string
+                            enum:
+                              - GLOBAL_ADMIN
+                              - PLAYER
+                        required:
+                          - id
+                          - email
+                          - fullName
+                          - sex
+                          - role
+                        additionalProperties: false
+                      session:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+                          expiresAt:
+                            type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        required:
+                          - token
+                          - expiresAt
+                        additionalProperties: false
+                      returnTo:
+                        type: string
+                    required:
+                      - outcome
+                      - user
+                      - session
+                      - returnTo
+                    additionalProperties: false
+                  - type: object
+                    properties:
+                      outcome:
+                        type: string
+                        enum:
+                          - pending_signup
+                      pendingToken:
+                        type: string
+                      returnTo:
+                        type: string
+                    required:
+                      - outcome
+                      - pendingToken
+                      - returnTo
+                    additionalProperties: false
+                  - type: object
+                    properties:
+                      outcome:
+                        type: string
+                        enum:
+                          - linked
+                      returnTo:
+                        type: string
+                        enum:
+                          - /account
+                    required:
+                      - outcome
+                      - returnTo
+                    additionalProperties: false
+                  - type: object
+                    properties:
+                      outcome:
+                        type: string
+                        enum:
+                          - already_linked
+                      returnTo:
+                        type: string
+                        enum:
+                          - /account
+                    required:
+                      - outcome
+                      - returnTo
+                    additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "502":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/oauth/pending:
+    get:
+      operationId: oauthPending
+      summary: The pending first-time sign-up
+      description: Prefills `/register/complete`. The handle travels in
+        `X-Pending-Signup`, never in the URL.
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+          in: header
+          name: x-pending-signup
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider:
+                    type: string
+                    enum:
+                      - GOOGLE
+                      - FACEBOOK
+                  email:
+                    type: string
+                  fullName:
+                    type:
+                      - string
+                      - "null"
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                  returnTo:
+                    type: string
+                required:
+                  - provider
+                  - email
+                  - fullName
+                  - expiresAt
+                  - returnTo
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/oauth/complete:
+    post:
+      operationId: oauthComplete
+      summary: Finish a first-time Google or Facebook sign-up
+      description: Requires the sex choice (422 keeps the pending sign-up valid). In
+        one transaction consumes the pending sign-up and creates the user and
+        identity. 201 for a new account, 200 when the identity already existed
+        (finished in another tab).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pendingToken:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                fullName:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                sex:
+                  type: string
+                  enum:
+                    - MALE
+                    - FEMALE
+                    - OTHER
+              required:
+                - pendingToken
+                - fullName
+                - sex
+              additionalProperties: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                      sex:
+                        type: string
+                        enum:
+                          - MALE
+                          - FEMALE
+                          - OTHER
+                      role:
+                        type: string
+                        enum:
+                          - GLOBAL_ADMIN
+                          - PLAYER
+                    required:
+                      - id
+                      - email
+                      - fullName
+                      - sex
+                      - role
+                    additionalProperties: false
+                  session:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - token
+                      - expiresAt
+                    additionalProperties: false
+                  returnTo:
+                    type: string
+                required:
+                  - user
+                  - session
+                  - returnTo
+                additionalProperties: false
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                      sex:
+                        type: string
+                        enum:
+                          - MALE
+                          - FEMALE
+                          - OTHER
+                      role:
+                        type: string
+                        enum:
+                          - GLOBAL_ADMIN
+                          - PLAYER
+                    required:
+                      - id
+                      - email
+                      - fullName
+                      - sex
+                      - role
+                    additionalProperties: false
+                  session:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - token
+                      - expiresAt
+                    additionalProperties: false
+                  returnTo:
+                    type: string
+                required:
+                  - user
+                  - session
+                  - returnTo
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/identities:
+    get:
+      operationId: listIdentities
+      summary: Sign-in methods of the signed-in user
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  identities:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                          enum:
+                            - PASSWORD
+                            - GOOGLE
+                            - FACEBOOK
+                        connectedAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        lastUsedAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                      required:
+                        - provider
+                        - connectedAt
+                        - lastUsedAt
+                      additionalProperties: false
+                  enabledProviders:
+                    type: object
+                    properties:
+                      google:
+                        type: boolean
+                      facebook:
+                        type: boolean
+                    required:
+                      - google
+                      - facebook
+                    additionalProperties: false
+                required:
+                  - identities
+                  - enabledProviders
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/identities/{provider}/link:
+    post:
+      operationId: startLinkIdentity
+      summary: Start connecting Google or Facebook
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - google
+              - facebook
+          in: path
+          name: provider
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorizationUrl:
+                    type: string
+                    format: uri
+                  state:
+                    type: string
+                required:
+                  - authorizationUrl
+                  - state
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /auth/identities/{provider}:
+    delete:
+      operationId: unlinkIdentity
+      summary: Disconnect Google or Facebook
+      description: "Never the last sign-in method: 409 `last_sign_in_method` (also
+        enforced by a deferred database trigger)."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - google
+              - facebook
+          in: path
+          name: provider
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "204":
+          description: Disconnected
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
                 additionalProperties: false
