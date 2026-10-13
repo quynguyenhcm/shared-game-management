@@ -59,6 +59,33 @@ describe('OpenAPI document', () => {
     expect(documents403).toBe(true);
   });
 
+  it('documents the Phase 2 team routes with the bearer requirement on every one and the guard 403 on the invite-code routes (AC-VERIFY-6)', async () => {
+    const document = (await generateOpenApiDocument()) as unknown as OpenApiDocument;
+    const routes: [string, string][] = [
+      ['/teams', 'post'],
+      ['/teams/find', 'get'],
+      ['/teams/mine', 'get'],
+      ['/teams/{teamId}', 'get'],
+      ['/teams/invite/lookup', 'post'],
+      ['/teams/{teamId}/join-requests', 'post'],
+      ['/teams/{teamId}/invite-code', 'get'],
+      ['/teams/{teamId}/invite-code/regenerate', 'post'],
+    ];
+    for (const [path, method] of routes) {
+      const operation = operationOf(document, path, method);
+      expect(
+        operation.security?.some((entry) => 'sessionToken' in entry),
+        `${method} ${path}`,
+      ).toBe(true);
+    }
+    expect(Object.keys(operationOf(document, '/teams', 'post').responses ?? {})).toEqual(
+      expect.arrayContaining(['200', '201', '401', '422']),
+    );
+    expect(
+      Object.keys(operationOf(document, '/teams/{teamId}/invite-code', 'get').responses ?? {}),
+    ).toEqual(expect.arrayContaining(['200', '401', '403']));
+  });
+
   it('is built from the shared zod contract: the web api-client and the Fastify routes import the same schemas (AC-VERIFY-8)', async () => {
     const routes = await readFile(new URL('./modules/auth/routes.ts', import.meta.url), 'utf8');
     const client = await readFile(

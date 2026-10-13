@@ -93,6 +93,41 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     await app.close();
   });
 
+  it('declares the documented policy on every Phase 2 /teams route and no team route is public (AC-VERIFY-1)', async () => {
+    const app = await buildApp(inertAppDeps(logger));
+    const teamRoutes = listRoutePolicies(app).filter(
+      (entry) => entry.method !== 'HEAD' && entry.url.startsWith('/teams'),
+    );
+    const byRoute = new Map(
+      teamRoutes.map((entry) => [`${entry.method} ${entry.url}`, entry.policy]),
+    );
+    for (const route of [
+      'POST /teams',
+      'GET /teams/mine',
+      'POST /teams/invite/lookup',
+      'POST /teams/:teamId/join-requests',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({ kind: 'authenticated' });
+    }
+    for (const route of ['GET /teams/find', 'GET /teams/:teamId']) {
+      expect(byRoute.get(route), route).toEqual({ kind: 'optionalSession' });
+    }
+    for (const route of [
+      'GET /teams/:teamId/invite-code',
+      'POST /teams/:teamId/invite-code/regenerate',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({
+        kind: 'teamRole',
+        role: 'TEAM_ADMIN',
+        teamIdParam: 'teamId',
+        allowGlobalAdmin: false,
+      });
+    }
+    // Phase 3 adds the moderation routes; whatever is registered, none may be public.
+    for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
+    await app.close();
+  });
+
   it('denies a protected route called without credentials by default and leaves unknown paths as 404', async () => {
     const app = await buildApp(
       inertAppDeps(logger, {

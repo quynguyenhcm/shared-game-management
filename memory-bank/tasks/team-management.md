@@ -557,7 +557,7 @@ Build teams as the second `modules/<feature>` slice on top of the auth platform.
 
 ### Phases
 - [x] **Phase 1: Schema invariants and shared contracts**: the migration (D-40 onwards), regenerated types, zod contracts, 7 error codes, logger redaction and the factory update. ACs: AC-VERIFY-2, AC-VERIFY-3 (redaction) and AC-VERIFY-6.
-- [ ] **Phase 2: Teams API, discovery and joining**: create, find, mine, detail, invite lookup/get/regenerate, join requests, route policies and `team.*` logs. ACs: AC-HAPPY-1 to 5 and 12, AC-ERROR-1 to 5, 10 and 11, AC-VERIFY-1 and 4.
+- [x] **Phase 2: Teams API, discovery and joining**: create, find, mine, detail, invite lookup/get/regenerate, join requests, route policies and `team.*` logs. ACs: AC-HAPPY-1 to 5 and 12, AC-ERROR-1 to 5, 10 and 11, AC-VERIFY-1 and 4.
 - [ ] **Phase 3: Moderation API and ban seam** (follows the architecture creative doc): members list, approve/reject/re-request/promote/demote/ban, the `member-banned` queue and job, the handler port, `assertApprovedMember`, and ADR 0015. ACs: AC-HAPPY-6 to 11, AC-ERROR-6 to 9 and 12, AC-ASYNC-1 to 3, AC-INTEGRATION-1 and 2, AC-VERIFY-5.
 - [ ] **Phase 4: Web discovery, create and join pages**: header links, `/teams/find`, `/teams`, `/teams/new`, `/teams/[teamId]`, `/teams/join`, proxy, api-client and Server Actions. ACs: AC-ENTRY-1 to 4, plus the web side of AC-HAPPY-1 to 5.
 - [ ] **Phase 5: Team-admin area, E2E and docs** (follows the UI/UX creative doc): the manage area, Playwright journeys with axe, OpenAPI regeneration, coverage gate, and `systemPatterns.md`/`techContext.md` updates. This phase delivers the complete entry-to-success flow. ACs: AC-ENTRY-5, the web side of AC-HAPPY-6 to 12, AC-VERIFY-7 and 8, AC-INTEGRATION-3.
@@ -615,7 +615,7 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 **Current Step**: Auto-build loop started (Phases 2-5)
 **Step Started**: 2026-10-13
 **Can Resume**: YES
-**Resume From**: Phase 2: Teams API, discovery and joining
+**Resume From**: Phase 3: Moderation API and ban seam
 
 ### Halt State
 (none)
@@ -628,6 +628,13 @@ Where the three docs disagree, these rulings apply. The build reads all three do
 - Code review: APPROVED (0 blocking). Applied rec 1 (Find cursor max length 700). Deferred: logger exact `code` body-key redaction (rec 2) for Phase 2 when lookup route lands; Phase 3 error mapper must key on `err.constraint` for 23000 guards.
 - D-46: `teams.create_idempotency_key uuid NULL` + `UNIQUE (created_by, create_idempotency_key)` (`uq_teams_created_by_idempotency_key`).
 - Guard & Recovery Log: empty (guard PASS first try).
+
+### Phase 2 Build Log
+- TDD: ~49 new tests (RED 49 failing, then GREEN); unit 487/487, integration 235/235, typecheck/lint/build PASS (verifier). Coverage gate incl. modules/teams/** passes.
+- Code review: APPROVED (0 blocking). Recs: R1 pin create-replay-with-different-body behaviour; R2 private-team member posting join without code gets 404 not_found (Phase 4 web must not rely on 409); R3 optional throttle on lookup/join.
+- Carry-overs done: AC-ERROR-15 idempotency + race tests; join FOR SHARE vs regenerate FOR UPDATE with deterministic race tests; mine.pendingRequestCount, detail.myStatus/myRole; banned lookup 403; logger exact `code` redaction (log field renamed errorCode in errors.ts); 100-char non-ASCII cursor round trip.
+- Notes for later phases: regenerate must be POSTed with no body/content-type (Fastify 422 on empty JSON); malformed non-UUID teamId on public route is 422; team.action.refused for guard 403s on admin routes to be finished in Phase 3; Phase 3 error mapper keys on err.constraint; Phase 3 policy test to add teamRole expectations.
+- Guard & Recovery Log: see commit guard result.
 
 ### Active Sub-Agents
 - User Journey Design (opus): COMPLETE

@@ -31,6 +31,8 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import { teamsRoutes } from './modules/teams/routes.ts';
+import { createTeamsService } from './modules/teams/service.ts';
 import { registerHealthRoute, type HealthDeps } from './routes/health.ts';
 
 export interface AppDeps extends HealthDeps {
@@ -154,6 +156,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       crypto: deps.crypto,
       warnAddressMissing,
     }),
+  });
+  await app.register(teamsRoutes, {
+    prefix: '/teams',
+    service: createTeamsService({ db: deps.db, clock: deps.clock }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);
   await app.ready();

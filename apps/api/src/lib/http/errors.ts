@@ -192,7 +192,10 @@ function handleError(
 ): FastifyReply {
   if (error instanceof AppError) {
     if (error.status >= 500) {
-      request.log.error({ event: 'http.error', err: error, code: error.code }, 'request failed');
+      request.log.error(
+        { event: 'http.error', err: error, errorCode: error.code },
+        'request failed',
+      );
     }
     return send(
       reply,

@@ -3305,3 +3305,1952 @@ paths:
                 required:
                   - error
                 additionalProperties: false
+  /teams:
+    post:
+      operationId: createTeam
+      summary: Create a team
+      description: "The creator becomes an approved TEAM_ADMIN with the skill level
+        they chose. The body is strict (no `inviteCode`, `role`, `createdBy`).
+        `idempotencyKey` is a UUID v4 the form generates once per render: a
+        replay of the same key by the same user answers 200 with the team that
+        already exists instead of 201, and never creates a second team."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 1000
+                visibility:
+                  type: string
+                  enum:
+                    - PUBLIC
+                    - PRIVATE
+                skillLevel:
+                  type: string
+                  enum:
+                    - BEGINNER
+                    - INTERMEDIATE
+                    - ADVANCED
+                idempotencyKey:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$
+              required:
+                - name
+                - visibility
+                - skillLevel
+                - idempotencyKey
+              additionalProperties: false
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
+                      description:
+                        type:
+                          - string
+                          - "null"
+                      visibility:
+                        type: string
+                        enum:
+                          - PUBLIC
+                          - PRIVATE
+                    required:
+                      - id
+                      - name
+                      - description
+                      - visibility
+                    additionalProperties: false
+                  membership:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                    required:
+                      - status
+                      - role
+                      - skillLevel
+                    additionalProperties: false
+                required:
+                  - team
+                  - membership
+                additionalProperties: false
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
+                      description:
+                        type:
+                          - string
+                          - "null"
+                      visibility:
+                        type: string
+                        enum:
+                          - PUBLIC
+                          - PRIVATE
+                    required:
+                      - id
+                      - name
+                      - description
+                      - visibility
+                    additionalProperties: false
+                  membership:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                    required:
+                      - status
+                      - role
+                      - skillLevel
+                    additionalProperties: false
+                required:
+                  - team
+                  - membership
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/find:
+    get:
+      operationId: findTeams
+      summary: Find a team
+      description: PUBLIC teams only. `q` is a case-insensitive substring match on
+        name or description (`%`, `_` and `\` are literal); results are ordered
+        by (lower(name), id), 20 per page, with opaque keyset cursors in both
+        directions. `myStatus` is the signed-in caller's own PENDING, APPROVED
+        or REJECTED row, null otherwise (and for BANNED).
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: q
+          required: false
+        - schema:
+            type: string
+            maxLength: 700
+            pattern: ^[A-Za-z0-9_-]+$
+          in: query
+          name: after
+          required: false
+      security:
+        - sessionToken: []
+        - {}
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        name:
+                          type: string
+                        description:
+                          type:
+                            - string
+                            - "null"
+                        memberCount:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        myStatus:
+                          anyOf:
+                            - type: string
+                              enum:
+                                - PENDING
+                                - APPROVED
+                                - REJECTED
+                            - type: "null"
+                      required:
+                        - id
+                        - name
+                        - description
+                        - memberCount
+                        - myStatus
+                      additionalProperties: false
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
+                  prevCursor:
+                    type:
+                      - string
+                      - "null"
+                required:
+                  - teams
+                  - nextCursor
+                  - prevCursor
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/mine:
+    get:
+      operationId: listMyTeams
+      summary: My teams
+      description: The caller's teams with their role and status; BANNED rows are
+        omitted. Rows where the caller is an approved admin carry
+        `pendingRequestCount`; rows with waiting requests come first.
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        name:
+                          type: string
+                        visibility:
+                          type: string
+                          enum:
+                            - PUBLIC
+                            - PRIVATE
+                        role:
+                          type: string
+                          enum:
+                            - TEAM_ADMIN
+                            - MEMBER
+                        status:
+                          type: string
+                          enum:
+                            - PENDING
+                            - APPROVED
+                            - REJECTED
+                        pendingRequestCount:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                      required:
+                        - id
+                        - name
+                        - visibility
+                        - role
+                        - status
+                      additionalProperties: false
+                required:
+                  - teams
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/invite/lookup:
+    post:
+      operationId: lookupTeamInvite
+      summary: Look up a team by invite code
+      description: POST so the code never appears in a URL the API logs. An unknown,
+        malformed or regenerated code is 404 `invite_invalid`; a caller banned
+        from the team gets 403 `banned_from_team` and no team preview.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+              required:
+                - code
+              additionalProperties: false
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
+                      description:
+                        type:
+                          - string
+                          - "null"
+                      visibility:
+                        type: string
+                        enum:
+                          - PUBLIC
+                          - PRIVATE
+                      memberCount:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                    required:
+                      - id
+                      - name
+                      - description
+                      - visibility
+                      - memberCount
+                    additionalProperties: false
+                  myStatus:
+                    anyOf:
+                      - type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                      - type: "null"
+                required:
+                  - team
+                  - myStatus
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}:
+    get:
+      operationId: getTeam
+      summary: Team detail
+      description: A PUBLIC team, or a PRIVATE team only for a caller with a
+        non-banned membership row; otherwise 404 `not_found`, identical to a
+        team that does not exist. `myStatus` and `myRole` are the caller's own
+        row (BANNED included).
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+        - {}
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
+                      description:
+                        type:
+                          - string
+                          - "null"
+                      visibility:
+                        type: string
+                        enum:
+                          - PUBLIC
+                          - PRIVATE
+                      memberCount:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                    required:
+                      - id
+                      - name
+                      - description
+                      - visibility
+                      - memberCount
+                    additionalProperties: false
+                  myStatus:
+                    anyOf:
+                      - type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      - type: "null"
+                  myRole:
+                    anyOf:
+                      - type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      - type: "null"
+                required:
+                  - team
+                  - myStatus
+                  - myRole
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/join-requests:
+    post:
+      operationId: requestToJoinTeam
+      summary: Ask to join a team
+      description: Creates a PENDING membership with the required self-assessed
+        `skillLevel` (a REJECTED row returns to PENDING). A PRIVATE team is
+        joined only with its current `inviteCode`; without it the answer is 404
+        `not_found`, identical to an unknown team. A PUBLIC team with a stale
+        `inviteCode` is 404 `invite_invalid`. 409 `already_requested` /
+        `already_member`; 403 `banned_from_team`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                skillLevel:
+                  type: string
+                  enum:
+                    - BEGINNER
+                    - INTERMEDIATE
+                    - ADVANCED
+                inviteCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+              required:
+                - skillLevel
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  membership:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                    required:
+                      - status
+                      - skillLevel
+                    additionalProperties: false
+                required:
+                  - membership
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/invite-code:
+    get:
+      operationId: getTeamInviteCode
+      summary: The team invite code
+      description: TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); the guard
+        answers 403 before anything else. The only responses that carry the code
+        are this one and regenerate.
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inviteCode:
+                    type: string
+                required:
+                  - inviteCode
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/invite-code/regenerate:
+    post:
+      operationId: regenerateTeamInviteCode
+      summary: Regenerate the team invite code
+      description: "TEAM_ADMIN of this team only. Replaces the code under a team-row
+        lock: the old code fails immediately for lookups and joins; pending
+        requests and members are unaffected."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inviteCode:
+                    type: string
+                required:
+                  - inviteCode
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false

@@ -78,6 +78,13 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   /connection_?string/i,
 ];
 
+/**
+ * Keys redacted by exact name only, for log fields and bound request data (not for `err` objects, whose `code`
+ * is a harmless SQLSTATE or Node error code). `code` is the invite lookup body key (`POST /teams/invite/lookup`);
+ * a substring pattern would also mask `statusCode` and `providerCode`.
+ */
+const EXACT_BODY_KEY_PATTERNS: readonly RegExp[] = [/^code$/i];
+
 /** `scheme://user:pass@host` credentials inside any string value (e.g. a URL logged under another key). */
 const URL_USERINFO = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]{0,31}:\/\/)[^/\s@]{0,512}@/gi;
 
@@ -205,6 +212,8 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     ...BASE_KEY_PATTERNS,
     ...options.redactPatterns.map((pattern) => new RegExp(escapeRegExp(pattern), 'i')),
   ];
+  // Everything except `err` also masks the exact body key `code`.
+  const fieldPatterns = [...patterns, ...EXACT_BODY_KEY_PATTERNS];
   const settings = {
     level: options.level,
     messageKey: 'message',
@@ -223,7 +232,10 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
       // redacted there (see `serializers`), everything else is redacted here.
       log: (object: Record<string, unknown>) => {
         const { req, res, err, ...rest } = object;
-        const redacted = redactDeep(rest, patterns, 0, new WeakSet()) as Record<string, unknown>;
+        const redacted = redactDeep(rest, fieldPatterns, 0, new WeakSet()) as Record<
+          string,
+          unknown
+        >;
         return {
           ...redacted,
           ...(req === undefined ? {} : { req }),
@@ -234,9 +246,9 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     },
     serializers: {
       req: (request: RequestLike) =>
-        redactDeep(serializeRequest(request, patterns), patterns, 0, new WeakSet()),
+        redactDeep(serializeRequest(request, patterns), fieldPatterns, 0, new WeakSet()),
       res: (response: Parameters<typeof stdSerializers.res>[0]) =>
-        redactDeep(stdSerializers.res(response), patterns, 0, new WeakSet()),
+        redactDeep(stdSerializers.res(response), fieldPatterns, 0, new WeakSet()),
       err: (error: Parameters<typeof stdSerializers.err>[0]) =>
         redactDeep(stdSerializers.err(error), patterns, 0, new WeakSet()),
     },
@@ -256,7 +268,10 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     bindings: Record<string, unknown>,
     childOptions?: Parameters<Logger['child']>[1],
   ) {
-    const redacted = redactDeep(bindings, patterns, 0, new WeakSet()) as Record<string, unknown>;
+    const redacted = redactDeep(bindings, fieldPatterns, 0, new WeakSet()) as Record<
+      string,
+      unknown
+    >;
     return originalChild.call(this, redacted, childOptions);
   } as Logger['child'];
   return logger;

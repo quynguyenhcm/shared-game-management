@@ -244,6 +244,33 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
     expect(lines[0]).toMatchObject({ invitedBy: 'visible-user', statusCode: 201 });
   });
 
+  it('redacts the exact body key `code` (the invite lookup body) at any depth, but not look-alikes (Phase 1 follow-up)', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        code: 'invite-secret-a',
+        body: { code: 'invite-secret-b' },
+        statusCode: 404,
+        errorCode: 'x',
+      },
+      'lookup',
+    );
+    logger.child({ code: 'invite-secret-c' }).info('child binding');
+    const lines = sink.lines();
+    const serialised = JSON.stringify(lines);
+    for (const letter of ['a', 'b', 'c'])
+      expect(serialised).not.toContain(`invite-secret-${letter}`);
+    expect(lines[0]).toMatchObject({ statusCode: 404, errorCode: 'x' });
+  });
+
+  it('keeps the SQLSTATE `code` of a logged error visible (the redaction is for bodies, not error objects)', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.error({ err: Object.assign(new Error('duplicate key'), { code: '23505' }) }, 'failed');
+    expect(JSON.stringify(sink.lines())).toContain('23505');
+  });
+
   it('masks the returnTo query parameter so a logged /login?returnTo=...code... URL never shows the code (A7)', () => {
     const sink = capture();
     const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
