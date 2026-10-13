@@ -3,7 +3,7 @@ version: v1.0.0
 status: planned
 priority: high
 complexity: 4
-linked_tasks: []
+linked_tasks: [registration-and-waitlist]
 created: 2026-09-29
 ---
 
