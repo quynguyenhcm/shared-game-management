@@ -12,6 +12,8 @@ status: COMPLETE
 **Reflection**: memory-bank/reflection/auth-and-user-roles-reflection.md
 **Archived**: memory-bank/archive/auth-and-user-roles-archive.md
 **Completed**: 2026-10-07
+**PR Created**: YES
+**PR URL**: https://github.com/quynguyenhcm/shared-game-management/pull/2 (stacked on #1, platform-foundation)
 **Roadmap**: auth-and-user-roles
 **Branch**: feature/auth-and-user-roles
 **Worktree**: ~/yay-wt/shared-game-management/feature-auth-and-user-roles
@@ -746,7 +748,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 **Build Status**: IDLE
 **Current Phase**: COMPLETE
 **Auto-Build Mode**: YES
-**Current Step**: Archived 2026-10-07 (learning consolidation additive: 2 rules reinforced, 2 new); push/PR pending GitHub access
+**Current Step**: Archived 2026-10-07 (learning consolidation additive: 2 rules reinforced, 2 new); pushed 2026-10-13, PR #2 open (base feature/platform-foundation)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention, 4 findings: all applied; finding 1 per user decision)
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (range 63dbc43..5c62539; verdict: Ready to merge with fixes — 1 Critical, 5 Important, 5 Minor; not addressed autonomously)
 **Final Review Findings** (1-4 fixed in 170bd5f; 5-11 open):
@@ -760,7 +762,7 @@ Consolidated 2026-10-06: spec and design docs reconciled (see Design Critique).
 
 ### Resumption Notes
 **Can Resume**: NO
-**Resume From**: n/a (when GitHub access works: push main and platform-foundation, rebase this branch onto main, push, open PR)
+**Resume From**: n/a (merge PR #1 first; PR #2 then retargets to main)
 **Notes**: Local-only run: commit per phase, do not push (GitHub push returns 403 for Quy-Nguyen-1156376; same as platform-foundation). Branch is stacked on feature/platform-foundation (63dbc43); review ranges start at 6e0d753, not the merge-base with origin/main.
 
 ### Guard & Recovery Log
