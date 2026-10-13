@@ -28,6 +28,7 @@
   - Retry strategy: `retryLimit: 3`, `retryDelay: 5s`, `retryBackoff: true` (exponential)
   - Deduplication via `singletonKey` (concurrent duplicates removed; handler must be idempotent for at-least-once delivery)
   - Visibility: job state in SQL (`pgboss.job`, `pgboss.archive`); visible failure tracking
+  - **`member-banned` queue** (team-management): policy `exclusive`, `singletonKey = member-banned:<membershipId>`, id-only payload, 7-day retention. Its handler is a no-op until registration-and-waitlist injects the real one via `registerJobs({ memberBannedHandler })`; a permanent failure is logged as `team.member.banned.hook_failed` and re-run with `cli jobs trigger member-banned` (ADR 0015)
 
 ### API & Communication
 - **REST API**: Fastify 5 with zod type provider
@@ -43,7 +44,8 @@
   - **Encrypted columns**: `teams.bank_account_number`, `teams.akahu_app_token`, `teams.bank_account_name`, `teams.ird_number`
   - DB Guard: CHECK constraint on envelope format; corrupted ciphertext fails on decryption with typed error
 - **Environment Secrets**: 12-factor config via `.env`, validated by zod at boot with fail-fast on invalid values
-- **Credential Redaction**: pino redaction patterns ban logging `authorization`, `cookie`, `set-cookie`, any key ending in `token` (snake or camelCase, e.g. `pendingToken`), `sgm_session|pending|oauth|flash`, `client_secret`, `code_verifier`, `x-sgm-internal-auth`, `x-sgm-client-ip`, `x-pending-signup`, `bank_account_*`, `ird_number`, `akahu_*`, `encryptionKeys`; OAuth `code`/`state` query values and secret query parameters inside error messages are masked
+- **Credential Redaction**: pino redaction patterns ban logging `authorization`, `cookie`, `set-cookie`, any key ending in `token` (snake or camelCase, e.g. `pendingToken`), `sgm_session|pending|oauth|flash`, `client_secret`, `code_verifier`, `x-sgm-internal-auth`, `x-sgm-client-ip`, `x-pending-signup`, `bank_account_*`, `ird_number`, `akahu_*`, `encryptionKeys`, team invite codes (`inviteCode`/`invite_code`, and a log field named exactly `code`); OAuth `code`/`state` query values, the `returnTo` query, and secret query parameters inside error messages are masked
+  - **Redaction keys are global**: they apply to every log line in every feature, not only the feature that added them. Before adding a key, grep all `logger.*`/`log.*` calls and log assertions for that field name and rename any harmless field that collides (e.g. error codes are logged as `errorCode`, never `code`). In team-management, the exact-`code` key silently redacted `auth.oauth.link_conflict` error codes until the final review (fixed in ad7256e).
 - **Authentication**: argon2id from `node:crypto` (Node >=24.7, no native addon), `jose` 6.x for Google ID-token verification, opaque Postgres sessions (SHA-256 of a 256-bit token); the web owns the session cookie and calls the API with a bearer token. Variables: `WEB_BASE_URL` (also a **build arg** of the web image), `GOOGLE_OAUTH_CLIENT_ID/_SECRET`, `FACEBOOK_OAUTH_APP_ID/_SECRET`, `AUTH_FAKE_OAUTH`, `AUTH_SESSION_*`, `AUTH_RESET_TOKEN_MINUTES`, `AUTH_LOGIN_*`, `AUTH_FORGOT_MAX_PER_ADDRESS`, `AUTH_REGISTER_MAX_PER_ADDRESS`, `API_INTERNAL_SHARED_SECRET`, `WEB_TRUSTED_PROXY_HOPS` (see `docs/getting-started.md`)
   - **Compose internal secret**: `docker-compose.yml` uses its own local-only default (`COMPOSE_API_INTERNAL_SHARED_SECRET`). It is for local stacks only; production validation does **not** yet refuse it (open pre-release item, final-review minor 8).
 - **Job payloads**: secret-bearing emails (password reset) are sealed with FieldCrypto before they reach `pgboss.job`; the worker builds `crypto` from the same keyring.
@@ -75,7 +77,8 @@
   - **Unit tests**: `**/*.test.ts` (no DB, no network, Node environment)
   - **Integration tests**: `**/*.int.test.ts` against real PostgreSQL 17 (forks pool, SKIP LOCKED job polling)
   - **Coverage provider**: v8, threshold 80% for money/time/invoice/auth shared code, the api platform libraries, `apps/api/src/modules/auth/**` and `apps/web/src/lib/**`; measured over unit and integration tests together (`pnpm run test:coverage`)
-  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
+  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`, `teams.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
+  - **Team journeys** (`teams.spec.ts`): run against a production `next start` build, with the worker running so the `member-banned` queue is drained. Not part of `pnpm run ci`
 - **Linting & Formatting**: ESLint 9.39.5 + TypeScript support, Prettier 3.9.9
   - **Type checking**: `tsc --noEmit` strict mode (no `any`, explicit return types)
   - **Code quality**: `no-console` error in `apps/api/src` (except `cli.ts`); bans on unsafe money operations (parseFloat, toFixed); host-TZ independence rules in `packages/shared/src/time/`
@@ -88,7 +91,7 @@
 | `apps/web` | Next.js App Router | Player and admin UI | `src/app/`, `src/components/`, `src/lib/api-client.ts` (typed Fetch wrapper with `traceparent` injection), `e2e/` (Playwright smoke tests) |
 | `apps/api` | Fastify service | REST API and job orchestration | `src/main.ts` (HTTP process), `src/worker.ts` (background worker), `src/cli.ts` (operator CLI: migrations, job triggers), `src/instrumentation.ts` (OTel setup) |
 | `apps/api/src/lib` | Server platform library | Shared infrastructure for API and worker | `config/` (zod env validation, fail-fast), `db/` (pg Pool, Kysely wrapper, migrations), `logger/` (pino setup, redaction), `crypto/` (AES-256-GCM keyring), `notifications/` (Notifier abstraction, adapters), `jobs/` (pg-boss wrapper, handler registry) |
-| `apps/api/src/modules` | Feature modules | Domain logic and handlers | One dir per feature; `<feature>/{routes.ts, service.ts, repo.ts}` convention (established for future features) |
+| `apps/api/src/modules` | Feature modules | Domain logic and handlers | One dir per feature; `<feature>/{routes.ts, service.ts, repo.ts}` convention (established for future features). `teams/` holds the membership state machine (`transitions.ts`), invite codes, the approved-member gate (`membership.ts`) and the ban port (`ban-hook.ts`) |
 | `apps/api/src/routes` | HTTP handlers | Request/response handlers `health.ts` (GET /health); cross-cutting routes land here, feature routes in modules |
 | `apps/api/src/jobs` | Job handlers | Background job implementations | `registry.ts` (queues), `schedules.ts` (cron slots), `bootstrap.ts`, `heartbeat.ts`, `send-email.ts`; billing/recurrence handlers are no-op placeholders until their features |
 | `apps/api/test` | Integration test harness | Real-DB test environment | `global-setup.ts` (migrations, pg-boss setup), `integration/` (*.int.test.ts files with real connections) |
@@ -149,6 +152,8 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 - **Scope**: End-to-end workflows (enqueue → fetch → process → verify), migration safety, constraint enforcement, enum parity with code
 - **Timeout**: 30 seconds per test, 60 seconds for hooks
 - **Example**: `apps/api/test/integration/jobs.int.test.ts` verifies pg-boss schedule firing and idempotency
+- **Environment**: integration runs, `db:migrate` and `test:coverage` read `.env` (created by `pnpm run setup`). In a checkout without `.env`, pass the variables inline: `DATABASE_URL=postgres://sgm:sgm@localhost:5432/sgm ENCRYPTION_KEYS="dev1:<base64 of 32 random bytes>" ENCRYPTION_ACTIVE_KEY_ID=dev1 API_INTERNAL_SHARED_SECRET=<32+ chars>`.
+- **Load-sensitive tests**: the DST/schedule unit tests and the pg-boss `previewSchedule` integration checks (1000 ms) can time out when other heavy processes share the CPU (e.g. parallel agents). If only those time out, re-run the failing files sequentially on a quiet machine before treating it as a regression.
 
 ### Coverage & Quality Gates
 

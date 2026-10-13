@@ -21,6 +21,7 @@ export const QUEUE_NAMES = {
   dailyOverdue: 'daily-overdue',
   sendEmail: 'send-email',
   authCleanup: 'auth-cleanup',
+  memberBanned: 'member-banned',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -43,6 +44,9 @@ export const QUEUES: readonly QueueDefinition[] = [
   { ...DEFAULTS, name: QUEUE_NAMES.sendEmail, policy: 'exclusive' },
   // Daily housekeeping of expired auth rows (sessions, tokens, OAuth state, throttle). One run at a time.
   { ...DEFAULTS, name: QUEUE_NAMES.authCleanup, policy: 'exclusive' },
+  // A ban's side effect (cancel registrations, promote the waitlist): one job per membership
+  // (`singletonKey = member-banned:<membershipId>`), enqueued in the ban's own transaction. ADR 0015.
+  { ...DEFAULTS, name: QUEUE_NAMES.memberBanned, policy: 'exclusive' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

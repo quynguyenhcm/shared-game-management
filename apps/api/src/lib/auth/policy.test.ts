@@ -93,6 +93,48 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     await app.close();
   });
 
+  it('declares the documented policy on every /teams route and no team route is public (AC-VERIFY-1)', async () => {
+    const app = await buildApp(inertAppDeps(logger));
+    const teamRoutes = listRoutePolicies(app).filter(
+      (entry) => entry.method !== 'HEAD' && entry.url.startsWith('/teams'),
+    );
+    const byRoute = new Map(
+      teamRoutes.map((entry) => [`${entry.method} ${entry.url}`, entry.policy]),
+    );
+    for (const route of [
+      'POST /teams',
+      'GET /teams/mine',
+      'POST /teams/invite/lookup',
+      'POST /teams/:teamId/join-requests',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({ kind: 'authenticated' });
+    }
+    for (const route of ['GET /teams/find', 'GET /teams/:teamId']) {
+      expect(byRoute.get(route), route).toEqual({ kind: 'optionalSession' });
+    }
+    for (const route of [
+      'GET /teams/:teamId/invite-code',
+      'POST /teams/:teamId/invite-code/regenerate',
+      'GET /teams/:teamId/members',
+      'POST /teams/:teamId/members/:userId/approve',
+      'POST /teams/:teamId/members/:userId/reject',
+      'POST /teams/:teamId/members/:userId/promote',
+      'POST /teams/:teamId/members/:userId/demote',
+      'POST /teams/:teamId/members/:userId/ban',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({
+        kind: 'teamRole',
+        role: 'TEAM_ADMIN',
+        teamIdParam: 'teamId',
+        allowGlobalAdmin: false,
+      });
+    }
+    // Exactly the 14 documented team routes exist, and none of them is public.
+    expect(byRoute.size).toBe(14);
+    for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
+    await app.close();
+  });
+
   it('denies a protected route called without credentials by default and leaves unknown paths as 404', async () => {
     const app = await buildApp(
       inertAppDeps(logger, {

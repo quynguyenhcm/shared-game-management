@@ -54,6 +54,28 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     message: 'This connection attempt belongs to another session.',
   },
   last_sign_in_method: { status: 409, message: 'You need at least one way to sign in.' },
+  invite_invalid: {
+    status: 404,
+    message: 'This invite link is no longer valid. Ask a team admin for a new one.',
+  },
+  already_requested: {
+    status: 409,
+    message: "You've already asked to join this team. A team admin will review it.",
+  },
+  already_member: { status: 409, message: "You're already a member of this team." },
+  banned_from_team: { status: 403, message: "You can't join this team." },
+  team_admin_cannot_be_banned: {
+    status: 409,
+    message: 'Remove admin rights from this member before banning them.',
+  },
+  last_team_admin: {
+    status: 409,
+    message: 'A team needs at least one admin. Make another member an admin first.',
+  },
+  membership_state_conflict: {
+    status: 409,
+    message: 'Someone else already handled this request. The list has been refreshed.',
+  },
 };
 
 export interface AppErrorOptions {
@@ -170,7 +192,10 @@ function handleError(
 ): FastifyReply {
   if (error instanceof AppError) {
     if (error.status >= 500) {
-      request.log.error({ event: 'http.error', err: error, code: error.code }, 'request failed');
+      request.log.error(
+        { event: 'http.error', err: error, errorCode: error.code },
+        'request failed',
+      );
     }
     return send(
       reply,

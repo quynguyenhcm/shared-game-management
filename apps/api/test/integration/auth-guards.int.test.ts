@@ -176,21 +176,49 @@ describe('team role guard', () => {
     const token = await sessionFor(h, user);
     expect((await get(`/_t/teams/${team}/member`, token)).statusCode).toBe(403); // no row
 
+    // team-management D-40/D-42: an admin is always APPROVED and statuses only move along the state
+    // machine (PENDING -> REJECTED -> PENDING -> APPROVED -> BANNED), so the row is a MEMBER until approved.
     const memberId = await insertTeamMember(h.pool, {
       teamId: team,
       userId: user.id,
-      role: 'TEAM_ADMIN',
+      role: 'MEMBER',
       status: 'PENDING',
     });
-    for (const status of ['PENDING', 'REJECTED', 'BANNED']) {
-      await h.pool.query(`UPDATE team_members SET status = $2 WHERE id = $1`, [memberId, status]);
-      // Even a TEAM_ADMIN role row grants nothing unless the membership is APPROVED.
-      expect((await get(`/_t/teams/${team}/member`, token)).statusCode, status).toBe(403);
-      expect((await get(`/_t/teams/${team}/admin`, token)).statusCode, status).toBe(403);
-    }
-    await h.pool.query(`UPDATE team_members SET status = 'APPROVED' WHERE id = $1`, [memberId]);
+    const stampsFor = (status: string): string =>
+      status === 'APPROVED'
+        ? `approved_at = now(), approved_by = user_id`
+        : status === 'BANNED'
+          ? `banned_at = now(), banned_by = user_id`
+          : `approved_at = NULL, approved_by = NULL`;
+    const moveTo = (status: string): Promise<unknown> =>
+      h.pool.query(`UPDATE team_members SET status = $2, ${stampsFor(status)} WHERE id = $1`, [
+        memberId,
+        status,
+      ]);
+    const expectNoAccess = async (label: string): Promise<void> => {
+      expect((await get(`/_t/teams/${team}/member`, token)).statusCode, label).toBe(403);
+      expect((await get(`/_t/teams/${team}/admin`, token)).statusCode, label).toBe(403);
+    };
+    await expectNoAccess('PENDING');
+    await moveTo('REJECTED');
+    await expectNoAccess('REJECTED');
+    await moveTo('PENDING');
+    await expectNoAccess('PENDING again');
+    await moveTo('APPROVED');
+    expect((await get(`/_t/teams/${team}/member`, token)).statusCode).toBe(200);
+    expect((await get(`/_t/teams/${team}/admin`, token)).statusCode).toBe(403);
+    // Promotion makes the approved member an admin on the very next request.
+    await h.pool.query(`UPDATE team_members SET role = 'TEAM_ADMIN' WHERE id = $1`, [memberId]);
     expect((await get(`/_t/teams/${team}/admin`, token)).statusCode).toBe(200);
-    await h.pool.query(`UPDATE team_members SET status = 'BANNED' WHERE id = $1`, [memberId]);
+    // A team keeps another admin, and an admin is demoted before a ban (D-40, D-43).
+    await insertTeamMember(h.pool, {
+      teamId: team,
+      userId: (await createPasswordUser(h, { email: 'team.status.other@example.com' })).id,
+      role: 'TEAM_ADMIN',
+    });
+    await h.pool.query(`UPDATE team_members SET role = 'MEMBER' WHERE id = $1`, [memberId]);
+    await moveTo('BANNED');
+    expect((await get(`/_t/teams/${team}/member`, token)).statusCode).toBe(403);
     expect((await get(`/_t/teams/${team}/admin`, token)).statusCode).toBe(403);
   });
 });

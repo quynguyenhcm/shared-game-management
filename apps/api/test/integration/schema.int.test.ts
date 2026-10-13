@@ -69,6 +69,8 @@ describe('migrations (AC-VERIFY-5)', () => {
         'column oauth_pending_signups.full_name',
         'column auth_throttle.attempts',
         'column users.email_verified_at',
+        // team-management membership invariants (D-40..D-46).
+        'column teams.create_idempotency_key',
       ]) {
         expect(
           afterFirst.some((line) => line.startsWith(prefix)),
@@ -78,6 +80,19 @@ describe('migrations (AC-VERIFY-5)', () => {
       expect(
         afterFirst.filter((line) => line.includes('FUNCTION public.auth_throttle_')),
       ).toHaveLength(2);
+      expect(
+        afterFirst.filter((line) => line.includes('FUNCTION public.team_members_')),
+      ).toHaveLength(2);
+      for (const trigger of [
+        'team_members_guard_update',
+        'team_members_last_admin_on_update',
+        'team_members_last_admin_on_delete',
+      ]) {
+        expect(
+          afterFirst.some((line) => line.startsWith('trigger') && line.includes(trigger)),
+          trigger,
+        ).toBe(true);
+      }
       // Core gen_random_uuid(), never uuid-ossp.
       expect(afterFirst).not.toContain('extension uuid-ossp');
 
@@ -372,8 +387,10 @@ describe('recurrence and auto-enrol (AC-VERIFY-12)', () => {
     const teamId = await insertTeam(db.pool);
     const [first, second] = [await insertUser(db.pool), await insertUser(db.pool)];
     await db.pool.query(
-      `INSERT INTO team_members (team_id, user_id, status, is_auto_enroll, auto_enroll_assigned_at) VALUES
-         ($1, $2, 'APPROVED', true, '2026-09-01T00:00:00Z'), ($1, $3, 'APPROVED', true, '2026-08-01T00:00:00Z')`,
+      `INSERT INTO team_members (team_id, user_id, status, approved_at, approved_by, is_auto_enroll,
+                                 auto_enroll_assigned_at) VALUES
+         ($1, $2, 'APPROVED', now(), $2, true, '2026-09-01T00:00:00Z'),
+         ($1, $3, 'APPROVED', now(), $3, true, '2026-08-01T00:00:00Z')`,
       [teamId, first, second],
     );
     const { rows } = await db.pool.query<{ user_id: string }>(

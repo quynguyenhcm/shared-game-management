@@ -1,6 +1,7 @@
 export * from './api/auth.ts';
 export * from './api/errors.ts';
 export { HealthResponse } from './api/health.ts';
+export * from './api/teams.ts';
 export * from './auth/email.ts';
 export * from './auth/oauth-binding.ts';
 export * from './auth/return-to.ts';

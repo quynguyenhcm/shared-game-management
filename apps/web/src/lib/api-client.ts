@@ -1,18 +1,33 @@
 import { context, propagation } from '@opentelemetry/api';
 import {
   AuthSuccessResponse,
+  CreateTeamResponse,
   ErrorResponse,
+  FindTeamsResponse,
   ForgotPasswordResponse,
   HealthResponse,
   IdentitiesResponse,
+  InviteCodeResponse,
+  InviteLookupResponse,
+  JoinRequestResponse,
   MeResponse,
+  MembersResponse,
+  MineTeamsResponse,
+  ModerationResponse,
   OAuthAuthorizeResponse,
   OAuthCallbackResponse,
   OAuthCompleteResponse,
   OAuthPendingResponse,
   ProvidersResponse,
   ResetPasswordResponse,
+  TeamDetailResponse,
+  type BanMemberRequest,
+  type CreateTeamRequest,
+  type FindTeamsQuery,
+  type MembersQuery,
   type ForgotPasswordRequest,
+  type InviteLookupRequest,
+  type JoinRequestRequest,
   type LoginRequest,
   type OAuthAuthorizeRequest,
   type OAuthCallbackRequest,
@@ -315,5 +330,127 @@ export const apiClient = {
       session,
       path: `/auth/identities/${provider}`,
       method: 'DELETE',
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Teams (team-management). `session` is required for the authenticated routes and optional for
+  // Find and the team page (the API treats a bad token there as anonymous).
+  // -------------------------------------------------------------------------------------------
+
+  createTeam: (body: CreateTeamRequest, options: ApiCallOptions = {}) =>
+    apiFetch({ ...options, path: '/teams', method: 'POST', body, schema: CreateTeamResponse }),
+
+  findTeams: (query: Pick<FindTeamsQuery, 'q' | 'after'>, options: ApiCallOptions = {}) => {
+    const params = new URLSearchParams();
+    if (query.q) params.set('q', query.q);
+    if (query.after) params.set('after', query.after);
+    const text = params.toString();
+    return apiFetch({
+      ...options,
+      path: text === '' ? '/teams/find' : `/teams/find?${text}`,
+      method: 'GET',
+      schema: FindTeamsResponse,
+    });
+  },
+
+  mineTeams: (session: string, options: Omit<ApiCallOptions, 'session'> = {}) =>
+    apiFetch({
+      ...options,
+      session,
+      path: '/teams/mine',
+      method: 'GET',
+      schema: MineTeamsResponse,
+    }),
+
+  teamDetail: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}`,
+      method: 'GET',
+      schema: TeamDetailResponse,
+    }),
+
+  /** POST so the invite code travels in the body and never in a URL the API logs. */
+  inviteLookup: (body: InviteLookupRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/teams/invite/lookup',
+      method: 'POST',
+      body,
+      schema: InviteLookupResponse,
+    }),
+
+  joinRequest: (teamId: string, body: JoinRequestRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/join-requests`,
+      method: 'POST',
+      body,
+      schema: JoinRequestResponse,
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Team-admin area (`TEAM_ADMIN` routes: the API answers 403 to everyone else, before validation).
+  // -------------------------------------------------------------------------------------------
+
+  /** One section per call (`status`), 50 per page, `after` is the opaque cursor of that section. */
+  teamMembers: (
+    teamId: string,
+    query: Pick<MembersQuery, 'status' | 'after'>,
+    options: ApiCallOptions = {},
+  ) => {
+    const params = new URLSearchParams({ status: query.status });
+    if (query.after) params.set('after', query.after);
+    return apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members?${params.toString()}`,
+      method: 'GET',
+      schema: MembersResponse,
+    });
+  },
+
+  /** Approve, reject, promote and demote take no body: sending JSON content-type with none is a 422. */
+  moderateMember: (
+    teamId: string,
+    userId: string,
+    action: 'approve' | 'reject' | 'promote' | 'demote',
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/${action}`,
+      method: 'POST',
+      schema: ModerationResponse,
+    }),
+
+  banMember: (
+    teamId: string,
+    userId: string,
+    body: BanMemberRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/ban`,
+      method: 'POST',
+      body,
+      schema: ModerationResponse,
+    }),
+
+  teamInviteCode: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/invite-code`,
+      method: 'GET',
+      schema: InviteCodeResponse,
+    }),
+
+  /** POST with NO body and no JSON content-type (the route takes none; an empty JSON body is a 422). */
+  regenerateInviteCode: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/invite-code/regenerate`,
+      method: 'POST',
+      schema: InviteCodeResponse,
     }),
 };

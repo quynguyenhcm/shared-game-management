@@ -13,11 +13,14 @@ export function FormBanner({
   lines,
   links = [],
   focusToken,
+  focusOnMount = false,
 }: {
   kind: 'notice' | 'error';
   lines: readonly string[];
   links?: readonly ErrorLink[];
   focusToken?: unknown;
+  /** A notice that is the result of a redirect (team created, request sent) takes focus once on load. */
+  focusOnMount?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const isError = kind === 'error';
@@ -25,6 +28,10 @@ export function FormBanner({
   useEffect(() => {
     if (isError) ref.current?.focus();
   }, [isError, focusToken]);
+
+  useEffect(() => {
+    if (focusOnMount) ref.current?.focus();
+  }, [focusOnMount]);
 
   return (
     <div

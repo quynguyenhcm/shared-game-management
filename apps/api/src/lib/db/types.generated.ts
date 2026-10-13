@@ -294,6 +294,7 @@ export interface Teams {
   bank_account_last4: string | null;
   bank_account_name: Ciphertext | null;
   bank_account_number: Ciphertext | null;
+  create_idempotency_key: string | null;
   created_at: Generated<Timestamp>;
   created_by: string | null;
   description: string | null;

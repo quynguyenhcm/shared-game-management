@@ -213,3 +213,205 @@ describe('apiClient trace propagation (web -> API)', () => {
     expect(headers.traceparent).not.toBe('garbage');
   });
 });
+
+describe('apiClient team calls (shared zod contracts, optional vs required session)', () => {
+  const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+  const KEY = '2f6c1c1e-7a64-4c0e-9d61-3c1f0c1f0a11';
+  const CODE = 'Zk3hQ9mXw2Lr8TfVb1NcY7uPaE4sJd6GoI0yHtKqRnA';
+  const TEAM = { id: TEAM_ID, name: 'Rosedale', description: null, visibility: 'PUBLIC' };
+
+  function call(fetchMock: ReturnType<typeof stubJson>) {
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    return { url: String(url), init, headers: (init?.headers ?? {}) as Record<string, string> };
+  }
+
+  it('createTeam POSTs the strict body as JSON with the bearer and parses the 201', async () => {
+    const fetchMock = stubJson(201, {
+      team: TEAM,
+      membership: { status: 'APPROVED', role: 'TEAM_ADMIN', skillLevel: 'INTERMEDIATE' },
+    });
+    const result = await apiClient.createTeam(
+      { name: 'Rosedale', visibility: 'PUBLIC', skillLevel: 'INTERMEDIATE', idempotencyKey: KEY },
+      { session: 'tok' },
+    );
+    expect(result).toMatchObject({ ok: true, status: 201, data: { team: { id: TEAM_ID } } });
+    const sent = call(fetchMock);
+    expect(sent.url).toBe('http://localhost:4000/teams');
+    expect(sent.init?.method).toBe('POST');
+    expect(sent.headers.authorization).toBe('Bearer tok');
+    expect(sent.headers['content-type']).toBe('application/json');
+    expect(JSON.parse(sent.init?.body as string)).toMatchObject({ idempotencyKey: KEY });
+  });
+
+  it('findTeams sends q and after as an encoded query, omits blanks and works without a session', async () => {
+    const empty = { teams: [], nextCursor: null, prevCursor: null };
+    const fetchMock = stubJson(200, empty);
+    await expect(apiClient.findTeams({ q: 'bad min&x', after: 'abc_-1' })).resolves.toMatchObject({
+      ok: true,
+    });
+    const sent = call(fetchMock);
+    expect(sent.url).toBe('http://localhost:4000/teams/find?q=bad+min%26x&after=abc_-1');
+    expect(sent.init?.method).toBe('GET');
+    expect(sent.headers.authorization).toBeUndefined();
+    expect(sent.init?.body).toBeUndefined();
+
+    const bare = stubJson(200, empty);
+    await apiClient.findTeams({ q: '', after: undefined }, { session: 'tok' });
+    expect(call(bare).url).toBe('http://localhost:4000/teams/find');
+    expect(call(bare).headers.authorization).toBe('Bearer tok');
+  });
+
+  it('mineTeams and teamDetail GET with the session (detail also works anonymously)', async () => {
+    const mine = stubJson(200, {
+      teams: [
+        {
+          id: TEAM_ID,
+          name: 'Rosedale',
+          visibility: 'PRIVATE',
+          role: 'TEAM_ADMIN',
+          status: 'APPROVED',
+          pendingRequestCount: 2,
+        },
+      ],
+    });
+    const mineResult = await apiClient.mineTeams('tok');
+    expect(mineResult).toMatchObject({ ok: true, data: { teams: [{ pendingRequestCount: 2 }] } });
+    expect(call(mine).url).toBe('http://localhost:4000/teams/mine');
+    expect(call(mine).headers.authorization).toBe('Bearer tok');
+
+    const detail = stubJson(200, {
+      team: { ...TEAM, memberCount: 3 },
+      myStatus: null,
+      myRole: null,
+    });
+    await expect(apiClient.teamDetail(TEAM_ID)).resolves.toMatchObject({
+      ok: true,
+      data: { team: { memberCount: 3 }, myStatus: null },
+    });
+    expect(call(detail).url).toBe(`http://localhost:4000/teams/${TEAM_ID}`);
+    expect(call(detail).headers.authorization).toBeUndefined();
+  });
+
+  it('inviteLookup POSTs the code in the body, never in the URL', async () => {
+    const fetchMock = stubJson(200, { team: { ...TEAM, memberCount: 1 }, myStatus: 'PENDING' });
+    await expect(apiClient.inviteLookup({ code: CODE }, { session: 'tok' })).resolves.toMatchObject(
+      {
+        ok: true,
+        data: { myStatus: 'PENDING' },
+      },
+    );
+    const sent = call(fetchMock);
+    expect(sent.url).toBe('http://localhost:4000/teams/invite/lookup');
+    expect(sent.url).not.toContain(CODE);
+    expect(JSON.parse(sent.init?.body as string)).toEqual({ code: CODE });
+  });
+
+  it('joinRequest POSTs to the team, and API errors come back typed (invite_invalid, banned_from_team)', async () => {
+    const fetchMock = stubJson(201, { membership: { status: 'PENDING', skillLevel: 'ADVANCED' } });
+    await expect(
+      apiClient.joinRequest(TEAM_ID, { skillLevel: 'ADVANCED' }, { session: 'tok' }),
+    ).resolves.toMatchObject({ ok: true, status: 201 });
+    expect(call(fetchMock).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/join-requests`);
+
+    stubJson(404, { error: { code: 'invite_invalid', message: 'x' } });
+    await expect(
+      apiClient.inviteLookup({ code: 'old' }, { session: 'tok' }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 404,
+      error: { code: 'invite_invalid' },
+    });
+    stubJson(403, { error: { code: 'banned_from_team', message: 'x' } });
+    await expect(
+      apiClient.joinRequest(TEAM_ID, { skillLevel: 'BEGINNER' }, { session: 'tok' }),
+    ).resolves.toMatchObject({ ok: false, status: 403, error: { code: 'banned_from_team' } });
+  });
+
+  it('never lets a hostile team id change the path', async () => {
+    const fetchMock = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.teamDetail('../auth/me?x=1');
+    expect(call(fetchMock).url).toBe('http://localhost:4000/teams/..%2Fauth%2Fme%3Fx%3D1');
+  });
+});
+
+describe('apiClient team-admin calls (members, moderation, invite code)', () => {
+  const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+  const USER_ID = '22222222-2222-4222-8222-222222222222';
+  const MEMBER = {
+    userId: USER_ID,
+    fullName: 'Ana Lee',
+    role: 'MEMBER',
+    status: 'APPROVED',
+    skillLevel: 'BEGINNER',
+    requestedAt: '2026-10-03T01:00:00.000Z',
+    approvedAt: '2026-10-04T01:00:00.000Z',
+    bannedAt: null,
+    banReason: null,
+  };
+
+  function call(fetchMock: ReturnType<typeof stubJson>) {
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    return { url: String(url), init, headers: (init?.headers ?? {}) as Record<string, string> };
+  }
+
+  it('teamMembers GETs one section with the opaque cursor and parses adminCount', async () => {
+    const fetchMock = stubJson(200, { members: [MEMBER], nextCursor: 'n_-1', adminCount: 2 });
+    const result = await apiClient.teamMembers(
+      TEAM_ID,
+      { status: 'APPROVED', after: 'c_-9' },
+      { session: 'tok' },
+    );
+    expect(result).toMatchObject({ ok: true, data: { adminCount: 2, nextCursor: 'n_-1' } });
+    const sent = call(fetchMock);
+    expect(sent.url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/members?status=APPROVED&after=c_-9`,
+    );
+    expect(sent.headers.authorization).toBe('Bearer tok');
+  });
+
+  it('moderateMember POSTs the four one-tap actions with NO body and no JSON content-type', async () => {
+    for (const action of ['approve', 'reject', 'promote', 'demote'] as const) {
+      const fetchMock = stubJson(200, { member: MEMBER });
+      const result = await apiClient.moderateMember(TEAM_ID, USER_ID, action, { session: 'tok' });
+      expect(result).toMatchObject({ ok: true, data: { member: { fullName: 'Ana Lee' } } });
+      const sent = call(fetchMock);
+      expect(sent.url).toBe(`http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/${action}`);
+      expect(sent.init?.method).toBe('POST');
+      expect(sent.init?.body).toBeUndefined();
+      expect(sent.headers['content-type']).toBeUndefined();
+    }
+  });
+
+  it('banMember POSTs the optional reason as JSON', async () => {
+    const fetchMock = stubJson(200, { member: { ...MEMBER, status: 'BANNED' } });
+    await apiClient.banMember(TEAM_ID, USER_ID, { reason: 'No-shows' }, { session: 'tok' });
+    const sent = call(fetchMock);
+    expect(sent.url).toBe(`http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/ban`);
+    expect(JSON.parse(sent.init?.body as string)).toEqual({ reason: 'No-shows' });
+    expect(sent.headers['content-type']).toBe('application/json');
+  });
+
+  it('teamInviteCode GETs and regenerateInviteCode POSTs with no body and no JSON content-type (else the API answers 422)', async () => {
+    const get = stubJson(200, { inviteCode: 'abc' });
+    await expect(apiClient.teamInviteCode(TEAM_ID, { session: 'tok' })).resolves.toMatchObject({
+      ok: true,
+      data: { inviteCode: 'abc' },
+    });
+    expect(call(get).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/invite-code`);
+
+    const post = stubJson(200, { inviteCode: 'def' });
+    await apiClient.regenerateInviteCode(TEAM_ID, { session: 'tok' });
+    const sent = call(post);
+    expect(sent.url).toBe(`http://localhost:4000/teams/${TEAM_ID}/invite-code/regenerate`);
+    expect(sent.init?.method).toBe('POST');
+    expect(sent.init?.body).toBeUndefined();
+    expect(sent.headers['content-type']).toBeUndefined();
+  });
+
+  it('a 403 from an admin route comes back typed so the page can render the no-access state', async () => {
+    stubJson(403, { error: { code: 'forbidden', message: 'x' } });
+    await expect(
+      apiClient.teamMembers(TEAM_ID, { status: 'PENDING' }, { session: 'tok' }),
+    ).resolves.toMatchObject({ ok: false, status: 403, error: { code: 'forbidden' } });
+  });
+});

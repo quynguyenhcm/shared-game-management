@@ -10,6 +10,8 @@ describe('coverage gate (AC-VERIFY-9)', () => {
     expect(config).toContain("'apps/api/src/modules/auth/**/*.ts'");
     expect(config).toContain("'apps/api/src/lib/auth/**/*.ts'");
     expect(config).toContain("'apps/web/src/lib/**/*.ts'");
+    // team-management (AC-VERIFY-8): the teams module is measured too.
+    expect(config).toContain("'apps/api/src/modules/teams/**/*.ts'");
     expect(config).toMatch(
       /thresholds: \{ lines: 80, functions: 80, branches: 80, statements: 80 \}/,
     );

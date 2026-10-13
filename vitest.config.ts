@@ -43,6 +43,8 @@ export default defineConfig({
         // The authentication module (AC-VERIFY-9) and the web's auth/library code.
         'apps/api/src/modules/auth/**/*.ts',
         'apps/api/src/lib/auth/**/*.ts',
+        // team-management (AC-VERIFY-8): the teams module.
+        'apps/api/src/modules/teams/**/*.ts',
         'apps/web/src/lib/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.int.test.ts'],

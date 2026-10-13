@@ -1,5 +1,6 @@
 import { AssignableGlobalRole, normaliseEmail } from '@sgm/shared';
 import type { Config } from './lib/config/config.ts';
+import { MemberBannedPayload, memberBannedSingletonKey } from './modules/teams/ban-hook.ts';
 
 export type SetRoleArgs =
   { readonly email: string; readonly role: AssignableGlobalRole } | { readonly error: string };
@@ -55,4 +56,38 @@ export function resetRefusal(
   return remote === undefined
     ? undefined
     : `db reset is refused for non-local host "${remote}" without --force`;
+}
+
+export type MemberBannedTrigger =
+  | { readonly payload: MemberBannedPayload; readonly singletonKey: string }
+  | { readonly error: string };
+
+/**
+ * Validates the JSON of `jobs trigger member-banned '<json>'` (Architecture A12, the operator's re-run path for a
+ * failed ban job) with the same strict schema the job handler uses, so a typo can never enqueue a job that only
+ * fails later. The job is keyed like the one the ban enqueues; the handler re-reads the membership, so a hand-typed
+ * payload for a membership that is not BANNED fails without effect.
+ */
+export function parseMemberBannedTrigger(raw: string | undefined): MemberBannedTrigger {
+  const usage =
+    'Usage: jobs trigger member-banned \'{"teamId":…,"userId":…,"membershipId":…,"bannedBy":…,"bannedAt":…}\'';
+  if (raw === undefined) return { error: usage };
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return { error: `The payload is not valid JSON. ${usage}` };
+  }
+  const parsed = MemberBannedPayload.safeParse(json);
+  if (!parsed.success) {
+    // Field paths only: the input is not echoed.
+    const fields = [
+      ...new Set(parsed.error.issues.map((issue) => issue.path.join('.') || '(root)')),
+    ];
+    return { error: `Invalid member-banned payload (${fields.join(', ')}). ${usage}` };
+  }
+  return {
+    payload: parsed.data,
+    singletonKey: memberBannedSingletonKey(parsed.data.membershipId),
+  };
 }

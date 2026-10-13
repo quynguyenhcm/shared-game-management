@@ -109,6 +109,11 @@ export async function insertResetToken(
   return { id, token };
 }
 
+/**
+ * A `team_members` row whose approval and ban stamps match its status (team-management D-40, D-41):
+ * `approved_*` are set for APPROVED and BANNED rows, `banned_*` for BANNED only. `actorId` is the admin who
+ * approved or banned the member and defaults to the member's own id. A TEAM_ADMIN row must be APPROVED.
+ */
 export function insertTeamMember(
   db: Queryable,
   input: {
@@ -116,20 +121,47 @@ export function insertTeamMember(
     userId: string;
     role?: 'TEAM_ADMIN' | 'MEMBER';
     status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED';
+    skillLevel?: Skill;
+    actorId?: string;
   },
 ): Promise<string> {
+  const status = input.status ?? 'APPROVED';
+  const actor = input.actorId ?? input.userId;
+  const approved = status === 'APPROVED' || status === 'BANNED';
+  const banned = status === 'BANNED';
+  const now = new Date();
   return insertId(
     db,
-    `INSERT INTO team_members (team_id, user_id, role, status) VALUES ($1, $2, $3, $4) RETURNING id`,
-    [input.teamId, input.userId, input.role ?? 'MEMBER', input.status ?? 'APPROVED'],
+    `INSERT INTO team_members (team_id, user_id, role, status, skill_level, approved_at, approved_by,
+                               banned_at, banned_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    [
+      input.teamId,
+      input.userId,
+      input.role ?? 'MEMBER',
+      status,
+      input.skillLevel ?? 'BEGINNER',
+      approved ? now : null,
+      approved ? actor : null,
+      banned ? now : null,
+      banned ? actor : null,
+    ],
   );
 }
 
-export function insertTeam(db: Queryable): Promise<string> {
+/** A team with a 256-bit base64url invite code (matches the `teams_invite_code_format` CHECK). */
+export function insertTeam(
+  db: Queryable,
+  options: { visibility?: 'PUBLIC' | 'PRIVATE'; name?: string } = {},
+): Promise<string> {
   return insertId(
     db,
-    `INSERT INTO teams (name, invite_code) VALUES ('Test Club', $1) RETURNING id`,
-    [`invite-${randomUUID()}`],
+    `INSERT INTO teams (name, visibility, invite_code) VALUES ($1, $2, $3) RETURNING id`,
+    [
+      options.name ?? 'Test Club',
+      options.visibility ?? 'PUBLIC',
+      randomBytes(32).toString('base64url'),
+    ],
   );
 }
 

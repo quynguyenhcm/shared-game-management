@@ -694,7 +694,11 @@ describe('link, identities and unlink (AC-HAPPY-11, AC-HAPPY-12, AC-ERROR-17, AC
     );
     expect(second.statusCode).toBe(409);
     expect(errorOf(second).code).toBe('provider_already_connected');
-    expect(h.logs.lines().some((line) => line.event === 'auth.oauth.link_conflict')).toBe(true);
+    const conflicts = h.logs.lines().filter((line) => line.event === 'auth.oauth.link_conflict');
+    // The decision code must stay readable: a field named exactly `code` is redacted by the logger.
+    expect(conflicts.map((line) => line.errorCode)).toEqual(
+      expect.arrayContaining(['identity_in_use', 'provider_already_connected']),
+    );
   });
 
   it('lists identities with enabled providers, unlinks one, and refuses the last method with 409 last_sign_in_method', async () => {
