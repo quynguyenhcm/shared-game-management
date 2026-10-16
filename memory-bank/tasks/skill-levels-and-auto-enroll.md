@@ -40,8 +40,8 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
   2. **Auto Enroll**: checkbox "Auto Enroll", a date input "Until (optional)" shown when the box is checked, and a "Save Auto Enroll" button.
   The row itself shows (read-only, no click needed): the current level, a provenance line ("Self-assessed", "Set by {adminName} · 17 Oct 2026", or "Moved up automatically · 3 Nov 2026"), a progress line ("23 of 40 games toward Intermediate", or "Highest level" at Advanced), and an "Auto Enroll until 30 Nov 2026" / "Auto Enroll, no end date" / "Auto Enroll ended 30 Nov 2026" tag.
 - **API** (both `config: { policy: requireTeamRole('TEAM_ADMIN') }`, no global-admin override, same as moderation; Fastify module registered under `/teams`; strict zod bodies in `packages/shared/src/api/`; `apps/api/openapi.yaml` regenerated):
-  - `PUT /teams/:teamId/members/:userId/skill-level` with `{ skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' }` answers `200 { member }`.
-  - `PUT /teams/:teamId/members/:userId/auto-enroll` with `{ enabled: boolean, until: 'YYYY-MM-DD' | null }` answers `200 { member }`.
+  - `PUT /teams/:teamId/members/:userId/skill-level` with `{ skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED', expectedSkillLevel, expectedChangedAt: string | null }` answers `200 { member, changed }` (amended at build, Binding Reconciliation decision 4: optimistic concurrency; 409 `skill_level_stale` carries the current `member`).
+  - `PUT /teams/:teamId/members/:userId/auto-enroll` with `{ enabled: boolean, until: 'YYYY-MM-DD' | null }` answers `200 { member, changed }` (`changed: false` for a no-op).
   - `GET /teams/:teamId/members?status=APPROVED` (existing) gains additive fields on `TeamMemberRow`: `skillOverride { byName, at } | null`, `skillChangedAt | null`, `autoEnroll { enabled, until, assignedAt }`, `skillProgress { games, required, nextLevel } | null`. No existing field changes.
 - **Background**: one new pg-boss queue and daily schedule slot `skill-progression` (`apps/api/src/jobs/registry.ts`, `schedules.ts`, `bootstrap.ts`), at `30 5 * * *` Pacific/Auckland (after the 02:00-02:59 DST window and the existing 03:00, 04:00 and 05:00 slots). Operator re-run: `cli jobs trigger skill-progression`.
 - **Visibility**: only approved admins of that team, through the existing `/teams/<id>/manage` guard (a non-admin already gets the no-access page). Pending, rejected and banned people never get the controls.
@@ -90,7 +90,7 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Priority**: SHOULD
 **Given** Priya is `INTERMEDIATE`
 **When** Aroha saves Intermediate
-**Then** the API answers 200 with the unchanged member, the panel says "Priya Patel is already Intermediate.", and `skill_level_override_by`, `skill_level_override_at` and `skill_level_changed_at` keep their previous values (no baseline reset, no event)
+**Then** the API answers 200 with the unchanged member and `changed: false`, the panel says "Priya Patel is already Intermediate.", and `skill_level_override_by`, `skill_level_override_at` and `skill_level_changed_at` keep their previous values (no baseline reset, no event). *(Amended at build: a save of the level the member already has is a no-op whatever `expectedSkillLevel`/`expectedChangedAt` say, so a retried save after a lost response is safe; the stale check of AC-ERROR-9 applies only to a different level.)*
 
 #### AC-HAPPY-4: A member reaching 40 qualifying games moves up one level
 **Priority**: MUST
@@ -126,13 +126,19 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Priority**: MUST
 **Given** Priya and Sam both have Auto Enroll on, Priya assigned earlier than Sam
 **When** Aroha changes Priya's "Until" date and saves
-**Then** Priya's `auto_enroll_assigned_at` is unchanged and she still sorts before Sam in the selection (AC-INTEGRATION-1)
+**Then** Priya's `auto_enroll_assigned_at` is unchanged and she still sorts before Sam in the selection (AC-INTEGRATION-1). *(Amended at build, Binding Reconciliation decision 3: this holds while her assignment is active, `until` today or later or none; an ended assignment renews at the back, AC-HAPPY-13. Off->off and an unchanged on->on are no-ops with no event and `changed: false`.)*
 
 #### AC-HAPPY-10: Turning Auto Enroll off clears it, and turning it on again puts the member at the back
 **Priority**: MUST
 **Given** Priya has Auto Enroll on with an end date and Sam was assigned later
 **When** Aroha unticks "Auto Enroll" and saves, and later ticks it again and saves
 **Then** after the first save `is_auto_enroll = false`, `auto_enroll_until IS NULL`, `auto_enroll_assigned_at IS NULL`, the panel reports "Auto Enroll turned off for Priya Patel." and existing registrations are untouched; after the second save her `auto_enroll_assigned_at` is the new time, so she sorts after Sam
+
+#### AC-HAPPY-13: An ended Auto Enroll is shown as off and renews at the back of the order (added at build, Binding Reconciliation decision 3)
+**Priority**: MUST
+**Given** Priya had Auto Enroll until 30 Nov 2026 and Sam was assigned after her, and today (NZ) is 2 Dec 2026
+**When** Aroha loads Members, opens Priya's panel, ticks "Auto Enroll" and saves with no date
+**Then** before saving, the API still returns `autoEnroll { enabled: true, until: '2026-11-30' }` (the flag stays set; the view derives "ended" from `until < todayNZ`), the row tag reads "Auto Enroll ended 30 Nov 2026" and the panel shows the box unticked with the ended note; after saving, the message is "Auto Enroll on for Priya Patel, with no end date.", `auto_enroll_assigned_at = now`, and `selectAutoEnrollees` returns Sam before Priya. An `until` equal to today is still active and keeps the place
 
 #### AC-HAPPY-11: Admin sees how many games a member has toward the next level
 **Priority**: SHOULD
@@ -181,6 +187,12 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Given** the sweep covers many members and one member's transaction fails (for example a lock timeout or a constraint violation)
 **When** the job runs
 **Then** every other eligible member is still processed; the failure is logged as `skill.progression.member_failed` with ids and `errorCode`; at the end the job reports `skill.progression.completed` with `scanned`, `promoted` and `failed`, and when `failed > 0` the job ends failed so it stays visible in `pgboss.job` and retries (safe because it is idempotent)
+
+#### AC-ERROR-9: A save based on a stale level is refused, not applied (added at build, Binding Reconciliation decision 4)
+**Priority**: MUST
+**Given** Aroha opened Priya's panel showing `BEGINNER`, and since then Bo overrode Priya or the `skill-progression` job promoted her
+**When** Aroha saves a different level with the `expectedSkillLevel` and `expectedChangedAt` the panel was showing
+**Then** under the member-row lock the service compares both (the baseline at millisecond precision, as the API returns it, although the column stores microseconds) and answers 409 `skill_level_stale` with the current `member`; nothing is written; the panel refreshes with "This member's level changed since you opened the panel. Check it and save again."; a save that re-sends the refreshed values applies
 
 #### AC-ASYNC-1: Progression appears at the next run, and an operator can run it on demand
 **Priority**: MUST
