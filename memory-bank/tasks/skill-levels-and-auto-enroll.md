@@ -214,9 +214,9 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 
 #### AC-VERIFY-3: "Qualifying game" is defined once and table-tested
 **Priority**: MUST
-**Given** the rule: a qualifying game for member M in team T at time `now` is a `registrations` row with `user_id = M`, `team_id = T`, `status = 'CONFIRMED'`, joined to a `game_sessions` row with `status = 'COMPLETED'` and `ends_at > now - 365 days` and `ends_at > coalesce(M.skill_level_changed_at, -infinity)`; guests, party size and payment status are irrelevant (one registration is one game)
+**Given** the rule: a qualifying game for member M in team T at time `now` is a `registrations` row with `user_id = M`, `team_id = T`, `status = 'CONFIRMED'`, joined to a `game_sessions` row with `status = 'COMPLETED'` and `ends_at` in `(greatest(now - SKILL_PROGRESSION_WINDOW_MS, coalesce(M.skill_level_changed_at, -infinity)), now]` (window start computed in TS and bound as a parameter; charged late withdrawals are WITHDRAWN and so excluded; no-shows count); guests, party size and payment status are irrelevant (one registration is one game)
 **When** a table-driven integration test seeds rows through the existing factories (`insertSession`, `insertRegistration`, then `UPDATE game_sessions SET status`)
-**Then** the count excludes `WAITLISTED` and `WITHDRAWN` registrations (early or late), sessions that are `DRAFT`, `PUBLISHED` or `CANCELLED`, other teams' sessions, other members, sessions ended exactly 365 days ago or earlier, and sessions that ended at or before the last level change; it includes the session ended 364 days 23 hours ago and one ended a second after the baseline; one function (`countQualifyingGames`, `apps/api/src/modules/skill-levels/`) is used by the job and by the row's progress line
+**Then** the count excludes `WAITLISTED` and `WITHDRAWN` registrations (early or late), sessions that are `DRAFT`, `PUBLISHED` or `CANCELLED`, other teams' sessions, other members, sessions ended exactly 365 days ago or earlier, and sessions that ended at or before the last level change; it includes the session ended 364 days 23 hours ago and one ended a second after the baseline; a completed session ending after `now` is excluded; one predicate builder (`qualifyingGamesQuery`, `apps/api/src/modules/skill-levels/games.ts`) backs the single-member count (`countQualifyingGames`), the per-page batch count (`countQualifyingGamesBatch`) and the sweep pre-pass, with a single-versus-batch parity test
 
 #### AC-VERIFY-4: The progression decision is a pure table and the constants live in one place
 **Priority**: MUST
@@ -252,7 +252,7 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Priority**: MUST
 **Given** a real database with team T holding approved members with: Auto Enroll assigned on days 1, 2 and 2 (same instant, different ids), one with `until` equal to the session date, one with `until` the day before, one with `until` NULL, plus a banned member, a member of another team, and a member with the flag off
 **When** `selectAutoEnrollees(db, { teamId: T, sessionDate: '2026-12-01' })` is called, and again with `'2026-11-30'`
-**Then** the result is `ORDER BY auto_enroll_assigned_at ASC, id ASC` over `status = 'APPROVED' AND is_auto_enroll AND (auto_enroll_until IS NULL OR auto_enroll_until >= sessionDate) AND team_id = T`; the `until`-equals-date member is included, the day-before member is excluded; changing `sessionDate` changes the result (not a stub); the function is a plain `SELECT` taking no row locks, so a caller keeps the canonical order `teams -> team_members -> game_sessions` and the allocator's `assertApprovedMember` remains the authoritative gate
+**Then** the result (a readonly `{ userId, membershipId, assignedAt }[]`, `sessionDate` a `LocalDate`, in `auto-enrol.ts`) is `ORDER BY auto_enroll_assigned_at ASC, id ASC` over `status = 'APPROVED' AND is_auto_enroll AND (auto_enroll_until IS NULL OR auto_enroll_until >= sessionDate) AND team_id = T`; the `until`-equals-date member is included, the day-before member is excluded; changing `sessionDate` changes the result (not a stub); the function is a plain `SELECT` taking no row locks, so a caller keeps the canonical order `teams -> team_members -> game_sessions` and the allocator's `assertApprovedMember` remains the authoritative gate
 
 #### AC-INTEGRATION-2: Progression works end to end on real registration and session rows
 **Priority**: MUST
@@ -264,7 +264,7 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Priority**: MUST
 **Given** an override has committed for Priya
 **When** `assertApprovedMember(trx, teamId, priyaId)` runs (the gate registration-and-waitlist calls for `BY_SKILL_LEVEL` pricing), and an ADR (next free number, `docs/adr/`) is read
-**Then** the gate returns the new `skillLevel`; the ADR records the contracts C-GAME-1 (registration-and-waitlist and billing: a game is a `CONFIRMED` registration in a `COMPLETED` session; a `COMPLETED` session's `CONFIRMED` rows are never withdrawn afterwards; sessions become `COMPLETED` only through billing), C-SKL-1 (session-scheduling-engine: the materialiser calls `selectAutoEnrollees` after the session is `PUBLISHED`, then `allocator.autoEnrolInSession` once per session with `userId`s in the returned order, per registration-and-waitlist C-SAE-1 and C-SAE-2) and the no-retroactive-repricing rule; a contract test pins the selection function's signature and return shape and the `TeamMemberRow` additive fields
+**Then** the gate returns the new `skillLevel`; the ADR records the contracts C-GAME-1 (registration-and-waitlist and billing: a game is a `CONFIRMED` registration in a `COMPLETED` session; a `COMPLETED` session's `CONFIRMED` rows are never withdrawn afterwards; sessions become `COMPLETED` only through billing), C-SKL-1 (session-scheduling-engine: the materialiser calls `selectAutoEnrollees` after the session is `PUBLISHED`, then `allocator.autoEnrolInSession` once per session with `userId`s in the returned order, per registration-and-waitlist C-SAE-1 and C-SAE-2) C-PRICE-1 (registrant skill tier snapshotted at CONFIRMED; a level change never reprices an existing registration) and the decision-5 allocator re-check under its member-row lock; a contract test pins the selection function's signature and return shape and the `TeamMemberRow` additive fields
 
 ### Scope Boundaries
 - **In scope**:
@@ -396,7 +396,7 @@ Admin skill override and Auto Enroll on the existing People page, a daily `skill
 
 ### Phases
 - [x] Phase 1: Schema and shared rules. Migration (`skill_level_changed_at`, paired-override, baseline >= override, auto-enrol-cleared-when-off and approved-only CHECKs, partial index), schema-deviation entries D-55+, codegen, ban `UPDATE` clears Auto Enroll, shared constants + `decideProgression` + strict API schemas. ACs: AC-VERIFY-1, AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-5 (DB half).
-- [ ] Phase 2: Read seams and contract. `countQualifyingGames` and `selectAutoEnrollees` with table-driven real-DB tests, contract pin test, ADR 0017. ACs: AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3 (ADR + pin).
+- [x] Phase 2: Read seams and contract. `countQualifyingGames` and `selectAutoEnrollees` with table-driven real-DB tests, contract pin test, ADR 0017. ACs: AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3 (ADR + pin).
 - [ ] Phase 3: Admin API. `skill-levels` module (override and Auto Enroll routes with the moderation transaction shape), `TeamMemberRow` additive fields incl. `skillProgress`, log events, OpenAPI, coverage gate entry. ACs: AC-HAPPY-1..3, AC-HAPPY-7..11 (API half), AC-ERROR-1..5, AC-VERIFY-6, AC-VERIFY-7, AC-INTEGRATION-3 (`assertApprovedMember`).
 - [ ] Phase 4: Progression job. `skill-progression` queue, 05:30 Pacific/Auckland slot, handler with keyset sweep, per-member lock-recount-decide-update, failure isolation, CLI trigger, race tests. ACs: AC-HAPPY-4..6, AC-ASYNC-1, AC-ASYNC-2, AC-ERROR-7, AC-VERIFY-5, AC-INTEGRATION-2.
 - [ ] Phase 5: Admin UI and end-to-end journey. Members-row read-only lines, "Skill and Auto Enroll" disclosure panel, Server Actions, status-region success messages, field and network errors, Playwright journey on both viewports with axe. Delivers the full entry-to-success flow: `/teams/<id>/manage` → Members → "Skill and Auto Enroll" → Save → "Skill level for Priya Patel set to Advanced." ACs: AC-ENTRY-1..3, AC-HAPPY-1/2/7..11 (UI half), AC-ERROR-3, AC-ERROR-6, AC-VERIFY-8.
@@ -452,8 +452,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 **Build Status**: RUNNING
 **Auto-Build Mode**: YES
-**Current Phase**: 2 of 5 (Phase 1 of 5 complete)
-**Resume From**: Phase 2
+**Current Phase**: 3 of 5 (Phase 2 of 5 complete)
+**Resume From**: Phase 3
 **Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
 **Previous Phase**: CREATIVE → BUILD
 **Last Completed**: CREATIVE (2026-10-17)
@@ -475,6 +475,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 - Phase 1 Build: COMPLETE (2026-10-17) - migration 20261017000100000 (D-55..D-61), shared progression constants + decideProgression + strict request schemas, ban UPDATE clears Auto Enroll; 28 shared unit tests, 16 schema integration tests + 1 ban-seam test; verifier PASS (unit flake on timing only), review APPROVED
 
+- Phase 2 Build: COMPLETE (2026-10-17) - countQualifyingGames/Batch (one predicate builder), selectAutoEnrollees (auto-enrol.ts), ADR 0017; 30 integration tests + 2 boundary tests; see commit
+
 ### Guide & Recovery Log
 (empty: commit guard passed first try)
 
@@ -483,3 +485,4 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - Phase 1 | db/migrations/20261017000100000_skill_levels_and_auto_enroll.sql | the selection index is named `idx_team_members_auto_enroll_order` because the draft index `idx_team_members_auto_enroll` already exists; the count index is `idx_registrations_confirmed_member` (D-60, D-61)
 - Phase 1 | packages/shared/src/api/skill-levels.ts | `TeamMemberRow` additive fields, `skill_level_stale` error code and `toSkillProgress`/`deriveSkillProvenance` are deferred to Phase 3 (they ship with the API that fills them); Phase 1 delivers only the request schemas
 - Phase 2 note | `skill_level_changed_at` is returned as a millisecond ISO string and stored with microseconds: the stale-compare under the row lock must compare at ms precision or the writer must always bind a JS Date from the injected clock
+- Phase 2 | apps/api/src/modules/skill-levels/auto-enrol.ts | `selectAutoEnrollees` lives in `auto-enrol.ts` (architecture leaf split), not `games.ts`; batch fn is `countQualifyingGamesBatch`
