@@ -479,10 +479,19 @@ describe('apiClient banking and GST calls (team-banking-and-gst)', () => {
     expect(call(get).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/gst`);
 
     const put = stubJson(200, { gst: { gstRegistered: false, gstNumber: null } });
-    await apiClient.putTeamGst(TEAM_ID, { gstRegistered: false }, { session: 'tok' });
+    const changeKey = '2f6c1c1e-7a64-4c0e-9d61-3c1f0c1f0a11';
+    await apiClient.putTeamGst(
+      TEAM_ID,
+      { gstRegistered: false, gstNumber: null, changeKey },
+      { session: 'tok' },
+    );
     const sent = call(put);
     expect(sent.init?.method).toBe('PUT');
-    expect(JSON.parse(sent.init?.body as string)).toEqual({ gstRegistered: false });
+    expect(JSON.parse(sent.init?.body as string)).toEqual({
+      gstRegistered: false,
+      gstNumber: null,
+      changeKey,
+    });
   });
 
   it('a response that fails the shared schema is an internal error, never trusted data', async () => {

@@ -99,7 +99,7 @@ describe('banking and GST routes leave no value in the logs', () => {
           method: 'PUT',
           url: `/teams/${teamId}/gst`,
           headers: withTrace(actor),
-          payload: { gstRegistered: true, gstNumber: GST_A.input },
+          payload: { gstRegistered: true, gstNumber: GST_A.input, changeKey: randomUUID() },
         })
       ).statusCode,
     ).toBe(200);

@@ -72,7 +72,7 @@
 - **Authentication**: Email/password plus OAuth 2.0 (Google, Facebook)
 - **Authorization**: Global role plus per-team role (RBAC)
 - **Encryption**: TLS in transit. Akahu credentials and bank details must be encrypted at rest. Team bank account name and number are encrypted at rest and shown masked (last 4 digits) after save; the team's GST number is not secret, since it is printed on invoices.
-- **Notifications on sensitive change**: other team admins are emailed when banking details change or are removed. The email names who changed them and when, and contains no account name or digits.
+- **Notifications on sensitive change**: every approved admin of the team, including the one who made the change, is emailed when banking details change or are removed. The email names who changed them and when, and contains no account name or digits.
 
 ### Data & Privacy
 - **Privacy Requirements**: NZ Privacy Act 2020

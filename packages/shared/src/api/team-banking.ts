@@ -112,12 +112,15 @@ export type PutBankingRequest = z.infer<typeof PutBankingRequest>;
 
 /**
  * `PUT /teams/:teamId/gst`. Turning GST off sends only `gstRegistered: false`; the saved number is kept.
- * Whether a number must accompany `gstRegistered: true` depends on what is saved, so the service decides
- * (message `gstNumberRequired`).
+ * `gstNumber: null` removes the saved number, which is allowed only while GST is off. Whether a number must
+ * accompany `gstRegistered: true` depends on what is saved, so the service decides (message
+ * `gstNumberRequired`). `changeKey` is a per-render UUID v4, as for banking: a late replay of a committed
+ * request changes nothing (D-54).
  */
 export const PutGstRequest = z.strictObject({
   gstRegistered: z.boolean(),
-  gstNumber: GstNumberInput,
+  gstNumber: GstNumberInput.nullable(),
+  changeKey: z.uuidv4({ error: BANKING_FIELD_MESSAGES.changeKeyInvalid }),
 });
 export type PutGstRequest = z.infer<typeof PutGstRequest>;
 
@@ -149,6 +152,10 @@ export const BankingResponse = z.object({
   }),
 });
 export type BankingResponse = z.infer<typeof BankingResponse>;
+
+/** `DELETE /teams/:teamId/banking`: `removed` is false when nothing was saved, so nobody was emailed. */
+export const RemoveBankingResponse = BankingResponse.extend({ removed: z.boolean() });
+export type RemoveBankingResponse = z.infer<typeof RemoveBankingResponse>;
 
 /** `GET` and `PUT /teams/:teamId/gst`. The GST number is public (printed on invoices): canonical digits. */
 export const GstResponse = z.object({

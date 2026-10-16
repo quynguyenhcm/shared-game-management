@@ -226,8 +226,17 @@ describe('GstSection (R2: one GST number field)', () => {
 
   it('nothing saved shows the form directly: toggle off, no number field yet, off-state helper', () => {
     const html = renderToStaticMarkup(
-      <GstSection teamId={TEAM_ID} gst={none} editing={false} returnTo={undefined} />,
+      <GstSection
+        teamId={TEAM_ID}
+        gst={none}
+        editing={false}
+        changeKey={KEY}
+        returnTo={undefined}
+      />,
     );
+    expect(html).toContain(`name="changeKey" value="${KEY}"`);
+    // Nothing saved, so there is nothing to remove.
+    expect(inputTag(html, 'clearGstNumber')).toBe('');
     expect(html).toContain('id="gst-heading"');
     expect(html).toContain('This team is registered for GST');
     expect(inputTag(html, 'gstRegistered')).not.toContain('checked');
@@ -243,6 +252,7 @@ describe('GstSection (R2: one GST number field)', () => {
         teamId={TEAM_ID}
         gst={{ gstRegistered: true, gstNumber: '136410132' }}
         editing={false}
+        changeKey={KEY}
         returnTo={RETURN_TO}
       />,
     );
@@ -260,10 +270,13 @@ describe('GstSection (R2: one GST number field)', () => {
         teamId={TEAM_ID}
         gst={{ gstRegistered: true, gstNumber: '136410132' }}
         editing
+        changeKey={KEY}
         returnTo={undefined}
       />,
     );
     expect(inputTag(html, 'gstRegistered')).toContain('checked');
+    // While registered the number is still needed, so it cannot be removed.
+    expect(inputTag(html, 'clearGstNumber')).toBe('');
     const number = inputTag(html, 'gstNumber');
     expect(number).toContain('value="136-410-132"');
     expect(number).toContain('inputMode="numeric"');
@@ -274,9 +287,34 @@ describe('GstSection (R2: one GST number field)', () => {
     expect(html).toMatch(/<a[^>]*>Cancel<\/a>/);
   });
 
+  it('edit mode while off with a saved number offers "Remove the saved GST number", labelled and described', () => {
+    const html = renderToStaticMarkup(
+      <GstSection
+        teamId={TEAM_ID}
+        gst={{ gstRegistered: false, gstNumber: '136410132' }}
+        editing
+        changeKey={KEY}
+        returnTo={undefined}
+      />,
+    );
+    const clear = inputTag(html, 'clearGstNumber');
+    expect(clear).toContain('type="checkbox"');
+    expect(clear).not.toContain('checked');
+    expect(clear).toContain('aria-describedby="field-clearGstNumber-hint"');
+    expect(html).toContain('<label for="field-clearGstNumber"');
+    expect(html).toContain('Remove the saved GST number');
+    expect(html).toContain('It isn&#x27;t used while GST is off. You can add it again later.');
+  });
+
   it('the toggle has its label as the accessible name and its helper linked by aria-describedby', () => {
     const html = renderToStaticMarkup(
-      <GstSection teamId={TEAM_ID} gst={none} editing={false} returnTo={undefined} />,
+      <GstSection
+        teamId={TEAM_ID}
+        gst={none}
+        editing={false}
+        changeKey={KEY}
+        returnTo={undefined}
+      />,
     );
     expect(html).toContain('<label for="field-gstRegistered"');
     expect(inputTag(html, 'gstRegistered')).toContain(

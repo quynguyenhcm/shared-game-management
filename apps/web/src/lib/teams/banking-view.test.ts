@@ -100,6 +100,10 @@ describe('bankingNotice (R6 notice codes; codes in, fixed text out)', () => {
     expect(bankingNotice('banking_saved', {})?.lines).toContain(email);
     expect(bankingNotice('banking_removed', {})?.lines).toContain(email);
     expect(bankingNotice('gst_saved', {})?.lines).toEqual(['GST settings saved.']);
+    // A removal that found nothing saved emailed nobody, so it says only that.
+    expect(bankingNotice('banking_nothing_removed', {})?.lines).toEqual([
+      'There were no banking details to remove.',
+    ]);
   });
 
   it('renders nothing for an unknown, missing or hostile code', () => {

@@ -294,9 +294,13 @@ describe('banking save and read (AC-HAPPY-1..4, AC-INTEGRATION-1)', () => {
     expect(empty.banking_updated_by).toBe(admin.id);
     expect(empty.banking_updated_at?.toISOString()).toBe(h.clock.now().toISOString());
 
-    // Nothing stored: a second removal is a harmless no-op that leaves the stamp alone.
+    expect(json<{ removed: boolean }>(removed).removed).toBe(true);
+
+    // Nothing stored: a second removal is a harmless no-op that leaves the stamp alone and says so.
     h.clock.advance(60_000);
-    expect((await scene.deleteBanking(teamId, admin)).statusCode).toBe(200);
+    const again = await scene.deleteBanking(teamId, admin);
+    expect(again.statusCode).toBe(200);
+    expect(json<{ removed: boolean }>(again).removed).toBe(false);
     expect((await scene.row(teamId)).banking_updated_at?.toISOString()).toBe(
       empty.banking_updated_at?.toISOString(),
     );
@@ -532,6 +536,53 @@ describe('GST (AC-HAPPY-5, AC-HAPPY-6, AC-ERROR-6, AC-ERROR-7, R2)', () => {
       expect(response.body).not.toContain('1234567');
     }
     expect(await scene.row(teamId)).toEqual(before);
+  });
+
+  it('removes a saved GST number only while GST is off, and refuses clearing it while registered', async () => {
+    const admin = await scene.person();
+    const teamId = await scene.team([admin]);
+    await scene.putGst(teamId, admin, { gstRegistered: true, gstNumber: GST_A.input });
+
+    const whileOn = await scene.putGst(teamId, admin, { gstRegistered: true, gstNumber: null });
+    expect(whileOn.statusCode).toBe(422);
+    expect(json<ErrorBody>(whileOn).error.fieldErrors?.gstNumber).toEqual([
+      'Enter your GST number to register for GST.',
+    ]);
+    expect((await scene.row(teamId)).gst_number).toBe(GST_A.canonical);
+
+    const cleared = await scene.putGst(teamId, admin, { gstRegistered: false, gstNumber: null });
+    expect(cleared.statusCode).toBe(200);
+    expect(json<GstBody>(cleared).gst).toEqual({ gstRegistered: false, gstNumber: null });
+    expect(await scene.row(teamId)).toMatchObject({ gst_registered: false, gst_number: null });
+  });
+
+  it('treats a late replay of a GST save as already applied, even one that changed nothing, and logs only real changes (D-54)', async () => {
+    const first = await scene.person();
+    const second = await scene.person();
+    const teamId = await scene.team([first, second]);
+    const register = { gstRegistered: true, gstNumber: GST_A.input, changeKey: randomUUID() };
+    expect((await scene.putGst(teamId, first, register)).statusCode).toBe(200);
+    // The same settings under a new key: no write, no log, but the key is claimed.
+    const unchanged = { gstRegistered: true, changeKey: randomUUID() };
+    const logsBefore = h.logs.lines().filter((l) => l.event === 'team.gst.updated').length;
+    expect((await scene.putGst(teamId, first, unchanged)).statusCode).toBe(200);
+    expect(h.logs.lines().filter((l) => l.event === 'team.gst.updated')).toHaveLength(logsBefore);
+    expect((await scene.row(teamId)).banking_change_keys).toContain(unchanged.changeKey);
+
+    // Another admin deregisters; both earlier requests then arrive again late.
+    expect(
+      (await scene.putGst(teamId, second, { gstRegistered: false, changeKey: randomUUID() }))
+        .statusCode,
+    ).toBe(200);
+    for (const replay of [register, unchanged]) {
+      const response = await scene.putGst(teamId, first, replay);
+      expect(response.statusCode).toBe(200);
+      expect(json<GstBody>(response).gst).toEqual({
+        gstRegistered: false,
+        gstNumber: GST_A.canonical,
+      });
+    }
+    expect((await scene.row(teamId)).gst_registered).toBe(false);
   });
 });
 
@@ -800,6 +851,40 @@ describe('change notification (AC-ASYNC-1 as MUST, R8)', () => {
     const reused = scene.body('Name Three', ACCOUNT_A, { changeKey: lastKey });
     expect((await scene.putBanking(teamId, first, reused)).statusCode).toBe(200);
     expect(await scene.opened(teamId)).toEqual({ name: 'Name Two', number: ACCOUNT_B.canonical });
+    expect(await bankingEmailJobs(database, teamId)).toHaveLength(4);
+  });
+
+  it('claims the change key of a save that changed nothing, so its late replay cannot overwrite a later change or lift a later payout block (D-54)', async () => {
+    const first = await scene.person();
+    const second = await scene.person();
+    const teamId = await scene.team([first, second]);
+    expect(
+      (await scene.putBanking(teamId, first, scene.body('Name One', ACCOUNT_A))).statusCode,
+    ).toBe(200);
+    // Same values again under a new key: nothing changes, but the key is still claimed.
+    const unchanged = scene.body('Name One', ACCOUNT_A);
+    const stamp = (await scene.row(teamId)).banking_updated_at?.toISOString();
+    expect((await scene.putBanking(teamId, first, unchanged)).statusCode).toBe(200);
+    const claimed = await scene.row(teamId);
+    expect(claimed.banking_change_keys).toContain(unchanged.changeKey);
+    expect(claimed.banking_updated_at?.toISOString()).toBe(stamp);
+    expect(await bankingEmailJobs(database, teamId)).toHaveLength(2);
+
+    // Another admin changes the account, then billing blocks payouts to it.
+    expect(
+      (await scene.putBanking(teamId, second, scene.body('Name Two', ACCOUNT_B))).statusCode,
+    ).toBe(200);
+    await database.pool.query(`UPDATE teams SET payout_blocked_at = now() WHERE id = $1`, [teamId]);
+
+    // The unchanged request arrives again late: it is already applied, so nothing moves.
+    const replay = await scene.putBanking(teamId, first, unchanged);
+    expect(replay.statusCode).toBe(200);
+    expect(json<BankingBody>(replay).banking).toMatchObject({
+      accountName: 'Name Two',
+      payoutBlocked: true,
+    });
+    expect(await scene.opened(teamId)).toEqual({ name: 'Name Two', number: ACCOUNT_B.canonical });
+    expect((await scene.row(teamId)).payout_blocked_at).not.toBeNull();
     expect(await bankingEmailJobs(database, teamId)).toHaveLength(4);
   });
 

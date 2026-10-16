@@ -121,7 +121,7 @@ The NZ bank-account and IRD/GST validators in `packages/shared/src/nz/*` are dat
 
 ### Notifications and audit (R8)
 
-Every banking save that changes something, and every removal, stamps `banking_updated_at` and `banking_updated_by` and enqueues one sealed `send-email` job per approved admin (the actor included) in the same transaction. The email names who and when, and contains no account name or digits. A replayed request with the same `changeKey` writes and sends nothing (D-54).
+Every banking save that changes something, and every removal, stamps `banking_updated_at` and `banking_updated_by` and enqueues one sealed `send-email` job per approved admin (the actor included) in the same transaction. The email names who and when, and contains no account name or digits. A replayed request with the same `changeKey` writes and sends nothing (D-54). Every committed request claims its key, including a save that changed nothing (it records only the key, never the audit stamp), so a late replay of it cannot overwrite a later change or lift a later `payout_blocked_at`. GST saves carry a `changeKey` too and share the same list; `gstNumber: null` removes a saved GST number while GST is off. A removal that finds nothing saved answers `removed: false` and emails nobody.
 
 ## Alternatives considered
 

@@ -18,12 +18,15 @@ export function GstSection({
   teamId,
   gst,
   editing,
+  changeKey,
   returnTo,
 }: {
   teamId: string;
   gst: GstResponse['gst'];
   /** `?edit=gst` was requested. */
   editing: boolean;
+  /** A UUID v4 generated for this render (D-54). */
+  changeKey: string;
   returnTo: string | undefined;
 }) {
   const saved = hasSavedGst(gst);
@@ -56,6 +59,7 @@ export function GstSection({
           teamId={teamId}
           savedRegistered={gst.gstRegistered}
           savedNumber={gst.gstNumber}
+          changeKey={changeKey}
           returnTo={returnTo}
           editing={saved && editing}
         />

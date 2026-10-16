@@ -45,6 +45,9 @@ export const ACCOUNT_NUMBER_HINT_SAVED =
   'Leave blank to keep the saved value. To replace it, use the format 00-0000-0000000-00.';
 export const GST_NUMBER_HINT = 'This is your IRD number.';
 export const GST_TOGGLE_LABEL = 'This team is registered for GST';
+/** Shown only while GST is off and a number is saved: the number is personal data for a sole trader. */
+export const GST_CLEAR_LABEL = 'Remove the saved GST number';
+export const GST_CLEAR_HINT = "It isn't used while GST is off. You can add it again later.";
 export const BANKING_REMOVE_PROMPT =
   "Remove banking details? Paid sessions can't be published until you add them again.";
 /** The API's `banking_in_use` wording: it also covers unsettled payments (architecture AC-ERROR-10). */
@@ -142,6 +145,9 @@ export function bankingNotice(
           EMAIL_LINE,
         ],
       };
+    case 'banking_nothing_removed':
+      // The DELETE found nothing saved (a double click, a second tab): nobody was emailed.
+      return { lines: ['There were no banking details to remove.'] };
     case 'gst_saved':
       return { lines: ['GST settings saved.'] };
     default:
@@ -243,7 +249,8 @@ export function validateGstForm(
   options: { hasSavedGstNumber: boolean },
 ): FieldErrors {
   const registered = values.gstRegistered === 'on';
-  const result = PutGstRequest.safeParse({
+  // The change key is a hidden per-render value the API checks; there is nothing to validate in the browser.
+  const result = PutGstRequest.omit({ changeKey: true }).safeParse({
     gstRegistered: registered,
     ...(values.gstNumber === undefined ? {} : { gstNumber: values.gstNumber }),
   });

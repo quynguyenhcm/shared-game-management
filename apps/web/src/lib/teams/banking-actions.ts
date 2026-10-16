@@ -150,9 +150,12 @@ export async function saveGstAction(_previous: FormState, formData: FormData): P
 
   if (!z.uuid().safeParse(teamId).success) return noTeam(values);
   // A hidden number input is not in the form at all, which the API reads as "keep the saved number".
+  // "Remove the saved GST number" counts only while GST is off: a registered team still needs it.
+  const clear = !registered && field(formData, 'clearGstNumber') === 'on';
   const parsed = PutGstRequest.safeParse({
     gstRegistered: registered,
-    ...(gstNumber === undefined ? {} : { gstNumber }),
+    ...(clear ? { gstNumber: null } : gstNumber === undefined ? {} : { gstNumber }),
+    changeKey: field(formData, 'changeKey'),
   });
   if (!parsed.success) return { fieldErrors: fieldErrorsOf(parsed.error), values };
 
@@ -207,7 +210,8 @@ export async function removeBankingAction(
     return redirect(
       bankingPageUrl({
         teamId,
-        notice: 'banking_removed',
+        // Nothing was saved (a double click or a second tab): nobody was emailed, so say only that.
+        notice: result.data.removed ? 'banking_removed' : 'banking_nothing_removed',
         returnTo: bankingReturnTo(teamId, field(formData, 'returnTo')),
       }),
       RedirectType.replace,

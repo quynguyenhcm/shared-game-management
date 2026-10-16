@@ -59,6 +59,7 @@ export interface TeamsRow {
   readonly ird_number: string | null;
   readonly akahu_merchant_id: string | null;
   readonly akahu_app_token: string | null;
+  readonly banking_change_keys: readonly string[];
 }
 
 export interface BankingBody {
@@ -146,7 +147,7 @@ export function createBankingScene(
     const { rows } = await database.pool.query<TeamsRow>(
       `SELECT bank_account_name, bank_account_number, bank_account_last4, is_payout_configured,
               payout_blocked_at, banking_updated_at, banking_updated_by, gst_registered, gst_number,
-              ird_number, akahu_merchant_id, akahu_app_token
+              ird_number, akahu_merchant_id, akahu_app_token, banking_change_keys
          FROM teams WHERE id = $1`,
       [teamId],
     );
@@ -181,8 +182,16 @@ export function createBankingScene(
     deleteBanking: (teamId: string, who: Person | null) =>
       call('DELETE', `/teams/${teamId}/banking`, who),
     getGst: (teamId: string, who: Person | null) => call('GET', `/teams/${teamId}/gst`, who),
+    /** A fresh `changeKey` is added to an object payload that has none (each call is a new form render). */
     putGst: (teamId: string, who: Person | null, payload: unknown) =>
-      call('PUT', `/teams/${teamId}/gst`, who, payload),
+      call(
+        'PUT',
+        `/teams/${teamId}/gst`,
+        who,
+        typeof payload === 'object' && payload !== null && !('changeKey' in payload)
+          ? { ...payload, changeKey: randomUUID() }
+          : payload,
+      ),
   };
 }
 

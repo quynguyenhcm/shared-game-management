@@ -112,7 +112,13 @@ export default async function BankingPage({
         changeKey={randomUUID()}
         returnTo={returnTo}
       />
-      <GstSection teamId={teamId} gst={gst.data.gst} editing={edit === 'gst'} returnTo={returnTo} />
+      <GstSection
+        teamId={teamId}
+        gst={gst.data.gst}
+        editing={edit === 'gst'}
+        changeKey={randomUUID()}
+        returnTo={returnTo}
+      />
     </ManageProvider>
   );
 }

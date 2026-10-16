@@ -93,6 +93,22 @@ const appendChangeKey = (changeKey: string) =>
     string[]
   >`(array_append(banking_change_keys, ${changeKey}::uuid))[greatest(1, cardinality(banking_change_keys) + 2 - ${CHANGE_KEYS_KEPT}::int):]`;
 
+/**
+ * Claims a change key without touching the settings or the audit stamp: a save that changed nothing is still an
+ * applied request, so a late replay of it must be recognised and must not overwrite a later change (D-54).
+ */
+export async function claimChangeKey(
+  db: Database,
+  teamId: string,
+  changeKey: string,
+): Promise<void> {
+  await db
+    .updateTable('teams')
+    .set({ banking_change_keys: appendChangeKey(changeKey) })
+    .where('id', '=', teamId)
+    .execute();
+}
+
 /** Clears the block (all three columns together) and the payout block, and stamps who removed it and when. */
 export async function clearBanking(
   db: Database,
@@ -158,21 +174,37 @@ export interface GstRow {
   readonly gstNumber: string | null;
 }
 
-export async function readGst(db: Database, teamId: string): Promise<GstRow | undefined> {
+/** The GST settings plus the change keys they share with banking (one replay claim per team, D-54). */
+export async function readGst(
+  db: Database,
+  teamId: string,
+): Promise<(GstRow & { readonly changeKeys: readonly string[] }) | undefined> {
   const row = await db
     .selectFrom('teams')
-    .select(['gst_registered', 'gst_number'])
+    .select(['gst_registered', 'gst_number', 'banking_change_keys'])
     .where('id', '=', teamId)
     .executeTakeFirst();
   return row === undefined
     ? undefined
-    : { gstRegistered: row.gst_registered, gstNumber: row.gst_number };
+    : {
+        gstRegistered: row.gst_registered,
+        gstNumber: row.gst_number,
+        changeKeys: row.banking_change_keys,
+      };
 }
 
-export async function writeGst(db: Database, teamId: string, input: GstRow): Promise<void> {
+export async function writeGst(
+  db: Database,
+  teamId: string,
+  input: GstRow & { readonly changeKey: string },
+): Promise<void> {
   await db
     .updateTable('teams')
-    .set({ gst_registered: input.gstRegistered, gst_number: input.gstNumber })
+    .set({
+      gst_registered: input.gstRegistered,
+      gst_number: input.gstNumber,
+      banking_change_keys: appendChangeKey(input.changeKey),
+    })
     .where('id', '=', teamId)
     .execute();
 }

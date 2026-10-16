@@ -697,6 +697,26 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
   - The `schema-deviations.md` formatter churn makes the diff noisy.
   - Pre-existing: pg error `detail` is logged unredacted (platform item).
 - Not addressed autonomously; awaiting the user.
+**Final Review Fixes** (2026-10-17, at the user's request):
+- Important 1, fixed:
+  - `repo.claimChangeKey` records the key of a save that changed nothing, without stamping the audit columns.
+  - Integration test: a no-op save, another admin's change, then a payout block; the late replay leaves both.
+  - ADR 0016 §Notifications, systemPatterns "Writes" and ledger D-54 updated.
+- Minor, productBrief:75: fixed (every approved admin, actor included).
+- Minor, GST no-op log: fixed. `team.gst.updated` is logged only on a write, with a test.
+- Minor, PUT /gst: fixed.
+  - `PutGstRequest` gains a required per-render `changeKey`, sharing `banking_change_keys`, so a late GST replay changes nothing.
+  - `gstNumber: null` removes a saved number, and only while GST is off (422 while registered).
+  - The web adds a "Remove the saved GST number" checkbox while GST is off.
+- Minor, no-op removal banner: fixed.
+  - DELETE answers `RemoveBankingResponse` with `removed`.
+  - The web shows `banking_nothing_removed` ("There were no banking details to remove.") with no email line.
+- Minor, GET decrypting the full number: partly fixed.
+  - A save reuses the envelopes it already opened, so a damaged one is decrypted and logged once.
+  - GET still opens the number, because AES-GCM proves integrity only by decrypting. Its plaintext never leaves `present()`. Accepted.
+- Minor, schema-deviations formatter churn: not changed. Prettier pads the whole markdown table to its widest cell, and the Phase 1 rows widened it. Reverting fails `prettier --check`. The D-54 edit here changed one line.
+- Minor, pg error `detail` logged unredacted: pre-existing platform behaviour, no banking path reaches it. Follow-up for a platform hardening task, not this feature.
+- Verification: lint, typecheck and build pass. Unit 1030/1030. Integration 357/357 (35 files). Coverage gate passes (1387 tests; 96.35% statements, 90.43% branches). Playwright `team-banking.spec.ts` was not re-run after these fixes (it needs the manual stack). The GST form and removal banner changes are covered by component and action unit tests.
 
 ### Active Sub-Agents
 - Algorithm Design: COMPLETE

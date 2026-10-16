@@ -21,6 +21,7 @@ import {
   OAuthCompleteResponse,
   OAuthPendingResponse,
   ProvidersResponse,
+  RemoveBankingResponse,
   ResetPasswordResponse,
   TeamDetailResponse,
   type BanMemberRequest,
@@ -485,7 +486,7 @@ export const apiClient = {
       ...options,
       path: `/teams/${encodeURIComponent(teamId)}/banking`,
       method: 'DELETE',
-      schema: BankingResponse,
+      schema: RemoveBankingResponse,
     }),
 
   teamGst: (teamId: string, options: ApiCallOptions = {}) =>

@@ -289,19 +289,26 @@ describe('saveBankingAction: failures (AC-ERROR-13 MUST, A7 rule)', () => {
 describe('removeBankingAction (AC-HAPPY-4, AC-ERROR-10, R6)', () => {
   const REMOVE_FIELDS = { teamId: TEAM_ID };
 
+  const EMPTY_BANKING = {
+    ...BANKING_BODY.banking,
+    isPayoutConfigured: false,
+    accountName: null,
+    accountNumberLast4: null,
+  };
+
   it('DELETEs, revalidates and redirects (replace) with banking_removed', async () => {
-    const fetchMock = stubFetch(200, {
-      banking: {
-        ...BANKING_BODY.banking,
-        isPayoutConfigured: false,
-        accountName: null,
-        accountNumberLast4: null,
-      },
-    });
+    const fetchMock = stubFetch(200, { banking: EMPTY_BANKING, removed: true });
     const target = await redirectOf(removeBankingAction(null, form(REMOVE_FIELDS)));
     expect(target).toBe(`${PAGE}?notice=banking_removed:replace`);
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('DELETE');
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBeUndefined();
+    expect(mocks.revalidate).toHaveBeenCalledWith(PAGE);
+  });
+
+  it('a removal that found nothing saved (a double click) redirects with the neutral banking_nothing_removed, which promises no email', async () => {
+    stubFetch(200, { banking: EMPTY_BANKING, removed: false });
+    const target = await redirectOf(removeBankingAction(null, form(REMOVE_FIELDS)));
+    expect(target).toBe(`${PAGE}?notice=banking_nothing_removed:replace`);
     expect(mocks.revalidate).toHaveBeenCalledWith(PAGE);
   });
 
@@ -344,24 +351,47 @@ describe('removeBankingAction (AC-HAPPY-4, AC-ERROR-10, R6)', () => {
 });
 
 describe('saveGstAction (AC-HAPPY-5, AC-ERROR-13)', () => {
-  const GST_FIELDS = { teamId: TEAM_ID, gstRegistered: 'on', gstNumber: '49-091-850' };
+  const GST_FIELDS = {
+    teamId: TEAM_ID,
+    gstRegistered: 'on',
+    gstNumber: '49-091-850',
+    changeKey: KEY,
+  };
 
-  it('registering sends gstRegistered and the canonical number, then redirects with gst_saved', async () => {
+  it('registering sends gstRegistered, the canonical number and the per-render changeKey, then redirects with gst_saved', async () => {
     const fetchMock = stubFetch(200, GST_BODY);
     const target = await redirectOf(saveGstAction({}, form(GST_FIELDS)));
     expect(target).toBe(`${PAGE}?notice=gst_saved:replace`);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(`http://localhost:4000/teams/${TEAM_ID}/gst`);
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
     const body = sentBody(fetchMock);
-    expect(body).toEqual({ gstRegistered: true, gstNumber: '49091850' });
+    expect(body).toEqual({ gstRegistered: true, gstNumber: '49091850', changeKey: KEY });
     expect(PutGstRequest.safeParse(body).success).toBe(true);
     expect(mocks.revalidate).toHaveBeenCalledWith(PAGE);
   });
 
   it('turning GST off sends only gstRegistered: false, so the saved number is kept (AC-HAPPY-6)', async () => {
     const fetchMock = stubFetch(200, { gst: { gstRegistered: false, gstNumber: '49091850' } });
-    await redirectOf(saveGstAction({}, form({ teamId: TEAM_ID })));
-    expect(sentBody(fetchMock)).toEqual({ gstRegistered: false });
+    await redirectOf(saveGstAction({}, form({ teamId: TEAM_ID, changeKey: KEY })));
+    expect(sentBody(fetchMock)).toEqual({ gstRegistered: false, changeKey: KEY });
+  });
+
+  it('ticking "remove the saved GST number" with GST off sends gstNumber: null', async () => {
+    const fetchMock = stubFetch(200, { gst: { gstRegistered: false, gstNumber: null } });
+    await redirectOf(
+      saveGstAction({}, form({ teamId: TEAM_ID, changeKey: KEY, clearGstNumber: 'on' })),
+    );
+    expect(sentBody(fetchMock)).toEqual({ gstRegistered: false, gstNumber: null, changeKey: KEY });
+  });
+
+  it('ignores "remove the saved GST number" while GST is on (the number is still needed)', async () => {
+    const fetchMock = stubFetch(200, GST_BODY);
+    await redirectOf(saveGstAction({}, form({ ...GST_FIELDS, clearGstNumber: 'on' })));
+    expect(sentBody(fetchMock)).toEqual({
+      gstRegistered: true,
+      gstNumber: '49091850',
+      changeKey: KEY,
+    });
   });
 
   it('keeps the returnTo through the save redirect', async () => {
@@ -392,7 +422,10 @@ describe('saveGstAction (AC-HAPPY-5, AC-ERROR-13)', () => {
         fieldErrors: { gstNumber: ['Enter your GST number to register for GST.'] },
       },
     });
-    const state = await saveGstAction({}, form({ teamId: TEAM_ID, gstRegistered: 'on' }));
+    const state = await saveGstAction(
+      {},
+      form({ teamId: TEAM_ID, gstRegistered: 'on', changeKey: KEY }),
+    );
     expect(state.fieldErrors).toEqual({
       gstNumber: ['Enter your GST number to register for GST.'],
     });
@@ -401,7 +434,7 @@ describe('saveGstAction (AC-HAPPY-5, AC-ERROR-13)', () => {
 
   it('a 5xx keeps the typed values (including an unticked toggle), no success, no revalidate', async () => {
     stubFetch(503, { error: { code: 'service_unavailable', message: 'down' } });
-    const state = await saveGstAction({}, form({ teamId: TEAM_ID }));
+    const state = await saveGstAction({}, form({ teamId: TEAM_ID, changeKey: KEY }));
     expect(state.error).toEqual({ code: 'service_unavailable' });
     expect(state.values?.gstRegistered).toBe('off');
     expect(mocks.revalidate).not.toHaveBeenCalled();

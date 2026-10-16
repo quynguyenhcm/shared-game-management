@@ -6,6 +6,7 @@ import {
   GstResponse,
   PutBankingRequest,
   PutGstRequest,
+  RemoveBankingResponse,
   TeamIdParams,
 } from '@sgm/shared';
 import { requireTeamRole } from '../../lib/auth/policy.ts';
@@ -65,7 +66,7 @@ export const teamBankingRoutes: FastifyPluginAsync<TeamBankingRoutesOptions> = (
       schema: {
         summary: "Save the team's banking details",
         description:
-          'TEAM_ADMIN of this team only. Saves the account name and account number as one block under the team-row lock, after re-checking that the caller is still an approved admin. A blank or omitted `accountNumber` keeps the saved number (422 on a first save). `changeKey` is a UUID v4 the form generates once per render; a replay never sends a second notification. A save that changes nothing writes nothing, except that any save clears a payout block. Every approved admin of the team (the caller included) is emailed about a change; the email carries no account name or digits. 422 `fieldErrors` use the shared copy deck and never echo the input; the body is strict.',
+          'TEAM_ADMIN of this team only. Saves the account name and account number as one block under the team-row lock, after re-checking that the caller is still an approved admin. A blank or omitted `accountNumber` keeps the saved number (422 on a first save). `changeKey` is a UUID v4 the form generates once per render; a replay of a committed request (even one that changed nothing) is answered with the current state and writes and sends nothing. A save that changes nothing writes nothing, except that any save clears a payout block. Every approved admin of the team (the caller included) is emailed about a change; the email carries no account name or digits. 422 `fieldErrors` use the shared copy deck and never echo the input; the body is strict.',
         operationId: 'putTeamBanking',
         params: TeamIdParams,
         body: PutBankingRequest,
@@ -88,10 +89,10 @@ export const teamBankingRoutes: FastifyPluginAsync<TeamBankingRoutesOptions> = (
       schema: {
         summary: "Remove the team's banking details",
         description:
-          'TEAM_ADMIN of this team only. Takes the team row `FOR UPDATE` first, then refuses with 409 `banking_in_use` while the team has a PUBLISHED paid session or a PENDING or OVERDUE payment. Clears the name, number and last 4 together and any payout block, and notifies every approved admin. Removing when nothing is stored is a harmless 200.',
+          'TEAM_ADMIN of this team only. Takes the team row `FOR UPDATE` first, then refuses with 409 `banking_in_use` while the team has a PUBLISHED paid session or a PENDING or OVERDUE payment. Clears the name, number and last 4 together and any payout block, and notifies every approved admin. Removing when nothing is stored is a harmless 200 with `removed` false (nobody is emailed).',
         operationId: 'deleteTeamBanking',
         params: TeamIdParams,
-        response: { 200: BankingResponse, ...ERROR_RESPONSES },
+        response: { 200: RemoveBankingResponse, ...ERROR_RESPONSES },
       },
     },
     async (request) =>
@@ -121,7 +122,7 @@ export const teamBankingRoutes: FastifyPluginAsync<TeamBankingRoutesOptions> = (
       schema: {
         summary: "Save the team's GST settings",
         description:
-          'TEAM_ADMIN of this team only. `gstRegistered` is required; an omitted or blank `gstNumber` keeps the saved number, so turning GST off keeps it. Registering requires a number (422 `fieldErrors.gstNumber`). The number must pass the IRD check-digit rules. This writes nothing to `payments`: existing payments keep the GST treatment they were charged with.',
+          'TEAM_ADMIN of this team only. `gstRegistered` is required; an omitted or blank `gstNumber` keeps the saved number, so turning GST off keeps it, and `gstNumber: null` removes it (only while GST is off). Registering requires a number (422 `fieldErrors.gstNumber`). `changeKey` is a per-render UUID v4: a replay of a committed request changes nothing. The number must pass the IRD check-digit rules. This writes nothing to `payments`: existing payments keep the GST treatment they were charged with.',
         operationId: 'putTeamGst',
         params: TeamIdParams,
         body: PutGstRequest,

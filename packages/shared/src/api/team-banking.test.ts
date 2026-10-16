@@ -114,19 +114,39 @@ describe('PutBankingRequest', () => {
 });
 
 describe('PutGstRequest', () => {
+  const changeKey = '2f6c1c1e-7a64-4c0e-9d61-3c1f0c1f0a11';
+
   it('accepts registered with a GST number and returns canonical digits', () => {
-    expect(PutGstRequest.parse({ gstRegistered: true, gstNumber: '049-091-850' })).toEqual({
-      gstRegistered: true,
-      gstNumber: '49091850',
-    });
-    expect(PutGstRequest.parse({ gstRegistered: true, gstNumber: '136 410 132' }).gstNumber).toBe(
-      '136410132',
-    );
+    expect(
+      PutGstRequest.parse({ gstRegistered: true, gstNumber: '049-091-850', changeKey }),
+    ).toEqual({ gstRegistered: true, gstNumber: '49091850', changeKey });
+    expect(
+      PutGstRequest.parse({ gstRegistered: true, gstNumber: '136 410 132', changeKey }).gstNumber,
+    ).toBe('136410132');
   });
 
   it('accepts turning GST off with no number, and treats a blank number as omitted (keep)', () => {
-    expect(PutGstRequest.parse({ gstRegistered: false })).toEqual({ gstRegistered: false });
-    expect(PutGstRequest.parse({ gstRegistered: true, gstNumber: '  ' }).gstNumber).toBeUndefined();
+    expect(PutGstRequest.parse({ gstRegistered: false, changeKey })).toEqual({
+      gstRegistered: false,
+      changeKey,
+    });
+    expect(
+      PutGstRequest.parse({ gstRegistered: true, gstNumber: '  ', changeKey }).gstNumber,
+    ).toBeUndefined();
+  });
+
+  it('accepts gstNumber null (remove the saved number) and requires a UUID v4 changeKey', () => {
+    expect(PutGstRequest.parse({ gstRegistered: false, gstNumber: null, changeKey })).toEqual({
+      gstRegistered: false,
+      gstNumber: null,
+      changeKey,
+    });
+    expect(errorsFor(PutGstRequest, { gstRegistered: false })['changeKey']).toEqual([
+      BANKING_FIELD_MESSAGES.changeKeyInvalid,
+    ]);
+    expect(
+      errorsFor(PutGstRequest, { gstRegistered: false, changeKey: 'not-a-uuid' })['changeKey'],
+    ).toEqual([BANKING_FIELD_MESSAGES.changeKeyInvalid]);
   });
 
   it('maps each number failure to a copy-deck message that does not echo input', () => {
@@ -144,12 +164,15 @@ describe('PutGstRequest', () => {
   });
 
   it('requires gstRegistered to be a boolean and is strict (no irdNumber, R2)', () => {
-    expect(PutGstRequest.safeParse({}).success).toBe(false);
-    expect(PutGstRequest.safeParse({ gstRegistered: 'yes' }).success).toBe(false);
-    expect(PutGstRequest.safeParse({ gstRegistered: true, irdNumber: '49091850' }).success).toBe(
-      false,
-    );
-    expect(PutGstRequest.safeParse({ gstRegistered: true, gstNumber: null }).success).toBe(false);
+    expect(PutGstRequest.safeParse({ changeKey }).success).toBe(false);
+    expect(PutGstRequest.safeParse({ gstRegistered: 'yes', changeKey }).success).toBe(false);
+    expect(
+      PutGstRequest.safeParse({ gstRegistered: true, irdNumber: '49091850', changeKey }).success,
+    ).toBe(false);
+    // Whether null is allowed depends on what is saved and the toggle, so the service decides (422 there).
+    expect(
+      PutGstRequest.safeParse({ gstRegistered: true, gstNumber: null, changeKey }).success,
+    ).toBe(true);
   });
 });
 

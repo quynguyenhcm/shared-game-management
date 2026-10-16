@@ -19,6 +19,7 @@ import {
   type GstResponse,
   type PutBankingRequest,
   type PutGstRequest,
+  type RemoveBankingResponse,
 } from '@sgm/shared';
 import { enqueueEmail } from '../../jobs/send-email.ts';
 import { refusing } from '../../lib/auth/team-refusals.ts';
@@ -57,7 +58,11 @@ export interface TeamBankingService {
     input: PutBankingRequest,
     ctx: TeamBankingContext,
   ): Promise<BankingResponse>;
-  removeBanking(teamId: string, actorId: string, ctx: TeamBankingContext): Promise<BankingResponse>;
+  removeBanking(
+    teamId: string,
+    actorId: string,
+    ctx: TeamBankingContext,
+  ): Promise<RemoveBankingResponse>;
   getGst(teamId: string): Promise<GstResponse>;
   putGst(
     teamId: string,
@@ -104,11 +109,21 @@ export function createTeamBankingService(deps: TeamBankingServiceDeps): TeamBank
     }
   }
 
-  /** The masked view an admin may read: the full name, the last 4, never the number or an envelope. */
-  function present(row: repo.BankingRow, teamId: string, log: TeamBankingLogger): BankingResponse {
-    const name = open(row.accountNameEnvelope, teamId, 'bank_account_name', log);
-    // The number is opened only to detect a damaged block; its plaintext is dropped at once.
-    const number = open(row.accountNumberEnvelope, teamId, 'bank_account_number', log);
+  /**
+   * The masked view an admin may read: the full name, the last 4, never the number or an envelope. `opened`
+   * passes envelopes the caller already opened for this same row, so a damaged one is decrypted (and logged) once.
+   */
+  function present(
+    row: repo.BankingRow,
+    teamId: string,
+    log: TeamBankingLogger,
+    opened?: { readonly name: Opened; readonly number: Opened },
+  ): BankingResponse {
+    const name = opened?.name ?? open(row.accountNameEnvelope, teamId, 'bank_account_name', log);
+    // The number is opened only to detect a damaged block (AES-GCM proves integrity only by decrypting); its
+    // plaintext is dropped at once and never leaves this function.
+    const number =
+      opened?.number ?? open(row.accountNumberEnvelope, teamId, 'bank_account_number', log);
     return {
       banking: {
         isPayoutConfigured: row.isPayoutConfigured,
@@ -182,6 +197,8 @@ export function createTeamBankingService(deps: TeamBankingServiceDeps): TeamBank
         let result: {
           row: repo.BankingRow;
           written: { firstSetup: boolean; changedFields: BankingChangedField[] } | null;
+          /** Set when the returned row is the one already opened here (nothing was written). */
+          opened?: { name: Opened; number: Opened };
         };
         try {
           result = await db.transaction().execute(async (trx) => {
@@ -222,9 +239,15 @@ export function createTeamBankingService(deps: TeamBankingServiceDeps): TeamBank
             ) {
               changedFields.push('accountNumber');
             }
-            // A save that changes nothing writes nothing and sends nothing, unless it lifts a payout block.
+            // A save that changes nothing sends nothing and leaves the settings and the audit stamp alone, unless
+            // it lifts a payout block. Its key is still claimed, so a late replay of it is recognised (D-54).
             if (changedFields.length === 0 && stored.payoutBlockedAt === null) {
-              return { row: stored, written: null };
+              await repo.claimChangeKey(trx, teamId, input.changeKey);
+              return {
+                row: stored,
+                written: null,
+                opened: { name: storedName, number: storedNumber },
+              };
             }
             await repo.writeBanking(trx, teamId, {
               accountNameEnvelope: crypto.encrypt(
@@ -273,7 +296,7 @@ export function createTeamBankingService(deps: TeamBankingServiceDeps): TeamBank
             'team banking updated',
           );
         }
-        return present(result.row, teamId, ctx.log);
+        return present(result.row, teamId, ctx.log, result.opened);
       });
     },
 
@@ -314,7 +337,8 @@ export function createTeamBankingService(deps: TeamBankingServiceDeps): TeamBank
         if (result.removed) {
           ctx.log.info({ event: 'team.banking.removed', teamId, actorId }, 'team banking removed');
         }
-        return present(result.row, teamId, ctx.log);
+        // `removed` false: nothing was saved, nobody was emailed (the web picks a neutral notice).
+        return { ...present(result.row, teamId, ctx.log), removed: result.removed };
       });
     },
 
@@ -326,27 +350,39 @@ export function createTeamBankingService(deps: TeamBankingServiceDeps): TeamBank
 
     putGst(teamId, actorId, input, ctx) {
       return refusing(ctx.log, { action: 'put_gst', actorId, teamId }, async () => {
-        const merged = await db.transaction().execute(async (trx) => {
+        const result = await db.transaction().execute(async (trx) => {
           await assertTeamAdminUnderLock(trx, teamId, actorId, 'noKeyUpdate');
           const stored = await repo.readGst(trx, teamId);
           if (stored === undefined) throw new AppError('forbidden');
-          // Omitted keeps the saved number; turning GST off sends no number, so the saved one survives.
-          const gstNumber = input.gstNumber ?? stored.gstNumber;
+          const current = { gstRegistered: stored.gstRegistered, gstNumber: stored.gstNumber };
+          // A replay of a request that already committed (D-54): current state, no write, no log.
+          if (stored.changeKeys.includes(input.changeKey)) return { gst: current, written: false };
+          // Omitted keeps the saved number (turning GST off sends none, so it survives); null removes it.
+          const gstNumber = input.gstNumber === undefined ? stored.gstNumber : input.gstNumber;
           if (input.gstRegistered && gstNumber === null) {
             throw new AppError('validation_failed', {
               fieldErrors: { gstNumber: [BANKING_FIELD_MESSAGES.gstNumberRequired] },
             });
           }
-          if (input.gstRegistered !== stored.gstRegistered || gstNumber !== stored.gstNumber) {
-            await repo.writeGst(trx, teamId, { gstRegistered: input.gstRegistered, gstNumber });
+          const next = { gstRegistered: input.gstRegistered, gstNumber };
+          if (
+            next.gstRegistered === current.gstRegistered &&
+            next.gstNumber === current.gstNumber
+          ) {
+            // Nothing changes, but the request is applied: claim its key so a late replay is recognised.
+            await repo.claimChangeKey(trx, teamId, input.changeKey);
+            return { gst: current, written: false };
           }
-          return { gstRegistered: input.gstRegistered, gstNumber };
+          await repo.writeGst(trx, teamId, { ...next, changeKey: input.changeKey });
+          return { gst: next, written: true };
         });
-        ctx.log.info(
-          { event: 'team.gst.updated', teamId, actorId, gstRegistered: merged.gstRegistered },
-          'team gst updated',
-        );
-        return { gst: merged };
+        if (result.written) {
+          ctx.log.info(
+            { event: 'team.gst.updated', teamId, actorId, gstRegistered: result.gst.gstRegistered },
+            'team gst updated',
+          );
+        }
+        return { gst: result.gst };
       });
     },
   };
