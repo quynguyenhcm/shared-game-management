@@ -2,13 +2,13 @@
 slug: skill-levels-and-auto-enroll
 legacy_id:
 feature: skill-levels-and-auto-enroll
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # skill-levels-and-auto-enroll: Skill Levels and Auto Enroll
 
 **Complexity**: Level 3 (inherited from skill-levels-and-auto-enroll)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: skill-levels-and-auto-enroll
 **Branch**: feature/skill-levels-and-auto-enroll
 **Worktree**: N/A (main checkout)
@@ -403,9 +403,46 @@ Admin skill override and Auto Enroll on the existing People page, a daily `skill
 
 ## Creative Phases
 
-- [ ] Algorithm design → pending. Game-counting edges (no-shows, charged late withdrawals, `ends_at` vs `date`), override vs auto-progression precedence and same-level saves, surplus-game carry-over and `skill_level_changed_at` semantics (spec Creative Q1-Q3, Q6).
-- [ ] Architecture design → pending. Cross-feature contracts C-GAME-1 / C-SKL-1 with registration-and-waitlist (C-SAE-1/2) and session-scheduling-engine, selection seam shape, lock order, job sweep design (spec Creative Q4, Q7).
-- [ ] UI/UX design → pending. Members-row layout: one panel with two forms vs a combined form vs a separate manage area, and where the progress line sits (spec Creative Q5).
+- [x] Algorithm design → COMPLETE. Game-counting edges (no-shows, charged late withdrawals, `ends_at` vs `date`), override vs auto-progression precedence and same-level saves, surplus-game carry-over and `skill_level_changed_at` semantics (spec Creative Q1-Q3, Q6).
+- [x] Architecture design → COMPLETE. Cross-feature contracts C-GAME-1 / C-SKL-1 with registration-and-waitlist (C-SAE-1/2) and session-scheduling-engine, selection seam shape, lock order, job sweep design (spec Creative Q4, Q7).
+- [x] UI/UX design → COMPLETE. Members-row layout: one panel with two forms vs a combined form vs a separate manage area, and where the progress line sits (spec Creative Q5).
+
+All four phases are COMPLETE (2026-10-17):
+- [x] Algorithm → `memory-bank/creative/skill-levels-and-auto-enroll-progression-algorithm.md`
+- [x] Architecture → `memory-bank/creative/skill-levels-and-auto-enroll-seams-architecture.md`
+- [x] UI/UX → `memory-bank/creative/skill-levels-and-auto-enroll-member-panel-uiux.md`
+- [x] User Journey (required at Level 3) → `memory-bank/creative/skill-levels-and-auto-enroll-admin-journey-user-journey.md`
+
+### Binding Reconciliation (supersedes the spec and any single design doc where they conflict)
+
+Build agents read this block first. Where an AC above says otherwise, this block wins and the AC is amended at build time to match.
+
+**Human decisions (2026-10-17, after the design critique):**
+1. **Pricing is snapshotted at CONFIRMED (C-PRICE-1).** A registrant's `BY_SKILL_LEVEL` tier is fixed when the registration becomes `CONFIRMED` and billing charges from that snapshot. A level change never reprices an existing registration. This is an obligation on registration-and-waitlist (it currently reads the level at charge time; it must add e.g. `registrations.registrant_skill_level`). It is recorded in ADR 0017 and flagged to that branch. This feature writes no registrations, so it does not implement the snapshot. The "existing fees don't change" copy (user journey) stays.
+2. **Self-override stays allowed** (decision (a) unchanged): it is safe under decision 1.
+3. **An expired Auto Enroll counts as off** (user journey A3 wins over architecture's "on→on keeps place"). When `auto_enroll_until < todayNZ`, the panel shows the box unticked with the "ended" note. An `enabled: true` save on such a row is a new assignment (`auto_enroll_assigned_at = now`, back of the order). An `until` of today keeps the place. Add AC-HAPPY-13 (as drafted in the journey doc) and a contract test for expired renewal ordering.
+4. **Overrides use optimistic concurrency.** `PUT .../skill-level` body becomes `{ skillLevel, expectedSkillLevel, expectedChangedAt: string | null }`. Under the row lock the service compares both. On mismatch (another admin, or the job promoted) it answers `409 skill_level_stale` with the current `member`, and the panel refreshes with "This member's level changed since you opened the panel. Check it and save again." This replaces the user-journey "accepted trade-off" of a stale panel undoing a promotion. Add AC-ERROR-9.
+
+**Adopted from the critique without a separate decision:**
+5. **Auto Enroll opt-out is authoritative at registration time (C-SKL-1 obligation).** The allocator's `autoEnrolInSession` transaction must re-check `is_auto_enroll`, `auto_enroll_until >= session date` and `auto_enroll_assigned_at` equal to the selected value, under its member-row lock, before it creates a registration. Recorded in ADR 0017 and pinned by the contract test header. A deterministic race test lands with whichever feature ships the allocator.
+
+**Doc conflicts resolved by the orchestrator:**
+6. Success messages go in a per-form `role="status"` line under each Save (UI/UX). The Members section status region is only for stale, gone and no-access results (panel closes, focus to `#members-heading`).
+7. The operator command is `pnpm run jobs:trigger skill-progression` (wraps `cli.ts jobs trigger`). `cli.ts` gets a usage-text change only.
+
+**Design amendments accepted (apply to ACs and the file list at build time):**
+- Algorithm: counting window `ends_at` in `(greatest(now − SKILL_PROGRESSION_WINDOW_MS, skill_level_changed_at), now]`, with the window computed in TS and bound as a parameter. Charged late withdrawals are excluded and no-shows count. One predicate builder backs the single-member count, the per-page batch count and the sweep pre-pass, with a parity test. Index `registrations (team_id, user_id, session_id) WHERE status='CONFIRMED'`. An override writes one `$now` to both `skill_level_override_at` and `skill_level_changed_at`. Surplus games are discarded. Constants include `SKILL_PROGRESSION_WINDOW_MS`.
+- Job: a read-only keyset pre-pass (500), then one transaction per candidate. Each runs `lock_timeout 5s` → `FOR NO KEY UPDATE` on the member row only → read `now` → recount → decide → UPDATE guarded on `status`, `skill_level` and `skill_level_changed_at`, never setting `status` or `role`. The run fails when `failed > 0`. Summary log: `scanned, candidates, promoted, skipped, failed, durationMs`. Per-member failures are span events.
+- Architecture: new `skill-levels` module (`routes, service, repo, games, auto-enrol, progression, decisions, errors`, plus `boundaries.test.ts`). `teams/member-read.ts` owns `TeamMemberRow` mapping, with required additive fields computed in one query per page. Shared `packages/shared/src/skill/provenance.ts` (`deriveSkillProvenance`). PUTs use `lock_timeout 2s`, `assertTeamAdminUnderLock(..., 'noKeyUpdate')` and the member row `FOR NO KEY UPDATE`. The ban UPDATE explicitly clears the three Auto Enroll columns. The migration pre-checks that no non-APPROVED row has Auto Enroll set, and adds partial index `idx_team_members_auto_enroll`. `selectAutoEnrollees(db, { teamId, sessionDate: LocalDate })` returns `{ userId, membershipId, assignedAt }[]`, takes no locks, and has a non-blocking proof test. Auto Enroll is not retroactive. Off→off and unchanged on→on are no-ops with no event. Responses signal `changed: false` for no-ops.
+- UI/UX: `member-skill-summary.tsx`, `skill-enroll-panel.tsx`, `use-skill-panel-action.ts`, `skill-levels-view.ts` with `formatCalendarDate` (UTC, never `formatManageDate`), third-person `SKILL_OVERRIDE_OPTIONS`, the panel stays open after save, the progress line is capped at `required`, and date input handling (`min=todayNz`, `badInput`, "Clear date").
+- Journey: an indeterminate network failure uses "We couldn't confirm that was saved. Try again; saving the same change twice is safe." Stale copy is member-specific. Consequence lines go beside each Save (AC-HAPPY-12). AC-ERROR-8 covers a member banned while the panel is open. AC-NAV-1. ADR 0017 records the later obligations: priced fees name the level used, and auto-enrolled registrations are labelled and emailed to the player.
+- Player visibility (Q7): admin-only, no notification in v1.
+- Numbering: ADR 0017 and D-55+. registration-and-waitlist may also target 0017; whichever merges second renumbers.
+
+### Design Critique (advisory)
+- **Backend**: codex (usable). **Verdict**: needs-attention.
+- **Summary**: pricing authority, the Auto Enroll opt-out race, a fee-stability promise and expired-renewal semantics were unresolved. All are now resolved by decisions 1–5 above.
+- **Findings**: [high] admins can manipulate their own billable tier → decision 1; [high] UI promises fee stability the architecture didn't provide → decision 1; [high] turning Auto Enroll off can still register and charge → decision 5; [medium] incompatible expired-renewal ordering → decision 3; [medium] last-writer-wins overrides → decision 4.
 
 **Resolved at plan review (2026-10-17)**: spec approved as drafted, with creative flagged. New schema deviations and the ADR use the next free numbers on main (D-55+, ADR 0017); whichever of this branch and `feature/registration-and-waitlist` merges second renumbers. Open questions (a) to (c) keep their drafted defaults unless creative changes them.
 
@@ -413,18 +450,14 @@ Admin skill override and Auto Enroll on the existing People page, a daily `skill
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Step 3 - design agents dispatched
-**Step Started**: 2026-10-17
-**Last Completed**: PLAN (2026-10-17)
-**Can Resume**: YES
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Last Completed**: CREATIVE (2026-10-17)
+**Can Resume**: NO
+**Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention; resolved by human decisions 1-4 and adopted fix 5)
 
 ### Active Sub-Agents
-- User Journey Design: COMPLETE
-- Algorithm Design: COMPLETE
-- Architecture Design: COMPLETE
-- UI/UX Design: COMPLETE
+(none)
 
 ### Completed Steps
 - Step 0.1: Task provisioned from roadmap feature
