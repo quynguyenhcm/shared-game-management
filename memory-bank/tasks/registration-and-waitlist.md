@@ -2,13 +2,13 @@
 slug: registration-and-waitlist
 legacy_id:
 feature: registration-and-waitlist
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # registration-and-waitlist: Registration and Waitlist
 
 **Complexity**: Level 4 (inherited from registration-and-waitlist)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: registration-and-waitlist
 **Branch**: feature/registration-and-waitlist
 **Worktree**: N/A (main checkout)
@@ -635,21 +635,95 @@ Provisional (pending creative): the defaults above. The creative architecture an
 ## Creative Phases
 
 Level 4: creative is required.
-- [ ] **Algorithm Design** (required): the promotion rule for a waitlisted group that doesn't fit (Q1) and the fee-transfer semantics at and after the deadline (Q3), recorded in ADR 0016 for wallet-and-akahu-billing. Status: pending.
-- [ ] **Architecture Design** (required): allocator and concurrency design (Q2), the ban handler and reconciliation sweep (Q4), and the cross-feature contracts (Q6). Status: pending.
-- [ ] **User Journey Design** (required for Level 4): register, waitlist, promotion, withdrawal and ban journeys, including the "passed over" and debt-block cases (Q5). Status: pending.
-- [ ] **UI/UX Design** (required): the registration panel, guest form and session page placement pending session-scheduling-engine (Q5). Status: pending.
+- [x] **Algorithm Design** (required): Q1 and Q3. Status: complete, `memory-bank/creative/registration-and-waitlist-allocation-algorithm.md` (first-fit; late fee released on refill; ADR 0016 draft inside).
+- [x] **Architecture Design** (required): Q2, Q4, Q6. Status: complete, `memory-bank/creative/registration-and-waitlist-allocator-architecture.md` (options 2A, 4A, 6A).
+- [x] **User Journey Design** (required for Level 4): Q5 journey. Status: complete, `memory-bank/creative/registration-and-waitlist-registration-user-journey.md` (Dashboard + Detail; this feature owns the player session page and the Upcoming sessions list).
+- [x] **UI/UX Design** (required): Q5 UI. Status: complete, `memory-bank/creative/registration-and-waitlist-registration-panel-uiux.md` (stacked state-driven panel).
 - **Reconciliation step**: after the parallel creative docs return, write one binding reconciliation section here before build (lesson from team-management).
+
+### Design Critique (advisory)
+- **Backend**: codex (`adversarial-review --base origin/main --scope branch`), 2026-10-16. Log: `.claude-logs/codex-critique-20261016.log` (local).
+- **Verdict**: needs-attention. The fee-release model isn't wired into the architecture, re-registration can erase an owed fee depending on which doc wins, and the deferred capacity trigger takes locks in reverse order.
+- **Findings**:
+  - high · The allocator transaction never reads or clears owed fees (architecture doc, lines 462-471).
+  - high · AC-HAPPY-8 lets a late withdrawer erase an owed fee by re-registering onto the waitlist (task file, lines 172-176).
+  - high · The deferred capacity trigger locks registration then session, the reverse of the canonical order (architecture doc, lines 156-165).
+  - medium · The withdrawn-state copy presents a provisional fee as final (UI/UX doc, lines 493-494).
+- **Resolution**: see Creative Reconciliation.
+
+### Creative Reconciliation (binding for build)
+
+Where this section and a creative doc or an AC disagree, this section wins. Build agents apply these rulings when they reach the affected AC; the ACs above are not rewritten line by line. Human decisions taken 2026-10-16 are marked **(user)**.
+
+**R1 · Promotion rule (Q1): first-fit.** Algorithm doc. After every change, scan WAITLISTED parties in `queue_position` order and promote each party that fits; a party that doesn't fit keeps its position. A newcomer is placed after the whole scan, so it is confirmed only if it still fits. Nothing is promoted at or after `starts_at`. Parties are never split. AC-HAPPY-9 drops its "block" fallback sentence; AC-HAPPY-3's existing waitlisted parties must be size 2 or more.
+
+**R2 · Late fee is released when the place is refilled (Q3b) (user).** Algorithm doc option 3B, overriding the spec's "still charged" assumption. `withdrawal_fee_due` means "currently owed".
+- It is set true only in the update that withdraws the row (LATE, nobody promoted in that step), and afterwards may only go true → false (trigger rule).
+- Any later step before `starts_at` that confirms seats (newcomer, any promotion, ban-triggered promotion, auto-enrol, `promoteWaitlist` after a capacity edit) releases the oldest owed withdrawals first, whole parties, while seats confirmed in that step remain. A release is never undone, sends no email, and stops at `starts_at`.
+- `decideAllocation` takes `openLiabilities` (owed withdrawals, oldest first) and returns `releasedLiabilities`. **Fixes critique high #1:** the architecture's normative transaction (architecture doc lines 462-471) also reads owed WITHDRAWN rows for the session under the session lock and applies a guarded `UPDATE ... SET withdrawal_fee_due = false WHERE id = ANY($released) AND withdrawal_fee_due`. A partial index on `(session_id, withdrawn_at) WHERE withdrawal_fee_due` supports the read.
+- New AC-HAPPY-6b (MUST): a released fee drops out of `listBillableRegistrations`; tests cover release by a newcomer, a promotion, a capacity-edit promotion, a ban promotion and auto-enrol.
+- **Copy (fixes critique medium #4):** never present the fee as final before start. AC-HAPPY-6 success: "You've withdrawn. No one could take your place yet, so the {fee} fee for your group applies unless someone takes your place before the game." Late-withdraw prompt, empty waitlist: "...so you'll be charged {fee} unless someone takes your place before the game. Withdraw anyway?"
+
+**R3 · Re-registration while a fee is owed (Q3g) (user).** Allowed only when the new registration is CONFIRMED immediately with a group at least as large as the owed one; it then takes over the place and the fee flag is cleared. Otherwise 409 `late_withdrawal_fee_due` ("You owe the late-withdrawal fee for this session. You can register again only if there's a place for your whole group right now."), nothing written, refusal logged. Replaces AC-HAPPY-8's unconditional reset (**fixes critique high #2**). New error code goes into AC-VERIFY-7 and the `registration.refused` reasons. The journey doc's `fee_due_waitlist_refused` name is not used.
+
+**R4 · Capacity backstop lock order (fixes critique high #3).** The deferred `registrations_within_capacity` trigger takes the session lock with `SELECT ... FOR UPDATE NOWAIT`. Allocator paths already hold that lock, so it succeeds at once. A writer that skipped the allocator and finds the lock held fails immediately with 55P03 instead of forming a registration → session wait cycle. Add a deterministic race test: an out-of-allocator promotion against each allocator path ends with the bypass refused and the allocator committed.
+
+**R5 · Allocator and concurrency (Q2).** Architecture doc option 2A is binding:
+- `createAllocator({ jobs, webBaseUrl })` with `registerInSession`, `autoEnrolInSession`, `withdrawFromSession`, `promoteWaitlist`, each taking `{ trx, now, log }`.
+- Pure rules in `allocation.ts`; refusals are returned values.
+- `SET LOCAL lock_timeout` (2 s HTTP, 5 s jobs) and a 3-attempt retry on 40P01/55P03 for this module's own transactions, with `now` read once before the first attempt.
+- Only `promoteWaitlist` promotes; only `repo.ts` writes `registrations` (grep test).
+- Migration ledger D-47..D-51, plus the R2 index.
+- Worker pool goes from 2 to 5.
+- This replaces the spec's `promoteWaitlist(trx, sessionId, now)` signature.
+
+**R6 · Ban handler and sweep (Q4).** Architecture doc option 4A: one job per membership, one transaction per session through `withdrawFromSession({ cause: 'ban' })`, continue past a failed session, transient vs permanent classification as listed there. Sweep at `30 5 * * *` Pacific/Auckland, once at worker start, and on demand, capped at 1000 memberships. Ban-triggered promotions release owed fees (R2).
+
+**R7 · Cross-feature contracts (Q6).** Architecture doc option 6A: consumer obligations C-SSE-1..5, C-SAE-1..2, C-BIL-1..3, C-ALL-1 go into ADR 0016 and are re-checked at the build gate. C-BIL is extended: billing reads the hand-off at or after `starts_at`, when the fee flag is final; the list is empty for a CANCELLED or unpublished session. Guest rows carry `guestId` and `position`.
+
+**R8 · Page ownership and entry (Q5).** User journey doc: this feature owns the player session page `/teams/[teamId]/sessions/[sessionId]` and an "Upcoming sessions" section on `/teams/[teamId]` (APPROVED members only), backed by a new `GET /teams/:teamId/sessions/upcoming` (`teamRole('MEMBER')`, next 10 sessions). New AC-ENTRY-4; add the route to AC-VERIFY-1. session-scheduling-engine owns admin pages under `/teams/[T]/manage/sessions` and follows the slot contract (`SessionSummary` + `RegistrationPanel`, only the panel changes a registration), recorded in ADR 0016. Phase 3 gains the endpoint, Phase 5 the section.
+
+**R9 · Deadline passing while the confirmation is open.** Use the journey doc's API-side check, not the UI/UX doc's web re-check. The withdraw body becomes strict `{ expectLate: boolean }`; when the classification inside the transaction is LATE and `expectLate` is false, the API returns 409 `cancellation_terms_changed` and the page re-opens the confirmation with the late wording. New AC-ERROR-10.
+
+**R10 · Ban copy.** The prompt is the AC-HAPPY-10 wording. The ban success message is unchanged: the journey and architecture docs agree, and the cancellation is eventual. The UI/UX doc's present-continuous success line is not used.
+
+**R11 · Panel UI.** UI/UX doc option 1 is binding (stacked, state-driven panel, `panelView`, Server Components with client islands), with these rulings:
+- **Focus:** focus does not move when guest fieldsets appear. On a failed submit, focus goes to the error summary. This replaces AC-VERIFY-8's "focus moves to Guest 1".
+- **Confirmations:** extract `components/teams/confirm-disclosure.tsx` from `InlineConfirm`, keeping `InlineConfirm`'s behaviour.
+- **Party option:** an option the party can never fit is natively `disabled` with visible hint text, not `aria-disabled` (AC-ERROR-4).
+- **Fee estimate:** `estimateTotal` is shared in `packages/shared/src/registrations/fees.ts`.
+- **Persisted withdrawn state:** derive the text from `withdrawalKind` and `withdrawalFeeDue`, as the journey doc proposes. EARLY, BANNED, or LATE with no fee due: "You won't be charged." LATE with a fee due: the R2 conditional copy.
+- **Leave-waitlist prompt:** the UI/UX doc's wording.
+- **Debt block:** "You have {n} overdue payments across your teams. Pay them before registering for more sessions. If you think this is wrong, ask your team admin."
+- **Copy precedence:** the UI/UX copy table is final unless this section overrides it.
+- **SHOULD:** `me.lateWithdrawalPreview` (journey doc A6), computed by a dry run of `decideAllocation`.
+
+**R12 · Phase 1 fixture fixes.** These existing fixtures break under the new triggers and are fixed in Phase 1, followed by a full integration-suite run:
+- `insertRegistration` writes WITHDRAWN rows with no stamps;
+- `registrations-guests.int.test.ts:183` promotes with no `promoted_at`;
+- the ban-seam stand-in withdraws with no stamps;
+- `insertSession` makes a DRAFT session.
+
+`insertPublishedSession` takes `now` and derives its dates from it (architecture doc A14).
+
+**R13 · Other amendments adopted as written in the creative docs:**
+- architecture doc: A1-A9 and A11-A15;
+- algorithm doc: A4, A5, A7-A13 (the 1 ms deadline boundary, the open check before the early/late check, `liabilitiesReleased` on log events);
+- journey doc: A4, A7, A8, A10, A12-A14 (A12 wording superseded by R11);
+- UI/UX doc: 3-5, 10, 12-14, 16.
+
+Where these overlap, the order of precedence is R1-R12, then the owning doc for that question (algorithm: Q1/Q3; architecture: Q2/Q4/Q6; journey: Q5 ownership; UI/UX: Q5 layout and copy).
 
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Step 4.5 - Adversarial design critique, then reconciliation
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete and reconciled (R1-R13). Build gated on session-scheduling-engine being merged.
 **Step Started**: 2026-10-16
-**Can Resume**: YES
+**Can Resume**: NO
+**Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
 
 ### Active Sub-Agents
 - Algorithm Design: COMPLETE
@@ -665,3 +739,5 @@ Level 4: creative is required.
 - Architecture Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/registration-and-waitlist-allocator-architecture.md
 - User Journey Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/registration-and-waitlist-registration-user-journey.md
 - UI/UX Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/registration-and-waitlist-registration-panel-uiux.md
+- Step 4.5: Codex design critique - COMPLETE (needs-attention, 4 findings)
+- Creative Reconciliation: COMPLETE (2026-10-16); user decided fee release on refill and confirmed-only re-registration
