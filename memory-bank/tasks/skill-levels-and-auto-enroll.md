@@ -2,13 +2,13 @@
 slug: skill-levels-and-auto-enroll
 legacy_id:
 feature: skill-levels-and-auto-enroll
-status: INITIALIZED
+status: PLANNING_COMPLETE
 ---
 
 # skill-levels-and-auto-enroll: Skill Levels and Auto Enroll
 
 **Complexity**: Level 3 (inherited from skill-levels-and-auto-enroll)
-**Status**: INITIALIZED
+**Status**: PLANNING_COMPLETE
 **Roadmap**: skill-levels-and-auto-enroll
 **Branch**: feature/skill-levels-and-auto-enroll
 **Worktree**: N/A (main checkout)
@@ -311,28 +311,118 @@ Yes. The requirement text fixes the thresholds but leaves several rules open. Th
 
 ## Test Strategy
 
-_(filled during planning)_
+### Approach
+- **Emphasis**: integration-heavy (balanced per systemPatterns.md, but most rules here are DB invariants, row-lock races and SQL counting, which must be proven on real PostgreSQL 17). Pure decisions (`decideProgression`, labels, view mapping) stay unit tests.
+- **Target test count**: ~60 across 5 phases. Above the 10-20 multi-component guideline because the spec has 35 ACs, 4 new CHECKs that each need an isolated refusal test (AC-VERIFY-2), and a table-driven counting rule (AC-VERIFY-3); table rows inside one `it.each` count as one test.
+
+### File Organization
+- **New test files**:
+  - `packages/shared/src/skill/progression.test.ts`: `decideProgression` table, constants grep guard (AC-VERIFY-4)
+  - `packages/shared/src/api/skill-levels.test.ts`: strict request schemas, `TeamMemberRow` additive fields
+  - `apps/api/test/integration/skill-levels-schema.int.test.ts`: migration round trip, CHECK refusals (AC-VERIFY-1, AC-VERIFY-2)
+  - `apps/api/test/integration/skill-levels-games.int.test.ts`: `countQualifyingGames` table, `selectAutoEnrollees` order/predicate, contract pin (AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3)
+  - `apps/api/test/integration/skill-levels-api.int.test.ts`: routes, policy, error codes, `assertApprovedMember` sees the new level (AC-HAPPY-1..3, 7..10, AC-ERROR-1..4, AC-VERIFY-7)
+  - `apps/api/test/integration/skill-levels-races.int.test.ts`: override vs progression, ban vs toggle, double job run, using `lock-waiters.ts` (AC-VERIFY-5, AC-ERROR-5, AC-ASYNC-2)
+  - `apps/api/test/integration/skill-levels-job.int.test.ts`: end-to-end job through `registerJobs`, per-member failure isolation (AC-HAPPY-4..6, AC-ASYNC-1, AC-ERROR-7, AC-INTEGRATION-2)
+  - `apps/api/test/integration/skill-levels-logs.int.test.ts`: exact log field sets (AC-VERIFY-6)
+  - `apps/web/src/lib/teams/skill-levels-view.test.ts`: provenance, progress and Auto Enroll tag copy
+  - `apps/web/e2e/skill-levels.spec.ts`: admin journey on desktop + 360 x 740 with axe (AC-ENTRY-1..3, AC-ERROR-6, AC-VERIFY-8)
+- **Extend existing**:
+  - `apps/api/src/jobs/registry.test.ts`, `schedules.test.ts`, `handlers.test.ts`: new queue and slot, DST guard
+  - `apps/api/test/integration/teams-ban-seam.int.test.ts`: ban clears Auto Enroll in the same `UPDATE`
+  - `apps/web/src/lib/teams/actions.test.ts`, `labels.test.ts`, `manage-view.test.ts`, `moderation.test.ts`: new Server Actions, copy, row controls
+  - `apps/web/src/components/teams/manage-components.test.tsx`: panel disclosure, focus return, field errors
+  - `apps/api/test/integration/db-codegen.int.test.ts` / `schema.int.test.ts`: drift picks up the new column automatically (no new assertions unless they fail)
+
+### What NOT to Test
+- `types.generated.ts`: checked by tsc and the codegen drift test.
+- The materialiser calling `selectAutoEnrollees` and `allocator.autoEnrolInSession`: neither exists on main; deferred to session-scheduling-engine (the contract test pins the seam instead).
+- Session completion and billing transitions: owned by wallet-and-akahu-billing; tests seed `COMPLETED` directly with `UPDATE game_sessions SET status`.
+- pg-boss internals (exclusive policy semantics, cron parsing): framework; the job test only proves our handler is idempotent.
+- Notifications: none are sent in v1.
+
+### Per-Phase Test Guidance
+- Phase 1: ~12 tests. Migration round trip, one refusal per new CHECK plus the existing `team_members_auto_enroll_assigned` CHECK, ban clears Auto Enroll, `decideProgression` table, constants guard, strict schemas.
+- Phase 2: ~10 tests. Qualifying-game table (each inclusion/exclusion row), selection predicate and order, `until` boundary, contract pin, partial index used (`EXPLAIN` assertion or documented check).
+- Phase 3: ~16 tests. Both routes happy paths, same-level no-op, policy and refusal codes (401/403/404/409/422), actor demoted mid-request, ban vs toggle race, `assertApprovedMember` sees the new level, `TeamMemberRow` additive fields and progress, log fields, OpenAPI drift.
+- Phase 4: ~10 tests. Job promotes at 40 and not at 39, one level per run, override resets baseline, double run and redelivery promote once, override vs progression interleaved both ways, one member failing does not stop the sweep, registry/schedule/handler wiring, CLI trigger.
+- Phase 5: ~12 tests. View-model copy (provenance, progress, tags, "ended"), Server Actions and error mapping, panel disclosure and focus, e2e journey on both viewports with axe.
 
 ## Implementation Roadmap
 
-_(filled during planning)_
+### Overview
+Admin skill override and Auto Enroll on the existing People page, a daily `skill-progression` job that promotes at 40 qualifying games, and the two read seams (`countQualifyingGames`, `selectAutoEnrollees`) that registration-and-waitlist and session-scheduling-engine will consume. No session or registration writes. The order is DB first, read seams, then API, then the job, then UI, so each phase is testable against real rows before anything consumes it.
+
+### Component Analysis
+- **New**: `apps/api/src/modules/skill-levels/` (routes, service, repo, games); the `skill-progression` job; shared `skill` primitives and API schemas; the web panel component and view model; ADR 0017.
+- **Affected**: `team_members` (migration), `apps/api/src/modules/teams/repo.ts` (ban `UPDATE` clears Auto Enroll; members list gains fields), `teams/routes.ts` or `buildApp` registration, `jobs/registry.ts`, `schedules.ts`, `bootstrap.ts`, the CLI trigger list, `member-list.tsx`, `manage-view.ts` (`memberRowControls`), `actions.ts`, `labels.ts`, `moderation.ts`, `vitest.config.ts` coverage list, `apps/api/openapi.yaml`, `db/schema-deviations.md`.
+- **Interactions**: web Server Action → `PUT` route (`requireTeamRole('TEAM_ADMIN')`) → service (moderation transaction shape: lock `teams` `FOR NO KEY UPDATE`, re-check actor, lock target row) → `team_members`. Job: sweep approved non-`ADVANCED` members in keyset batches → per member: lock row, recount via `countQualifyingGames`, `decideProgression`, guarded `UPDATE`. Consumers: `assertApprovedMember` (reads `skill_level`), future materialiser → `selectAutoEnrollees`.
+
+### Dependencies & Risks
+- Risk: registration-and-waitlist (in flight) also claims D-47+ and ADR 0016 → Mitigation: this task uses the next free numbers on main (D-55+, ADR 0017); whichever branch merges second renumbers (user decision 2026-10-17).
+- Risk: game counts are zero in production until session-scheduling-engine and registration-and-waitlist ship → Mitigation: prove counting on factory-seeded real rows; state it in the ADR and the UI progress line copy is still accurate ("0 of 40").
+- Risk: creative outcomes (override precedence, surplus carry-over) could change `skill_level_changed_at` semantics → Mitigation: Phase 1 migration is built only after `/yay:creative` locks those rules.
+- Risk: lock-order deadlock between override (teams → team_members) and job (team_members only) → Mitigation: the job never locks `teams`; race tests interleave both orders (AC-VERIFY-5).
+- Risk: count query cost on the members list (up to 50 counts per page) → Mitigation: partial index `registrations (team_id, user_id) WHERE status = 'CONFIRMED'`; check with `EXPLAIN` in Phase 2.
+
+### Observability Requirements
+- **Applies**: Yes → reference `context/observability-requirements.md` during build.
+- **Logging**: business events `team.member.skill_overridden`, `team.member.auto_enroll_changed` (request path, with `traceId`), `team.member.skill_progressed`, `skill.progression.completed`, `skill.progression.member_failed` (job path). Ids, levels, counts and booleans only; no names or emails; no field named `code`.
+- **Tracing**: existing Fastify and pg-boss instrumentation; one custom span per progression run, with per-member child spans only on failure.
+- **Metrics**: none new beyond the run-summary log counts (promoted, unchanged, failed).
+- **Configuration**: no new env vars (thresholds are shared constants, pending creative Q6).
+
+### API Requirements - REST
+- **Involves REST API**: Yes
+- **OpenAPI Spec Location**: `apps/api/openapi.yaml` (generated by `pnpm run openapi`, drift-checked)
+- **Endpoints Affected**: `PUT /teams/:teamId/members/:userId/skill-level` (new), `PUT /teams/:teamId/members/:userId/auto-enroll` (new), `GET /teams/:teamId/members` (additive response fields)
+- **Build Phase**: load `context/api-rest-requirements.md`
+
+### New Source Files (pin path + extension)
+- [ ] `db/migrations/<utc>_skill_levels_and_auto_enroll.sql`: `skill_level_changed_at`, 4 CHECKs, partial index (Up/Down)
+- [ ] `packages/shared/src/skill/progression.ts`: `SKILL_PROGRESSION_GAMES`, `SKILL_PROGRESSION_WINDOW_DAYS`, `decideProgression`, `nextSkillLevel`
+- [ ] `packages/shared/src/skill/index.ts`: barrel (re-exported from `packages/shared/src/index.ts`, extend)
+- [ ] `packages/shared/src/api/skill-levels.ts`: strict zod bodies, response shapes, error codes
+- [ ] `apps/api/src/modules/skill-levels/games.ts`: `countQualifyingGames`, `selectAutoEnrollees` (read-only, no locks)
+- [ ] `apps/api/src/modules/skill-levels/repo.ts`: guarded override, Auto Enroll and progression `UPDATE`s, keyset sweep query
+- [ ] `apps/api/src/modules/skill-levels/service.ts`: override and Auto Enroll transactions (moderation shape), progression of one member
+- [ ] `apps/api/src/modules/skill-levels/routes.ts`: the two `PUT` routes
+- [ ] `apps/api/src/modules/skill-levels/errors.ts`: refusal codes and HTTP mapping (mirrors `team-banking/errors.ts`)
+- [ ] `apps/api/src/jobs/skill-progression.ts`: job handler (sweep + per-member isolation + summary log)
+- [ ] `apps/web/src/components/teams/skill-enroll-panel.tsx`: disclosure panel with the two forms
+- [ ] `apps/web/src/lib/teams/skill-levels-view.ts`: provenance, progress and Auto Enroll tag copy
+- [ ] `docs/adr/0017-skill-levels-and-auto-enroll.md`: C-GAME-1, C-SKL-1, no-retroactive-repricing
+- [ ] extend: `db/schema-deviations.md` (D-55+), `apps/api/src/lib/db/types.generated.ts` (codegen), `apps/api/src/modules/teams/repo.ts`, `apps/api/src/app.ts` (`buildApp` registration), `apps/api/src/jobs/{registry,schedules,bootstrap}.ts`, `apps/api/src/cli.ts` (job trigger list), `apps/api/openapi.yaml`, `vitest.config.ts`, `apps/web/src/components/teams/member-list.tsx`, `apps/web/src/lib/teams/{manage-view,actions,labels,moderation}.ts`, `docs/getting-started.md` (CLI trigger)
+
+### Phases
+- [ ] Phase 1: Schema and shared rules. Migration (`skill_level_changed_at`, paired-override, baseline >= override, auto-enrol-cleared-when-off and approved-only CHECKs, partial index), schema-deviation entries D-55+, codegen, ban `UPDATE` clears Auto Enroll, shared constants + `decideProgression` + strict API schemas. ACs: AC-VERIFY-1, AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-5 (DB half).
+- [ ] Phase 2: Read seams and contract. `countQualifyingGames` and `selectAutoEnrollees` with table-driven real-DB tests, contract pin test, ADR 0017. ACs: AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3 (ADR + pin).
+- [ ] Phase 3: Admin API. `skill-levels` module (override and Auto Enroll routes with the moderation transaction shape), `TeamMemberRow` additive fields incl. `skillProgress`, log events, OpenAPI, coverage gate entry. ACs: AC-HAPPY-1..3, AC-HAPPY-7..11 (API half), AC-ERROR-1..5, AC-VERIFY-6, AC-VERIFY-7, AC-INTEGRATION-3 (`assertApprovedMember`).
+- [ ] Phase 4: Progression job. `skill-progression` queue, 05:30 Pacific/Auckland slot, handler with keyset sweep, per-member lock-recount-decide-update, failure isolation, CLI trigger, race tests. ACs: AC-HAPPY-4..6, AC-ASYNC-1, AC-ASYNC-2, AC-ERROR-7, AC-VERIFY-5, AC-INTEGRATION-2.
+- [ ] Phase 5: Admin UI and end-to-end journey. Members-row read-only lines, "Skill and Auto Enroll" disclosure panel, Server Actions, status-region success messages, field and network errors, Playwright journey on both viewports with axe. Delivers the full entry-to-success flow: `/teams/<id>/manage` → Members → "Skill and Auto Enroll" → Save → "Skill level for Priya Patel set to Advanced." ACs: AC-ENTRY-1..3, AC-HAPPY-1/2/7..11 (UI half), AC-ERROR-3, AC-ERROR-6, AC-VERIFY-8.
 
 ## Creative Phases
 
-_(filled during planning)_
+- [ ] Algorithm design → pending. Game-counting edges (no-shows, charged late withdrawals, `ends_at` vs `date`), override vs auto-progression precedence and same-level saves, surplus-game carry-over and `skill_level_changed_at` semantics (spec Creative Q1-Q3, Q6).
+- [ ] Architecture design → pending. Cross-feature contracts C-GAME-1 / C-SKL-1 with registration-and-waitlist (C-SAE-1/2) and session-scheduling-engine, selection seam shape, lock order, job sweep design (spec Creative Q4, Q7).
+- [ ] UI/UX design → pending. Members-row layout: one panel with two forms vs a combined form vs a separate manage area, and where the progress line sits (spec Creative Q5).
+
+**Resolved at plan review (2026-10-17)**: spec approved as drafted, with creative flagged. New schema deviations and the ADR use the next free numbers on main (D-55+, ADR 0017); whichever of this branch and `feature/registration-and-waitlist` merges second renumbers. Open questions (a) to (c) keep their drafted defaults unless creative changes them.
 
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: PLAN
-**Current Step**: Step 3 - Spec Writer Agent - RUNNING
-**Step Started**: 2026-10-17
-**Can Resume**: YES
+**Build Status**: IDLE
+**Current Phase**: CREATIVE
+**Last Completed**: PLAN (2026-10-17)
+**Can Resume**: NO
 
 ### Active Sub-Agents
 (none)
 
 ### Completed Steps
 - Step 0.1: Task provisioned from roadmap feature
+- Step 3: Spec Writer Agent (Sonnet) - COMPLETE; taxonomy lint CLEAN; human approved with creative flagged
+- Step 4-5: Codebase analysis and 5-phase implementation plan - COMPLETE
+- Step 6: Validation gate passed; status PLANNING_COMPLETE
