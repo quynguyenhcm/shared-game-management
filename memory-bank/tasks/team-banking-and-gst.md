@@ -2,13 +2,13 @@
 slug: team-banking-and-gst
 legacy_id:
 feature: team-banking-and-gst
-status: CREATIVE_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # team-banking-and-gst: Team Banking and GST
 
 **Complexity**: Level 3 (inherited from team-banking-and-gst)
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: team-banking-and-gst
 **Branch**: feature/team-banking-and-gst
 **Worktree**: N/A (main checkout)
@@ -533,7 +533,7 @@ Critical path: the validators and migration (Phase 1), then the API (Phase 2), t
 - [x] **Phase 2: Banking and GST API**: module, routes, service (lock, re-check, encrypt, mask), logging, and camelCase redaction with the collision grep. ACs: AC-HAPPY-1 to 6 (API), AC-ERROR-1 to 7, 11, 12, 14, AC-VERIFY-2, 3, 4, 5, 10, AC-INTEGRATION-1.
 - [x] **Phase 3: Publish gate and removal guard**: `isPaidSession`, `assertTeamCanPublishPaidSession`, `mapPublishGateDbError`, `banking_in_use`, the race tests, and ADR 0016. ACs: AC-HAPPY-7, AC-ERROR-8, 9, 10, AC-VERIFY-8, 9, AC-INTEGRATION-2.
 - [x] **Phase 4: Web banking area**: the manage-area nav with the current area marked, the banking page with both sections, Server Actions, the removal `InlineConfirm` and write-only inputs. Also the change-notification email if creative promotes AC-ASYNC-1. ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 5, AC-ERROR-13, (AC-ASYNC-1).
-- [ ] **Phase 5: E2E, accessibility and docs**: Playwright journeys on both viewports with axe, the coverage gate, and updates to `systemPatterns.md`, `techContext.md` and `productBrief.md`. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-12, 13, 14, AC-INTEGRATION-4.
+- [x] **Phase 5: E2E, accessibility and docs**: Playwright journeys on both viewports with axe, the coverage gate, and updates to `systemPatterns.md`, `techContext.md` and `productBrief.md`. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-12, 13, 14, AC-INTEGRATION-4.
 
 ## Creative Phases
 
@@ -677,10 +677,10 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: 5 of 5 (Phases 1-4 complete)
+**Build Status**: COMPLETE
+**Current Phase**: 5 of 5 (all phases complete)
 **Auto-Build Mode**: YES
-**Current Step**: Phase 4 committed; Phase 5 next
+**Current Step**: Phase 5 committed; next is /yay:reflect
 **Step Started**: 2026-10-16
 **Can Resume**: YES
 **Creative Reconciliation**: binding. Build agents apply R1-R12 over the spec ACs.
@@ -707,6 +707,9 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 - Phase 3 (Publish gate and removal guard): COMPLETE (2026-10-16) - 897 unit + 354 integration passing (26 new in `team-banking-gate.int.test.ts`); lint/typecheck/build/coverage PASS; review PROCEED (Anthropic-side; Codex produced no verdict). No schema change. Handoff: `publish-gate.ts` (`isPaidSession`, `checkTeamCanPublishPaidSession`, `assertTeamCanPublishPaidSession(trx, {teamId, pricingStructure, fees, log?, actorId?})`), `mapPublishGateDbError` in `errors.ts`, test-only `test/helpers/payment-stand-in.ts`, ADR 0016 (gate contract, recurrence, C-BIL-PAY, `payout_blocked_at`, `returnTo`, paid rule, GST snapshot, April review). Phase 4 must validate `returnTo` per ADR 0016 (`safeReturnTo`, same-team `/teams/<id>/` prefix, not the banking page itself). `systemPatterns.md`/`techContext.md` updates are left to Phase 5.
 
 - Phase 4 (Web banking area): COMPLETE (2026-10-16) - 1026 unit + 354 integration passing (full suite on the final Phase 3+4 head); typecheck/build/eslint/coverage PASS; Codex review ran with an explicit range and returned a verdict (one P2, fixed). Handoff for Phase 5: page `apps/web/src/app/teams/[teamId]/manage/banking/page.tsx`, `ManageAreaNav` (per-page `current`), `no-access.tsx`, `banking-actions.ts`/`banking-view.ts`, forms `banking-form.tsx`/`gst-form.tsx` and sections. Browser-only behaviour is untested and must be covered by Phase 5 Playwright: form reset after a Server Action, focus on first error/banner, InlineConfirm closing on `banking_in_use`, the `returnTo` "Back to your session" flow, 360 px, axe. `systemPatterns.md`/`techContext.md`/`productBrief.md` updates still belong to Phase 5.
+
+- Phase 5 (E2E, accessibility and docs): COMPLETE (2026-10-16) - `apps/web/e2e/team-banking.spec.ts` 14/14 passing (7 journeys x desktop and 360x740, axe critical and serious both fail the test). `pnpm run ci` steps all PASS: lint, typecheck, coverage (119 files, 1379 tests; global 97.85% lines), build. Full integration suite 354/354, and two more consecutive runs 354/354 each (35 files, no flakiness in the Phase 3 race tests). Coverage of the measured set: `team-banking/**` 99.37% lines / 91.43% branches, `nz/**` 100% / 100%, `lib/teams/banking-*.ts` 99.29% / 88.15%; the banking and GST components are not in the coverage include. Review: Codex ran with a verdict (one P3, stale techContext wording, fixed). Docs updated by the Documentation agent (systemPatterns, techContext, productBrief), claims verified against the code; no `memory-bank/c4`, so no C4 note.
+- How the E2E was run (natively, like `teams.spec.ts`): temporary database `sgm_e2e_banking` created in the docker Postgres and migrated with `pnpm run db:migrate`; API (`tsx src/main.ts`), worker (`tsx src/worker.ts`) and a production `next build` plus `next start -p 3000` started by hand with `AUTH_FAKE_OAUTH=true`, a generated `ENCRYPTION_KEYS`, `API_INTERNAL_SHARED_SECRET` (32+ chars), `WEB_BASE_URL=http://localhost:3000`; then `E2E_DATABASE_URL=postgres://sgm:sgm@localhost:5432/sgm_e2e_banking pnpm run test:e2e apps/web/e2e/team-banking.spec.ts`. Not part of `pnpm run ci`.
 
 ### Halt State
 (none)
@@ -742,4 +745,8 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 - Phase 4 | banking-actions.ts | `field`/`requireSession` duplicated from actions.ts because a `'use server'` file may export only Server Actions.
 - Phase 4 | banking page | a payout-blocked team sees the summary with "Change banking details" (the number is write-only, so the admin retypes it), not the form directly.
 - Phase 4 | repo | `.vitest/` (generated test report, untracked, not in .gitignore) makes `prettier --check` fail after any test run; not committed. Delete it or add it to .gitignore/.prettierignore (Phase 5).
+- Phase 5 | .gitignore, .prettierignore | `.vitest/` added to both (clears the Phase 4 housekeeping deviation). The stray generated file was not deleted.
+- Phase 5 | apps/web/e2e/team-banking.spec.ts | no token input exists (R1), so AC-VERIFY-13's password-input check is asserted as "no password input on the page". Server-side 422s cannot be reached through the UI (the client runs the same validators), so "typed values kept" and focus are asserted on client validation failures; the AC-ERROR-13 5xx path stays unit-tested. Seeded journeys (published paid session, payout blocked, unreadable name) skip without `E2E_DATABASE_URL`. The banking components (`banking-*.tsx`, `gst-*.tsx`) are outside the coverage include and are covered by the unit tests and Playwright.
+- Phase 5 | Step 8 code review | Codex ran with a verdict (working-tree scope; the change was uncommitted at review time).
+- Phase 5 | docs vs plan | the Documentation agent recorded where code differs from the original spec (constraint `teams_payout_details_all_or_none`, GST CHECK `^[1-9][0-9]{7,8}$`, account stored padded to 3 digits, no Akahu or IRD values); the code and R1-R12 are what the docs state. `irdNumber` and `akahu*` are not redacted by name, which follows R10.
 - Phase 2 | apps/api/openapi.yaml | no 500 is documented on the five routes: no route in the spec documents one (the global error schema covers it). A malformed team id answers the global error body, covered by a test.

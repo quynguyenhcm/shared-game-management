@@ -6,6 +6,7 @@ coverage
 .agent-logs
 test-results
 playwright-report
+.vitest
 *.tsbuildinfo
 next-env.d.ts
 **/types.generated.ts
