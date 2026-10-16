@@ -713,3 +713,6 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 - Phase 1 | same migration | no CHECK tying payout_blocked_at to a banking block (neither R3 nor architecture doc defines one); service clears it on save/removal.
 - Phase 1 | apps/api/.kysely-codegenrc.json | override types the generated is_payout_configured as never for insert/update.
 - Phase 1 | packages/shared/src/nz/ird-number.test.ts | IRD spec example 150000026 is rejected under both weight sets (check digit 5, not 6); conclusion unchanged from creative doc.
+- Phase 1 | same migration (removal trigger) | trigger named `teams_guard_banking_removal`; it raises constraint `teams_banking_in_use` (the R4 name). Map errors by `err.constraint`. Accepted by the phase reviewer.
+- Phase 1 | packages/shared/src/api/team-banking.ts | copy-deck strings beyond the UI/UX deck (`accountNameTooLong`, `changeKeyInvalid`, `accountNumberUnknownBank`, IRD range reusing the check-digit message). Phase 4 must check the wording against the UI/UX copy table. Accepted by the phase reviewer.
+- Phase 1 | apps/api/test/integration/teams-schema.int.test.ts (~line 470) | the rollback test now rolls back 2 migrations because the new migration is newest. The assertion is not weakened. Accepted by the phase reviewer.
