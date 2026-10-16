@@ -2,13 +2,13 @@
 slug: team-banking-and-gst
 legacy_id:
 feature: team-banking-and-gst
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # team-banking-and-gst: Team Banking and GST
 
 **Complexity**: Level 3 (inherited from team-banking-and-gst)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: team-banking-and-gst
 **Branch**: feature/team-banking-and-gst
 **Worktree**: N/A (main checkout)
@@ -538,21 +538,151 @@ Critical path: the validators and migration (Phase 1), then the API (Phase 2), t
 ## Creative Phases
 
 Level 3 with LOW-confidence items, so creative is required.
-- [ ] **Algorithm Design** (required): the NZ bank-account tables and their source, the policy for bank or branch codes added after the source date, suffix storage and the `last4` display (Q1); the IRD range and the GST/IRD field relationship (Q2); the paid-session rule (Q5). Status: pending.
-- [ ] **Architecture Design** (required): Akahu credential semantics and whether to verify at save time (Q3); the removal policy and the recurrence contract for ADR 0016 (Q4); deriving `is_payout_configured` (Q6); change notification, audit columns or step-up re-auth (Q8); `GLOBAL_ADMIN` access (Q9, API side); where the GST rate constant lives (Q10); GST number history for invoices (Q11); where `lockTeam` and `findApprovedRole` live once a second module needs them. Status: pending.
-- [ ] **User Journey Design** (required for Level 3): first-time setup, the replace and remove journeys, the GST toggle, and what an admin sees when a paid publish is refused (hand-off copy for session-scheduling-engine). Status: pending.
-- [ ] **UI/UX Design** (required): what admins can read back and the write-only fields (Q7); one page or sub-pages, how the nav marks the current area, and a "not set up" hint on My teams (Q9); the copy deck. Status: pending.
+- [x] **Algorithm Design** (required): Q1, Q2, Q5. Status: complete, `memory-bank/creative/team-banking-and-gst-nz-validation-algorithm.md`.
+- [x] **Architecture Design** (required), complete, `memory-bank/creative/team-banking-and-gst-banking-architecture.md`: Akahu credential semantics and whether to verify at save time (Q3); the removal policy and the recurrence contract for ADR 0016 (Q4); deriving `is_payout_configured` (Q6); change notification, audit columns or step-up re-auth (Q8); `GLOBAL_ADMIN` access (Q9, API side); where the GST rate constant lives (Q10); GST number history for invoices (Q11); where `lockTeam` and `findApprovedRole` live once a second module needs them.
+- [x] **User Journey Design** (required for Level 3): setup, replace, remove, GST, and the publish-refusal hand-off. Status: complete, `memory-bank/creative/team-banking-and-gst-payout-setup-user-journey.md`.
+- [x] **UI/UX Design** (required): Q7, Q9 (UX) and copy. Status: complete, `memory-bank/creative/team-banking-and-gst-banking-page-uiux.md`.
 - **Reconciliation step**: after the parallel creative docs return, write one binding reconciliation section here before build (learned rule: review-process-plan-claims).
+
+### Design Critique (advisory)
+- **Backend**: codex (`adversarial-review --base origin/main --scope branch`), 2026-10-16. Log: `.claude-logs/codex-critique-team-banking-20261016.log` (local).
+- **Verdict**: needs-attention. The removal and payment-creation race is still open, and the four docs don't yet define one contract for payout fields, GST fields, notification or UI state.
+- **Findings**:
+  - high · A removal can commit while an uncommitted payment waits on the team foreign key, for a session that is already COMPLETED (architecture doc, lines 120-136).
+  - high · Option 3C (drop team-supplied Akahu credentials) is treated as chosen without product approval and contradicts the task, UI and journey docs (architecture doc, lines 88-99).
+  - high · The validator accepts some wrong branches, and nothing revokes publish eligibility when payouts to the account fail (algorithm doc, lines 159-171).
+  - high · The GST data model differs across the docs: one field in the algorithm doc, two everywhere else (algorithm doc, lines 256-275).
+  - medium · The generated column and its all-or-none CHECK have no plan for existing partial rows (architecture doc, lines 180-197).
+  - medium · The UI doc (forms always shown) and the journey doc (`?edit=` URL state) define incompatible editing models (UI/UX doc, lines 94-160).
+  - medium · The change email's content (whether it shows the account ending) and its retry idempotency are unresolved (architecture doc, lines 209-213).
+- **Resolution**: see Creative Reconciliation.
+
+### Creative Reconciliation (binding for build)
+
+Where this section and a creative doc or an AC disagree, this section wins. Build agents apply these rulings when they reach the affected AC. Decisions the user made on 2026-10-16 are marked **(user)**.
+
+**R1 · The payout destination is the bank account only (Q3, option 3C) (user).**
+- Teams enter the account name and account number only.
+- The platform's Akahu app credentials are server configuration owned by wallet-and-akahu-billing.
+- This feature never reads or writes `akahu_merchant_id` or `akahu_app_token`. They stay reserved for billing, and their existing redaction and envelope CHECKs are unchanged.
+- The payout block is `bank_account_name` (encrypted), `bank_account_number` (encrypted) and `bank_account_last4`.
+- No Akahu call is made at save time.
+- Removed everywhere: the merchant ID and token fields, their copy and validation messages, `akahuAppTokenSet`, `akahuMerchantId`, and the token cases in AC-ERROR-4, AC-HAPPY-1/2/3, AC-VERIFY-2/3/13 and AC-INTEGRATION-1. The 3B fallback is not built.
+
+**R2 · One GST number field (Q2, option G2) (user).**
+- The GST section has a toggle and a single `GST number` field, with the hint "This is your IRD number."
+- `gst_number` is stored as plaintext canonical digits with no leading zero, and CHECK `^[1-9][0-9]{7,8}$`.
+- This feature never writes `ird_number`.
+- Removed: the IRD field, `irdNumber` in the request, `irdNumberLast3` and `irdNumberSet` in the response, the "Remove the saved IRD number" control, the IRD decrypt and unreadable paths, and IRD from AC-HAPPY-5, AC-ERROR-6/12, AC-VERIFY-2/3/10.
+- The validator still applies the IRD check-digit and range rules to the GST number.
+- Turning GST off keeps the saved number.
+
+**R3 · A failed payout destination blocks publishing until fixed (user). Fixes critique high #3.**
+- New column `teams.payout_blocked_at timestamptz NULL`.
+- `is_payout_configured` becomes a generated column: true when name, number and last4 are all set AND `payout_blocked_at IS NULL` (architecture Q6, extended).
+- Saving banking details always clears `payout_blocked_at`. Removing them clears it too.
+- ADR 0016 obliges wallet-and-akahu-billing to set `payout_blocked_at` (under the team-row lock) when Akahu declines a payout because of the destination account, and never to clear or change the banking columns.
+- Page states:
+  - status line when blocked: "Needs attention. Payments to the account ending {last4} failed. Check the account number and save it again."
+  - `GET /banking` returns `payoutBlocked: boolean`.
+- New AC-ERROR-15 (MUST): with `payout_blocked_at` set, the gate and the trigger refuse a paid publish, and a save clears the block.
+
+**R4 · Lock protocol (architecture Q4, option 4C). Fixes critique high #1.**
+- The architecture doc's design is binding:
+  - the gate and the `game_sessions` publish trigger take `teams FOR KEY SHARE`;
+  - PUT banking and PUT GST take `FOR NO KEY UPDATE`;
+  - DELETE banking takes `teams FOR UPDATE` as its first statement and only reads afterwards;
+  - the `teams` BEFORE UPDATE trigger `teams_banking_in_use` backstops raw-SQL removal.
+- Removal is refused while the team has a PUBLISHED paid session or a PENDING or OVERDUE payment, through one SQL function `team_banking_in_use` that the service also calls.
+- **Added contract C-BIL-PAY (ADR 0016):** every payment-creation path takes `teams FOR KEY SHARE` and checks `is_payout_configured` before inserting any payment row. This includes post-game payment links for an already-COMPLETED session. A removal therefore either waits for that payment and then refuses, or commits first so the payment path sees no banking and fails cleanly.
+- AC-VERIFY-9 adds both orderings of this race against a COMPLETED session, using a test-only payment stand-in that follows C-BIL-PAY.
+- The lock order across features stays `teams → team_members → game_sessions → registrations`. The registration allocator never locks `teams` stronger than `KEY SHARE`.
+
+**R5 · Migration strategy for existing rows. Fixes critique medium #5.**
+- The migration first cleans up rows the old schema allowed:
+  - a partial banking block (some of name, number or last4 missing) is cleared to all-NULL and logged in a `NOTICE` count;
+  - `gst_registered = true` with no `gst_number` becomes false;
+  - a `gst_number` that fails the format CHECK is set to NULL.
+- New CHECKs are added `NOT VALID`, then `VALIDATE CONSTRAINT`d in the same migration.
+- The rollback restores the plain `is_payout_configured` column.
+- An upgrade test runs from a pre-feature database seeded with every partial shape.
+- Phase 1 also fixes `crypto-columns.int.test.ts` (`writeBanking` and the copied-row case) and `session-instants.int.test.ts:67`.
+
+**R6 · Editing model: summary, then Change (user). Fixes critique medium #6.**
+- The journey doc's model is binding:
+  - **Nothing saved:** the form shows directly.
+  - **Saved:** a read-only summary (`dl` pairs) with "Change banking details" / "Change GST settings". Edit mode is `?edit=banking|gst`. "Remove banking details" appears only in summary view.
+  - **Saves:** successful saves redirect with `?notice=` codes (`banking_saved`, `banking_updated`, `banking_account_changed`, `banking_removed`, `gst_saved`).
+- From the UI/UX doc:
+  - the per-page `ManageAreaNav` with a `current` prop, with no nav on `NoAccess`;
+  - an extracted `no-access.tsx`;
+  - write-only behaviour: blank keeps the saved number, the typed number is re-echoed after a 422;
+  - `inputMode=numeric` for the account number;
+  - the outage copy;
+  - the GST helper split by toggle state, with "3/23" derived from `GST_RATE_BPS`;
+  - the text-led status line;
+  - the copy table, unless this section overrides it.
+- `returnTo` hand-off from a refused publish (journey AC-ENTRY-4, SHOULD), validated as the journey doc specifies.
+- **No hint on My teams** (UI/UX doc). The publish-refusal hand-off is the discovery path, so `MineTeamsResponse` doesn't change. Journey AC-ENTRY-5 is dropped.
+- Configured status copy: "Set up. Paid sessions can be published." (journey doc: nothing is verified with Akahu).
+- `InlineConfirm` is generalised to take a `section` id (UI/UX amendment 11). registration-and-waitlist later extracts `ConfirmDisclosure` from the generalised version.
+
+**R7 · Unreadable details (AC-ERROR-12).**
+- `GET /banking` answers 200 with `accountName: null, unreadable: true` and logs `team.banking.decrypt_failed`.
+- The page shows "Needs attention" and a form where name and number are required.
+- A full save restores the page.
+
+**R8 · Change notification (architecture Q8 with journey content rules). Fixes critique medium #7.**
+- AC-ASYNC-1 becomes MUST.
+- On every banking save that changes something, and on removal, a `send-email` job per approved admin (the actor included) is enqueued in the same transaction.
+- The email names who changed it and when and links to the page. It contains **no account name or digits**.
+- Idempotency: the form carries a hidden per-render `changeKey` uuid (the team-create D-46 pattern). The job key is `banking-changed:<teamId>:<changeKey>:<recipientId>`, and a replayed request with the same `changeKey` enqueues nothing new.
+- A save that changes nothing (same values) writes nothing and sends no email.
+- No email for GST changes.
+- New audit columns `banking_updated_at` and `banking_updated_by`, shown as "Last changed by {name} on {date}" in the summary.
+- Step-up sign-in is deferred.
+
+**R9 · Validators and the paid rule (algorithm doc, binding).**
+- **Source:** IRD *Payroll Calculations & Business Rules Specification 2026-27* §6.1/§7. The Payments NZ register is a cross-check only.
+- **Bank account checks:** bank ID plus weighted modulus. No branch ranges. Unknown banks are refused, and so are legacy IDs 07, 09, 26, 28, 29, 33 and 35.
+- **Bank account storage:** stored as `BB-bbbb-AAAAAAA-SSS` (suffix padded to 3 digits). `last4` comes from the account base.
+- **The last-4 helper:** `deriveBankAccountLast4`'s rule moves to `packages/shared/src/nz/bank-account.ts`, and the API helper delegates to it.
+- **IRD/GST range:** 10,000,000 to 200,000,000 inclusive. Secondary weights apply only when the primary result is 10. The 150000026 erratum is pinned as rejected.
+- **Paid rule:** the fee columns that apply to the session's `pricing_structure`, with NULL counted as 0 and a session paid only when a fee is above 0. The SQL twin fails closed.
+- **Review:** an annual April review of the `nz/*` tables is recorded in ADR 0016.
+
+**R10 · Shared code, logging and constants (architecture doc, binding).**
+- `modules/teams/admin-lock.ts` provides `lockTeamRow` and `assertTeamAdminUnderLock`, and `findApprovedRole` moves there.
+- `lib/auth/team-refusals.ts` is registered once in `buildApp`.
+- Redaction gains only the anchored patterns `/^(bank_?)?account_?(name|number)$/i` (no IRD pattern is needed under R2). The collision grep on `main` was clean.
+- Log events use `changedFields` instead of the `replaced*` fields, which `/token$/` would have redacted.
+- `GST_RATE_BPS` lives in `packages/shared/src/nz/gst.ts`.
+- **Q11:** wallet-and-akahu-billing snapshots `payments.gst_number` at charge time (ADR 0016 contract).
+- No `GLOBAL_ADMIN` access.
+
+**R11 · Ledger, ADR and phase impact.**
+- Ledger D-47 onward covers the cleanup, the CHECKs, the generated column, `payout_blocked_at`, the audit columns, `team_banking_in_use`, both triggers and `game_session_is_paid`.
+- ADR 0016 is `docs/adr/0016-team-banking-and-publish-gate.md`. It includes the gate contract, the recurrence contract (gate before insert, refused instance as DRAFT, at most one admin email per rule per run window), C-BIL-PAY, `payout_blocked_at`, the `returnTo` hand-off, the paid rule, and the GST number snapshot.
+- Phase 2 gains the audit columns and the change email; the email moves out of Phase 4.
+
+**R12 · Other amendments adopted as written in the creative docs**, except where R1-R11 override:
+- algorithm doc: amendment table;
+- architecture doc: lock, gate API (`checkTeamCanPublishPaidSession`, `mapBankingDbError`), AC-ERROR-10 copy mentioning unpaid payments, AC-VERIFY-1/4/9/14;
+- journey doc: AC-HAPPY-1 to 4 behaviour, AC-ERROR-10 panel handling, AC-ERROR-13 raised to MUST, AC-VERIFY-13 extra states;
+- UI/UX doc: amendments 1, 2, 5, 6, 7, 8, 10, 11.
+
+Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/Q5; architecture: Q3/Q4/Q6/Q8/Q9-API/Q10/Q11; journey: flow and hand-off; UI/UX: layout and copy).
 
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Step 4.5 - Adversarial design critique, then reconciliation
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete and reconciled (R1-R12); ready for /yay:build
 **Step Started**: 2026-10-16
-**Can Resume**: YES
+**Can Resume**: NO
+**Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 4 high + 3 medium, all resolved in the reconciliation)
 
 ### Active Sub-Agents
 - Algorithm Design: COMPLETE
@@ -568,3 +698,5 @@ Level 3 with LOW-confidence items, so creative is required.
 - Architecture Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/team-banking-and-gst-banking-architecture.md
 - User Journey Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/team-banking-and-gst-payout-setup-user-journey.md
 - UI/UX Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/team-banking-and-gst-banking-page-uiux.md
+- Step 4.5: Codex design critique - COMPLETE (needs-attention, 7 findings)
+- Creative Reconciliation: COMPLETE (2026-10-16); user chose bank-account-only payout (3C), a single GST number (G2), payout_blocked_at, and summary-then-Change editing
