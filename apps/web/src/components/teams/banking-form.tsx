@@ -31,6 +31,7 @@ export function BankingForm({
   savedAccountName,
   requireNumber,
   wasConfigured,
+  savedLast4,
   returnTo,
   editing,
 }: {
@@ -42,6 +43,8 @@ export function BankingForm({
   requireNumber: boolean;
   /** Something readable was saved when the page rendered (picks the notice after a save). */
   wasConfigured: boolean;
+  /** The saved number's last 4 digits (picks "account changed" vs "updated" after a save). */
+  savedLast4?: string | undefined;
   returnTo: string | undefined;
   /** Edit mode (`?edit=banking`): a Cancel link back to the summary. */
   editing: boolean;
@@ -69,6 +72,9 @@ export function BankingForm({
       <input type="hidden" name="teamId" value={teamId} />
       <input type="hidden" name="changeKey" value={changeKey} />
       <input type="hidden" name="wasConfigured" value={wasConfigured ? 'true' : 'false'} />
+      {savedLast4 === undefined ? null : (
+        <input type="hidden" name="savedLast4" value={savedLast4} />
+      )}
       {returnTo === undefined ? null : <input type="hidden" name="returnTo" value={returnTo} />}
       {editing ? <input type="hidden" name="edit" value="banking" /> : null}
       <TextField

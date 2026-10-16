@@ -1,6 +1,6 @@
 'use server';
 
-import { PutBankingRequest, PutGstRequest } from '@sgm/shared';
+import { PutBankingRequest, PutGstRequest, deriveBankAccountLast4 } from '@sgm/shared';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { RedirectType, redirect } from 'next/navigation';
@@ -118,10 +118,16 @@ export async function saveBankingAction(
   }
 
   const wasConfigured = field(formData, 'wasConfigured') === 'true';
-  const replacedNumber = parsed.data.accountNumber !== undefined;
+  // The API does not say whether the account moved (an identical re-save is a no-op), so an
+  // "account changed" notice is claimed only when the typed number ends differently from the saved one.
+  const typed = parsed.data.accountNumber;
+  const savedLast4 = field(formData, 'savedLast4');
+  const accountMoved =
+    typed !== undefined &&
+    (savedLast4 === undefined || deriveBankAccountLast4(typed) !== savedLast4);
   const notice = !wasConfigured
     ? 'banking_saved'
-    : replacedNumber
+    : accountMoved
       ? 'banking_account_changed'
       : 'banking_updated';
   revalidatePath(bankingPath(teamId));

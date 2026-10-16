@@ -73,6 +73,7 @@ export function BankingSection({
           savedAccountName={saved ? (banking.accountName ?? '') : ''}
           requireNumber={!saved}
           wasConfigured={saved}
+          savedLast4={saved ? (banking.accountNumberLast4 ?? undefined) : undefined}
           returnTo={returnTo}
           editing={saved && editing}
         />

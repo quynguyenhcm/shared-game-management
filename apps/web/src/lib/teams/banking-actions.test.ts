@@ -131,7 +131,23 @@ describe('saveBankingAction: success (AC-HAPPY-1 to 3, R6 notices, R8 changeKey)
     });
   });
 
-  it('a typed number on a configured team is banking_account_changed', async () => {
+  it('a typed number that ends differently from the saved one is banking_account_changed', async () => {
+    stubFetch(200, BANKING_BODY);
+    const target = await redirectOf(
+      saveBankingAction({}, form({ ...BANKING_FIELDS, wasConfigured: 'true', savedLast4: '1234' })),
+    );
+    expect(target).toBe(`${PAGE}?notice=banking_account_changed:replace`);
+  });
+
+  it('re-typing the saved number is banking_updated: no account-changed or email claim (the API treats it as a no-op)', async () => {
+    stubFetch(200, BANKING_BODY);
+    const target = await redirectOf(
+      saveBankingAction({}, form({ ...BANKING_FIELDS, wasConfigured: 'true', savedLast4: '8389' })),
+    );
+    expect(target).toBe(`${PAGE}?notice=banking_updated:replace`);
+  });
+
+  it('a typed number with no saved last 4 reported is treated as changed', async () => {
     stubFetch(200, BANKING_BODY);
     const target = await redirectOf(
       saveBankingAction({}, form({ ...BANKING_FIELDS, wasConfigured: 'true' })),
