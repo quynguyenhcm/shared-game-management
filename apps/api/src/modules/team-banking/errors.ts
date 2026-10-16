@@ -14,3 +14,18 @@ export function mapBankingDbError(error: unknown): unknown {
   }
   return error;
 }
+
+/**
+ * Maps the database's publish backstop (migration D-49, the `game_sessions_paid_requires_payout` trigger) to the
+ * same `payout_not_configured` error the TypeScript gate throws. Keyed on SQLSTATE plus `err.constraint`, never on
+ * message text. Reaching this means a caller skipped `assertTeamCanPublishPaidSession`; never use it for flow
+ * control.
+ */
+export function mapPublishGateDbError(error: unknown): unknown {
+  if (!(error instanceof Error)) return error;
+  const { code, constraint } = error as Error & { code?: unknown; constraint?: unknown };
+  if (code === '23514' && constraint === 'game_sessions_paid_requires_payout') {
+    return new AppError('payout_not_configured', { cause: error });
+  }
+  return error;
+}

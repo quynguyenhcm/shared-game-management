@@ -169,9 +169,7 @@ describe('route guard (AC-ENTRY-2, AC-ERROR-14, AC-VERIFY-5)', () => {
     for (const target of ['not-a-uuid', '123']) {
       const response = await scene.getBanking(target, admin);
       expect([403, 404, 422]).toContain(response.statusCode);
-      expect(json<ErrorBody>(response).error).toEqual(
-        expect.objectContaining({ code: expect.any(String) }),
-      );
+      expect(typeof json<ErrorBody>(response).error.code).toBe('string');
     }
   });
 });
