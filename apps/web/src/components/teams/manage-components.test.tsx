@@ -48,7 +48,7 @@ const person = (
 describe('InlineConfirm (UI/UX: the one confirmation pattern; never window.confirm)', () => {
   const base = {
     id: 'ban-x',
-    kind: 'ban' as const,
+    section: 'members' as const,
     action: banMemberAction,
     fields: { teamId: TEAM_ID, userId: OTHER, fullName: 'Dee Park' },
     triggerLabel: 'Ban',
@@ -312,7 +312,7 @@ describe('InviteLinkPanel (AC-HAPPY-2/12)', () => {
     const open = renderToStaticMarkup(
       <InlineConfirm
         id="regenerate"
-        kind="regenerate"
+        section="invite"
         action={regenerateInviteAction}
         fields={{ teamId: TEAM_ID }}
         triggerLabel="Generate new link"

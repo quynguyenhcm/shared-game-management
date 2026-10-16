@@ -3,15 +3,16 @@ import { headers } from 'next/headers';
 import { RedirectType, notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
 import { FormBanner } from '../../../../components/auth/form-banner.tsx';
-import { LINK_CLASS } from '../../../../components/auth/styles.ts';
 import { StripAuthParams } from '../../../../components/flash-notice.tsx';
 import { BannedList } from '../../../../components/teams/banned-list.tsx';
 import { InviteLinkPanel } from '../../../../components/teams/invite-link-panel.tsx';
 import { JoinRequestList } from '../../../../components/teams/join-request-list.tsx';
+import { ManageAreaNav } from '../../../../components/teams/manage-area-nav.tsx';
 import { ManageJumpNav } from '../../../../components/teams/manage-jump-nav.tsx';
 import { ManageProvider } from '../../../../components/teams/manage-context.tsx';
 import { ManageSection } from '../../../../components/teams/manage-section.tsx';
 import { MemberList } from '../../../../components/teams/member-list.tsx';
+import { NoAccess } from '../../../../components/teams/no-access.tsx';
 import { SectionPager } from '../../../../components/teams/section-pager.tsx';
 import { apiClient } from '../../../../lib/api-client.ts';
 import { readCookie } from '../../../../lib/auth/cookies.ts';
@@ -20,28 +21,11 @@ import { firstParam, type SearchParams } from '../../../../lib/auth/page-params.
 import { requireUser } from '../../../../lib/auth/session.ts';
 import { loadWebConfig } from '../../../../lib/config.ts';
 import { log } from '../../../../lib/log.ts';
-import {
-  BANNED_INTRO,
-  NO_ACCESS_HEADING,
-  manageSubtitle,
-  noticeText,
-} from '../../../../lib/teams/labels.ts';
+import { BANNED_INTRO, manageSubtitle, noticeText } from '../../../../lib/teams/labels.ts';
 import { cursorParam, inviteUrl, pagerHrefs } from '../../../../lib/teams/manage-view.ts';
 
 export const metadata: Metadata = { robots: { index: false } };
 export const dynamic = 'force-dynamic';
-
-function NoAccess() {
-  return (
-    <>
-      <title>No access – Shared Game Management</title>
-      <h1 className="text-2xl font-semibold">{NO_ACCESS_HEADING}</h1>
-      <a href="/teams" className={LINK_CLASS}>
-        Back to My teams
-      </a>
-    </>
-  );
-}
 
 /**
  * The "People" area (UI/UX Option 3): join requests, members, the invite link and banned members on one
@@ -110,6 +94,7 @@ export default async function ManagePage({
     <ManageProvider>
       <title>{`Manage ${team.name} – Shared Game Management`}</title>
       <StripAuthParams />
+      <ManageAreaNav teamId={teamId} current="people" />
       {notice === null ? null : <FormBanner kind="notice" lines={[notice]} focusOnMount />}
       <header className="flex flex-col gap-1">
         <h1 className="min-w-0 break-words text-2xl font-semibold">Manage {team.name}</h1>
