@@ -12,6 +12,8 @@ status: COMPLETE
 **Reflection**: memory-bank/reflection/team-banking-and-gst-reflection.md
 **Archived**: memory-bank/archive/team-banking-and-gst-archive.md
 **Completed**: 2026-10-17
+**PR Created**: YES
+**PR URL**: https://github.com/quynguyenhcm/shared-game-management/pull/5
 **Roadmap**: team-banking-and-gst
 **Branch**: feature/team-banking-and-gst
 **Worktree**: N/A (main checkout)
