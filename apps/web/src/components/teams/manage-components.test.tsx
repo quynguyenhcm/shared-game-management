@@ -16,6 +16,8 @@ const { JoinRequestList } = await import('./join-request-list.tsx');
 const { MemberList } = await import('./member-list.tsx');
 const { BannedList } = await import('./banned-list.tsx');
 const { SectionPager } = await import('./section-pager.tsx');
+const { SkillEnrollPanel, SkillEnrollTrigger } = await import('./skill-enroll-panel.tsx');
+const { MemberSkillSummary } = await import('./member-skill-summary.tsx');
 const { ManageJumpNav } = await import('./manage-jump-nav.tsx');
 const { ManageSection } = await import('./manage-section.tsx');
 const { InviteLinkPanel } = await import('./invite-link-panel.tsx');
@@ -26,6 +28,7 @@ const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
 const ME = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
 const THIRD = '33333333-3333-4333-8333-333333333333';
+const TODAY = '2026-12-02';
 
 const person = (
   userId: string,
@@ -152,7 +155,13 @@ describe('MemberList (AC-HAPPY-9..11, AC-ERROR-6/7 row rules)', () => {
     person(THIRD, 'Dee Park', 'MEMBER'),
   ];
   const html = renderToStaticMarkup(
-    <MemberList teamId={TEAM_ID} members={members} selfUserId={ME} adminCount={2} />,
+    <MemberList
+      teamId={TEAM_ID}
+      members={members}
+      selfUserId={ME}
+      todayNz={TODAY}
+      adminCount={2}
+    />,
   );
   const rowOf = (name: string): string => {
     const items = html.split('<li').slice(1);
@@ -197,6 +206,7 @@ describe('MemberList (AC-HAPPY-9..11, AC-ERROR-6/7 row rules)', () => {
         teamId={TEAM_ID}
         members={[person(ME, 'Quy Nguyen', 'TEAM_ADMIN')]}
         selfUserId={ME}
+        todayNz={TODAY}
         adminCount={1}
       />,
     );
@@ -210,6 +220,7 @@ describe('MemberList (AC-HAPPY-9..11, AC-ERROR-6/7 row rules)', () => {
         teamId={TEAM_ID}
         members={[person(ME, 'Quy Nguyen', 'TEAM_ADMIN')]}
         selfUserId={ME}
+        todayNz={TODAY}
         adminCount={2}
       />,
     );
@@ -341,5 +352,217 @@ describe('one-tap actions are forms, so they work before hydration', () => {
     );
     expect(html).toMatch(/<form[^>]*>[\s\S]*<button[^>]*type="submit"[^>]*>Approve<\/button>/);
     expect(typeof approveMemberAction).toBe('function');
+  });
+});
+
+describe('MemberSkillSummary (AC-ENTRY-1, AC-HAPPY-11, AC-HAPPY-13 read-only lines)', () => {
+  it('shows level, provenance, progress and the Auto Enroll tag', () => {
+    const html = renderToStaticMarkup(
+      <MemberSkillSummary
+        todayNz={TODAY}
+        member={person(OTHER, 'Priya Patel', 'MEMBER', {
+          skillLevel: 'INTERMEDIATE',
+          skillOverride: { byName: 'Aroha Ngata', at: '2026-10-17T01:00:00.000Z' },
+          skillChangedAt: '2026-10-17T01:00:00.000Z',
+          autoEnroll: {
+            enabled: true,
+            until: '2026-12-20',
+            assignedAt: '2026-10-17T01:00:00.000Z',
+          },
+          skillProgress: { games: 23, required: 40, nextLevel: 'ADVANCED' },
+        })}
+      />,
+    );
+    expect(html).toMatch(/<span[^>]*sr-only[^>]*>Skill level: <\/span>/);
+    expect(html).toContain('Intermediate');
+    expect(html).toContain('Set by Aroha Ngata · 17 Oct 2026');
+    expect(html).toContain('23 of 40 games toward Advanced');
+    expect(html).toContain('Auto Enroll until 20 Dec 2026');
+  });
+
+  it('an ended Auto Enroll reads ended and the top level reads Highest level', () => {
+    const html = renderToStaticMarkup(
+      <MemberSkillSummary
+        todayNz={TODAY}
+        member={person(OTHER, 'Priya Patel', 'MEMBER', {
+          skillLevel: 'ADVANCED',
+          autoEnroll: {
+            enabled: true,
+            until: '2026-11-30',
+            assignedAt: '2026-10-17T01:00:00.000Z',
+          },
+        })}
+      />,
+    );
+    expect(html).toContain('Auto Enroll ended 30 Nov 2026');
+    expect(html).toContain('Highest level');
+    expect(html).toContain('Self-assessed');
+  });
+});
+
+describe('MemberList skill controls (AC-ENTRY-1)', () => {
+  const html = renderToStaticMarkup(
+    <MemberList
+      teamId={TEAM_ID}
+      todayNz={TODAY}
+      members={[person(ME, 'Quy Nguyen', 'TEAM_ADMIN'), person(THIRD, 'Dee Park', 'MEMBER')]}
+      selfUserId={ME}
+      adminCount={2}
+    />,
+  );
+  const rowOf = (name: string): string =>
+    html
+      .split('<li')
+      .slice(1)
+      .find((item) => item.includes(name)) ?? '';
+
+  it('every approved row, your own included, has the trigger with the member in its accessible name', () => {
+    for (const [name, id] of [
+      ['Quy Nguyen', ME],
+      ['Dee Park', THIRD],
+    ] as const) {
+      const trigger =
+        new RegExp(`<button[^>]*aria-label="Skill and Auto Enroll, ${name}"[^>]*>`).exec(
+          rowOf(name),
+        )?.[0] ?? '';
+      expect(trigger).toContain('aria-expanded="false"');
+      expect(trigger).toContain(`aria-controls="skill-${id}-panel"`);
+      expect(rowOf(name)).toMatch(/>Skill and Auto Enroll<\/button>/);
+    }
+  });
+
+  it('shows the read-only lines on the row and mounts no panel while closed', () => {
+    expect(rowOf('Dee Park')).toContain('Self-assessed');
+    expect(html).not.toContain('role="group"');
+  });
+});
+
+describe('SkillEnrollPanel (AC-ENTRY-1, AC-HAPPY-12/13, AC-ERROR-3, AC-NAV-1)', () => {
+  const priya = person(OTHER, 'Priya Patel', 'MEMBER', {
+    skillLevel: 'BEGINNER',
+    skillProgress: { games: 23, required: 40, nextLevel: 'INTERMEDIATE' },
+  });
+  const open = (member = priya) =>
+    renderToStaticMarkup(
+      <SkillEnrollPanel teamId={TEAM_ID} todayNz={TODAY} member={member} defaultOpen />,
+    );
+
+  it('closed renders nothing; open is a non-modal group named by its focusable heading', () => {
+    expect(
+      renderToStaticMarkup(<SkillEnrollPanel teamId={TEAM_ID} todayNz={TODAY} member={priya} />),
+    ).toBe('');
+    const html = open();
+    const panel = /<div[^>]*role="group"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(panel).toContain(`id="skill-${OTHER}-panel"`);
+    expect(panel).toContain(`aria-labelledby="skill-${OTHER}-heading"`);
+    expect(html).not.toContain('aria-modal');
+    expect(html).toMatch(
+      new RegExp(
+        `<h3[^>]*id="skill-${OTHER}-heading"[^>]*tabindex="-1"[^>]*>Skill and Auto Enroll for Priya Patel</h3>`,
+      ),
+    );
+  });
+
+  it('skill form: legend, third-person options, current level preselected, hidden ids, token fields, Save', () => {
+    const html = open();
+    expect(html).toMatch(/<legend[^>]*>Skill level<\/legend>/);
+    expect(html).toContain('Plays regularly and knows the game well.');
+    expect(html).not.toContain('You play regularly');
+    const beginner = /<input[^>]*type="radio"[^>]*value="BEGINNER"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(beginner).toContain('checked');
+    expect(html).toMatch(
+      /<input[^>]*type="hidden"[^>]*name="expectedSkillLevel"[^>]*value="BEGINNER"/,
+    );
+    expect(html).toMatch(/<input[^>]*type="hidden"[^>]*name="expectedChangedAt"[^>]*value=""/);
+    expect(html).toMatch(/<input[^>]*type="hidden"[^>]*name="fullName"[^>]*value="Priya Patel"/);
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Save skill level<\/button>/);
+  });
+
+  it('consequence lines sit beside Save: the count, the restart and the existing-fee line (AC-HAPPY-12)', () => {
+    const html = open();
+    expect(html).toContain('23 of 40 toward Intermediate');
+    expect(html).toContain('restarts');
+    expect(html).toContain('keep their fee');
+    expect(html).toContain('charged like any other player');
+    expect(open(person(OTHER, 'Priya Patel', 'MEMBER', { skillLevel: 'ADVANCED' }))).toContain(
+      'Advanced is the highest level.',
+    );
+  });
+
+  it('each form has its own persistent, empty role=status line from first render', () => {
+    const html = open();
+    expect(html.match(/<div[^>]*role="status"[^>]*>\s*<\/div>/g)?.length).toBe(2);
+  });
+
+  it('Auto Enroll form: unticked box, hidden disabled date with min=today, hint, Save Auto Enroll', () => {
+    const html = open();
+    expect(html).toMatch(/<legend[^>]*>Auto Enroll<\/legend>/);
+    const box = /<input[^>]*type="checkbox"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(box).toContain('name="enabled"');
+    expect(box).not.toContain('checked');
+    expect(html).toMatch(/<label[^>]*>[^<]*(<[^>]*>)*Auto Enroll/);
+    const date = /<input[^>]*type="date"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(date).toContain(`min="${TODAY}"`);
+    expect(date).toContain('name="until"');
+    expect(date).toContain('disabled');
+    expect(html).toMatch(/<label[^>]*>Until \(optional\)<\/label>/);
+    expect(html).toContain('Adds Priya to new sessions automatically');
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Save Auto Enroll<\/button>/);
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*>Close<\/button>/);
+  });
+
+  it('an active Auto Enroll shows ticked, with its date, the turn-off hint absent while ticked and Clear date', () => {
+    const html = open(
+      person(OTHER, 'Priya Patel', 'MEMBER', {
+        autoEnroll: { enabled: true, until: '2026-12-20', assignedAt: '2026-10-17T01:00:00.000Z' },
+      }),
+    );
+    expect(/<input[^>]*type="checkbox"[^>]*>/.exec(html)?.[0]).toContain('checked');
+    const date = /<input[^>]*type="date"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(date).toContain('value="2026-12-20"');
+    expect(date).not.toContain('disabled');
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*>Clear date<\/button>/);
+  });
+
+  it('an ended Auto Enroll shows the box unticked with the ended note and no stale date (AC-HAPPY-13)', () => {
+    const html = open(
+      person(OTHER, 'Priya Patel', 'MEMBER', {
+        autoEnroll: { enabled: true, until: '2026-11-30', assignedAt: '2026-10-17T01:00:00.000Z' },
+      }),
+    );
+    expect(/<input[^>]*type="checkbox"[^>]*>/.exec(html)?.[0]).not.toContain('checked');
+    expect(html).toContain(
+      'Auto Enroll ended 30 Nov 2026. Choose a new end date, clear the date, or turn Auto Enroll off.',
+    );
+    expect(/<input[^>]*type="date"[^>]*>/.exec(html)?.[0]).not.toContain('value="2026-11-30"');
+  });
+
+  it('turning off a saved-on member carries the place-in-order hint', () => {
+    const html = open(
+      person(OTHER, 'Priya Patel', 'MEMBER', {
+        autoEnroll: { enabled: true, until: null, assignedAt: '2026-10-17T01:00:00.000Z' },
+      }),
+    );
+    expect(html).toContain('Turning this off removes Priya Patel');
+  });
+
+  it('the trigger is the disclosure button; open reports aria-expanded=true', () => {
+    const closed = renderToStaticMarkup(
+      <SkillEnrollTrigger userId={OTHER} fullName="Priya Patel" />,
+    );
+    expect(closed).toContain('aria-expanded="false"');
+    expect(closed).toContain(`aria-controls="skill-${OTHER}-panel"`);
+    expect(closed).toContain('aria-label="Skill and Auto Enroll, Priya Patel"');
+    expect(
+      renderToStaticMarkup(
+        <SkillEnrollTrigger userId={OTHER} fullName="Priya Patel" defaultOpen />,
+      ),
+    ).toContain('aria-expanded="true"');
+  });
+
+  it('the source never uses a native dialog', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const source = await readFile(new URL('./skill-enroll-panel.tsx', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/window\.confirm|\bconfirm\(|\balert\(|\bprompt\(|<dialog/);
   });
 });

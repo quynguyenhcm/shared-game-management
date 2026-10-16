@@ -22,8 +22,11 @@ import {
   bannedLine,
   INVITE_INVALID_HEADING,
   NOT_FOUND_HEADING,
+  SAVE_FAILED_MESSAGE,
   SKILL_OPTIONS,
+  SKILL_OVERRIDE_OPTIONS,
   TERMINAL_JOIN_ERRORS,
+  UNCONFIRMED_MESSAGE,
   VISIBILITY_OPTIONS,
   inviteView,
   isTerminalJoinError,
@@ -337,5 +340,25 @@ describe('field option data (Q6: honest skill capture, none preselected)', () =>
       ['PUBLIC', 'Public'],
       ['PRIVATE', 'Private'],
     ]);
+  });
+});
+
+describe('skill panel copy (skill-levels-and-auto-enroll)', () => {
+  it('the generic save failure and the unknown-outcome line are exact', () => {
+    expect(SAVE_FAILED_MESSAGE).toBe("We couldn't save that. Nothing was changed. Try again.");
+    expect(UNCONFIRMED_MESSAGE).toBe(
+      "We couldn't confirm that was saved. Try again; saving the same change twice is safe.",
+    );
+  });
+
+  it('the admin-voiced skill options use the same values as the join form but third-person help', () => {
+    expect(SKILL_OVERRIDE_OPTIONS.map((option) => option.value)).toEqual(
+      SKILL_OPTIONS.map((option) => option.value),
+    );
+    expect(SKILL_OVERRIDE_OPTIONS.map((option) => option.label)).toEqual(
+      SKILL_OPTIONS.map((option) => option.label),
+    );
+    for (const option of SKILL_OVERRIDE_OPTIONS) expect(option.help).not.toMatch(/\byou\b/i);
+    expect(SKILL_OVERRIDE_OPTIONS[1]?.help).toBe('Plays regularly and knows the game well.');
   });
 });

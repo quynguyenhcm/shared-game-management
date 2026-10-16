@@ -4,6 +4,9 @@ import {
   BanMemberRequest,
   CreateTeamRequest,
   JoinRequestRequest,
+  type MemberSkillChangeResponse,
+  SetAutoEnrollRequest,
+  SetSkillLevelRequest,
   TEAM_FIELD_MESSAGES,
   safeReturnTo,
 } from '@sgm/shared';
@@ -11,13 +14,14 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { RedirectType, redirect } from 'next/navigation';
 import { z } from 'zod';
-import { apiClient, type ApiResult } from '../api-client.ts';
+import { apiClient, type ApiCallOptions, type ApiResult } from '../api-client.ts';
 import { readCookie } from '../auth/cookies.ts';
 import type { FormState } from '../auth/form-state.ts';
 import { buildUrl, loginUrl, sessionExpiredUrl } from '../auth/landing.ts';
 import { log } from '../log.ts';
 import { STALE_MESSAGE } from './labels.ts';
 import { toModerationResult, type ModerationKind, type ModerationResult } from './moderation.ts';
+import { toSkillResult, type SkillPanelResult, type SkillResultKind } from './skill-levels-view.ts';
 import { validateCreateTeam, validateJoinRequest } from './validation.ts';
 
 /**
@@ -289,4 +293,92 @@ export async function regenerateInviteAction(
     });
   }
   return settle(teamId, toModerationResult('regenerate', result, {}));
+}
+
+// ---------------------------------------------------------------------------------------------
+// "Skill and Auto Enroll" panel (skill-levels-and-auto-enroll)
+// ---------------------------------------------------------------------------------------------
+
+/** A save the form could not build into a valid body: a field error with no request (the API re-validates). */
+function invalidPanelInput(kind: SkillResultKind, error: z.ZodError): SkillPanelResult {
+  const fieldErrors = z.flattenError(error).fieldErrors as Record<string, string[]>;
+  const message = Object.values(fieldErrors)[0]?.[0] ?? STALE_MESSAGE;
+  return { ok: false, kind, code: 'validation_failed', message, refresh: false, fieldErrors };
+}
+
+/** The target is not a valid member id: the same answer as a member who has left the list. */
+function goneMember(kind: SkillResultKind, fullName: string | undefined): SkillPanelResult {
+  return {
+    ok: false,
+    kind,
+    code: 'membership_state_conflict',
+    message: `${fullName === undefined || fullName === '' ? 'This person' : fullName} is no longer an approved member. The list has been refreshed.`,
+    refresh: false,
+    close: true,
+  };
+}
+
+async function savePanel(
+  kind: SkillResultKind,
+  target: MemberTarget,
+  call: (options: ApiCallOptions) => Promise<ApiResult<MemberSkillChangeResponse>>,
+): Promise<SkillPanelResult> {
+  const returnTo = managePath(target.teamId);
+  const token = await requireSession(returnTo);
+  const result = await call({ session: token, incoming: await headers() });
+  if (!result.ok && result.status === 401) {
+    return redirect(sessionExpiredUrl(returnTo), RedirectType.replace);
+  }
+  if (!result.ok && (result.status === 0 || result.status >= 500)) {
+    log.warn('web.teams.api_failure', {
+      action: kind === 'skill' ? 'skill_level' : 'auto_enroll',
+      status: result.status,
+      code: result.error.code,
+    });
+  }
+  const outcome = toSkillResult(kind, result, { fullName: target.fullName ?? 'This person' });
+  if (outcome.refresh) revalidatePath(managePath(target.teamId));
+  return outcome;
+}
+
+/**
+ * Admin override of one member's level. The form sends the level the panel was showing
+ * (`expectedSkillLevel`, `expectedChangedAt`; empty means "never changed"), so the API can refuse a save
+ * based on a stale view (409 `skill_level_stale`). Never optimistic; revalidates only when the list changed.
+ */
+export async function setSkillLevelAction(
+  _previous: SkillPanelResult | null,
+  formData: FormData,
+): Promise<SkillPanelResult> {
+  const target = memberTarget(formData);
+  if (target === null) return goneMember('skill', field(formData, 'fullName'));
+  const changedAt = field(formData, 'expectedChangedAt');
+  const body = SetSkillLevelRequest.safeParse({
+    skillLevel: field(formData, 'skillLevel'),
+    expectedSkillLevel: field(formData, 'expectedSkillLevel'),
+    expectedChangedAt: changedAt === undefined || changedAt === '' ? null : changedAt,
+  });
+  if (!body.success) return invalidPanelInput('skill', body.error);
+  return savePanel('skill', target, (options) =>
+    apiClient.setSkillLevel(target.teamId, target.userId, body.data, options),
+  );
+}
+
+/** Auto Enroll on (with an optional end date) or off. A date is never sent with the flag off. */
+export async function setAutoEnrollAction(
+  _previous: SkillPanelResult | null,
+  formData: FormData,
+): Promise<SkillPanelResult> {
+  const target = memberTarget(formData);
+  if (target === null) return goneMember('autoEnroll', field(formData, 'fullName'));
+  const enabled = field(formData, 'enabled') === 'true';
+  const typed = field(formData, 'until');
+  const body = SetAutoEnrollRequest.safeParse({
+    enabled,
+    until: enabled && typed !== undefined && typed !== '' ? typed : null,
+  });
+  if (!body.success) return invalidPanelInput('autoEnroll', body.error);
+  return savePanel('autoEnroll', target, (options) =>
+    apiClient.setAutoEnroll(target.teamId, target.userId, body.data, options),
+  );
 }

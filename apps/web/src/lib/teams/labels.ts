@@ -225,6 +225,13 @@ export const LAST_ADMIN_MESSAGE =
   'A team needs at least one admin. Make another member an admin first.';
 export const OUTAGE_MESSAGE =
   'Something went wrong on our side. Your details are still here. Try again in a minute.';
+/** A definite failure (5xx, a lock timeout): the transaction rolled back, so "nothing was changed" is true. */
+export const SAVE_FAILED_MESSAGE = "We couldn't save that. Nothing was changed. Try again.";
+/** No answer arrived (timeout, network): the save may have committed, so never claim nothing changed. */
+export const UNCONFIRMED_MESSAGE =
+  "We couldn't confirm that was saved. Try again; saving the same change twice is safe.";
+export const SKILL_STALE_MESSAGE =
+  "This member's level changed since you opened the panel. Check it and save again.";
 export const REGENERATE_PROMPT = 'Generate a new link? The old link stops working immediately.';
 export const REGENERATE_SUCCESS = 'New invite link generated. The old link no longer works.';
 export const SELF_DEMOTE_PROMPT = "Remove your own admin rights? You'll lose access to this page.";
@@ -295,6 +302,22 @@ export const SKILL_OPTIONS: readonly { value: SkillTier; label: string; help: st
   },
   { value: 'ADVANCED', label: 'Advanced', help: 'Experienced and competitive.' },
 ];
+
+/** The admin-voiced help for the skill override: third person, unlike the player-facing `SKILL_OPTIONS`. */
+export const SKILL_OVERRIDE_OPTIONS: readonly { value: SkillTier; label: string; help: string }[] =
+  [
+    {
+      value: 'BEGINNER',
+      label: 'Beginner',
+      help: 'New to the sport or still learning the basics.',
+    },
+    {
+      value: 'INTERMEDIATE',
+      label: 'Intermediate',
+      help: 'Plays regularly and knows the game well.',
+    },
+    { value: 'ADVANCED', label: 'Advanced', help: 'Experienced and competitive.' },
+  ];
 
 export const SKILL_HINT_CREATE = 'Your own level as a player. Team admins can see it.';
 export const SKILL_HINT_JOIN =
