@@ -2,14 +2,16 @@
 slug: team-banking-and-gst
 legacy_id:
 feature: team-banking-and-gst
-status: REFLECTION_COMPLETE
+status: COMPLETE
 ---
 
 # team-banking-and-gst: Team Banking and GST
 
 **Complexity**: Level 3 (inherited from team-banking-and-gst)
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
 **Reflection**: memory-bank/reflection/team-banking-and-gst-reflection.md
+**Archived**: memory-bank/archive/team-banking-and-gst-archive.md
+**Completed**: 2026-10-17
 **Roadmap**: team-banking-and-gst
 **Branch**: feature/team-banking-and-gst
 **Worktree**: N/A (main checkout)
@@ -86,6 +88,16 @@ Team merchant banking and tax settings (PRODDUCT-OVERVIEW §2, §8).
 - **Observable within**: immediate (synchronous request; the page is revalidated after a successful save). The optional change-notification email (AC-ASYNC-1) is observable within about one worker poll.
 
 ### Acceptance Criteria
+
+> **Superseded in part (2026-10-17).** These ACs and the copy above were written before creative. The binding "Creative Reconciliation" R1-R12 below, and the post-review fixes in the Execution State, change them:
+> - all Akahu merchant ID and app token parts are removed (R1);
+> - all IRD-number parts are removed (R2);
+> - AC-ASYNC-1 is MUST (R8);
+> - AC-ERROR-12 answers 200 `unreadable` (R7);
+> - AC-ERROR-15 is new (R3);
+> - removal is also refused while payments are unpaid (R4).
+>
+> Read `memory-bank/archive/team-banking-and-gst-archive.md` § Requirements for the delivered contract.
 
 #### AC-ENTRY-1: Team admin finds Banking and GST from the manage area
 **Priority**: MUST
@@ -679,9 +691,9 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 ## Execution State
 
 **Build Status**: IDLE
-**Current Phase**: REFLECT → ARCHIVE
+**Current Phase**: COMPLETE
 **Auto-Build Mode**: YES
-**Current Step**: Reflection complete (2026-10-17); next is /yay:archive
+**Current Step**: Archived (2026-10-17); PR to main opened by /yay:archive
 **Step Started**: 2026-10-17
 **Can Resume**: NO
 **Creative Reconciliation**: binding. Build agents apply R1-R12 over the spec ACs.
