@@ -468,6 +468,11 @@ export async function applyMembershipChange(
           banned_at: change.now,
           banned_by: change.actorId,
           ban_reason: change.reason,
+          // Auto Enroll exists only on APPROVED rows (D-59), so the same statement that bans clears it. A
+          // racing "Save Auto Enroll" then finds a non-APPROVED row and gets 409 (AC-ERROR-5).
+          is_auto_enroll: false,
+          auto_enroll_until: null,
+          auto_enroll_assigned_at: null,
         })
         .where('status', '=', 'APPROVED')
         .where('role', '=', 'MEMBER')

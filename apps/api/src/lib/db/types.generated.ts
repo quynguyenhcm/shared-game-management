@@ -281,6 +281,7 @@ export interface TeamMembers {
   requested_at: Generated<Timestamp>;
   role: Generated<TeamRole>;
   skill_level: Generated<SkillTier>;
+  skill_level_changed_at: Timestamp | null;
   skill_level_override_at: Timestamp | null;
   skill_level_override_by: string | null;
   status: Generated<MembershipStatus>;

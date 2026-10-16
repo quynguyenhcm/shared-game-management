@@ -168,7 +168,7 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Priority**: MUST
 **Given** Priya is an approved auto-enrolled member
 **When** an admin bans her, and separately another admin's "Save Auto Enroll" for her races the ban
-**Then** the ban's single `UPDATE` also sets `is_auto_enroll = false`, `auto_enroll_until = NULL`, `auto_enroll_assigned_at = NULL`; selection never returns her; the racing toggle gets 409 `membership_state_conflict` if the ban committed first, and if the toggle committed first the ban still clears the flag
+**Then** the ban's single `UPDATE` also sets `is_auto_enroll = false`, `auto_enroll_until = NULL`, `auto_enroll_assigned_at = NULL` (the approved-only CHECK refuses a ban that leaves the flag set); selection never returns her; the racing toggle gets 409 `membership_state_conflict` if the ban committed first, and if the toggle committed first the ban still clears the flag
 
 #### AC-ERROR-6: A save that cannot reach the API changes nothing and says so
 **Priority**: MUST
@@ -204,12 +204,12 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **Priority**: MUST
 **Given** the new migration `db/migrations/<utc>_skill_levels_and_auto_enroll.sql`
 **When** it is applied, rolled back (`db:rollback`) and applied again
-**Then** the schema is identical after the round trip; `schema-deviations.md` has one entry per new object (next free D-number at build time; main is at D-54 and the registration-and-waitlist plan also claims D-47 onwards, so renumber on merge), each with a Source; `types.generated.ts` matches codegen; the migration adds `team_members.skill_level_changed_at timestamptz` and these CHECKs: override stamps paired (`(skill_level_override_by IS NULL) = (skill_level_override_at IS NULL)`), `skill_level_changed_at >= skill_level_override_at` when both are set, auto-enrol fields cleared when off (`is_auto_enroll OR (auto_enroll_until IS NULL AND auto_enroll_assigned_at IS NULL)`), and Auto Enroll only on approved rows (`NOT is_auto_enroll OR status = 'APPROVED'`)
+**Then** the schema is identical after the round trip; `schema-deviations.md` has one entry per new object (D-55 to D-61 as built; main was at D-54 and the registration-and-waitlist plan also claims D-47 onwards, so whichever merges second renumbers), each with a Source; `types.generated.ts` matches codegen; the migration adds `team_members.skill_level_changed_at timestamptz`, these named CHECKs: `team_members_override_stamps_paired` (`(skill_level_override_by IS NULL) = (skill_level_override_at IS NULL)`), `team_members_changed_after_override` (`skill_level_override_at IS NULL OR (skill_level_changed_at IS NOT NULL AND skill_level_changed_at >= skill_level_override_at)`, stricter than "when both are set" so provenance is always derivable), `team_members_auto_enroll_cleared_when_off` (`is_auto_enroll OR (auto_enroll_until IS NULL AND auto_enroll_assigned_at IS NULL)`) and `team_members_auto_enroll_approved_only` (`NOT is_auto_enroll OR status = 'APPROVED'`), and two partial indexes: `idx_registrations_confirmed_member (team_id, user_id, session_id) WHERE status = 'CONFIRMED'` and `idx_team_members_auto_enroll_order (team_id, auto_enroll_assigned_at, id) WHERE is_auto_enroll` (named `_order` because the draft `idx_team_members_auto_enroll` already exists and is kept); the Up migration first raises a readable error if an existing row would break a CHECK
 
 #### AC-VERIFY-2: The database refuses each invalid combination on its own
 **Priority**: MUST
 **Given** a migrated test database
-**When** raw SQL (bypassing the service) sets: an override actor without a time or the reverse; `skill_level_changed_at` earlier than the override time; `auto_enroll_until` or `auto_enroll_assigned_at` with `is_auto_enroll = false`; `is_auto_enroll = true` on a `PENDING`, `REJECTED` or `BANNED` row
+**When** raw SQL (bypassing the service) sets: an override actor without a time or the reverse; `skill_level_changed_at` earlier than the override time, or an override time with no `skill_level_changed_at`; `auto_enroll_until` or `auto_enroll_assigned_at` with `is_auto_enroll = false`; `is_auto_enroll = true` on a `PENDING`, `REJECTED` or `BANNED` row
 **Then** each statement fails with SQLSTATE 23514 and the constraint name; the existing `team_members_auto_enroll_assigned` CHECK still fires when the flag is set without an assignment time
 
 #### AC-VERIFY-3: "Qualifying game" is defined once and table-tested
@@ -220,7 +220,7 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 
 #### AC-VERIFY-4: The progression decision is a pure table and the constants live in one place
 **Priority**: MUST
-**Given** `decideProgression({ level, games })` and `SKILL_PROGRESSION_GAMES = 40`, `SKILL_PROGRESSION_WINDOW_DAYS = 365` exported from `packages/shared`
+**Given** `decideProgression({ level, games })` and `SKILL_PROGRESSION_GAMES = 40`, `SKILL_PROGRESSION_WINDOW_DAYS = 365` and the derived `SKILL_PROGRESSION_WINDOW_MS` exported from `packages/shared` (`decideProgression` returns `{ kind: 'promote', from, to }` or `{ kind: 'none', reason: 'highest_level' | 'below_threshold' }`)
 **When** unit tests run every level against 0, 39, 40, 41 and 400 games
 **Then** `BEGINNER` and `INTERMEDIATE` move up exactly one level at 40 or more and stay put below; `ADVANCED` never moves; a repo-wide grep test finds the literals 40 and 365 for this rule only in the shared constants and their tests
 
@@ -395,7 +395,7 @@ Admin skill override and Auto Enroll on the existing People page, a daily `skill
 - [ ] extend: `db/schema-deviations.md` (D-55+), `apps/api/src/lib/db/types.generated.ts` (codegen), `apps/api/src/modules/teams/repo.ts`, `apps/api/src/app.ts` (`buildApp` registration), `apps/api/src/jobs/{registry,schedules,bootstrap}.ts`, `apps/api/src/cli.ts` (job trigger list), `apps/api/openapi.yaml`, `vitest.config.ts`, `apps/web/src/components/teams/member-list.tsx`, `apps/web/src/lib/teams/{manage-view,actions,labels,moderation}.ts`, `docs/getting-started.md` (CLI trigger)
 
 ### Phases
-- [ ] Phase 1: Schema and shared rules. Migration (`skill_level_changed_at`, paired-override, baseline >= override, auto-enrol-cleared-when-off and approved-only CHECKs, partial index), schema-deviation entries D-55+, codegen, ban `UPDATE` clears Auto Enroll, shared constants + `decideProgression` + strict API schemas. ACs: AC-VERIFY-1, AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-5 (DB half).
+- [x] Phase 1: Schema and shared rules. Migration (`skill_level_changed_at`, paired-override, baseline >= override, auto-enrol-cleared-when-off and approved-only CHECKs, partial index), schema-deviation entries D-55+, codegen, ban `UPDATE` clears Auto Enroll, shared constants + `decideProgression` + strict API schemas. ACs: AC-VERIFY-1, AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-5 (DB half).
 - [ ] Phase 2: Read seams and contract. `countQualifyingGames` and `selectAutoEnrollees` with table-driven real-DB tests, contract pin test, ADR 0017. ACs: AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3 (ADR + pin).
 - [ ] Phase 3: Admin API. `skill-levels` module (override and Auto Enroll routes with the moderation transaction shape), `TeamMemberRow` additive fields incl. `skillProgress`, log events, OpenAPI, coverage gate entry. ACs: AC-HAPPY-1..3, AC-HAPPY-7..11 (API half), AC-ERROR-1..5, AC-VERIFY-6, AC-VERIFY-7, AC-INTEGRATION-3 (`assertApprovedMember`).
 - [ ] Phase 4: Progression job. `skill-progression` queue, 05:30 Pacific/Auckland slot, handler with keyset sweep, per-member lock-recount-decide-update, failure isolation, CLI trigger, race tests. ACs: AC-HAPPY-4..6, AC-ASYNC-1, AC-ASYNC-2, AC-ERROR-7, AC-VERIFY-5, AC-INTEGRATION-2.
@@ -452,8 +452,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 **Build Status**: RUNNING
 **Auto-Build Mode**: YES
-**Current Phase**: 1 of 5
-**Resume From**: Phase 1
+**Current Phase**: 2 of 5 (Phase 1 of 5 complete)
+**Resume From**: Phase 2
 **Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
 **Previous Phase**: CREATIVE → BUILD
 **Last Completed**: CREATIVE (2026-10-17)
@@ -473,5 +473,13 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - UI/UX Creative Design: COMPLETE (2026-10-17) - Output: memory-bank/creative/skill-levels-and-auto-enroll-member-panel-uiux.md
 - User Journey Creative Design: COMPLETE (2026-10-17) - Output: memory-bank/creative/skill-levels-and-auto-enroll-admin-journey-user-journey.md
 
+- Phase 1 Build: COMPLETE (2026-10-17) - migration 20261017000100000 (D-55..D-61), shared progression constants + decideProgression + strict request schemas, ban UPDATE clears Auto Enroll; 28 shared unit tests, 16 schema integration tests + 1 ban-seam test; verifier PASS (unit flake on timing only), review APPROVED
+
+### Guide & Recovery Log
+(empty: commit guard passed first try)
+
 ### Deviations
-<!-- - Phase <N> | <file:line> | <rationale> -->
+- Phase 1 | db/migrations/20261017000100000_skill_levels_and_auto_enroll.sql | `team_members_changed_after_override` is stricter than the AC wording (override time requires a baseline), so provenance is always derivable (D-57)
+- Phase 1 | db/migrations/20261017000100000_skill_levels_and_auto_enroll.sql | the selection index is named `idx_team_members_auto_enroll_order` because the draft index `idx_team_members_auto_enroll` already exists; the count index is `idx_registrations_confirmed_member` (D-60, D-61)
+- Phase 1 | packages/shared/src/api/skill-levels.ts | `TeamMemberRow` additive fields, `skill_level_stale` error code and `toSkillProgress`/`deriveSkillProvenance` are deferred to Phase 3 (they ship with the API that fills them); Phase 1 delivers only the request schemas
+- Phase 2 note | `skill_level_changed_at` is returned as a millisecond ISO string and stored with microseconds: the stale-compare under the row lock must compare at ms precision or the writer must always bind a JS Date from the injected clock
