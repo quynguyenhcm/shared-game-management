@@ -685,6 +685,18 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 **Can Resume**: YES
 **Creative Reconciliation**: binding. Build agents apply R1-R12 over the spec ACs.
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 4 high + 3 medium, all resolved in the reconciliation)
+**Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
+**Final Review**: Ready to merge WITH FIXES (2026-10-16).
+- Important 1 (Codex P1, confirmed): a no-op save never records its `changeKey` (`service.ts:225-227`), so a delayed replay after another admin's change can overwrite it, or clear a later `payout_blocked_at`. ADR 0016 §Notifications and the systemPatterns "Writes" bullet overstate the guarantee.
+- Minors:
+  - `productBrief.md:75` still says "other team admins".
+  - `team.gst.updated` is logged on no-op saves.
+  - PUT `/gst` has no change key, and there is no way to clear a GST number.
+  - A no-op removal shows the "we've emailed" banner.
+  - GET decrypts the full number only to detect damage.
+  - The `schema-deviations.md` formatter churn makes the diff noisy.
+  - Pre-existing: pg error `detail` is logged unredacted (platform item).
+- Not addressed autonomously; awaiting the user.
 
 ### Active Sub-Agents
 - Algorithm Design: COMPLETE
