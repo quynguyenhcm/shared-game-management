@@ -23,6 +23,8 @@ export interface ModerationResult {
   code?: string;
   refresh: boolean;
   fieldErrors?: Record<string, string[]>;
+  /** A final failure: the confirm panel closes (the server state is known and unchanged). */
+  close?: boolean;
 }
 
 export type ModerationAction = (

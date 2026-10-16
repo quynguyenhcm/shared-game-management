@@ -45,6 +45,9 @@ export default defineConfig({
         'apps/api/src/lib/auth/**/*.ts',
         // team-management (AC-VERIFY-8): the teams module.
         'apps/api/src/modules/teams/**/*.ts',
+        // team-banking-and-gst (AC-VERIFY-12): the banking module and the shared NZ validators.
+        'apps/api/src/modules/team-banking/**/*.ts',
+        'packages/shared/src/nz/**/*.ts',
         'apps/web/src/lib/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.int.test.ts'],

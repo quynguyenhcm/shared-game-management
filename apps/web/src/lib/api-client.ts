@@ -1,10 +1,12 @@
 import { context, propagation } from '@opentelemetry/api';
 import {
   AuthSuccessResponse,
+  BankingResponse,
   CreateTeamResponse,
   ErrorResponse,
   FindTeamsResponse,
   ForgotPasswordResponse,
+  GstResponse,
   HealthResponse,
   IdentitiesResponse,
   InviteCodeResponse,
@@ -19,6 +21,7 @@ import {
   OAuthCompleteResponse,
   OAuthPendingResponse,
   ProvidersResponse,
+  RemoveBankingResponse,
   ResetPasswordResponse,
   TeamDetailResponse,
   type BanMemberRequest,
@@ -32,6 +35,8 @@ import {
   type OAuthAuthorizeRequest,
   type OAuthCallbackRequest,
   type OAuthCompleteRequest,
+  type PutBankingRequest,
+  type PutGstRequest,
   type RegisterRequest,
   type ResetPasswordRequest,
 } from '@sgm/shared';
@@ -108,7 +113,7 @@ export interface ApiCallOptions {
 
 interface ApiRequest<T> extends ApiCallOptions {
   path: string;
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   schema?: z.ZodType<T>;
   /** Extra request headers (an allowlisted few, set by `apiClient` only; never copied from the browser). */
@@ -452,5 +457,52 @@ export const apiClient = {
       path: `/teams/${encodeURIComponent(teamId)}/invite-code/regenerate`,
       method: 'POST',
       schema: InviteCodeResponse,
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Team banking and GST (`TEAM_ADMIN` routes; responses are masked, never the full account number).
+  // -------------------------------------------------------------------------------------------
+
+  teamBanking: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/banking`,
+      method: 'GET',
+      schema: BankingResponse,
+    }),
+
+  putTeamBanking: (teamId: string, body: PutBankingRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/banking`,
+      method: 'PUT',
+      body,
+      schema: BankingResponse,
+    }),
+
+  /** DELETE takes no body (the route has none; the API generates its own idempotency key). */
+  removeTeamBanking: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/banking`,
+      method: 'DELETE',
+      schema: RemoveBankingResponse,
+    }),
+
+  teamGst: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/gst`,
+      method: 'GET',
+      schema: GstResponse,
+    }),
+
+  putTeamGst: (teamId: string, body: PutGstRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/gst`,
+      method: 'PUT',
+      body,
+      schema: GstResponse,
     }),
 };

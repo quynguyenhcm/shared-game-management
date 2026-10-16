@@ -71,6 +71,11 @@ describe('migrations (AC-VERIFY-5)', () => {
         'column users.email_verified_at',
         // team-management membership invariants (D-40..D-46).
         'column teams.create_idempotency_key',
+        // team-banking-and-gst invariants (D-47..D-53); is_payout_configured is a STORED generated column.
+        'column teams.payout_blocked_at',
+        'column teams.banking_updated_at',
+        'column teams.banking_updated_by',
+        'column teams.banking_change_keys',
       ]) {
         expect(
           afterFirst.some((line) => line.startsWith(prefix)),
@@ -88,6 +93,26 @@ describe('migrations (AC-VERIFY-5)', () => {
         'team_members_last_admin_on_update',
         'team_members_last_admin_on_delete',
       ]) {
+        expect(
+          afterFirst.some((line) => line.startsWith('trigger') && line.includes(trigger)),
+          trigger,
+        ).toBe(true);
+      }
+      expect(
+        afterFirst.some(
+          (line) =>
+            line.startsWith('column teams.is_payout_configured') && line.endsWith('generated=s'),
+        ),
+      ).toBe(true);
+      for (const fn of ['game_session_is_paid', 'team_banking_in_use']) {
+        expect(
+          afterFirst.some(
+            (line) => line.startsWith('function') && line.includes(`FUNCTION public.${fn}(`),
+          ),
+          fn,
+        ).toBe(true);
+      }
+      for (const trigger of ['game_sessions_paid_requires_payout', 'teams_guard_banking_removal']) {
         expect(
           afterFirst.some((line) => line.startsWith('trigger') && line.includes(trigger)),
           trigger,

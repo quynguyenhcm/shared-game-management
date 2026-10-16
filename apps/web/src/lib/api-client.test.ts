@@ -415,3 +415,90 @@ describe('apiClient team-admin calls (members, moderation, invite code)', () => 
     ).resolves.toMatchObject({ ok: false, status: 403, error: { code: 'forbidden' } });
   });
 });
+
+describe('apiClient banking and GST calls (team-banking-and-gst)', () => {
+  const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+  const KEY = '2f6c1c1e-7a64-4c0e-9d61-3c1f0c1f0a11';
+  const BANKING = {
+    banking: {
+      isPayoutConfigured: true,
+      payoutBlocked: false,
+      accountName: 'Rosedale',
+      unreadable: false,
+      accountNumberLast4: '8389',
+      lastChanged: null,
+    },
+  };
+
+  function call(fetchMock: ReturnType<typeof stubJson>) {
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    return { url: String(url), init, headers: (init?.headers ?? {}) as Record<string, string> };
+  }
+
+  it('teamBanking GETs and parses the masked view with the shared schema', async () => {
+    const fetchMock = stubJson(200, BANKING);
+    const result = await apiClient.teamBanking(TEAM_ID, { session: 'tok' });
+    expect(result).toMatchObject({ ok: true, data: { banking: { accountNumberLast4: '8389' } } });
+    const sent = call(fetchMock);
+    expect(sent.url).toBe(`http://localhost:4000/teams/${TEAM_ID}/banking`);
+    expect(sent.init?.method).toBe('GET');
+    expect(sent.headers.authorization).toBe('Bearer tok');
+  });
+
+  it('putTeamBanking PUTs the JSON body; removeTeamBanking DELETEs with no body', async () => {
+    const put = stubJson(200, BANKING);
+    await apiClient.putTeamBanking(
+      TEAM_ID,
+      { accountName: 'Rosedale', accountNumber: '01-0902-0068389-000', changeKey: KEY },
+      { session: 'tok' },
+    );
+    const sentPut = call(put);
+    expect(sentPut.init?.method).toBe('PUT');
+    expect(sentPut.headers['content-type']).toBe('application/json');
+    expect(JSON.parse(sentPut.init?.body as string)).toEqual({
+      accountName: 'Rosedale',
+      accountNumber: '01-0902-0068389-000',
+      changeKey: KEY,
+    });
+
+    const del = stubJson(200, BANKING);
+    await apiClient.removeTeamBanking(TEAM_ID, { session: 'tok' });
+    const sentDelete = call(del);
+    expect(sentDelete.url).toBe(`http://localhost:4000/teams/${TEAM_ID}/banking`);
+    expect(sentDelete.init?.method).toBe('DELETE');
+    expect(sentDelete.init?.body).toBeUndefined();
+    expect(sentDelete.headers['content-type']).toBeUndefined();
+  });
+
+  it('teamGst GETs and putTeamGst PUTs, parsing the GST response', async () => {
+    const get = stubJson(200, { gst: { gstRegistered: true, gstNumber: '49091850' } });
+    await expect(apiClient.teamGst(TEAM_ID, { session: 'tok' })).resolves.toMatchObject({
+      ok: true,
+      data: { gst: { gstNumber: '49091850' } },
+    });
+    expect(call(get).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/gst`);
+
+    const put = stubJson(200, { gst: { gstRegistered: false, gstNumber: null } });
+    const changeKey = '2f6c1c1e-7a64-4c0e-9d61-3c1f0c1f0a11';
+    await apiClient.putTeamGst(
+      TEAM_ID,
+      { gstRegistered: false, gstNumber: null, changeKey },
+      { session: 'tok' },
+    );
+    const sent = call(put);
+    expect(sent.init?.method).toBe('PUT');
+    expect(JSON.parse(sent.init?.body as string)).toEqual({
+      gstRegistered: false,
+      gstNumber: null,
+      changeKey,
+    });
+  });
+
+  it('a response that fails the shared schema is an internal error, never trusted data', async () => {
+    stubJson(200, { banking: { accountNumberLast4: '123456789' } });
+    await expect(apiClient.teamBanking(TEAM_ID, { session: 'tok' })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'internal_error' },
+    });
+  });
+});

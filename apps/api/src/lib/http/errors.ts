@@ -76,6 +76,15 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     status: 409,
     message: 'Someone else already handled this request. The list has been refreshed.',
   },
+  payout_not_configured: {
+    status: 409,
+    message: "Add your team's bank account details before publishing a paid session.",
+  },
+  banking_in_use: {
+    status: 409,
+    message:
+      'Cancel or complete your published paid sessions, and wait for unpaid payments to be settled, before removing the banking details.',
+  },
 };
 
 export interface AppErrorOptions {

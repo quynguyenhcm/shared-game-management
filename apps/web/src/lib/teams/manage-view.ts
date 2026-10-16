@@ -7,7 +7,11 @@ import { LAST_ADMIN_MESSAGE, adminBanBlockedHint } from './labels.ts';
  * is unit-tested once; the components only render what these return.
  */
 
-export type SectionId = 'requests' | 'members' | 'invite' | 'banned';
+/** Every status region and confirm slot of the manage area: People sections, then the banking page's two. */
+export type SectionId = 'requests' | 'members' | 'invite' | 'banned' | 'banking' | 'gst';
+
+/** The People sections that page with a keyset cursor. */
+type PagedSection = 'requests' | 'members' | 'banned';
 
 export const MANAGE_SECTIONS: readonly { id: SectionId; title: string }[] = [
   { id: 'requests', title: 'Join requests' },
@@ -93,13 +97,13 @@ export function memberRowControls(input: {
   };
 }
 
-const CURSOR_PARAM: Record<Exclude<SectionId, 'invite'>, string> = {
+const CURSOR_PARAM: Record<PagedSection, string> = {
   requests: 'requestsAfter',
   members: 'membersAfter',
   banned: 'bannedAfter',
 };
 
-export function cursorParam(section: Exclude<SectionId, 'invite'>): string {
+export function cursorParam(section: PagedSection): string {
   return CURSOR_PARAM[section];
 }
 
@@ -109,7 +113,7 @@ export function cursorParam(section: Exclude<SectionId, 'invite'>): string {
  */
 export function pagerHrefs(input: {
   teamId: string;
-  section: Exclude<SectionId, 'invite'>;
+  section: PagedSection;
   current: Record<string, string | undefined>;
   nextCursor: string | null;
 }): { next: string | null; start: string | null } {

@@ -23,4 +23,5 @@ next-env.d.ts
 .agent-logs/
 test-results/
 playwright-report/
+.vitest/
 .claude-logs/

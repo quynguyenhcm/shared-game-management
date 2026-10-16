@@ -92,7 +92,7 @@ export function MemberList({
                   {controls.roleControl.kind === 'demote_self' ? (
                     <InlineConfirm
                       id="self-demote"
-                      kind="demote"
+                      section="members"
                       action={demoteSelfAction}
                       fields={fields}
                       triggerLabel="Remove admin"
@@ -110,7 +110,7 @@ export function MemberList({
                 {controls.banControl.kind === 'ban' ? (
                   <InlineConfirm
                     id={`ban-${person.userId}`}
-                    kind="ban"
+                    section="members"
                     action={banMemberAction}
                     fields={fields}
                     triggerLabel="Ban"

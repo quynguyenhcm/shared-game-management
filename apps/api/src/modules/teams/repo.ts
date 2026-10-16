@@ -354,21 +354,8 @@ export async function upsertJoinRequest(
   return row === undefined ? undefined : { skillLevel: row.skill_level, rerequest: !row.inserted };
 }
 
-/** The caller's role when (and only when) approved: the authority re-check inside a locked transaction. */
-export async function findApprovedRole(
-  db: Database,
-  teamId: string,
-  userId: string,
-): Promise<TeamRole | undefined> {
-  const row = await db
-    .selectFrom('team_members')
-    .select('role')
-    .where('team_id', '=', teamId)
-    .where('user_id', '=', userId)
-    .where('status', '=', 'APPROVED')
-    .executeTakeFirst();
-  return row?.role;
-}
+/** Moved to the module's public `admin-lock.ts` (team-banking shares it); re-exported so teams code is unchanged. */
+export { findApprovedRole } from './admin-lock.ts';
 
 export async function getInviteCode(db: Database, teamId: string): Promise<string | undefined> {
   const row = await db

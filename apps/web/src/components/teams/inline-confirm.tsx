@@ -1,11 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  sectionFor,
-  type ModerationAction,
-  type ModerationKind,
-} from '../../lib/teams/moderation.ts';
+import type { ModerationAction } from '../../lib/teams/moderation.ts';
+import type { SectionId } from '../../lib/teams/manage-view.ts';
 import { FOCUS_RING, INPUT_CLASS, SECONDARY_BUTTON_CLASS } from '../auth/styles.ts';
 import { useManage } from './manage-context.tsx';
 import { useModerationAction } from './use-moderation-action.ts';
@@ -22,11 +19,12 @@ export interface ReasonField {
  * the row, so the rest of the page stays reachable and nothing is mistaken for a native browser dialog (a
  * UAT blocker). Opening moves focus to the prompt; Cancel and Escape close the panel and return focus
  * to the trigger. Only one confirm is open per section. A 5xx keeps the panel open with what was typed.
- * Needs JavaScript (accepted: the safe failure is "cannot do the destructive thing").
+ * Needs JavaScript (accepted: the safe failure is "cannot do the destructive thing"). `section` is the
+ * status region and confirm slot it reports to, so any area of the manage page can use it.
  */
 export function InlineConfirm({
   id,
-  kind,
+  section,
   action,
   fields,
   triggerLabel,
@@ -41,7 +39,7 @@ export function InlineConfirm({
   defaultOpen = false,
 }: {
   id: string;
-  kind: ModerationKind;
+  section: SectionId;
   action: ModerationAction;
   fields: Record<string, string>;
   triggerLabel: string;
@@ -56,9 +54,8 @@ export function InlineConfirm({
   /** Render the panel open on first render (tests, and a panel that must be visible without script). */
   defaultOpen?: boolean;
 }) {
-  const section = sectionFor(kind);
   const { state: manage, dispatch } = useManage();
-  const { state, formAction, pending } = useModerationAction(kind, action, focusOnSuccess);
+  const { state, formAction, pending } = useModerationAction(section, action, focusOnSuccess);
   const [reason, setReason] = useState('');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const promptRef = useRef<HTMLParagraphElement>(null);

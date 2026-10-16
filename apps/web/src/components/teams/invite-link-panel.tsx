@@ -69,7 +69,7 @@ export function InviteLinkPanel({
       </div>
       <InlineConfirm
         id="regenerate"
-        kind="regenerate"
+        section="invite"
         action={regenerateInviteAction}
         fields={{ teamId }}
         triggerLabel="Generate new link"

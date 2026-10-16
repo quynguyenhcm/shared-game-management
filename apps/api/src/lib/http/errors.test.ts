@@ -50,6 +50,9 @@ const AUTHORITATIVE_ERROR_CODES = [
   'team_admin_cannot_be_banned',
   'last_team_admin',
   'membership_state_conflict',
+  // team-banking-and-gst (architecture doc Q4: publish gate and removal guard)
+  'payout_not_configured',
+  'banking_in_use',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -60,6 +63,8 @@ const TEAM_ERROR_STATUSES = [
   ['team_admin_cannot_be_banned', 409],
   ['last_team_admin', 409],
   ['membership_state_conflict', 409],
+  ['payout_not_configured', 409],
+  ['banking_in_use', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];
@@ -131,6 +136,15 @@ describe('ErrorCode list', () => {
     expect(ERROR_DEFAULTS.service_unavailable.status).toBe(503);
     for (const { message } of Object.values(ERROR_DEFAULTS))
       expect(message.length).toBeGreaterThan(0);
+  });
+
+  it('banking codes carry the copy deck text (AC-ERROR-8, AC-ERROR-10 as amended by R1 and R12)', () => {
+    expect(ERROR_DEFAULTS.payout_not_configured.message).toBe(
+      "Add your team's bank account details before publishing a paid session.",
+    );
+    expect(ERROR_DEFAULTS.banking_in_use.message).toMatch(/published paid sessions/);
+    expect(ERROR_DEFAULTS.banking_in_use.message).toMatch(/unpaid payments/);
+    expect(ERROR_DEFAULTS.payout_not_configured.message).not.toMatch(/akahu/i);
   });
 
   it.each(TEAM_ERROR_STATUSES)(

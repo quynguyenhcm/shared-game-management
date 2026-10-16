@@ -123,6 +123,30 @@ describe('proxy.ts (Next 16 file convention; runs before every page)', () => {
       }
     });
 
+    it('protects the banking page: anonymous callers go to /login with the full path (and edit/returnTo) kept', () => {
+      const path = `/teams/${TEAM_ID}/manage/banking`;
+      const response = proxy(request(path));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encodeURIComponent(path)}`,
+      );
+      const withQuery = proxy(request(`${path}?edit=banking`));
+      expect(withQuery.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encodeURIComponent(`${path}?edit=banking`)}`,
+      );
+    });
+
+    it('marks the banking page no-store (banking details are personal information) and sets no referrer override', () => {
+      for (const path of [
+        `/teams/${TEAM_ID}/manage/banking`,
+        `/teams/${TEAM_ID}/manage/banking?notice=banking_saved`,
+      ]) {
+        const response = proxy(request(path, withCookie));
+        expect(response.headers.get('location'), path).toBeNull();
+        expect(response.headers.get('cache-control'), path).toContain('no-store');
+      }
+    });
+
     it('marks the invite page no-store and no-referrer so the code never leaks (AC-ENTRY-4)', () => {
       const response = proxy(request(`/teams/join?code=${CODE}`, withCookie));
       expect(response.headers.get('cache-control')).toContain('no-store');

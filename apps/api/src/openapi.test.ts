@@ -86,6 +86,27 @@ describe('OpenAPI document', () => {
     ).toEqual(expect.arrayContaining(['200', '401', '403']));
   });
 
+  it('documents the five banking and GST routes with the bearer requirement and the 401, 403, 409 and 422 answers (team-banking AC-VERIFY-5)', async () => {
+    const document = (await generateOpenApiDocument()) as unknown as OpenApiDocument;
+    const routes: [string, string][] = [
+      ['/teams/{teamId}/banking', 'get'],
+      ['/teams/{teamId}/banking', 'put'],
+      ['/teams/{teamId}/banking', 'delete'],
+      ['/teams/{teamId}/gst', 'get'],
+      ['/teams/{teamId}/gst', 'put'],
+    ];
+    for (const [path, method] of routes) {
+      const operation = operationOf(document, path, method);
+      expect(
+        operation.security?.some((entry) => 'sessionToken' in entry),
+        `${method} ${path}`,
+      ).toBe(true);
+      expect(Object.keys(operation.responses ?? {}), `${method} ${path}`).toEqual(
+        expect.arrayContaining(['200', '401', '403', '409', '422']),
+      );
+    }
+  });
+
   it('is built from the shared zod contract: the web api-client and the Fastify routes import the same schemas (AC-VERIFY-8)', async () => {
     const routes = await readFile(new URL('./modules/auth/routes.ts', import.meta.url), 'utf8');
     const client = await readFile(

@@ -217,9 +217,11 @@ describe('keyring', () => {
 });
 
 describe('deriveBankAccountLast4', () => {
-  it('returns the last four digits of an account number, ignoring separators', () => {
-    expect(deriveBankAccountLast4(PLAINTEXT)).toBe('2300');
-    expect(deriveBankAccountLast4('01-0123-0456789-000')).toBe('9000');
+  it('returns the last four digits of the account base (R9), not of the suffix', () => {
+    // PLAINTEXT is 12-3456-7890123-00: base 7890123 -> 0123 (the old whole-string rule gave 2300).
+    expect(deriveBankAccountLast4(PLAINTEXT)).toBe('0123');
+    expect(deriveBankAccountLast4('01-0123-0456789-000')).toBe('6789');
+    expect(deriveBankAccountLast4('0456789')).toBe('6789');
     expect(() => deriveBankAccountLast4('12-3')).toThrow(RangeError);
   });
 });

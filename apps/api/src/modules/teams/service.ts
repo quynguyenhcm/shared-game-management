@@ -10,7 +10,6 @@
  * `FOR NO KEY UPDATE` (the per-team mutex), re-checks that the actor is still an approved admin under that lock
  * (Architecture A10: the guard ran outside the transaction), then locks the target row.
  */
-import type { FastifyBaseLogger } from 'fastify';
 import {
   FIND_PAGE_SIZE,
   decodeFindCursor,
@@ -31,6 +30,7 @@ import {
   type TeamMemberRow,
   TEAM_FIELD_MESSAGES,
 } from '@sgm/shared';
+import { refusing as sharedRefusing, type RefusalLogger } from '../../lib/auth/team-refusals.ts';
 import type { Clock } from '../../lib/clock.ts';
 import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
@@ -44,7 +44,7 @@ import { containsPattern } from './search.ts';
 import { decide, type ModerationAction } from './transitions.ts';
 
 /** The subset of the request logger the service uses (`request.log`, which carries the trace ids). */
-export type TeamsLogger = Pick<FastifyBaseLogger, 'info' | 'warn'>;
+export type TeamsLogger = RefusalLogger;
 
 export interface TeamsContext {
   readonly log: TeamsLogger;
@@ -121,23 +121,12 @@ export interface TeamsService {
  * Logs one `team.action.refused` event (reason = the error code, never the input) for a domain refusal and
  * rethrows. The request logger already carries the traceId.
  */
-async function refusing<T>(
+function refusing<T>(
   ctx: TeamsContext,
   fields: { action: string; actorId: string; teamId?: string },
   work: () => Promise<T>,
 ): Promise<T> {
-  try {
-    return await work();
-  } catch (error) {
-    if (error instanceof AppError) {
-      const level = error.code === 'forbidden' ? 'warn' : 'info';
-      ctx.log[level](
-        { event: 'team.action.refused', ...fields, reason: error.code },
-        'team action refused',
-      );
-    }
-    throw error;
-  }
+  return sharedRefusing(ctx.log, fields, work);
 }
 
 function cursorOf(row: repo.FindRow, direction: 'f' | 'b'): string {

@@ -7,7 +7,10 @@
  * fixed message only: never plaintext, ciphertext, key ids or key material.
  */
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import type { Ciphertext } from '@sgm/shared';
+import {
+  deriveBankAccountLast4 as sharedDeriveBankAccountLast4,
+  type Ciphertext,
+} from '@sgm/shared';
 import type { KeyProvider } from './keyring.ts';
 
 /** Same pattern as the `teams_*_envelope` CHECK constraints. */
@@ -110,11 +113,10 @@ export function createCrypto(keys: KeyProvider): FieldCrypto {
   };
 }
 
-/** Plaintext display projection stored in `teams.bank_account_last4` beside the encrypted number. */
+/**
+ * Plaintext display projection stored in `teams.bank_account_last4` beside the encrypted number: the last 4
+ * digits of the account base, not the suffix (R9). The rule lives in `@sgm/shared` beside the validator.
+ */
 export function deriveBankAccountLast4(accountNumber: string): string {
-  const digits = accountNumber.replace(/\D/g, '');
-  if (digits.length < 4) {
-    throw new RangeError('account number must contain at least 4 digits');
-  }
-  return digits.slice(-4);
+  return sharedDeriveBankAccountLast4(accountNumber);
 }

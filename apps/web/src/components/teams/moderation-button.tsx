@@ -1,6 +1,10 @@
 'use client';
 
-import type { ModerationAction, ModerationKind } from '../../lib/teams/moderation.ts';
+import {
+  sectionFor,
+  type ModerationAction,
+  type ModerationKind,
+} from '../../lib/teams/moderation.ts';
 import { BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '../auth/styles.ts';
 import { useModerationAction } from './use-moderation-action.ts';
 
@@ -29,7 +33,7 @@ export function ModerationButton({
   /** Selector to focus after success; default is the section heading. */
   focus?: string;
 }) {
-  const { formAction, pending } = useModerationAction(kind, action, focus);
+  const { formAction, pending } = useModerationAction(sectionFor(kind), action, focus);
   const className = `${variant === 'primary' ? BUTTON_CLASS : SECONDARY_BUTTON_CLASS} sm:w-auto`;
   return (
     <form action={formAction} className="flex-1 sm:flex-none">

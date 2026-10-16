@@ -294,6 +294,9 @@ export interface Teams {
   bank_account_last4: string | null;
   bank_account_name: Ciphertext | null;
   bank_account_number: Ciphertext | null;
+  banking_change_keys: Generated<string[]>;
+  banking_updated_at: Timestamp | null;
+  banking_updated_by: string | null;
   create_idempotency_key: string | null;
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -303,8 +306,9 @@ export interface Teams {
   id: Generated<string>;
   invite_code: string;
   ird_number: Ciphertext | null;
-  is_payout_configured: Generated<boolean>;
+  is_payout_configured: ColumnType<boolean, never, never>;
   name: string;
+  payout_blocked_at: Timestamp | null;
   visibility: Generated<TeamVisibility>;
 }
 
