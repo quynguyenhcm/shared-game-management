@@ -35,7 +35,7 @@
 - Recurring multi-court sessions with single-date overrides, cost-based suggested rates, and flat, by-sex or by-skill pricing
 - Registration with up to 2 guests, FIFO waitlist, overdue-debt blocking, and deadline-based cancellation fees
 - Prepaid wallet per team (max $100 NZD), post-game auto-deduction, Akahu payment links, overdue cron and reminders
-- Team banking and GST settings: a team admin sets the bank account that receives payouts and whether the team is GST-registered. Paid sessions cannot be published until banking is set up, and, once payouts are live (wallet-and-akahu-billing), a payout account that Akahu rejects blocks new paid publishes until it is fixed. The account name and number are encrypted and write-only after save, and every other admin is emailed when they change. Akahu verification of the account is a future feature (wallet-and-akahu-billing).
+- Team banking and GST settings: a team admin sets the bank account that receives payouts and whether the team is GST-registered. Paid sessions cannot be published until banking is set up, and, once payouts are live (wallet-and-akahu-billing), a payout account that Akahu rejects blocks new paid publishes until it is fixed. The account name and number are encrypted and write-only after save, and every approved admin of the team, including the one who made the change, is emailed when they change. Akahu verification of the account is a future feature (wallet-and-akahu-billing).
 - NZ GST (15%, 3/23 split), PDF tax invoices, and IRD-ready CSV/Excel exports
 - Player dashboard (Currently Opening, My Registration, Payments & Wallet) and an admin master report
 
