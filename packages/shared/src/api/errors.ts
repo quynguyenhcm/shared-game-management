@@ -43,6 +43,9 @@ export const ErrorCode = [
   'team_admin_cannot_be_banned',
   'last_team_admin',
   'membership_state_conflict',
+  // team banking: publish gate and removal guard (team-banking-and-gst)
+  'payout_not_configured',
+  'banking_in_use',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

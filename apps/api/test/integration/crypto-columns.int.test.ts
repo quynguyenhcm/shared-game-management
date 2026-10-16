@@ -7,7 +7,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   DecryptionError,
   createCrypto,
-  deriveBankAccountLast4,
   type EncryptionContext,
 } from '../../src/lib/crypto/crypto.ts';
 import { createKeyProvider } from '../../src/lib/crypto/keyring.ts';
@@ -15,7 +14,10 @@ import { insertTeam } from '../helpers/factories.ts';
 import { createTestDatabase, expectPgError, type TestDatabase } from '../helpers/test-db.ts';
 
 const ACCOUNT = '12-3456-7890123-00';
-const TOKEN = 'test_akahu_token_ABC123';
+// Hand-built: last 4 digits of the 7-digit account base (7890123), as the validators will derive it.
+const LAST4 = '0123';
+const ACCOUNT_NAME = 'Court Jesters Badminton Club';
+// akahu_app_token keeps its envelope CHECK (R1: this feature never writes it, so only plaintext rejection is tested).
 const ENCRYPTED_COLUMNS = [
   'bank_account_number',
   'akahu_app_token',
@@ -38,15 +40,16 @@ afterAll(async () => {
   await db.close();
 });
 
+/** The payout block is all-or-none (teams_payout_details_all_or_none): name, number and last4 together. */
 async function writeBanking(teamId: string): Promise<void> {
   await db.pool.query(
-    `UPDATE teams SET bank_account_number = $2, bank_account_last4 = $3, akahu_app_token = $4
+    `UPDATE teams SET bank_account_name = $2, bank_account_number = $3, bank_account_last4 = $4
      WHERE id = $1`,
     [
       teamId,
+      crypto.encrypt(ACCOUNT_NAME, ctxFor(teamId, 'bank_account_name')),
       crypto.encrypt(ACCOUNT, ctxFor(teamId, 'bank_account_number')),
-      deriveBankAccountLast4(ACCOUNT),
-      crypto.encrypt(TOKEN, ctxFor(teamId, 'akahu_app_token')),
+      LAST4,
     ],
   );
 }
@@ -56,19 +59,19 @@ describe('teams encrypted columns', () => {
     const teamId = await insertTeam(db.pool);
     await writeBanking(teamId);
     const { rows } = await db.pool.query<{
+      bank_account_name: string;
       bank_account_number: string;
-      akahu_app_token: string;
       bank_account_last4: string;
       whole_row: string;
     }>(
-      `SELECT bank_account_number, akahu_app_token, bank_account_last4, t::text AS whole_row
+      `SELECT bank_account_name, bank_account_number, bank_account_last4, t::text AS whole_row
        FROM teams t WHERE id = $1`,
       [teamId],
     );
     const row = rows[0];
     if (row === undefined) throw new Error('team row missing');
-    const raw = `${row.bank_account_number}\n${row.akahu_app_token}\n${row.whole_row}`;
-    for (const secret of [ACCOUNT, TOKEN, '1234567890123', '7890123']) {
+    const raw = `${row.bank_account_name}\n${row.bank_account_number}\n${row.whole_row}`;
+    for (const secret of [ACCOUNT, ACCOUNT_NAME, '1234567890123', '7890123']) {
       for (const form of [
         secret,
         Buffer.from(secret).toString('hex'),
@@ -80,14 +83,20 @@ describe('teams encrypted columns', () => {
     }
     // Key id is present in the envelope (readable for rotation queries).
     expect(row.bank_account_number.startsWith('v1.test1.')).toBe(true);
-    expect(row.akahu_app_token.split('.')[1]).toBe('test1');
-    expect(row.bank_account_last4).toBe('2300');
+    expect(row.bank_account_name.split('.')[1]).toBe('test1');
+    expect(row.bank_account_last4).toBe(LAST4);
     expect(
       crypto.decrypt(row.bank_account_number as never, ctxFor(teamId, 'bank_account_number')),
     ).toBe(ACCOUNT);
-    expect(crypto.decrypt(row.akahu_app_token as never, ctxFor(teamId, 'akahu_app_token'))).toBe(
-      TOKEN,
+    expect(
+      crypto.decrypt(row.bank_account_name as never, ctxFor(teamId, 'bank_account_name')),
+    ).toBe(ACCOUNT_NAME);
+    // The generated flag follows the block (R1/R3): no Akahu column takes part.
+    const { rows: flag } = await db.pool.query<{ is_payout_configured: boolean }>(
+      'SELECT is_payout_configured FROM teams WHERE id = $1',
+      [teamId],
     );
+    expect(flag[0]?.is_payout_configured).toBe(true);
   });
 
   it('encrypting the same plaintext twice stores different ciphertext, both decryptable', async () => {
@@ -115,8 +124,12 @@ describe('teams encrypted columns', () => {
       [teamA],
     );
     const stolen = rows[0]?.bank_account_number ?? '';
-    // Other row, same column.
-    await db.pool.query('UPDATE teams SET bank_account_number = $2 WHERE id = $1', [teamB, stolen]);
+    // Other row, same column: team B gets a full block (all-or-none) whose number is team A's ciphertext.
+    await db.pool.query(
+      `UPDATE teams SET bank_account_name = $2, bank_account_number = $3, bank_account_last4 = $4
+        WHERE id = $1`,
+      [teamB, crypto.encrypt(ACCOUNT_NAME, ctxFor(teamB, 'bank_account_name')), stolen, LAST4],
+    );
     // Same row, other column.
     await db.pool.query('UPDATE teams SET bank_account_name = $2 WHERE id = $1', [teamA, stolen]);
     const read = await db.pool.query<{
@@ -149,7 +162,11 @@ describe('teams encrypted columns', () => {
         `teams_${column}_envelope`,
       );
     }
-    // NULL stays allowed (banking not configured yet).
-    await db.pool.query('UPDATE teams SET bank_account_number = NULL WHERE id = $1', [teamId]);
+    // NULL stays allowed (banking not configured yet): the whole block cleared together.
+    await db.pool.query(
+      `UPDATE teams SET bank_account_name = NULL, bank_account_number = NULL, bank_account_last4 = NULL
+        WHERE id = $1`,
+      [teamId],
+    );
   });
 });

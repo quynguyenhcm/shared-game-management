@@ -467,9 +467,11 @@ describe('ledger and reversibility (AC-VERIFY-2)', () => {
         true,
       );
 
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 1 });
-      expect(reverted).toHaveLength(1);
-      expect(reverted[0]).toContain('team_membership_invariants');
+      // Newest first: the team-banking migration sits on top of the membership invariants.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      expect(reverted).toHaveLength(2);
+      expect(reverted[0]).toContain('team_banking_and_gst_invariants');
+      expect(reverted[1]).toContain('team_membership_invariants');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'team_members_admin_approved',

@@ -529,7 +529,7 @@ Critical path: the validators and migration (Phase 1), then the API (Phase 2), t
 - [ ] extend: `apps/api/src/app.ts`, `apps/api/src/lib/logger/logger.ts` (+ test), `apps/api/src/lib/http/errors.ts`, `packages/shared/src/api/errors.ts`, `packages/shared/src/index.ts`, `apps/api/src/lib/db/types.generated.ts`, `apps/api/test/fixtures/expected-schema.ts`, `apps/api/test/helpers/factories.ts`, `apps/api/test/integration/crypto-columns.int.test.ts`, `apps/api/openapi.yaml`, `db/schema-deviations.md`, `vitest.config.ts`, `apps/web/src/lib/teams/manage-areas.ts` (+ test), `apps/web/src/app/teams/[teamId]/manage/layout.tsx`, `apps/web/src/lib/teams/labels.ts`
 
 ### Phases
-- [ ] **Phase 1: Schema, validators and shared contracts**: the migration (CHECKs, `game_session_is_paid`, publish trigger, D-47 onwards), the NZ bank and IRD validators with sourced vectors, zod contracts and copy deck, the two error codes, regenerated types and expected schema, and factory updates for the new trigger (`insertTeam({ payoutConfigured })`, fix `session-instants.int.test.ts:67`, full integration run). ACs: AC-VERIFY-1, 6, 7, 8 (SQL side), 11, AC-INTEGRATION-3.
+- [x] **Phase 1: Schema, validators and shared contracts**: the migration (CHECKs, `game_session_is_paid`, publish trigger, D-47 onwards), the NZ bank and IRD validators with sourced vectors, zod contracts and copy deck, the two error codes, regenerated types and expected schema, and factory updates for the new trigger (`insertTeam({ payoutConfigured })`, fix `session-instants.int.test.ts:67`, full integration run). ACs: AC-VERIFY-1, 6, 7, 8 (SQL side), 11, AC-INTEGRATION-3.
 - [ ] **Phase 2: Banking and GST API**: module, routes, service (lock, re-check, encrypt, mask), logging, and camelCase redaction with the collision grep. ACs: AC-HAPPY-1 to 6 (API), AC-ERROR-1 to 7, 11, 12, 14, AC-VERIFY-2, 3, 4, 5, 10, AC-INTEGRATION-1.
 - [ ] **Phase 3: Publish gate and removal guard**: `isPaidSession`, `assertTeamCanPublishPaidSession`, `mapPublishGateDbError`, `banking_in_use`, the race tests, and ADR 0016. ACs: AC-HAPPY-7, AC-ERROR-8, 9, 10, AC-VERIFY-8, 9, AC-INTEGRATION-2.
 - [ ] **Phase 4: Web banking area**: the manage-area nav with the current area marked, the banking page with both sections, Server Actions, the removal `InlineConfirm` and write-only inputs. Also the change-notification email if creative promotes AC-ASYNC-1. ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 5, AC-ERROR-13, (AC-ASYNC-1).
@@ -678,9 +678,9 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 1 of 5
+**Current Phase**: 2 of 5 (Phase 1 complete)
 **Auto-Build Mode**: YES
-**Current Step**: Auto-build started; Phase 1 dispatching
+**Current Step**: Phase 1 committed; Phase 2 next
 **Step Started**: 2026-10-16
 **Can Resume**: YES
 **Creative Reconciliation**: binding. Build agents apply R1-R12 over the spec ACs.
@@ -702,9 +702,14 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 - UI/UX Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/team-banking-and-gst-banking-page-uiux.md
 - Step 4.5: Codex design critique - COMPLETE (needs-attention, 7 findings)
 - Creative Reconciliation: COMPLETE (2026-10-16); user chose bank-account-only payout (3C), a single GST number (G2), payout_blocked_at, and summary-then-Change editing
+- Phase 1 (Schema, validators, shared contracts): COMPLETE (2026-10-16) - 884 unit + 304 integration passing; lint/typecheck/build PASS; Codex review clean. Ledger D-47..D-53. Handoff for later phases: `payoutBlockFor`/`testFieldCrypto`/`insertTeam({payoutConfigured})` in test factories; `apps/api/test/fixtures/paid-session-matrix.ts` for the phase-3 TS twin; teams trigger `teams_guard_banking_removal` raises 23514 constraint `teams_banking_in_use` (map by err.constraint); `is_payout_configured` is generated (insert/update typed never); `deriveBankAccountLast4` now delegates to shared (last4 from the account base).
 
 ### Halt State
 (none)
 
 ### Deviations
 <!-- Per entry: - Phase <N> | <file:line/artifact> | <rationale>. -->
+- Phase 1 | db/migrations/20261016000100000_team_banking_and_gst_invariants.sql | cleanup order reversed vs R5 (null malformed gst_number first, then deregister numberless teams) so the CHECKs validate.
+- Phase 1 | same migration | no CHECK tying payout_blocked_at to a banking block (neither R3 nor architecture doc defines one); service clears it on save/removal.
+- Phase 1 | apps/api/.kysely-codegenrc.json | override types the generated is_payout_configured as never for insert/update.
+- Phase 1 | packages/shared/src/nz/ird-number.test.ts | IRD spec example 150000026 is rejected under both weight sets (check digit 5, not 6); conclusion unchanged from creative doc.

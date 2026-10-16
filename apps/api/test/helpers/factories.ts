@@ -4,6 +4,8 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
+import { createCrypto } from '../../src/lib/crypto/crypto.ts';
+import { createKeyProvider } from '../../src/lib/crypto/keyring.ts';
 import { inTransaction, type Queryable } from './test-db.ts';
 
 type Sex = 'MALE' | 'FEMALE' | 'OTHER';
@@ -149,18 +151,63 @@ export function insertTeamMember(
   );
 }
 
+/** Field encryption with a throwaway keyring, for rows written straight to the database in tests. */
+export const testFieldCrypto = createCrypto(
+  createKeyProvider([{ id: 'test1', key: randomBytes(32) }], 'test1'),
+);
+
+/** A payout block (account name and number as envelopes under the correct AAD, plus last4) for one team row. */
+export function payoutBlockFor(
+  teamId: string,
+  block: { accountName?: string; accountNumber?: string; last4?: string } = {},
+): { name: string; number: string; last4: string } {
+  return {
+    name: testFieldCrypto.encrypt(block.accountName ?? 'Test Club Account', {
+      table: 'teams',
+      column: 'bank_account_name',
+      rowId: teamId,
+    }),
+    number: testFieldCrypto.encrypt(block.accountNumber ?? '01-0902-0068389-000', {
+      table: 'teams',
+      column: 'bank_account_number',
+      rowId: teamId,
+    }),
+    // Hand-built (the last 4 digits of the 7-digit account base of the default number).
+    last4: block.last4 ?? '8389',
+  };
+}
+
+export interface TeamOptions {
+  readonly visibility?: 'PUBLIC' | 'PRIVATE';
+  readonly name?: string;
+  /** Writes a valid name + number + last4 block, so the generated `is_payout_configured` is true. */
+  readonly payoutConfigured?: boolean;
+  /** Sets `payout_blocked_at` (needs `payoutConfigured` for the flag to matter). */
+  readonly payoutBlockedAt?: Date;
+  readonly gstRegistered?: boolean;
+  readonly gstNumber?: string;
+}
+
 /** A team with a 256-bit base64url invite code (matches the `teams_invite_code_format` CHECK). */
-export function insertTeam(
-  db: Queryable,
-  options: { visibility?: 'PUBLIC' | 'PRIVATE'; name?: string } = {},
-): Promise<string> {
+export async function insertTeam(db: Queryable, options: TeamOptions = {}): Promise<string> {
+  const id = randomUUID();
+  const block = options.payoutConfigured === true ? payoutBlockFor(id) : undefined;
   return insertId(
     db,
-    `INSERT INTO teams (name, visibility, invite_code) VALUES ($1, $2, $3) RETURNING id`,
+    `INSERT INTO teams (id, name, visibility, invite_code, bank_account_name, bank_account_number,
+                        bank_account_last4, payout_blocked_at, gst_registered, gst_number)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
     [
+      id,
       options.name ?? 'Test Club',
       options.visibility ?? 'PUBLIC',
       randomBytes(32).toString('base64url'),
+      block?.name ?? null,
+      block?.number ?? null,
+      block?.last4 ?? null,
+      options.payoutBlockedAt ?? null,
+      options.gstRegistered ?? false,
+      options.gstNumber ?? null,
     ],
   );
 }

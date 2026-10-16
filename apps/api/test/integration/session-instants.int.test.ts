@@ -61,7 +61,8 @@ describe('game_sessions.starts_at / ends_at', () => {
 
   it('keeps a session without courts DRAFT: publishing it fails with 23514', async () => {
     const teamId = await insertTeam(db.pool);
-    const sessionId = await insertSession(db.pool, teamId, {}, { withCourt: false });
+    // A free session: a paid one would be refused by the payout gate (game_sessions_paid_requires_payout) first.
+    const sessionId = await insertSession(db.pool, teamId, { flat: '0.00' }, { withCourt: false });
     expect(await instants(sessionId)).toEqual({ starts_at: null, ends_at: null });
     await expectPgError(
       db.pool.query(`UPDATE game_sessions SET status = 'PUBLISHED' WHERE id = $1`, [sessionId]),
