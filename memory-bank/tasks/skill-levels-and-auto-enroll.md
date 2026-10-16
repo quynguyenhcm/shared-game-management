@@ -526,3 +526,4 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - Phase 5 | skill-levels-view.ts | status 0 and offline TypeError use UNCONFIRMED_MESSAGE; 503 and other failures use SAVE_FAILED_MESSAGE; moderation.ts not edited (mapping lives in skill-levels-view.ts toSkillResult)
 - Phase 5 | manage-view.ts | memberRowControls gained skillControl; MemberList requires todayNz (page computes via instantToLocal)
 - Phase 5 review notes (non-blocking) | off-hint not in checkbox aria-describedby; success line persists after re-edit; 502/504 says "Nothing was changed"; todayNz stale across NZ midnight
+- Phase 5 review | apps/web/e2e/teams.spec.ts:241 | failure judged an environment artefact (proxy.ts cache-control under next dev; page/proxy untouched by this branch), but the promote/demote/ban steps after line 241 were NOT exercised against the new member-list.tsx row layout: re-run `pnpm run test:e2e` on the Compose stack before merge
