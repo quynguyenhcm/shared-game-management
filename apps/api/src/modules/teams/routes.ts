@@ -22,7 +22,6 @@ import {
 } from '@sgm/shared';
 import { authenticated, optionalSession, requireTeamRole } from '../../lib/auth/policy.ts';
 import { requireAuth } from '../../lib/auth/request-auth.ts';
-import { AppError } from '../../lib/http/errors.ts';
 import type { TeamsContext, TeamsService } from './service.ts';
 
 export interface TeamsRoutesOptions {
@@ -68,31 +67,7 @@ export const teamsRoutes: FastifyPluginAsync<TeamsRoutesOptions> = (app, options
   const { service } = options;
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
-  // A guard refusal never reaches a handler, so the service cannot log it: record `team.action.refused` here for the
-  // admin routes (ids and the route template only, never the body). A 401 has no actor and is not logged.
-  app.addHook('onError', (request, _reply, error, done) => {
-    const policy = request.routeOptions.config.policy;
-    if (
-      policy?.kind === 'teamRole' &&
-      error instanceof AppError &&
-      error.code === 'forbidden' &&
-      request.auth !== null
-    ) {
-      const params = request.params as Record<string, unknown> | undefined;
-      const teamId = params?.[policy.teamIdParam];
-      request.log.warn(
-        {
-          event: 'team.action.refused',
-          action: `${request.method} ${request.routeOptions.url ?? ''}`,
-          actorId: request.auth.userId,
-          ...(typeof teamId === 'string' && /^[0-9a-f-]{36}$/i.test(teamId) ? { teamId } : {}),
-          reason: 'forbidden',
-        },
-        'team action refused',
-      );
-    }
-    done();
-  });
+  // The guard's `team.action.refused` logging is registered once at the root (`registerTeamRefusalLogging`).
 
   typed.post(
     '',

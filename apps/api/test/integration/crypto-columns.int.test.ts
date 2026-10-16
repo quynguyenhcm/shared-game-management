@@ -10,6 +10,8 @@ import {
   type EncryptionContext,
 } from '../../src/lib/crypto/crypto.ts';
 import { createKeyProvider } from '../../src/lib/crypto/keyring.ts';
+import { buildAuthTestApp } from '../helpers/auth-app.ts';
+import { ACCOUNT_A, createBankingScene } from '../helpers/banking-scene.ts';
 import { insertTeam } from '../helpers/factories.ts';
 import { createTestDatabase, expectPgError, type TestDatabase } from '../helpers/test-db.ts';
 
@@ -148,6 +150,52 @@ describe('teams encrypted columns', () => {
     expect(() =>
       crypto.decrypt(copiedColumn?.bank_account_name as never, ctxFor(teamA, 'bank_account_name')),
     ).toThrow(DecryptionError);
+  });
+
+  it('seals the name and number written through the real API: no readable secret in the row, active key id, and an envelope moved to another column fails authentication (AC-VERIFY-2)', async () => {
+    const h = await buildAuthTestApp(db.pool);
+    try {
+      const scene = createBankingScene(h, db);
+      const admin = await scene.person();
+      const teamId = await scene.team([admin]);
+      const saved = await scene.putBanking(
+        teamId,
+        admin,
+        scene.body('Real API Holder Club', ACCOUNT_A),
+      );
+      expect(saved.statusCode).toBe(200);
+      const { rows } = await db.pool.query<{ whole_row: string }>(
+        `SELECT t::text AS whole_row FROM teams t WHERE id = $1`,
+        [teamId],
+      );
+      const raw = rows[0]?.whole_row ?? '';
+      for (const secret of ['Real API Holder Club', ACCOUNT_A.canonical, '0068389']) {
+        for (const form of [
+          secret,
+          Buffer.from(secret).toString('hex'),
+          Buffer.from(secret).toString('base64'),
+          Buffer.from(secret).toString('base64url'),
+        ]) {
+          expect(raw).not.toContain(form);
+        }
+      }
+      const stored = await scene.row(teamId);
+      expect(stored.bank_account_name?.startsWith('v1.dev1.')).toBe(true);
+      expect(stored.bank_account_number?.startsWith('v1.dev1.')).toBe(true);
+      expect(await scene.opened(teamId)).toEqual({
+        name: 'Real API Holder Club',
+        number: ACCOUNT_A.canonical,
+      });
+      expect(() =>
+        scene.crypto.decrypt(stored.bank_account_number as never, {
+          table: 'teams',
+          column: 'bank_account_name',
+          rowId: teamId,
+        }),
+      ).toThrow(DecryptionError);
+    } finally {
+      await h.close();
+    }
   });
 
   it('rejects a plaintext write to every encrypted column with SQLSTATE 23514', async () => {

@@ -264,6 +264,52 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
     expect(lines[0]).toMatchObject({ statusCode: 404, errorCode: 'x' });
   });
 
+  it('redacts the anchored account name and number keys (camelCase and snake_case) at any depth, in child bindings too, and keeps a negative list readable (team-banking AC-VERIFY-4)', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        accountName: 'secret-name-1',
+        accountNumber: 'secret-number-2',
+        account_name: 'secret-name-3',
+        account_number: 'secret-number-4',
+        bankAccountName: 'secret-name-5',
+        bank_accountNumber: 'secret-number-6',
+        body: { accountNumber: 'secret-number-7', nested: { ACCOUNT_NAME: 'secret-name-8' } },
+        statusCode: 201,
+        providerCode: 'p',
+        errorCode: 'e',
+        teamId: 'team-1',
+        actorId: 'actor-1',
+        userId: 'user-1',
+        changedFields: ['accountName', 'accountNumber'],
+        gstRegistered: true,
+        accountId: 'acct-1',
+        isPayoutConfigured: true,
+        accountNumberLast4: '8389',
+      },
+      'banking',
+    );
+    logger.child({ accountName: 'secret-name-9' }).info('child binding');
+    const lines = sink.lines();
+    const serialised = JSON.stringify(lines);
+    for (let i = 1; i <= 9; i += 1)
+      expect(serialised).not.toMatch(new RegExp(`secret-(name|number)-${i}`));
+    expect(lines[0]).toMatchObject({
+      statusCode: 201,
+      providerCode: 'p',
+      errorCode: 'e',
+      teamId: 'team-1',
+      actorId: 'actor-1',
+      userId: 'user-1',
+      changedFields: ['accountName', 'accountNumber'],
+      gstRegistered: true,
+      accountId: 'acct-1',
+      isPayoutConfigured: true,
+      accountNumberLast4: '8389',
+    });
+  });
+
   it('keeps the SQLSTATE `code` of a logged error visible (the redaction is for bodies, not error objects)', () => {
     const sink = capture();
     const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);

@@ -530,7 +530,7 @@ Critical path: the validators and migration (Phase 1), then the API (Phase 2), t
 
 ### Phases
 - [x] **Phase 1: Schema, validators and shared contracts**: the migration (CHECKs, `game_session_is_paid`, publish trigger, D-47 onwards), the NZ bank and IRD validators with sourced vectors, zod contracts and copy deck, the two error codes, regenerated types and expected schema, and factory updates for the new trigger (`insertTeam({ payoutConfigured })`, fix `session-instants.int.test.ts:67`, full integration run). ACs: AC-VERIFY-1, 6, 7, 8 (SQL side), 11, AC-INTEGRATION-3.
-- [ ] **Phase 2: Banking and GST API**: module, routes, service (lock, re-check, encrypt, mask), logging, and camelCase redaction with the collision grep. ACs: AC-HAPPY-1 to 6 (API), AC-ERROR-1 to 7, 11, 12, 14, AC-VERIFY-2, 3, 4, 5, 10, AC-INTEGRATION-1.
+- [x] **Phase 2: Banking and GST API**: module, routes, service (lock, re-check, encrypt, mask), logging, and camelCase redaction with the collision grep. ACs: AC-HAPPY-1 to 6 (API), AC-ERROR-1 to 7, 11, 12, 14, AC-VERIFY-2, 3, 4, 5, 10, AC-INTEGRATION-1.
 - [ ] **Phase 3: Publish gate and removal guard**: `isPaidSession`, `assertTeamCanPublishPaidSession`, `mapPublishGateDbError`, `banking_in_use`, the race tests, and ADR 0016. ACs: AC-HAPPY-7, AC-ERROR-8, 9, 10, AC-VERIFY-8, 9, AC-INTEGRATION-2.
 - [ ] **Phase 4: Web banking area**: the manage-area nav with the current area marked, the banking page with both sections, Server Actions, the removal `InlineConfirm` and write-only inputs. Also the change-notification email if creative promotes AC-ASYNC-1. ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 5, AC-ERROR-13, (AC-ASYNC-1).
 - [ ] **Phase 5: E2E, accessibility and docs**: Playwright journeys on both viewports with axe, the coverage gate, and updates to `systemPatterns.md`, `techContext.md` and `productBrief.md`. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-12, 13, 14, AC-INTEGRATION-4.
@@ -678,9 +678,9 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 2 of 5 (Phase 1 complete)
+**Current Phase**: 3 of 5 (Phases 1-2 complete)
 **Auto-Build Mode**: YES
-**Current Step**: Phase 1 committed; Phase 2 next
+**Current Step**: Phase 2 committed; Phase 3 next
 **Step Started**: 2026-10-16
 **Can Resume**: YES
 **Creative Reconciliation**: binding. Build agents apply R1-R12 over the spec ACs.
@@ -703,6 +703,7 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 - Step 4.5: Codex design critique - COMPLETE (needs-attention, 7 findings)
 - Creative Reconciliation: COMPLETE (2026-10-16); user chose bank-account-only payout (3C), a single GST number (G2), payout_blocked_at, and summary-then-Change editing
 - Phase 1 (Schema, validators, shared contracts): COMPLETE (2026-10-16) - 884 unit + 304 integration passing; lint/typecheck/build PASS; Codex review clean. Ledger D-47..D-53. Handoff for later phases: `payoutBlockFor`/`testFieldCrypto`/`insertTeam({payoutConfigured})` in test factories; `apps/api/test/fixtures/paid-session-matrix.ts` for the phase-3 TS twin; teams trigger `teams_guard_banking_removal` raises 23514 constraint `teams_banking_in_use` (map by err.constraint); `is_payout_configured` is generated (insert/update typed never); `deriveBankAccountLast4` now delegates to shared (last4 from the account base).
+- Phase 2 (Banking and GST API): COMPLETE (2026-10-16) - 890 unit + 328 integration passing; lint/typecheck/build PASS; Codex review P1 (replay) and coordinator review items fixed. Ledger D-54. Handoff for later phases: module `apps/api/src/modules/team-banking/` (routes, service, repo, emails, errors); `assertTeamAdminUnderLock` in `modules/teams/admin-lock.ts` (shared with teams); `refusing()` and `registerTeamRefusalLogging` in `lib/auth/team-refusals.ts` (registered once in `buildApp`; a WeakSet stops the hook re-logging an error `refusing` already logged); `mapBankingDbError` in `team-banking/errors.ts` (Phase 3 adds `mapPublishGateDbError` beside it, keyed on `err.constraint`); `repo.isBankingInUse` calls SQL `team_banking_in_use` (the one predicate for removal and Phase 3); test helper `apps/api/test/helpers/banking-scene.ts` (person, team, body, put/get/delete, `bankingEmailJobs`); every response from the five routes carries `Cache-Control: no-store`; the web client (Phase 4) must send a fresh `changeKey` uuid per form render and reuse it on retry; a replayed key returns 200 with the current state and sends nothing.
 
 ### Halt State
 (none)
@@ -716,3 +717,13 @@ Precedence: R1-R11 first, then the doc that owns the question (algorithm: Q1/Q2/
 - Phase 1 | same migration (removal trigger) | trigger named `teams_guard_banking_removal`; it raises constraint `teams_banking_in_use` (the R4 name). Map errors by `err.constraint`. Accepted by the phase reviewer.
 - Phase 1 | packages/shared/src/api/team-banking.ts | copy-deck strings beyond the UI/UX deck (`accountNameTooLong`, `changeKeyInvalid`, `accountNumberUnknownBank`, IRD range reusing the check-digit message). Phase 4 must check the wording against the UI/UX copy table. Accepted by the phase reviewer.
 - Phase 1 | apps/api/test/integration/teams-schema.int.test.ts (~line 470) | the rollback test now rolls back 2 migrations because the new migration is newest. The assertion is not weakened. Accepted by the phase reviewer.
+- Phase 2 | apps/api/src/modules/team-banking/service.ts | an identical re-save is a no-op unless payout_blocked_at is set; then it clears the block, stamps the audit columns, emails "saved again" (changedFields []) and logs changedFields [] (intended per R3).
+- Phase 2 | apps/api/src/modules/team-banking/service.ts | DELETE has no changeKey (the contract has none): the server generates a uuid, and a second removal is a 200 no-op with no email.
+- Phase 2 | apps/api/src/modules/team-banking/service.ts | the `team.banking.decrypt_failed` log also carries a constant `column` field. It may log more than once per request (the same block is opened for the check and the read); noise only, no value is logged.
+- Phase 2 | apps/api/src/modules/team-banking/errors.ts | `mapBankingDbError` lives in the team-banking module, not `lib/http/errors.ts`.
+- Phase 2 | apps/api/src/modules/team-banking/routes.ts | an onSend hook sets `Cache-Control: no-store` on every response from the five routes.
+- Phase 2 | apps/api/src/lib/auth/team-refusals.ts | schema-level 422s (zod body validation) are not logged as `team.action.refused`. The stale-admin 403 used to log twice (service plus global hook, as in team-management); it now logs once.
+- Phase 2 | db/migrations/20261016000200000_team_banking_change_keys.sql | review-driven (Codex P1): `teams.banking_change_keys uuid[]` (newest 32 keys, ledger D-54, reversible) makes the change key a durable replay claim under the team lock. A single last-key column was rejected: it cannot recognise a replay after a different admin saved in between. Removal appends its server key too.
+- Phase 2 | apps/api/src/modules/team-banking/service.ts | review-driven (R7): a save that omits the account number while the stored number is unreadable or absent answers 422 `accountNumberRequired`, so an unreadable block is replaced only by a full save. The name is always in the request, so an unreadable name needs no extra rule.
+- Phase 2 | apps/api/test/integration/teams-schema.int.test.ts, team-banking-upgrade.int.test.ts | rollback counts raised by one (3 and 2) because D-54 is now the newest migration; assertions not weakened.
+- Phase 2 | apps/api/openapi.yaml | no 500 is documented on the five routes: no route in the spec documents one (the global error schema covers it). A malformed team id answers the global error body, covered by a test.

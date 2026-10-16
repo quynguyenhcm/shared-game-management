@@ -69,6 +69,9 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   // Team invite codes (bearer capability to ask to join): inviteCode / invite_code, exact key only.
   /^invite_?code$/i,
   /^bank_account_/i,
+  // The banking API body keys (accountName / accountNumber and their snake_case and bank-prefixed spellings),
+  // anchored so `accountId`, `accountNumberLast4` and the like stay readable (keys are matched globally).
+  /^(bank_?)?account_?(name|number)$/i,
   /^ird_number$/i,
   /^akahu_/i,
   /^encryptionKeys$/i,

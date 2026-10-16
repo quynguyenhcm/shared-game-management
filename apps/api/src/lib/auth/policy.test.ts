@@ -121,6 +121,12 @@ describe('route policy registry (AC-VERIFY-3)', () => {
       'POST /teams/:teamId/members/:userId/promote',
       'POST /teams/:teamId/members/:userId/demote',
       'POST /teams/:teamId/members/:userId/ban',
+      // team-banking-and-gst (AC-VERIFY-5): the five banking and GST routes.
+      'GET /teams/:teamId/banking',
+      'PUT /teams/:teamId/banking',
+      'DELETE /teams/:teamId/banking',
+      'GET /teams/:teamId/gst',
+      'PUT /teams/:teamId/gst',
     ]) {
       expect(byRoute.get(route), route).toEqual({
         kind: 'teamRole',
@@ -129,8 +135,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 14 documented team routes exist, and none of them is public.
-    expect(byRoute.size).toBe(14);
+    // Exactly the 19 documented team routes exist (14 + the five banking and GST routes), none of them public.
+    expect(byRoute.size).toBe(19);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });

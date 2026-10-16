@@ -15,6 +15,7 @@ import type { AuthConfig } from './lib/config/config.ts';
 import type { FieldCrypto } from './lib/crypto/crypto.ts';
 import type { Database } from './lib/db/kysely.ts';
 import { registerAuthPlatform } from './lib/auth/policy.ts';
+import { registerTeamRefusalLogging } from './lib/auth/team-refusals.ts';
 import { registerErrorHandling } from './lib/http/errors.ts';
 import { registerInternalAuth } from './lib/http/internal-auth.ts';
 import { registerOriginCheck } from './lib/http/origin.ts';
@@ -31,6 +32,8 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import { teamBankingRoutes } from './modules/team-banking/routes.ts';
+import { createTeamBankingService } from './modules/team-banking/service.ts';
 import { teamsRoutes } from './modules/teams/routes.ts';
 import { createTeamsService } from './modules/teams/service.ts';
 import { registerHealthRoute, type HealthDeps } from './routes/health.ts';
@@ -109,6 +112,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Before swagger and before any route: the onRoute registry refuses a route without a policy, and adds
   // the bearer requirement to each route's OpenAPI schema.
   registerAuthPlatform(app, { sessions, db: deps.db });
+  // Once, at the root: every `requireTeamRole` route in every module logs its 403 as `team.action.refused`.
+  registerTeamRefusalLogging(app);
   // Registered before the routes so the generated OpenAPI document (src/openapi.ts) sees every route.
   await app.register(swagger, {
     openapi: {
@@ -160,6 +165,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(teamsRoutes, {
     prefix: '/teams',
     service: createTeamsService({ db: deps.db, clock: deps.clock, jobs: deps.jobs }),
+  });
+  await app.register(teamBankingRoutes, {
+    prefix: '/teams',
+    service: createTeamBankingService({
+      db: deps.db,
+      clock: deps.clock,
+      crypto: deps.crypto,
+      jobs: deps.jobs,
+      webBaseUrl: deps.auth.webBaseUrl,
+    }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);
   await app.ready();

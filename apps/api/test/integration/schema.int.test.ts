@@ -75,6 +75,7 @@ describe('migrations (AC-VERIFY-5)', () => {
         'column teams.payout_blocked_at',
         'column teams.banking_updated_at',
         'column teams.banking_updated_by',
+        'column teams.banking_change_keys',
       ]) {
         expect(
           afterFirst.some((line) => line.startsWith(prefix)),
