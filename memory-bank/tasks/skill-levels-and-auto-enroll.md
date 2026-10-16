@@ -410,7 +410,7 @@ Admin skill override and Auto Enroll on the existing People page, a daily `skill
 - [x] Phase 1: Schema and shared rules. Migration (`skill_level_changed_at`, paired-override, baseline >= override, auto-enrol-cleared-when-off and approved-only CHECKs, partial index), schema-deviation entries D-55+, codegen, ban `UPDATE` clears Auto Enroll, shared constants + `decideProgression` + strict API schemas. ACs: AC-VERIFY-1, AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-5 (DB half).
 - [x] Phase 2: Read seams and contract. `countQualifyingGames` and `selectAutoEnrollees` with table-driven real-DB tests, contract pin test, ADR 0017. ACs: AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3 (ADR + pin).
 - [x] Phase 3: Admin API. `skill-levels` module (override and Auto Enroll routes with the moderation transaction shape), `TeamMemberRow` additive fields incl. `skillProgress`, log events, OpenAPI, coverage gate entry. ACs: AC-HAPPY-1..3, AC-HAPPY-7..11 (API half), AC-ERROR-1..5, AC-VERIFY-6, AC-VERIFY-7, AC-INTEGRATION-3 (`assertApprovedMember`).
-- [ ] Phase 4: Progression job. `skill-progression` queue, 05:30 Pacific/Auckland slot, handler with keyset sweep, per-member lock-recount-decide-update, failure isolation, CLI trigger, race tests. ACs: AC-HAPPY-4..6, AC-ASYNC-1, AC-ASYNC-2, AC-ERROR-7, AC-VERIFY-5, AC-INTEGRATION-2.
+- [x] Phase 4: Progression job. `skill-progression` queue, 05:30 Pacific/Auckland slot, handler with keyset sweep, per-member lock-recount-decide-update, failure isolation, CLI trigger, race tests. ACs: AC-HAPPY-4..6, AC-ASYNC-1, AC-ASYNC-2, AC-ERROR-7, AC-VERIFY-5, AC-INTEGRATION-2.
 - [ ] Phase 5: Admin UI and end-to-end journey. Members-row read-only lines, "Skill and Auto Enroll" disclosure panel, Server Actions, status-region success messages, field and network errors, Playwright journey on both viewports with axe. Delivers the full entry-to-success flow: `/teams/<id>/manage` → Members → "Skill and Auto Enroll" → Save → "Skill level for Priya Patel set to Advanced." ACs: AC-ENTRY-1..3, AC-HAPPY-1/2/7..11 (UI half), AC-ERROR-3, AC-ERROR-6, AC-VERIFY-8.
 
 ## Creative Phases
@@ -464,8 +464,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 **Build Status**: RUNNING
 **Auto-Build Mode**: YES
-**Current Phase**: 4 of 5 (Phase 3 of 5 complete)
-**Resume From**: Phase 4
+**Current Phase**: 5 of 5 (Phase 4 of 5 complete)
+**Resume From**: Phase 5
 **Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
 **Previous Phase**: CREATIVE → BUILD
 **Last Completed**: CREATIVE (2026-10-17)
@@ -491,6 +491,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 - Phase 3 Build: COMPLETE (2026-10-17) - skill-levels module (routes/service/repo/decisions/errors), teams member-read.ts, SkillProvenance, skill_level_stale, OpenAPI regenerated, coverage gate entry; 35 RED tests -> unit 1092, integration 423, combined coverage gate PASS; lint/typecheck/build PASS; review APPROVED
 
+- Phase 4 Build: COMPLETE (2026-10-17) - skill-progression queue (exclusive, 05:30 Pacific/Auckland), handler with 500-keyset pre-pass, progressMember (lock_timeout 5s, member row FOR NO KEY UPDATE, recount, guarded UPDATE with microsecond baseline), failure isolation, CLI usage text, getting-started docs; 6 job + 6 race integration tests plus registry/schedules/handlers unit tests; unit 1094, integration 435, combined coverage gate PASS (after one flake fix); lint/typecheck/build PASS; review APPROVED
+
 ### Guide & Recovery Log
 (empty: commit guard passed first try)
 
@@ -511,3 +513,9 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - Phase 3 | skill-levels-api.int.test.ts | flake risk: 2s HTTP lock_timeout in race tests could give 503 under heavy load
 - Phase 3 | shared/api/skill-levels.ts | no request-schema change was needed
 - Phase 3 | verify | `pnpm run test:coverage` needs DATABASE_URL (it runs the integration project); unit-only coverage of skill-levels/** is low by design, the gate passes on the combined run
+- Phase 4 | test/integration/skill-levels-races.int.test.ts | clock is synchronous, so races suspend the job mid-transaction with a throwaway BEFORE UPDATE trigger waiting on a test-held advisory lock (no production hooks)
+- Phase 4 | jobs/skill-progression.ts | span events use trace.getActiveSpan()?.addEvent; lib/jobs/jobs.ts does not make the run span active, so they are no-ops until it does (member_failed log and failed job state carry visibility)
+- Phase 4 | jobs/skill-progression.ts | on abort the handler logs the summary then throws
+- Phase 4 | modules/skill-levels/repo.ts | baseline read as ::text under the lock and bound back as text so microsecond precision is exact
+- Phase 4 | jobs/schedules.test.ts | DST-hour guard test given a 30s timeout; it timed out at 5s under full coverage load (pre-existing flake family)
+- Phase 4 note | skill-levels-schema.int.test.ts:351 failed once with a node-pg-migrate checkOrder error inside one combined coverage run; passed alone and on two later full coverage runs

@@ -28,7 +28,7 @@ function usage(): string {
     ),
     '  db rollback [--count N | --all]   (default: one step; refused in production)',
     '  db reset [--force]                (refused in production or on a non-local host)',
-    '  jobs trigger <slot|heartbeat> [json]   (manually enqueue a slot or the heartbeat job)',
+    '  jobs trigger <slot|heartbeat> [json]   (manually enqueue a slot, e.g. skill-progression, or the heartbeat job)',
     "  jobs trigger member-banned '<json>'    (re-run a ban's side effect; payload as in ADR 0015)",
     '  jobs schedules                         (list registered cron schedules)',
     '  users set-role <email> <GLOBAL_ADMIN|PLAYER>   (grant or revoke the global admin role)',

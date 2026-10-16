@@ -82,6 +82,11 @@ The pg-boss schema is owned by pg-boss, not by these migrations. App processes n
 
 Failed jobs retry 3 times with exponential backoff and then stay visible in `pgboss.job` with state `failed`.
 
+**Skill progression.** The `skill-progression` queue runs daily at 05:30 Pacific/Auckland. It moves an approved member up one
+level after 40 qualifying games since their last level change (see ADR 0017). To run it on demand, with a worker running:
+`pnpm run jobs:trigger skill-progression`. The run is idempotent, logs `skill.progression.completed` with its counts, and ends
+`failed` if any member could not be processed (`skill.progression.member_failed` names them by id), so it retries safely.
+
 **Data retention note.** pg-boss job payloads (`pgboss.job.data`) may carry personal information such as email addresses
 (the `send-email` queue does). Completed and failed jobs are retained for 7 days. Keep payloads minimal: prefer IDs over
 values, and do not put secrets, bank details or tokens in a job payload.

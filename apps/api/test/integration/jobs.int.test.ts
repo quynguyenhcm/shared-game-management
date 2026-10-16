@@ -379,7 +379,7 @@ describe('schedules (AC-ASYNC-2)', () => {
     expect(next('2027-04-02T15:00:01Z')).toBe('2027-04-03T16:00:00.000Z');
   });
 
-  it('lists all four slots, and every placeholder plus heartbeat can be triggered manually and observed', async () => {
+  it('lists all five slots, and every placeholder plus heartbeat can be triggered manually and observed', async () => {
     const schedules = await worker.listSchedules();
     expect(
       schedules
@@ -390,6 +390,7 @@ describe('schedules (AC-ASYNC-2)', () => {
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
+      { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
     ]);
     for (const slot of ['recurrence-materialisation', 'post-game-billing', 'daily-overdue']) {
       const id = await worker.trigger(slot, { source: 'integration-test' });

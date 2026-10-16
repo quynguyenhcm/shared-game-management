@@ -185,7 +185,13 @@ describe('registerJobs', () => {
     expect(defined.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
     expect(worked.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
     expect(scheduled.sort()).toEqual(
-      ['auth-cleanup', 'daily-overdue', 'post-game-billing', 'recurrence-materialisation'].sort(),
+      [
+        'auth-cleanup',
+        'daily-overdue',
+        'post-game-billing',
+        'recurrence-materialisation',
+        'skill-progression',
+      ].sort(),
     );
   });
 
@@ -215,5 +221,33 @@ describe('registerJobs', () => {
     });
     expect(handlers.get('member-banned')).toBeTypeOf('function');
     expect(handlers.get('member-banned')).not.toBe(defaultHandler);
+  });
+});
+
+describe('skill-progression wiring', () => {
+  it('works the skill-progression queue with the real handler, not the placeholder', async () => {
+    const handlers = new Map<string, (data: object, ctx: JobContext) => Promise<void>>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: (data: object, ctx: JobContext) => Promise<void>) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    // A database that is down: the placeholder would complete, the real sweep must fail.
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down');
+      },
+    } as never;
+    await registerJobs({ runner, notifier: createInMemoryNotifier(), crypto: testCrypto(), db });
+    const handler = handlers.get('skill-progression');
+    expect(handler).toBeTypeOf('function');
+    const { ctx } = context();
+    await expect(handler?.({}, { ...ctx, signal: new AbortController().signal })).rejects.toThrow(
+      /db down/,
+    );
   });
 });

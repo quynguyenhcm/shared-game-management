@@ -5,6 +5,7 @@
  * the progression job and `assertApprovedMember`'s `FOR SHARE`). Every timestamp is a `Date` from the injected
  * clock, never SQL `now()`, so what is stored is exactly the millisecond instant the API returns.
  */
+import { sql } from 'kysely';
 import type { MembershipStatus, SkillTier } from '@sgm/shared';
 import type { Database } from '../../lib/db/kysely.ts';
 import type { AutoEnrolState } from './decisions.ts';
@@ -91,6 +92,73 @@ export async function applyAutoEnrol(
     })
     .where('id', '=', membershipId)
     .where('status', '=', 'APPROVED')
+    .executeTakeFirst();
+  return result.numUpdatedRows > 0n;
+}
+
+/** The member row as the progression job sees it under its lock. */
+export interface ProgressionMember {
+  readonly id: string;
+  readonly status: MembershipStatus;
+  readonly skillLevel: SkillTier;
+  /**
+   * The baseline exactly as stored, as text. The column keeps microseconds and node-postgres hands back a
+   * millisecond `Date`, so the write guard binds this string back (`::timestamptz`) instead of a truncated `Date`.
+   */
+  readonly baselineExact: string | null;
+}
+
+/** The member row of `(teamId, userId)` locked `FOR NO KEY UPDATE` (the team row is never locked by the job). */
+export async function lockMemberForProgression(
+  trx: Database,
+  teamId: string,
+  userId: string,
+): Promise<ProgressionMember | undefined> {
+  const row = await trx
+    .selectFrom('team_members')
+    .select([
+      'id',
+      'status',
+      'skill_level',
+      sql<string | null>`skill_level_changed_at::text`.as('baseline_exact'),
+    ])
+    .where('team_id', '=', teamId)
+    .where('user_id', '=', userId)
+    .forNoKeyUpdate()
+    .executeTakeFirst();
+  if (row === undefined) return undefined;
+  return {
+    id: row.id,
+    status: row.status,
+    skillLevel: row.skill_level,
+    baselineExact: row.baseline_exact,
+  };
+}
+
+/**
+ * An automatic promotion: sets only the level and the baseline (never `status`, `role` or the override stamps).
+ * Guarded on APPROVED, the level the decision was made from and the baseline read under the lock; false when the
+ * row no longer matches (unreachable while the caller holds the row lock, kept as the durable idempotency guard).
+ */
+export async function applyProgression(
+  trx: Database,
+  membershipId: string,
+  change: {
+    readonly from: SkillTier;
+    readonly to: SkillTier;
+    readonly now: Date;
+    readonly baselineExact: string | null;
+  },
+): Promise<boolean> {
+  const result = await trx
+    .updateTable('team_members')
+    .set({ skill_level: change.to, skill_level_changed_at: change.now })
+    .where('id', '=', membershipId)
+    .where('status', '=', 'APPROVED')
+    .where('skill_level', '=', change.from)
+    .where(
+      sql<boolean>`skill_level_changed_at IS NOT DISTINCT FROM ${change.baselineExact}::timestamptz`,
+    )
     .executeTakeFirst();
   return result.numUpdatedRows > 0n;
 }

@@ -10,6 +10,7 @@ import { createMemberBannedJobHandler } from './member-banned.ts';
 import { QUEUES, QUEUE_NAMES, withExpireOverride } from './registry.ts';
 import { SCHEDULES, placeholderHandler, registerSchedules } from './schedules.ts';
 import { createSendEmailHandler } from './send-email.ts';
+import { createSkillProgressionHandler } from './skill-progression.ts';
 
 export interface ExtraQueue {
   readonly definition: QueueDefinition;
@@ -57,6 +58,10 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
     [QUEUE_NAMES.memberBanned]: createMemberBannedJobHandler({
       db: options.db,
       hook: options.memberBannedHandler ?? noopMemberBannedHandler,
+    }),
+    [QUEUE_NAMES.skillProgression]: createSkillProgressionHandler({
+      db: options.db,
+      clock: options.clock ?? systemClock,
     }),
   };
 

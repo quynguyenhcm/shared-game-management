@@ -30,13 +30,14 @@ const runner = createJobRunner({
 const preview = runner.previewSchedule.bind(runner);
 
 describe('schedule slots', () => {
-  it('registers the binding slots (plus auth-cleanup at 05:00) in Pacific/Auckland', () => {
+  it('registers the binding slots (plus auth-cleanup at 05:00 and skill-progression at 05:30) in Pacific/Auckland', () => {
     expect(SCHEDULE_TZ).toBe('Pacific/Auckland');
     expect(SCHEDULES.map(({ name, cron, tz }) => ({ name, cron, tz }))).toEqual([
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
+      { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
     ]);
   });
 
@@ -45,7 +46,7 @@ describe('schedule slots', () => {
       expect(findDstHourFirings(slot, preview), slot.name).toEqual([]);
     }
     expect(() => assertNoDstHourFirings(SCHEDULES, preview)).not.toThrow();
-  });
+  }, 30_000);
 
   it('guard rejects a slot that can fire in the skipped/repeated hour', () => {
     const bad: ScheduleSlot = { name: 'daily-overdue', cron: '30 2 * * *', tz: SCHEDULE_TZ };
@@ -58,6 +59,18 @@ describe('schedule slots', () => {
       tz: SCHEDULE_TZ,
     };
     expect(() => assertNoDstHourFirings([sweepWithoutExemption], preview)).toThrow();
+  });
+
+  it('fires skill-progression at 05:30 local on both sides of each DST change, never in the 02:00 hour', () => {
+    const slot = SCHEDULES.find((candidate) => candidate.name === 'skill-progression');
+    expect(slot).toBeDefined();
+    expect(slot?.intervalSweep).toBeUndefined();
+    const next = (from: string): string | undefined =>
+      preview('30 5 * * *', { tz: SCHEDULE_TZ, from: new Date(from), count: 1 })[0]?.toISOString();
+    // DST starts 2026-09-27 (NZST +12 -> NZDT +13) and ends 2027-04-04 (NZDT -> NZST).
+    expect(next('2026-09-25T17:30:01Z')).toBe('2026-09-26T16:30:00.000Z');
+    expect(next('2027-04-02T16:30:01Z')).toBe('2027-04-03T17:30:00.000Z');
+    expect(findDstHourFirings(slot as ScheduleSlot, preview)).toEqual([]);
   });
 
   it('exempts only the flagged idempotent interval sweep', () => {
@@ -81,6 +94,7 @@ describe('schedule slots', () => {
       ['post-game-billing', '*/5 * * * *'],
       ['daily-overdue', '0 4 * * *'],
       ['auth-cleanup', '0 5 * * *'],
+      ['skill-progression', '30 5 * * *'],
     ]);
     expect(calls.every((call) => (call[3] as { tz: string }).tz === 'Pacific/Auckland')).toBe(true);
     calls.length = 0;

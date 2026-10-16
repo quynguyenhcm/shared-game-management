@@ -22,6 +22,7 @@ export const QUEUE_NAMES = {
   sendEmail: 'send-email',
   authCleanup: 'auth-cleanup',
   memberBanned: 'member-banned',
+  skillProgression: 'skill-progression',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -47,6 +48,9 @@ export const QUEUES: readonly QueueDefinition[] = [
   // A ban's side effect (cancel registrations, promote the waitlist): one job per membership
   // (`singletonKey = member-banned:<membershipId>`), enqueued in the ban's own transaction. ADR 0015.
   { ...DEFAULTS, name: QUEUE_NAMES.memberBanned, policy: 'exclusive' },
+  // Daily skill progression sweep (skill-levels-and-auto-enroll): one run at a time. The member-row lock and the
+  // guarded UPDATE, not this policy, are what make a redelivery or an overlapping run safe.
+  { ...DEFAULTS, name: QUEUE_NAMES.skillProgression, policy: 'exclusive' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

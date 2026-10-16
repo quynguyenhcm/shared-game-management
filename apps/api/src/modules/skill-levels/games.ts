@@ -54,7 +54,7 @@ export function qualifyingGamesQuery(db: Database, input: QualifyingGamesInput) 
     .groupBy('tm.user_id');
 }
 
-/** Qualifying games per user for one page of members (up to 50) in a single query; absent users count 0. */
+/** Qualifying games per user for one page of members (up to a sweep page, 500) in a single query; absent users count 0. */
 export async function countQualifyingGamesBatch(
   db: Database,
   input: QualifyingGamesInput,
