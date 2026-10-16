@@ -450,8 +450,12 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: CREATIVE → BUILD
+**Build Status**: RUNNING
+**Auto-Build Mode**: YES
+**Current Phase**: 1 of 5
+**Resume From**: Phase 1
+**Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
+**Previous Phase**: CREATIVE → BUILD
 **Last Completed**: CREATIVE (2026-10-17)
 **Can Resume**: NO
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention; resolved by human decisions 1-4 and adopted fix 5)
@@ -468,3 +472,6 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - Architecture Creative Design: COMPLETE (2026-10-17) - Output: memory-bank/creative/skill-levels-and-auto-enroll-seams-architecture.md
 - UI/UX Creative Design: COMPLETE (2026-10-17) - Output: memory-bank/creative/skill-levels-and-auto-enroll-member-panel-uiux.md
 - User Journey Creative Design: COMPLETE (2026-10-17) - Output: memory-bank/creative/skill-levels-and-auto-enroll-admin-journey-user-journey.md
+
+### Deviations
+<!-- - Phase <N> | <file:line> | <rationale> -->
