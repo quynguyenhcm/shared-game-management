@@ -1,9 +1,82 @@
 import { describe, expect, it } from 'vitest';
+import { ErrorCode } from './errors.ts';
 import {
+  MemberSkillChangeResponse,
   SKILL_LEVELS_FIELD_MESSAGES,
   SetAutoEnrollRequest,
   SetSkillLevelRequest,
+  SkillLevelConflictResponse,
 } from './skill-levels.ts';
+import { TeamMemberRow } from './teams.ts';
+
+/** An APPROVED row as the API returns it, with the additive skill and Auto Enroll fields. */
+const ROW = {
+  userId: '22222222-2222-4222-8222-222222222222',
+  fullName: 'Priya Patel',
+  role: 'MEMBER',
+  status: 'APPROVED',
+  skillLevel: 'ADVANCED',
+  requestedAt: '2026-10-03T01:00:00.000Z',
+  approvedAt: '2026-10-04T01:00:00.000Z',
+  bannedAt: null,
+  banReason: null,
+  skillOverride: { byName: 'Aroha Ngata', at: '2026-10-17T01:02:03.456Z' },
+  skillChangedAt: '2026-10-17T01:02:03.456Z',
+  autoEnroll: { enabled: true, until: '2026-11-30', assignedAt: '2026-10-17T01:02:03.456Z' },
+  skillProgress: null,
+} as const;
+
+describe('TeamMemberRow additive fields (AC-VERIFY-7: existing fields unchanged, new ones required)', () => {
+  it('parses a row with every additive field, and a never-touched row', () => {
+    expect(TeamMemberRow.parse(ROW)).toEqual(ROW);
+    const plain = {
+      ...ROW,
+      skillLevel: 'BEGINNER',
+      skillOverride: null,
+      skillChangedAt: null,
+      autoEnroll: { enabled: false, until: null, assignedAt: null },
+      skillProgress: { games: 23, required: 40, nextLevel: 'INTERMEDIATE' },
+    };
+    expect(TeamMemberRow.parse(plain)).toEqual(plain);
+  });
+
+  it('requires each additive field on every row and keeps the until a calendar date', () => {
+    for (const field of ['skillOverride', 'skillChangedAt', 'autoEnroll', 'skillProgress']) {
+      const rest = Object.fromEntries(Object.entries(ROW).filter(([key]) => key !== field));
+      expect(TeamMemberRow.safeParse(rest).success, field).toBe(false);
+    }
+    expect(
+      TeamMemberRow.safeParse({
+        ...ROW,
+        autoEnroll: { ...ROW.autoEnroll, until: '2026-11-30T00:00:00Z' },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('PUT response shapes', () => {
+  it('answers { member, changed } so the web can tell a save from a no-op', () => {
+    expect(MemberSkillChangeResponse.parse({ member: ROW, changed: false })).toEqual({
+      member: ROW,
+      changed: false,
+    });
+    expect(MemberSkillChangeResponse.safeParse({ member: ROW }).success).toBe(false);
+  });
+
+  it('a stale override carries the current member beside the error; other 409s carry none', () => {
+    expect(ErrorCode).toContain('skill_level_stale');
+    const stale = {
+      error: { code: 'skill_level_stale', message: 'x' },
+      member: ROW,
+    };
+    expect(SkillLevelConflictResponse.parse(stale)).toEqual(stale);
+    expect(
+      SkillLevelConflictResponse.parse({
+        error: { code: 'membership_state_conflict', message: 'x' },
+      }),
+    ).not.toHaveProperty('member');
+  });
+});
 
 function fieldErrors(
   schema: { safeParse(value: unknown): unknown },

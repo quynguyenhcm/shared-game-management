@@ -16,6 +16,8 @@
 import { z } from 'zod';
 import { parseLocalDate } from '../time/time.ts';
 import { SkillTier } from '../types/enums.ts';
+import { ErrorResponse } from './errors.ts';
+import { TeamMemberRow } from './teams.ts';
 
 export const SKILL_LEVELS_FIELD_MESSAGES = {
   skillLevelRequired: 'Select a skill level.',
@@ -83,3 +85,24 @@ export const SetAutoEnrollRequest = z
     }
   });
 export type SetAutoEnrollRequest = z.infer<typeof SetAutoEnrollRequest>;
+
+/**
+ * `200` for both routes: the member after the save, and whether anything changed. `changed: false` is a no-op
+ * (the level the member already has, Auto Enroll off -> off, or an unchanged on -> on): nothing was written and
+ * no event was logged, so the web can say "already ..." instead of claiming a change.
+ */
+export const MemberSkillChangeResponse = z.object({
+  member: TeamMemberRow,
+  changed: z.boolean(),
+});
+export type MemberSkillChangeResponse = z.infer<typeof MemberSkillChangeResponse>;
+
+/**
+ * `409` on `PUT .../skill-level`. With `skill_level_stale` (the panel's `expectedSkillLevel` or
+ * `expectedChangedAt` no longer matches) the body also carries the current `member`, so the panel refreshes
+ * without another request. `membership_state_conflict` carries no member.
+ */
+export const SkillLevelConflictResponse = ErrorResponse.extend({
+  member: TeamMemberRow.optional(),
+});
+export type SkillLevelConflictResponse = z.infer<typeof SkillLevelConflictResponse>;

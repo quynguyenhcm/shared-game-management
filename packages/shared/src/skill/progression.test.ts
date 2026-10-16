@@ -9,7 +9,30 @@ import {
   SKILL_PROGRESSION_WINDOW_MS,
   decideProgression,
   nextSkillLevel,
+  toSkillProgress,
 } from './progression.ts';
+
+describe('toSkillProgress (the Members row progress line, AC-HAPPY-11)', () => {
+  it('reports games toward the next level, capped at the threshold (never "43 of 40")', () => {
+    expect(toSkillProgress('BEGINNER', 23)).toEqual({
+      games: 23,
+      required: SKILL_PROGRESSION_GAMES,
+      nextLevel: 'INTERMEDIATE',
+    });
+    expect(toSkillProgress('INTERMEDIATE', 0)).toEqual({
+      games: 0,
+      required: SKILL_PROGRESSION_GAMES,
+      nextLevel: 'ADVANCED',
+    });
+    expect(toSkillProgress('BEGINNER', SKILL_PROGRESSION_GAMES + 3)?.games).toBe(
+      SKILL_PROGRESSION_GAMES,
+    );
+  });
+
+  it('is null at the highest level ("Highest level")', () => {
+    expect(toSkillProgress('ADVANCED', 12)).toBeNull();
+  });
+});
 
 describe('constants (AC-VERIFY-4)', () => {
   it('pins the product rule: 40 games in a trailing 365 days, and the window as milliseconds', () => {

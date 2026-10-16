@@ -1,34 +1,70 @@
 /**
- * Structural guard for the skill-levels read seams (seams architecture, "Import graph"): `games.ts` and
- * `auto-enrol.ts` are LEAVES. They may import only `lib/`, `kysely`, `@sgm/shared` and Node built-ins, never
- * another module's internals, so `teams/member-read.ts` can embed the counting fragment (Phase 3) without a cycle.
- * TODO(Phase 3): add `../teams/member-read.ts` to the checked files (it may import only `skill-levels/games.ts`
- * from this module) and the other files' allowed edges.
+ * Structural guard for the skill-levels read seams (seams architecture, "Import graph"). The graph is two-way at
+ * module level (`teams/member-read.ts` -> `skill-levels/games.ts`, `skill-levels/*` -> `teams/admin-lock.ts` and
+ * `teams/member-read.ts`), so it must stay acyclic at file level:
+ *
+ * - `games.ts` and `auto-enrol.ts` are LEAVES: only `lib/`, `kysely`, `@sgm/shared` and Node built-ins.
+ * - `teams/member-read.ts` (the one `TeamMemberRow` mapper) may add exactly one module edge: `skill-levels/games.ts`.
+ * - The rest of `skill-levels/` may reach into `teams/` only through its public files `admin-lock.ts` and
+ *   `member-read.ts` (never `teams/repo.ts` or `teams/service.ts`), and into no other module.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const LEAVES = ['games.ts', 'auto-enrol.ts'] as const;
 
-function importSpecifiers(file: string): string[] {
-  const source = readFileSync(fileURLToPath(new URL(`./${file}`, import.meta.url)), 'utf8');
+function importSpecifiers(relativePath: string): string[] {
+  const source = readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
   return [...source.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s+'([^']+)'/gm)].map(
     (match) => match[1] ?? '',
   );
 }
 
+const isPlatform = (specifier: string): boolean =>
+  specifier === 'kysely' ||
+  specifier === '@sgm/shared' ||
+  specifier.startsWith('node:') ||
+  specifier.startsWith('../../lib/');
+
 describe('skill-levels leaf files', () => {
   it.each(LEAVES)('%s imports nothing from another module or from its siblings', (file) => {
-    const specifiers = importSpecifiers(file);
+    const specifiers = importSpecifiers(`./${file}`);
     expect(specifiers.length).toBeGreaterThan(0);
     for (const specifier of specifiers) {
-      const allowed =
-        specifier === 'kysely' ||
-        specifier === '@sgm/shared' ||
-        specifier.startsWith('node:') ||
-        specifier.startsWith('../../lib/');
-      expect(allowed, `${file} imports ${specifier}`).toBe(true);
+      expect(isPlatform(specifier), `${file} imports ${specifier}`).toBe(true);
+    }
+  });
+
+  it('teams/member-read.ts imports only the platform and skill-levels/games.ts (no cycle back)', () => {
+    const specifiers = importSpecifiers('../teams/member-read.ts');
+    expect(specifiers).toContain('../skill-levels/games.ts');
+    for (const specifier of specifiers) {
+      expect(
+        isPlatform(specifier) || specifier === '../skill-levels/games.ts',
+        `member-read.ts imports ${specifier}`,
+      ).toBe(true);
+    }
+  });
+
+  it('the other skill-levels files reach teams only through admin-lock.ts and member-read.ts', () => {
+    const dir = fileURLToPath(new URL('./', import.meta.url));
+    const files = readdirSync(dir).filter(
+      (name) =>
+        name.endsWith('.ts') && !name.endsWith('.test.ts') && !LEAVES.includes(name as never),
+    );
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      for (const specifier of importSpecifiers(`./${file}`)) {
+        const allowed =
+          isPlatform(specifier) ||
+          specifier.startsWith('./') ||
+          specifier === 'fastify' ||
+          specifier === 'fastify-type-provider-zod' ||
+          specifier === '../teams/admin-lock.ts' ||
+          specifier === '../teams/member-read.ts';
+        expect(allowed, `${file} imports ${specifier}`).toBe(true);
+      }
     }
   });
 });

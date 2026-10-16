@@ -43,3 +43,26 @@ export function decideProgression(input: {
   if (input.games < SKILL_PROGRESSION_GAMES) return { kind: 'none', reason: 'below_threshold' };
   return { kind: 'promote', from: input.level, to };
 }
+
+/** The Members row progress line: games toward `nextLevel`, out of `required`. */
+export interface SkillProgress {
+  readonly games: number;
+  readonly required: number;
+  readonly nextLevel: SkillTier;
+}
+
+/**
+ * What the Members row shows for an APPROVED member: `games` of `required` toward `nextLevel`, capped at the
+ * threshold (a member who reached it waits for the next daily run; the line never reads more than the
+ * threshold). `null` at the highest level ("Highest level"). `games` must come from the same count the
+ * progression job uses (`countQualifyingGames`), so the line matches what the next run decides.
+ */
+export function toSkillProgress(level: SkillTier, games: number): SkillProgress | null {
+  const nextLevel = nextSkillLevel(level);
+  if (nextLevel === null) return null;
+  return {
+    games: Math.min(Math.max(games, 0), SKILL_PROGRESSION_GAMES),
+    required: SKILL_PROGRESSION_GAMES,
+    nextLevel,
+  };
+}

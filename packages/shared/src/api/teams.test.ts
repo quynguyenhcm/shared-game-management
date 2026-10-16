@@ -58,6 +58,11 @@ const member = {
   approvedAt: null,
   bannedAt: null,
   banReason: null,
+  // Additive fields (skill-levels-and-auto-enroll), as on every row that is not APPROVED.
+  skillOverride: null,
+  skillChangedAt: null,
+  autoEnroll: { enabled: false, until: null, assignedAt: null },
+  skillProgress: null,
 };
 
 describe('CreateTeamRequest (AC-ERROR-1, AC-ERROR-15)', () => {

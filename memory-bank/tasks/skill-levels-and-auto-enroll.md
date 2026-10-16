@@ -409,7 +409,7 @@ Admin skill override and Auto Enroll on the existing People page, a daily `skill
 ### Phases
 - [x] Phase 1: Schema and shared rules. Migration (`skill_level_changed_at`, paired-override, baseline >= override, auto-enrol-cleared-when-off and approved-only CHECKs, partial index), schema-deviation entries D-55+, codegen, ban `UPDATE` clears Auto Enroll, shared constants + `decideProgression` + strict API schemas. ACs: AC-VERIFY-1, AC-VERIFY-2, AC-VERIFY-4, AC-ERROR-5 (DB half).
 - [x] Phase 2: Read seams and contract. `countQualifyingGames` and `selectAutoEnrollees` with table-driven real-DB tests, contract pin test, ADR 0017. ACs: AC-VERIFY-3, AC-INTEGRATION-1, AC-ASYNC-3, AC-INTEGRATION-3 (ADR + pin).
-- [ ] Phase 3: Admin API. `skill-levels` module (override and Auto Enroll routes with the moderation transaction shape), `TeamMemberRow` additive fields incl. `skillProgress`, log events, OpenAPI, coverage gate entry. ACs: AC-HAPPY-1..3, AC-HAPPY-7..11 (API half), AC-ERROR-1..5, AC-VERIFY-6, AC-VERIFY-7, AC-INTEGRATION-3 (`assertApprovedMember`).
+- [x] Phase 3: Admin API. `skill-levels` module (override and Auto Enroll routes with the moderation transaction shape), `TeamMemberRow` additive fields incl. `skillProgress`, log events, OpenAPI, coverage gate entry. ACs: AC-HAPPY-1..3, AC-HAPPY-7..11 (API half), AC-ERROR-1..5, AC-VERIFY-6, AC-VERIFY-7, AC-INTEGRATION-3 (`assertApprovedMember`).
 - [ ] Phase 4: Progression job. `skill-progression` queue, 05:30 Pacific/Auckland slot, handler with keyset sweep, per-member lock-recount-decide-update, failure isolation, CLI trigger, race tests. ACs: AC-HAPPY-4..6, AC-ASYNC-1, AC-ASYNC-2, AC-ERROR-7, AC-VERIFY-5, AC-INTEGRATION-2.
 - [ ] Phase 5: Admin UI and end-to-end journey. Members-row read-only lines, "Skill and Auto Enroll" disclosure panel, Server Actions, status-region success messages, field and network errors, Playwright journey on both viewports with axe. Delivers the full entry-to-success flow: `/teams/<id>/manage` → Members → "Skill and Auto Enroll" → Save → "Skill level for Priya Patel set to Advanced." ACs: AC-ENTRY-1..3, AC-HAPPY-1/2/7..11 (UI half), AC-ERROR-3, AC-ERROR-6, AC-VERIFY-8.
 
@@ -464,8 +464,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 **Build Status**: RUNNING
 **Auto-Build Mode**: YES
-**Current Phase**: 3 of 5 (Phase 2 of 5 complete)
-**Resume From**: Phase 3
+**Current Phase**: 4 of 5 (Phase 3 of 5 complete)
+**Resume From**: Phase 4
 **Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
 **Previous Phase**: CREATIVE → BUILD
 **Last Completed**: CREATIVE (2026-10-17)
@@ -489,6 +489,8 @@ Build agents read this block first. Where an AC above says otherwise, this block
 
 - Phase 2 Build: COMPLETE (2026-10-17) - countQualifyingGames/Batch (one predicate builder), selectAutoEnrollees (auto-enrol.ts), ADR 0017; 30 integration tests + 2 boundary tests; see commit
 
+- Phase 3 Build: COMPLETE (2026-10-17) - skill-levels module (routes/service/repo/decisions/errors), teams member-read.ts, SkillProvenance, skill_level_stale, OpenAPI regenerated, coverage gate entry; 35 RED tests -> unit 1092, integration 423, combined coverage gate PASS; lint/typecheck/build PASS; review APPROVED
+
 ### Guide & Recovery Log
 (empty: commit guard passed first try)
 
@@ -500,3 +502,12 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - Phase 2 | apps/api/src/modules/skill-levels/auto-enrol.ts | `selectAutoEnrollees` lives in `auto-enrol.ts` (architecture leaf split), not `games.ts`; batch fn is `countQualifyingGamesBatch`
 - Phase 2 | apps/api/test/integration/skill-levels-games.int.test.ts:306 | partial-index check is an EXPLAIN with seq scans discouraged: proves the index is usable, not that the planner picks it at scale (plan allowed "EXPLAIN or documented check")
 - Phase 2 (DONE_WITH_CONCERNS) | verifier | verifier reported jobs.int.test.ts and teams-ban-seam.int.test.ts FAIL on the pg-boss previewSchedule timeout (schedules.ts:85) under load; the builder's later full integration run passed 404/404; pre-existing flake not touched by this branch, not re-run in isolation
+- Phase 3 | decisions.ts | same-level save is a no-op even when expected values are stale, so retries are safe (AC-HAPPY-3 amended)
+- Phase 3 | service.ts | invalid_until 422 is checked after target-row checks, so a non-APPROVED target with a past date gets 409
+- Phase 3 | errors.ts | lock timeout 55P03 maps to 503 service_unavailable (not declared in route response schemas/OpenAPI; non-blocking review note)
+- Phase 3 | progression.ts | skillProgress.games is capped at required
+- Phase 3 | member-read.ts | no-N+1 means 2 queries per page (list plus one grouped count)
+- Phase 3 | teams/service.ts | skillOverride.byName falls back to ''
+- Phase 3 | skill-levels-api.int.test.ts | flake risk: 2s HTTP lock_timeout in race tests could give 503 under heavy load
+- Phase 3 | shared/api/skill-levels.ts | no request-schema change was needed
+- Phase 3 | verify | `pnpm run test:coverage` needs DATABASE_URL (it runs the integration project); unit-only coverage of skill-levels/** is low by design, the gate passes on the combined run

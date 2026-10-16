@@ -272,6 +272,10 @@ describe('moderation Server Actions (AC-HAPPY-6..12, AC-ERROR-6/7/9/11 web side)
     approvedAt: '2026-10-04T01:00:00.000Z',
     bannedAt: null,
     banReason: null,
+    skillOverride: null,
+    skillChangedAt: null,
+    autoEnroll: { enabled: false, until: null, assignedAt: null },
+    skillProgress: { games: 0, required: 40, nextLevel: 'INTERMEDIATE' },
   };
   const FIELDS = { teamId: TEAM_ID, userId: USER_ID, fullName: 'Ana Lee' };
   const NONE = null;

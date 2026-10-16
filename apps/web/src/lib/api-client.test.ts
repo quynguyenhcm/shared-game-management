@@ -347,6 +347,10 @@ describe('apiClient team-admin calls (members, moderation, invite code)', () => 
     approvedAt: '2026-10-04T01:00:00.000Z',
     bannedAt: null,
     banReason: null,
+    skillOverride: null,
+    skillChangedAt: null,
+    autoEnroll: { enabled: false, until: null, assignedAt: null },
+    skillProgress: { games: 0, required: 40, nextLevel: 'INTERMEDIATE' },
   };
 
   function call(fetchMock: ReturnType<typeof stubJson>) {

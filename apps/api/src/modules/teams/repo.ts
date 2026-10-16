@@ -16,6 +16,7 @@ import {
   type TeamVisibility,
 } from '@sgm/shared';
 import type { Database } from '../../lib/db/kysely.ts';
+import { memberColumns, memberJoins, toMemberRows, type MemberSqlRow } from './member-read.ts';
 import type { MembersCursor } from './members-cursor.ts';
 
 export interface TeamRow {
@@ -482,57 +483,11 @@ export async function applyMembershipChange(
   return result.numUpdatedRows > 0n;
 }
 
-interface MemberSqlRow {
-  readonly user_id: string;
-  readonly full_name: string;
-  readonly role: TeamRole;
-  readonly status: MembershipStatus;
-  readonly skill_level: SkillTier;
-  readonly requested_at: Date;
-  readonly approved_at: Date | null;
-  readonly banned_at: Date | null;
-  readonly ban_reason: string | null;
-}
-
-function toMemberRow(row: MemberSqlRow): TeamMemberRow {
-  return {
-    userId: row.user_id,
-    fullName: row.full_name,
-    role: row.role,
-    status: row.status,
-    skillLevel: row.skill_level,
-    requestedAt: row.requested_at.toISOString(),
-    approvedAt: row.approved_at === null ? null : row.approved_at.toISOString(),
-    bannedAt: row.banned_at === null ? null : row.banned_at.toISOString(),
-    banReason: row.ban_reason,
-  };
-}
-
-/** One person as the admin lists show them (full name and self-assessed skill; never an email). */
-export async function getMemberRow(
-  db: Database,
-  teamId: string,
-  userId: string,
-): Promise<TeamMemberRow | undefined> {
-  const row = await db
-    .selectFrom('team_members as m')
-    .innerJoin('users as u', 'u.id', 'm.user_id')
-    .select([
-      'm.user_id',
-      'u.full_name',
-      'm.role',
-      'm.status',
-      'm.skill_level',
-      'm.requested_at',
-      'm.approved_at',
-      'm.banned_at',
-      'm.ban_reason',
-    ])
-    .where('m.team_id', '=', teamId)
-    .where('m.user_id', '=', userId)
-    .executeTakeFirst();
-  return row === undefined ? undefined : toMemberRow(row);
-}
+/**
+ * The `TeamMemberRow` mapper lives in the public `member-read.ts` (skill-levels-and-auto-enroll adds fields every
+ * member endpoint must carry); re-exported so teams code is unchanged.
+ */
+export { getMemberRow } from './member-read.ts';
 
 export interface MemberListPage {
   readonly members: readonly TeamMemberRow[];
@@ -541,7 +496,8 @@ export interface MemberListPage {
 }
 
 /**
- * One section of the admin lists, 50 rows (51 fetched; the extra one only signals "more"), keyset-paged:
+ * One section of the admin lists, 50 rows (51 fetched; the extra one only signals "more"), keyset-paged, mapped by
+ * `member-read.ts` (one extra grouped count for the page's progress lines, at `now`):
  *  PENDING  oldest request first      (requested_at, user_id)
  *  APPROVED admins first, then name   (role rank, lower(full_name), user_id)
  *  BANNED   newest ban first          (banned_at, user_id) descending
@@ -553,6 +509,7 @@ export async function listMembers(
   teamId: string,
   status: MemberListStatus,
   cursor: MembersCursor | null,
+  now: Date,
 ): Promise<MemberListPage> {
   const filters: RawBuilder<unknown>[] = [
     sql`m.team_id = ${teamId}::uuid`,
@@ -582,13 +539,12 @@ export async function listMembers(
   const { rows } = await sql<
     MemberSqlRow & { sort_time: string; sort_name: string; sort_rank: number }
   >`
-    SELECT m.user_id, u.full_name, m.role, m.status, m.skill_level, m.requested_at, m.approved_at,
-           m.banned_at, ${status === 'BANNED' ? sql`m.ban_reason` : sql`NULL::text`} AS ban_reason,
+    SELECT ${memberColumns({ withBanReason: status === 'BANNED' })},
            ${status === 'BANNED' ? sql`m.banned_at::text` : sql`m.requested_at::text`} AS sort_time,
            lower(u.full_name) AS sort_name,
            CASE WHEN m.role = 'TEAM_ADMIN' THEN 0 ELSE 1 END AS sort_rank
       FROM team_members m
-      JOIN users u ON u.id = m.user_id
+      ${memberJoins()}
      WHERE ${sql.join(filters, sql` AND `)}
      ORDER BY ${order}
      LIMIT ${MEMBERS_PAGE_SIZE + 1}`.execute(db);
@@ -607,7 +563,7 @@ export async function listMembers(
           }
         : { v: 1, s: status, t: last.sort_time, i: last.user_id };
   }
-  return { members: page.map(toMemberRow), next };
+  return { members: await toMemberRows(db, teamId, page, now), next };
 }
 
 /** The ban job's re-read: just enough of the row to check it still matches the payload. */

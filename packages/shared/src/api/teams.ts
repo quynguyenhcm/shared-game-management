@@ -247,7 +247,21 @@ export const JoinRequestResponse = z.object({
 });
 export type JoinRequestResponse = z.infer<typeof JoinRequestResponse>;
 
-/** One person in an admin list: full name and self-assessed skill only, never an email. */
+/**
+ * One person in an admin list: full name and skill level only, never an email.
+ *
+ * The last four fields were added by skill-levels-and-auto-enroll (additive: no earlier field changed). They are
+ * present on every row of every endpoint that returns a `TeamMemberRow`:
+ * - `skillOverride`: who last set the level by hand and when (the actor's name is shown to team admins only).
+ * - `skillChangedAt`: the last level change (override or automatic), the progression counting baseline; null
+ *   while the level is still the self-assessed one. With `skillOverride` it derives the provenance line
+ *   (`deriveSkillProvenance`).
+ * - `autoEnroll`: the stored flag, end date (a Pacific/Auckland calendar date, inclusive) and order key. An
+ *   assignment whose `until` is before today stays `enabled` here; the view derives "ended". Always
+ *   `{ enabled: false, until: null, assignedAt: null }` off the APPROVED list (database CHECK).
+ * - `skillProgress`: games toward the next level (`toSkillProgress`, capped at the threshold); null at ADVANCED
+ *   and for every row that is not APPROVED.
+ */
 export const TeamMemberRow = z.object({
   userId: z.uuid(),
   fullName: z.string(),
@@ -259,6 +273,20 @@ export const TeamMemberRow = z.object({
   bannedAt: z.iso.datetime().nullable(),
   /** Only in the BANNED list, and only for team admins. */
   banReason: z.string().nullable(),
+  skillOverride: z.object({ byName: z.string(), at: z.iso.datetime() }).nullable(),
+  skillChangedAt: z.iso.datetime().nullable(),
+  autoEnroll: z.object({
+    enabled: z.boolean(),
+    until: z.iso.date().nullable(),
+    assignedAt: z.iso.datetime().nullable(),
+  }),
+  skillProgress: z
+    .object({
+      games: z.number().int().min(0),
+      required: z.number().int().min(1),
+      nextLevel: z.enum(SkillTier),
+    })
+    .nullable(),
 });
 export type TeamMemberRow = z.infer<typeof TeamMemberRow>;
 

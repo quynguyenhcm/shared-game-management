@@ -15,14 +15,16 @@
  * returned for that member. The opt-out is authoritative at registration time. A deterministic race test lands
  * with whichever feature ships the allocator; whoever writes it should reuse `holdMemberLock` below.
  *
- * TODO(skill-levels Phase 3): the `TeamMemberRow` additive fields (`skillOverride`, `skillChangedAt`,
- * `autoEnroll`, `skillProgress`) do not exist yet. When Phase 3 adds them, extend the "consumer contract" block
- * at the bottom with a strict parse of a real `GET /teams/:id/members` row. Only what exists today is pinned.
+ * The "consumer contract" block at the bottom also pins the `TeamMemberRow` additive fields (`skillOverride`,
+ * `skillChangedAt`, `autoEnroll`, `skillProgress`) with a strict parse of a real `GET /teams/:id/members` row: the
+ * web panel and any later consumer read exactly these keys and shapes.
  */
 import type { Kysely } from 'kysely';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  SKILL_PROGRESSION_GAMES,
   SKILL_PROGRESSION_WINDOW_MS,
+  TeamMemberRow,
   parseLocalDate,
   type LocalDate,
   type SkillTier,
@@ -40,12 +42,14 @@ import {
 } from '../../src/modules/skill-levels/auto-enrol.ts';
 import { assertApprovedMember } from '../../src/modules/teams/membership.ts';
 import {
+  insertAuthSession,
   insertRegistration,
   insertSession,
   insertTeam,
   insertTeamMember,
   insertUser,
 } from '../helpers/factories.ts';
+import { bearer, buildAuthTestApp } from '../helpers/auth-app.ts';
 import { countLockWaiters } from '../helpers/lock-waiters.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 
@@ -518,7 +522,7 @@ describe('the seams take no locks (AC-INTEGRATION-1, C-SKL-1)', () => {
   });
 });
 
-describe('consumer contract: what exists today (AC-INTEGRATION-3)', () => {
+describe('consumer contract (AC-INTEGRATION-3)', () => {
   it('pins the selection and count signatures and the selection return shape', async () => {
     expectTypeOf(selectAutoEnrollees).parameters.toEqualTypeOf<
       [Kysely<DB>, { readonly teamId: string; readonly sessionDate: LocalDate }]
@@ -559,5 +563,66 @@ describe('consumer contract: what exists today (AC-INTEGRATION-3)', () => {
       [teamId, userId, actor, at],
     );
     expect(await gate()).toBe('ADVANCED');
+  });
+
+  it('pins the TeamMemberRow additive fields with a strict parse of a real members-list row', async () => {
+    const harness = await buildAuthTestApp(database.pool);
+    try {
+      const teamId = await insertTeam(database.pool);
+      const admin = await insertUser(database.pool);
+      await database.pool.query(`UPDATE users SET full_name = 'Contract Admin' WHERE id = $1`, [
+        admin,
+      ]);
+      await insertTeamMember(database.pool, { teamId, userId: admin, role: 'TEAM_ADMIN' });
+      const { token } = await insertAuthSession(database.pool, admin, {
+        createdAt: harness.clock.now(),
+      });
+      const member = await approvedMember(teamId, 'INTERMEDIATE');
+      const overrideAt = new Date('2026-10-01T00:00:00.000Z');
+      await database.pool.query(
+        `UPDATE team_members SET skill_level_override_by = $3, skill_level_override_at = $4,
+                skill_level_changed_at = $4, is_auto_enroll = true, auto_enroll_until = '2026-11-30',
+                auto_enroll_assigned_at = $4
+          WHERE team_id = $1 AND user_id = $2`,
+        [teamId, member, admin, overrideAt],
+      );
+      const response = await harness.app.inject({
+        method: 'GET',
+        url: `/teams/${teamId}/members?status=APPROVED`,
+        headers: bearer(token),
+      });
+      expect(response.statusCode).toBe(200);
+      const rows = response.json<{ members: unknown[] }>().members;
+      for (const row of rows) expect(TeamMemberRow.strict().parse(row)).toEqual(row);
+      const pinned = rows
+        .map((row) => TeamMemberRow.strict().parse(row))
+        .find((row) => row.userId === member);
+      expect(pinned).toMatchObject({
+        skillLevel: 'INTERMEDIATE',
+        skillOverride: { byName: 'Contract Admin', at: overrideAt.toISOString() },
+        skillChangedAt: overrideAt.toISOString(),
+        autoEnroll: { enabled: true, until: '2026-11-30', assignedAt: overrideAt.toISOString() },
+        skillProgress: { games: 0, required: SKILL_PROGRESSION_GAMES, nextLevel: 'ADVANCED' },
+      });
+      expect(Object.keys(pinned ?? {}).sort()).toEqual(
+        [
+          'approvedAt',
+          'autoEnroll',
+          'banReason',
+          'bannedAt',
+          'fullName',
+          'requestedAt',
+          'role',
+          'skillChangedAt',
+          'skillLevel',
+          'skillOverride',
+          'skillProgress',
+          'status',
+          'userId',
+        ].sort(),
+      );
+    } finally {
+      await harness.close();
+    }
   });
 });
