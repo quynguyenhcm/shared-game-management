@@ -9,15 +9,16 @@ import { AppError } from '../../lib/http/errors.ts';
 const LOCK_NOT_AVAILABLE = '55P03';
 
 /**
- * 409 `skill_level_stale` (Binding Reconciliation decision 4): the override was based on a level or baseline that
- * is no longer current. Carries the current member so the route can answer with it and the panel refreshes.
+ * 409 `skill_level_stale` (Binding Reconciliation decision 4) or `auto_enroll_stale` (final review): the save was
+ * based on a view of the member that is no longer current. Carries the current member so the route can answer
+ * with it and the panel refreshes.
  */
-export class SkillLevelStaleError extends AppError {
+export class MemberStaleError extends AppError {
   readonly member: TeamMemberRow;
 
-  constructor(member: TeamMemberRow) {
-    super('skill_level_stale');
-    this.name = 'SkillLevelStaleError';
+  constructor(code: 'skill_level_stale' | 'auto_enroll_stale', member: TeamMemberRow) {
+    super(code);
+    this.name = 'MemberStaleError';
     this.member = member;
   }
 }

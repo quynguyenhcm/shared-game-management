@@ -36,18 +36,19 @@ const StaleLevelToken = z.enum(SkillTier, {
   error: SKILL_LEVELS_FIELD_MESSAGES.staleTokenInvalid,
 });
 
+function isCalendarDate(value: string): boolean {
+  try {
+    parseLocalDate(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** A real calendar date as `YYYY-MM-DD` (the Pacific/Auckland wall date the admin picked). */
-const UntilDate = z.string({ error: SKILL_LEVELS_FIELD_MESSAGES.untilInvalid }).refine(
-  (value) => {
-    try {
-      parseLocalDate(value);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  { error: SKILL_LEVELS_FIELD_MESSAGES.untilInvalid },
-);
+const UntilDate = z
+  .string({ error: SKILL_LEVELS_FIELD_MESSAGES.untilInvalid })
+  .refine(isCalendarDate, { error: SKILL_LEVELS_FIELD_MESSAGES.untilInvalid });
 
 /**
  * `PUT /teams/:teamId/members/:userId/skill-level`. `expectedSkillLevel` and `expectedChangedAt` are what the
@@ -65,15 +66,31 @@ export const SetSkillLevelRequest = z.strictObject({
 });
 export type SetSkillLevelRequest = z.infer<typeof SetSkillLevelRequest>;
 
+/** A hidden "what the panel was showing" date: the stored `until`, which may be past (an ended assignment). */
+const StaleDateToken = z
+  .string({ error: SKILL_LEVELS_FIELD_MESSAGES.staleTokenInvalid })
+  .refine(isCalendarDate, { error: SKILL_LEVELS_FIELD_MESSAGES.staleTokenInvalid });
+
 /**
  * `PUT /teams/:teamId/members/:userId/auto-enroll`. `until` is optional in meaning, not in shape: send `null`
  * for "no end date". `enabled: false` with a date is rejected so a client cannot leave an end date on an off
  * flag (the database forbids it too).
+ *
+ * `expectedEnabled`, `expectedUntil` and `expectedAssignedAt` are the row's `autoEnroll` exactly as the API
+ * returned it (the stored state, so an ended assignment still reads `enabled: true`). The service compares all
+ * three under the member-row lock and answers 409 `auto_enroll_stale` with the current member when the save
+ * would change something and another admin changed Auto Enroll since: a stale panel can never silently
+ * re-enrol a member someone else turned off (final review, same guard as the skill-level body).
  */
 export const SetAutoEnrollRequest = z
   .strictObject({
     enabled: z.boolean(),
     until: UntilDate.nullable(),
+    expectedEnabled: z.boolean({ error: SKILL_LEVELS_FIELD_MESSAGES.staleTokenInvalid }),
+    expectedUntil: StaleDateToken.nullable(),
+    expectedAssignedAt: z.iso
+      .datetime({ error: SKILL_LEVELS_FIELD_MESSAGES.staleTokenInvalid })
+      .nullable(),
   })
   .superRefine((value, context) => {
     if (!value.enabled && value.until !== null) {
@@ -98,9 +115,9 @@ export const MemberSkillChangeResponse = z.object({
 export type MemberSkillChangeResponse = z.infer<typeof MemberSkillChangeResponse>;
 
 /**
- * `409` on `PUT .../skill-level`. With `skill_level_stale` (the panel's `expectedSkillLevel` or
- * `expectedChangedAt` no longer matches) the body also carries the current `member`, so the panel refreshes
- * without another request. `membership_state_conflict` carries no member.
+ * `409` on both member routes. With `skill_level_stale` or `auto_enroll_stale` (the panel's expected values no
+ * longer match) the body also carries the current `member`, so the panel refreshes without another request.
+ * `membership_state_conflict` carries no member.
  */
 export const SkillLevelConflictResponse = ErrorResponse.extend({
   member: TeamMemberRow.optional(),

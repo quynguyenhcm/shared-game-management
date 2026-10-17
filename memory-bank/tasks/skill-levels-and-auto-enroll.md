@@ -194,6 +194,12 @@ Member skill management and auto-enrollment (PRODDUCT-OVERVIEW §2).
 **When** Aroha saves a different level with the `expectedSkillLevel` and `expectedChangedAt` the panel was showing
 **Then** under the member-row lock the service compares both (the baseline at millisecond precision, as the API returns it, although the column stores microseconds) and answers 409 `skill_level_stale` with the current `member`; nothing is written; the panel refreshes with "This member's level changed since you opened the panel. Check it and save again."; a save that re-sends the refreshed values applies
 
+#### AC-ERROR-10: A stale Auto Enroll save cannot re-enrol a member another admin turned off (added after the final review, 2026-10-17)
+**Priority**: MUST
+**Given** Aroha opened Priya's panel showing "Auto Enroll until 30 Nov", and since then Bo turned Priya's Auto Enroll off
+**When** Aroha saves a new end date with the `expectedEnabled`, `expectedUntil` and `expectedAssignedAt` the panel was showing (the stored state, so an ended assignment still reads enabled)
+**Then** under the member-row lock the service compares all three and answers 409 `auto_enroll_stale` with the current `member`; nothing is written and no event is logged; the panel refreshes with "This member's Auto Enroll changed since you opened the panel. Check it and save again."; a save that would change nothing is still a no-op on a stale view (retries stay safe); a save from the refreshed panel applies. Both admin saves read the injected clock after their locks, so a save that waited across NZ midnight is validated against the date it writes on
+
 #### AC-ASYNC-1: Progression appears at the next run, and an operator can run it on demand
 **Priority**: MUST
 **Given** a session has just become `COMPLETED` and its confirmed registrant now has their 40th qualifying game
@@ -466,6 +472,7 @@ Build agents read this block first. Where an AC above says otherwise, this block
 **Auto-Build Mode**: YES
 **Current Phase**: 5 of 5 (all phases complete)
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (verdict: Ready to merge — With fixes; 0 Critical, 3 Important: Compose e2e regression on Members row, Auto Enroll PUT last-writer-wins, clock read before lock in both admin saves)
+**Post-review fixes (2026-10-17, user-requested)**: Important #2 fixed (Auto Enroll optimistic concurrency, 409 `auto_enroll_stale`, AC-ERROR-10). Important #3 fixed (both saves read `clock.now()` after `lockMemberRow`). Important #1 (Compose e2e regression) is still OPEN: run `pnpm run test:e2e` on the Compose stack before merge.
 **Resume From**: n/a (run /yay:reflect)
 **Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
 **Previous Phase**: CREATIVE → BUILD

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../lib/http/errors.ts';
-import { SkillLevelStaleError, mapSkillLevelsDbError } from './errors.ts';
+import { MemberStaleError, mapSkillLevelsDbError } from './errors.ts';
 
 const pgError = (code: string, constraint?: string): Error =>
   Object.assign(new Error('db said no'), { code, constraint });
@@ -24,11 +24,14 @@ describe('mapSkillLevelsDbError (keyed on SQLSTATE + constraint, never message t
   });
 });
 
-describe('SkillLevelStaleError', () => {
-  it('is a 409 skill_level_stale AppError that carries the current member', () => {
-    const member = { userId: 'u' } as never;
-    const error = new SkillLevelStaleError(member);
-    expect(error).toBeInstanceOf(AppError);
-    expect(error).toMatchObject({ code: 'skill_level_stale', status: 409, member });
-  });
+describe('MemberStaleError', () => {
+  it.each(['skill_level_stale', 'auto_enroll_stale'] as const)(
+    'is a 409 %s AppError that carries the current member',
+    (code) => {
+      const member = { userId: 'u' } as never;
+      const error = new MemberStaleError(code, member);
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({ code, status: 409, member });
+    },
+  );
 });

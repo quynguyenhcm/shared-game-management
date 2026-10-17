@@ -129,8 +129,35 @@ const setLevel = (
     ...body,
   });
 
-const setAuto = (s: Scene, who: Person | null, body: unknown, userId = s.priya.id) =>
-  put('auto-enroll', s.teamId, userId, who, body);
+/** A panel that saw Auto Enroll off (the expected-state token of a fresh member). */
+const SAW_OFF = { expectedEnabled: false, expectedUntil: null, expectedAssignedAt: null };
+
+/** The expected-state token of a panel opened now: the member's stored Auto Enroll, as the API returns it. */
+async function shownAutoEnroll(teamId: string, userId: string) {
+  const { rows } = await database.pool.query<{
+    is_auto_enroll: boolean;
+    until: string | null;
+    auto_enroll_assigned_at: Date | null;
+  }>(
+    `SELECT is_auto_enroll, auto_enroll_until::text AS until, auto_enroll_assigned_at
+       FROM team_members WHERE team_id = $1 AND user_id = $2`,
+    [teamId, userId],
+  );
+  const row = rows[0];
+  if (row === undefined) return SAW_OFF;
+  return {
+    expectedEnabled: row.is_auto_enroll,
+    expectedUntil: row.until,
+    expectedAssignedAt: row.auto_enroll_assigned_at?.toISOString() ?? null,
+  };
+}
+
+/** An Auto Enroll save from a panel opened just now, unless `body` brings its own expected-state token. */
+const setAuto = async (s: Scene, who: Person | null, body: object, userId = s.priya.id) =>
+  put('auto-enroll', s.teamId, userId, who, {
+    ...(await shownAutoEnroll(s.teamId, userId)),
+    ...body,
+  });
 
 async function columns(teamId: string, userId: string) {
   const { rows } = await database.pool.query<{
@@ -431,6 +458,36 @@ describe('PUT .../auto-enroll (AC-HAPPY-7..10, AC-HAPPY-13)', () => {
     });
     expect(order.map((e) => e.userId)).toEqual([kim.id, sam.id, s.priya.id]);
   });
+
+  it('a stale panel cannot re-enrol a member another admin turned off: 409 auto_enroll_stale with the current member (final review)', async () => {
+    const s = await scene();
+    await setAuto(s, s.aroha, { enabled: true, until: '2026-11-30' });
+    // Aroha's panel was opened now, showing "on until 30 Nov".
+    const arohaSaw = await shownAutoEnroll(s.teamId, s.priya.id);
+    h.clock.advance(60_000);
+    expect((await setAuto(s, s.bo, { enabled: false, until: null })).statusCode).toBe(200);
+    const before = await columns(s.teamId, s.priya.id);
+    const events = eventsFor('team.member.auto_enroll_changed', s.priya.id).length;
+
+    h.clock.advance(60_000);
+    const stale = await setAuto(s, s.aroha, { enabled: true, until: '2026-12-24', ...arohaSaw });
+    expect(stale.statusCode).toBe(409);
+    const body = errorOf(stale);
+    expect(body.error.code).toBe('auto_enroll_stale');
+    expect(body.member?.autoEnroll).toEqual({ enabled: false, until: null, assignedAt: null });
+    expect(await columns(s.teamId, s.priya.id)).toEqual(before);
+    expect(eventsFor('team.member.auto_enroll_changed', s.priya.id)).toHaveLength(events);
+    expect(
+      await selectAutoEnrollees(h.db, { teamId: s.teamId, sessionDate: '2026-10-20' as LocalDate }),
+    ).toEqual([]);
+
+    // A save that would change nothing is still a no-op on a stale view (retries stay safe), and a save
+    // from the refreshed panel goes through.
+    const retried = await setAuto(s, s.aroha, { enabled: false, until: null, ...arohaSaw });
+    expect(retried.json<ChangeBody>().changed).toBe(false);
+    const fresh = await setAuto(s, s.aroha, { enabled: true, until: '2026-12-24' });
+    expect(fresh.statusCode).toBe(200);
+  });
 });
 
 describe('refusals (AC-ERROR-1..3)', () => {
@@ -521,10 +578,11 @@ describe('refusals (AC-ERROR-1..3)', () => {
         },
         '_form',
       ],
-      ['auto-enroll', { enabled: true, until: '30/11/2026' }, 'until'],
+      ['auto-enroll', { enabled: true, until: '30/11/2026', ...SAW_OFF }, 'until'],
       // Yesterday in Pacific/Auckland (today is 6 Oct): needs the injected clock, so the service checks it.
-      ['auto-enroll', { enabled: true, until: '2026-10-05' }, 'until'],
-      ['auto-enroll', { enabled: false, until: '2026-11-30' }, 'until'],
+      ['auto-enroll', { enabled: true, until: '2026-10-05', ...SAW_OFF }, 'until'],
+      ['auto-enroll', { enabled: false, until: '2026-11-30', ...SAW_OFF }, 'until'],
+      ['auto-enroll', { enabled: true, until: null }, 'expectedEnabled'],
     ];
     for (const [path, body, field] of cases) {
       const response = await put(path, s.teamId, s.priya.id, s.aroha, body);
@@ -592,6 +650,36 @@ describe('races under the team lock (AC-ERROR-4, AC-ERROR-5)', () => {
       auto_enroll_until: null,
       auto_enroll_assigned_at: null,
     });
+  });
+
+  it('both saves stamp the instant they wrote, not when they arrived: the clock is read after the locks (final review)', async () => {
+    const s = await scene();
+    const sam = await person();
+    await insertTeamMember(database.pool, { teamId: s.teamId, userId: sam.id });
+    const lock = await holdTeamLock(database.pool, s.teamId);
+    // 2026-10-06T10:59:30Z is 23:59:30 on 6 Oct in Auckland: the saves arrive before NZ midnight...
+    h.clock.set(new Date('2026-10-06T10:59:30.000Z'));
+    try {
+      const pending = [
+        setLevel(s, s.aroha, { skillLevel: 'ADVANCED' }),
+        // ...with an end date of 6 Oct, which is still today when they arrive.
+        setAuto(s, s.aroha, { enabled: true, until: '2026-10-06' }, sam.id),
+      ];
+      await waitForLockWaiters(database.pool, 2, 'saves blocked on the team row');
+      // ...and get their locks after midnight.
+      h.clock.set(new Date('2026-10-06T11:00:30.000Z'));
+      await lock.release();
+      const [level, auto] = await Promise.all(pending);
+      expect(level?.statusCode).toBe(200);
+      expect(level?.json<ChangeBody>().member.skillOverride?.at).toBe('2026-10-06T11:00:30.000Z');
+      expect(level?.json<ChangeBody>().member.skillChangedAt).toBe('2026-10-06T11:00:30.000Z');
+      // 6 Oct is yesterday by the time the save runs, so it is refused and nothing is written.
+      expect(auto?.statusCode).toBe(422);
+      expect(errorOf(auto as LightMyRequestResponse).error.fieldErrors).toHaveProperty('until');
+    } finally {
+      await lock.release();
+    }
+    expect(await columns(s.teamId, sam.id)).toMatchObject({ is_auto_enroll: false });
   });
 
   it('a toggle that committed first is cleared by the ban, and a later toggle gets 409', async () => {

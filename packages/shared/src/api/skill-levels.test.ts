@@ -143,40 +143,82 @@ describe('SetSkillLevelRequest (AC-ERROR-3, optimistic concurrency)', () => {
   });
 });
 
-describe('SetAutoEnrollRequest (AC-ERROR-3)', () => {
+describe('SetAutoEnrollRequest (AC-ERROR-3, optimistic concurrency)', () => {
+  /** A panel that saw the member with Auto Enroll off. */
+  const sawOff = { expectedEnabled: false, expectedUntil: null, expectedAssignedAt: null };
+
   it('accepts on with a date, on without one, and off without one', () => {
-    expect(SetAutoEnrollRequest.parse({ enabled: true, until: '2026-11-30' })).toEqual({
+    expect(SetAutoEnrollRequest.parse({ enabled: true, until: '2026-11-30', ...sawOff })).toEqual({
       enabled: true,
       until: '2026-11-30',
+      ...sawOff,
     });
-    expect(SetAutoEnrollRequest.parse({ enabled: true, until: null }).until).toBeNull();
-    expect(SetAutoEnrollRequest.parse({ enabled: false, until: null }).enabled).toBe(false);
+    expect(SetAutoEnrollRequest.parse({ enabled: true, until: null, ...sawOff }).until).toBeNull();
+    expect(SetAutoEnrollRequest.parse({ enabled: false, until: null, ...sawOff }).enabled).toBe(
+      false,
+    );
   });
 
   it('rejects a malformed or impossible date with the until copy', () => {
     for (const until of ['30/11/2026', '2026-13-01', '2026-02-30', '', 20261130, undefined]) {
-      expect(fieldErrors(SetAutoEnrollRequest, { enabled: true, until })).toEqual({
+      expect(fieldErrors(SetAutoEnrollRequest, { enabled: true, until, ...sawOff })).toEqual({
         until: [SKILL_LEVELS_FIELD_MESSAGES.untilInvalid],
       });
     }
   });
 
   it('rejects an end date on an off flag, on the until field', () => {
-    expect(fieldErrors(SetAutoEnrollRequest, { enabled: false, until: '2026-11-30' })).toEqual({
-      until: [SKILL_LEVELS_FIELD_MESSAGES.untilNeedsAutoEnroll],
-    });
+    expect(
+      fieldErrors(SetAutoEnrollRequest, { enabled: false, until: '2026-11-30', ...sawOff }),
+    ).toEqual({ until: [SKILL_LEVELS_FIELD_MESSAGES.untilNeedsAutoEnroll] });
   });
 
   it('requires a boolean enabled and refuses unknown fields such as the assignment time', () => {
-    expect(fieldErrors(SetAutoEnrollRequest, { enabled: 'yes', until: null })).toHaveProperty(
-      'enabled',
-    );
+    expect(
+      fieldErrors(SetAutoEnrollRequest, { enabled: 'yes', until: null, ...sawOff }),
+    ).toHaveProperty('enabled');
     expect(
       SetAutoEnrollRequest.safeParse({
         enabled: true,
         until: null,
+        ...sawOff,
         autoEnrollAssignedAt: '2026-10-17T00:00:00Z',
       }).success,
     ).toBe(false);
+  });
+
+  it('requires the state the panel was showing; a past stored date is a valid token', () => {
+    expect(Object.keys(fieldErrors(SetAutoEnrollRequest, { enabled: true, until: null }))).toEqual([
+      'expectedEnabled',
+      'expectedUntil',
+      'expectedAssignedAt',
+    ]);
+    const sawEnded = {
+      expectedEnabled: true,
+      expectedUntil: '2020-01-31',
+      expectedAssignedAt: '2026-10-17T01:02:03.456Z',
+    };
+    expect(SetAutoEnrollRequest.parse({ enabled: true, until: null, ...sawEnded })).toMatchObject(
+      sawEnded,
+    );
+    for (const bad of [
+      { expectedUntil: '31/01/2020' },
+      { expectedAssignedAt: '2026-10-17' },
+      { expectedEnabled: 'true' },
+    ]) {
+      const errors = fieldErrors(SetAutoEnrollRequest, {
+        enabled: true,
+        until: null,
+        ...sawEnded,
+        ...bad,
+      });
+      expect(Object.values(errors).flat()).toEqual([SKILL_LEVELS_FIELD_MESSAGES.staleTokenInvalid]);
+    }
+  });
+
+  it('an Auto Enroll 409 carries the current member like a stale override', () => {
+    expect(ErrorCode).toContain('auto_enroll_stale');
+    const stale = { error: { code: 'auto_enroll_stale', message: 'x' }, member: ROW };
+    expect(SkillLevelConflictResponse.parse(stale)).toEqual(stale);
   });
 });

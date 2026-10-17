@@ -55,29 +55,60 @@ export interface AutoEnrolState {
 export type AutoEnrolDecision =
   | { readonly kind: 'invalid_until' }
   | { readonly kind: 'noop' }
+  | { readonly kind: 'stale' }
   | { readonly kind: 'set'; readonly next: AutoEnrolState };
 
 const OFF: AutoEnrolState = { enabled: false, until: null, assignedAt: null };
+
+/** What the panel was showing: the stored state as the API returned it. */
+export interface ExpectedAutoEnrol {
+  readonly expectedEnabled: boolean;
+  readonly expectedUntil: string | null;
+  readonly expectedAssignedAt: string | null;
+}
 
 /**
  * An Auto Enroll save. `until` is inclusive and compared with today in Pacific/Auckland (`YYYY-MM-DD` strings
  * order like dates).
  * - An end date before today is refused (422 on `until`).
- * - Off: clears all three columns; already off is a no-op.
+ * - A save that changes nothing is a no-op, whatever the panel saw (a retried save after a lost response is safe).
+ * - Otherwise the state the panel was showing must still be current (optimistic concurrency, as for the
+ *   override): another admin's save since makes it `stale`, so a stale panel cannot re-enrol a member someone
+ *   else turned off.
+ * - Off: clears all three columns.
  * - On, from off or from an ENDED assignment (`until` before today): a new assignment at the back of the
  *   order (`assignedAt = now`, decision 3). An `until` of today is still active.
- * - On, from an active assignment: keeps its place (`assignedAt` unchanged); an unchanged `until` is a no-op.
+ * - On, from an active assignment: keeps its place (`assignedAt` unchanged).
  */
 export function decideAutoEnrolChange(
   current: AutoEnrolState,
-  input: { readonly enabled: boolean; readonly until: string | null },
+  input: { readonly enabled: boolean; readonly until: string | null } & ExpectedAutoEnrol,
   context: { readonly todayNz: LocalDate; readonly now: Date },
 ): AutoEnrolDecision {
   const until = input.until as LocalDate | null;
   if (input.enabled && until !== null && until < context.todayNz) return { kind: 'invalid_until' };
-  if (!input.enabled) return current.enabled ? { kind: 'set', next: OFF } : { kind: 'noop' };
+  const next = nextAutoEnrol(current, input.enabled, until, context);
+  if (next === null) return { kind: 'noop' };
+  if (
+    input.expectedEnabled !== current.enabled ||
+    input.expectedUntil !== current.until ||
+    !sameInstant(input.expectedAssignedAt, current.assignedAt)
+  ) {
+    return { kind: 'stale' };
+  }
+  return { kind: 'set', next };
+}
+
+/** The state an Auto Enroll save would write, or `null` when it would change nothing. */
+function nextAutoEnrol(
+  current: AutoEnrolState,
+  enabled: boolean,
+  until: LocalDate | null,
+  context: { readonly todayNz: LocalDate; readonly now: Date },
+): AutoEnrolState | null {
+  if (!enabled) return current.enabled ? OFF : null;
   const active = current.enabled && (current.until === null || current.until >= context.todayNz);
-  if (!active) return { kind: 'set', next: { enabled: true, until, assignedAt: context.now } };
-  if (current.until === until) return { kind: 'noop' };
-  return { kind: 'set', next: { enabled: true, until, assignedAt: current.assignedAt } };
+  if (!active) return { enabled: true, until, assignedAt: context.now };
+  if (current.until === until) return null;
+  return { enabled: true, until, assignedAt: current.assignedAt };
 }

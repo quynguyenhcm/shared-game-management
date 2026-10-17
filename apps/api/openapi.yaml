@@ -198,6 +198,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -266,6 +267,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -334,6 +336,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -402,6 +405,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -551,6 +555,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -619,6 +624,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -687,6 +693,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -755,6 +762,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -881,6 +889,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1007,6 +1016,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1075,6 +1085,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1143,6 +1154,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1256,6 +1268,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1324,6 +1337,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1392,6 +1406,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1508,6 +1523,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1576,6 +1592,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1805,6 +1822,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1873,6 +1891,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1941,6 +1960,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2009,6 +2029,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2077,6 +2098,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2145,6 +2167,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2213,6 +2236,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2327,6 +2351,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2395,6 +2420,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2610,6 +2636,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2678,6 +2705,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2746,6 +2774,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2869,6 +2898,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2969,6 +2999,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3037,6 +3068,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3105,6 +3137,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3193,6 +3226,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3261,6 +3295,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3329,6 +3364,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3397,6 +3433,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3634,6 +3671,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3702,6 +3740,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3850,6 +3889,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3976,6 +4016,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4116,6 +4157,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4184,6 +4226,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4252,6 +4295,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4320,6 +4364,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4465,6 +4510,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4533,6 +4579,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4669,6 +4716,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4737,6 +4785,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4805,6 +4854,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4873,6 +4923,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4941,6 +4992,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5039,6 +5091,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5107,6 +5160,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5175,6 +5229,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5273,6 +5328,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5341,6 +5397,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5409,6 +5466,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5665,6 +5723,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5733,6 +5792,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5801,6 +5861,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6037,6 +6098,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6105,6 +6167,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6173,6 +6236,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6241,6 +6305,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6309,6 +6374,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6544,6 +6610,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6612,6 +6679,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6680,6 +6748,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6748,6 +6817,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6816,6 +6886,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7050,6 +7121,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7118,6 +7190,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7186,6 +7259,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7254,6 +7328,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7322,6 +7397,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7557,6 +7633,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7625,6 +7702,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7693,6 +7771,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7761,6 +7840,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7829,6 +7909,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8078,6 +8159,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8146,6 +8228,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8214,6 +8297,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8282,6 +8366,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8350,6 +8435,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8499,6 +8585,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8567,6 +8654,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8635,6 +8723,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8703,6 +8792,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8876,6 +8966,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8944,6 +9035,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9012,6 +9104,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9080,6 +9173,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9230,6 +9324,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9298,6 +9393,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9366,6 +9462,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9434,6 +9531,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9543,6 +9641,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9611,6 +9710,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9679,6 +9779,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9747,6 +9848,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9882,6 +9984,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9950,6 +10053,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10018,6 +10122,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10086,6 +10191,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10365,6 +10471,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10433,6 +10540,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10501,6 +10609,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10569,6 +10678,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10766,6 +10876,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -10795,16 +10906,21 @@ paths:
         the back of the Auto Enroll order; changing only `until` keeps their
         place; an assignment that already ended (`until` before today) counts as
         off, so renewing it is a new place at the back. Off clears the end date
-        and the place. `until` with `enabled: false` is 422. Auto Enroll applies
-        to sessions selected after the save: nothing is registered or withdrawn
-        now. TEAM_ADMIN of this team only (`allowGlobalAdmin` is off): the guard
-        answers 401/403 before the body is read, so an invalid body from a
-        non-admin is still 403. The target is looked up by (team, user): a user
-        with no row in this team is 404 `not_found`; a PENDING, REJECTED or
-        BANNED target is 409 `membership_state_conflict`. The actor is
-        re-checked as an approved admin under the team-row lock (403 when
-        demoted meanwhile). Admins may change their own row. `changed: false`
-        means nothing was written and no event was logged."
+        and the place. `until` with `enabled: false` is 422. `expectedEnabled`,
+        `expectedUntil` and `expectedAssignedAt` are the member's `autoEnroll`
+        as the panel was showing it: when a save would change something and Auto
+        Enroll changed since (another admin saved), the answer is 409
+        `auto_enroll_stale` with the current `member`, and nothing is written.
+        Auto Enroll applies to sessions selected after the save: nothing is
+        registered or withdrawn now. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off): the guard answers 401/403 before the body
+        is read, so an invalid body from a non-admin is still 403. The target is
+        looked up by (team, user): a user with no row in this team is 404
+        `not_found`; a PENDING, REJECTED or BANNED target is 409
+        `membership_state_conflict`. The actor is re-checked as an approved
+        admin under the team-row lock (403 when demoted meanwhile). Admins may
+        change their own row. `changed: false` means nothing was written and no
+        event was logged."
       requestBody:
         required: true
         content:
@@ -10818,9 +10934,24 @@ paths:
                   type:
                     - string
                     - "null"
+                expectedEnabled:
+                  type: boolean
+                expectedUntil:
+                  type:
+                    - string
+                    - "null"
+                expectedAssignedAt:
+                  anyOf:
+                    - type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    - type: "null"
               required:
                 - enabled
                 - until
+                - expectedEnabled
+                - expectedUntil
+                - expectedAssignedAt
               additionalProperties: false
       parameters:
         - schema:
@@ -11031,6 +11162,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -11099,6 +11231,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -11167,6 +11300,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -11235,6 +11369,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -11250,6 +11385,135 @@ paths:
                     required:
                       - code
                       - message
+                    additionalProperties: false
+                  member:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                      requestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      approvedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      bannedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      banReason:
+                        type:
+                          - string
+                          - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
+                    required:
+                      - userId
+                      - fullName
+                      - role
+                      - status
+                      - skillLevel
+                      - requestedAt
+                      - approvedAt
+                      - bannedAt
+                      - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
                     additionalProperties: false
                 required:
                   - error
@@ -11303,6 +11567,7 @@ paths:
                           - payout_not_configured
                           - banking_in_use
                           - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:

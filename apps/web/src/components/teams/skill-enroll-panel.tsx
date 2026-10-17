@@ -345,7 +345,15 @@ function AutoEnrollForm({
   // `validateUntil` can show the field error in the page's own copy.
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <HiddenFields fields={fields} />
+      {/* The stored state the panel is showing (an ended assignment still reads enabled), for the stale check. */}
+      <HiddenFields
+        fields={{
+          ...fields,
+          expectedEnabled: String(member.autoEnroll.enabled),
+          expectedUntil: member.autoEnroll.until ?? '',
+          expectedAssignedAt: member.autoEnroll.assignedAt ?? '',
+        }}
+      />
       {banner === null ? null : (
         <FormBanner kind="error" lines={[banner.message]} focusToken={banner} />
       )}

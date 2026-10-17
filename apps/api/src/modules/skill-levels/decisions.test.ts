@@ -149,6 +149,51 @@ describe('decideAutoEnrolChange (AC-HAPPY-7..10, AC-HAPPY-13, AC-ERROR-3)', () =
       { kind: 'invalid_until' },
     ],
   ] as const)('%s', (_name, current, input, expected) => {
-    expect(decideAutoEnrolChange(current, input, ctx)).toEqual(expected);
+    expect(decideAutoEnrolChange(current, { ...input, ...shown(current) }, ctx)).toEqual(expected);
+  });
+
+  /** The expected-state token of a panel that saw `state`, as the API returns it. */
+  function shown(state: AutoEnrolState) {
+    return {
+      expectedEnabled: state.enabled,
+      expectedUntil: state.until,
+      expectedAssignedAt: state.assignedAt?.toISOString() ?? null,
+    };
+  }
+
+  it.each([
+    ['another admin turned it off since', off, shown(on('2026-12-30'))],
+    ['another admin turned it on since', on(null), shown(off)],
+    ['another admin changed the date since', on('2026-12-24'), shown(on('2026-12-30'))],
+    [
+      'another admin renewed it since (new place)',
+      { ...on(null), assignedAt: now },
+      shown(on(null)),
+    ],
+  ] as const)(
+    'a save based on a stale view is stale when it would change something: %s (final review)',
+    (_name, current, panel) => {
+      expect(
+        decideAutoEnrolChange(current, { enabled: true, until: '2026-12-31', ...panel }, ctx),
+      ).toEqual({ kind: 'stale' });
+    },
+  );
+
+  it('a stale view is still a no-op when the save changes nothing (a retried save is safe)', () => {
+    const current = on('2026-12-30');
+    expect(
+      decideAutoEnrolChange(current, { enabled: true, until: '2026-12-30', ...shown(off) }, ctx),
+    ).toEqual({ kind: 'noop' });
+    expect(
+      decideAutoEnrolChange(off, { enabled: false, until: null, ...shown(current) }, ctx),
+    ).toEqual({ kind: 'noop' });
+  });
+
+  it('compares the assignment time at millisecond precision, whatever the ISO offset', () => {
+    const current = on(null);
+    const panel = { ...shown(current), expectedAssignedAt: '2026-10-01T13:00:00.000+13:00' };
+    expect(
+      decideAutoEnrolChange(current, { enabled: true, until: '2026-12-30', ...panel }, ctx).kind,
+    ).toBe('set');
   });
 });

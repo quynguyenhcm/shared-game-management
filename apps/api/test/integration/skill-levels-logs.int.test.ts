@@ -112,17 +112,33 @@ describe('skill-levels events log ids, levels and booleans only (AC-VERIFY-6)', 
         })
       ).statusCode,
     ).toBe(200);
-    expect((await put(aroha, 'auto-enroll', { enabled: false, until: null })).statusCode).toBe(200);
+    const sawOff = { expectedEnabled: false, expectedUntil: null, expectedAssignedAt: null };
     expect(
-      (await put(aroha, 'auto-enroll', { enabled: true, until: '2026-11-30' })).statusCode,
+      (await put(aroha, 'auto-enroll', { enabled: false, until: null, ...sawOff })).statusCode,
     ).toBe(200);
-    expect((await put(aroha, 'auto-enroll', { enabled: true, until: null })).statusCode).toBe(200);
-    // Refusals: stale, a past date, and a plain member (guard 403).
+    const on = await put(aroha, 'auto-enroll', { enabled: true, until: '2026-11-30', ...sawOff });
+    expect(on.statusCode).toBe(200);
+    const sawOn = {
+      expectedEnabled: true,
+      expectedUntil: '2026-11-30',
+      expectedAssignedAt: on.json<{ member: { autoEnroll: { assignedAt: string } } }>().member
+        .autoEnroll.assignedAt,
+    };
+    expect(
+      (await put(aroha, 'auto-enroll', { enabled: true, until: null, ...sawOn })).statusCode,
+    ).toBe(200);
+    // Refusals: stale level, stale Auto Enroll, a past date, and a plain member (guard 403).
     expect((await level('INTERMEDIATE', 'BEGINNER')).statusCode).toBe(409);
     expect(
-      (await put(aroha, 'auto-enroll', { enabled: true, until: '2026-10-01' })).statusCode,
+      (await put(aroha, 'auto-enroll', { enabled: false, until: null, ...sawOff })).statusCode,
+    ).toBe(409);
+    expect(
+      (await put(aroha, 'auto-enroll', { enabled: true, until: '2026-10-01', ...sawOff }))
+        .statusCode,
     ).toBe(422);
-    expect((await put(plain, 'auto-enroll', { enabled: true, until: null })).statusCode).toBe(403);
+    expect(
+      (await put(plain, 'auto-enroll', { enabled: true, until: null, ...sawOff })).statusCode,
+    ).toBe(403);
 
     const lines = h.logs.lines();
     const mine = lines.filter((line) => line.teamId === teamId);
@@ -153,7 +169,7 @@ describe('skill-levels events log ids, levels and booleans only (AC-VERIFY-6)', 
 
     const refused = only('team.action.refused');
     expect(refused.map((line) => line.reason).sort()).toEqual(
-      ['forbidden', 'skill_level_stale', 'validation_failed'].sort(),
+      ['auto_enroll_stale', 'forbidden', 'skill_level_stale', 'validation_failed'].sort(),
     );
     for (const line of refused) {
       expect(line.traceId).toBe(TRACE_ID);
@@ -164,7 +180,7 @@ describe('skill-levels events log ids, levels and booleans only (AC-VERIFY-6)', 
         .filter((line) => line.reason !== 'forbidden')
         .map((line) => line.action)
         .sort(),
-    ).toEqual(['auto_enroll', 'skill_override']);
+    ).toEqual(['auto_enroll', 'auto_enroll', 'skill_override']);
 
     // Every line of these requests carries the trace (request lines included).
     const traced = lines.filter((line) => line.traceId === TRACE_ID);

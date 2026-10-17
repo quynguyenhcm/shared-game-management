@@ -11,7 +11,7 @@
  *   6. the member re-read through `teams/member-read.ts` for the answer.
  *
  * Lock order is teams -> team_members everywhere, as in moderation; a ban and a save therefore serialise on the
- * team row (AC-ERROR-5). Instants come from the injected clock only. Nothing here writes registrations: Auto
+ * team row (AC-ERROR-5). Instants come from the injected clock only, read after the locks. Nothing here writes registrations: Auto
  * Enroll applies to sessions selected after the save (not retroactive). Events carry ids, levels and booleans.
  */
 import { sql } from 'kysely';
@@ -30,7 +30,7 @@ import { AppError } from '../../lib/http/errors.ts';
 import { assertTeamAdminUnderLock } from '../teams/admin-lock.ts';
 import { getMemberRow } from '../teams/member-read.ts';
 import { decideAutoEnrolChange, decideOverride } from './decisions.ts';
-import { SkillLevelStaleError, mapSkillLevelsDbError } from './errors.ts';
+import { MemberStaleError, mapSkillLevelsDbError } from './errors.ts';
 import * as repo from './repo.ts';
 
 export interface SkillLevelsContext {
@@ -99,11 +99,13 @@ export function createSkillLevelsService(deps: SkillLevelsServiceDeps): SkillLev
     setSkillLevel(target, input, ctx) {
       const { teamId, actorId, userId } = target;
       return refusing(ctx.log, { action: 'skill_override', actorId, teamId }, async () => {
-        const now = clock.now();
         const outcome = await underMemberLock(target, async (trx, member) => {
+          // Read after the locks: a save that waited behind another writer stamps when it wrote, not when it
+          // arrived.
+          const now = clock.now();
           const decision = decideOverride(member, input);
           if (decision.kind === 'stale') {
-            throw new SkillLevelStaleError(await readMember(trx, target, now));
+            throw new MemberStaleError('skill_level_stale', await readMember(trx, target, now));
           }
           if (decision.kind === 'change') {
             const written = await repo.applyOverride(trx, member.id, {
@@ -135,14 +137,19 @@ export function createSkillLevelsService(deps: SkillLevelsServiceDeps): SkillLev
     setAutoEnroll(target, input, ctx) {
       const { teamId, actorId, userId } = target;
       return refusing(ctx.log, { action: 'auto_enroll', actorId, teamId }, async () => {
-        const now = clock.now();
-        const todayNz = instantToLocal(now).date;
         const outcome = await underMemberLock(target, async (trx, member) => {
+          // Read after the locks, so "today" and a new place in the order follow commit order: a save that
+          // waited across NZ midnight cannot store an end date that is already past.
+          const now = clock.now();
+          const todayNz = instantToLocal(now).date;
           const decision = decideAutoEnrolChange(member.autoEnroll, input, { todayNz, now });
           if (decision.kind === 'invalid_until') {
             throw new AppError('validation_failed', {
               fieldErrors: { until: [SKILL_LEVELS_FIELD_MESSAGES.untilInvalid] },
             });
+          }
+          if (decision.kind === 'stale') {
+            throw new MemberStaleError('auto_enroll_stale', await readMember(trx, target, now));
           }
           if (decision.kind === 'set') {
             if (!(await repo.applyAutoEnrol(trx, member.id, decision.next))) {

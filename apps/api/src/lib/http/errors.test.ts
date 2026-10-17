@@ -55,6 +55,8 @@ const AUTHORITATIVE_ERROR_CODES = [
   'banking_in_use',
   // skill-levels-and-auto-enroll (Binding Reconciliation decision 4: optimistic concurrency on overrides)
   'skill_level_stale',
+  // ...and on Auto Enroll saves (final review: a stale panel must not re-enrol a member)
+  'auto_enroll_stale',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -68,6 +70,7 @@ const TEAM_ERROR_STATUSES = [
   ['payout_not_configured', 409],
   ['banking_in_use', 409],
   ['skill_level_stale', 409],
+  ['auto_enroll_stale', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];

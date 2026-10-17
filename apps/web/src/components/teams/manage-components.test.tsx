@@ -535,6 +535,14 @@ describe('SkillEnrollPanel (AC-ENTRY-1, AC-HAPPY-12/13, AC-ERROR-3, AC-NAV-1)', 
       'Auto Enroll ended 30 Nov 2026. Choose a new end date, clear the date, or turn Auto Enroll off.',
     );
     expect(/<input[^>]*type="date"[^>]*>/.exec(html)?.[0]).not.toContain('value="2026-11-30"');
+    // The stale-check token is the STORED state, so it still says enabled with the ended date.
+    expect(html).toMatch(/<input[^>]*type="hidden"[^>]*name="expectedEnabled"[^>]*value="true"/);
+    expect(html).toMatch(
+      /<input[^>]*type="hidden"[^>]*name="expectedUntil"[^>]*value="2026-11-30"/,
+    );
+    expect(html).toMatch(
+      /<input[^>]*type="hidden"[^>]*name="expectedAssignedAt"[^>]*value="2026-10-17T01:00:00.000Z"/,
+    );
   });
 
   it('turning off a saved-on member carries the place-in-order hint', () => {

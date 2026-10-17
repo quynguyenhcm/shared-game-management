@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   ErrorResponse,
@@ -10,8 +10,29 @@ import {
 } from '@sgm/shared';
 import { requireTeamRole } from '../../lib/auth/policy.ts';
 import { requireAuth } from '../../lib/auth/request-auth.ts';
-import { SkillLevelStaleError } from './errors.ts';
+import { MemberStaleError } from './errors.ts';
 import type { MemberTarget, SkillLevelsContext, SkillLevelsService } from './service.ts';
+
+/**
+ * A stale save answers 409 with the current member beside the error (`SkillLevelConflictResponse`), so the panel
+ * refreshes without another request. The global error handler only knows `{ error }`, hence the local catch.
+ */
+async function answeringStale<T>(
+  reply: FastifyReply,
+  save: () => Promise<T>,
+): Promise<T | FastifyReply> {
+  try {
+    return await save();
+  } catch (error) {
+    if (error instanceof MemberStaleError) {
+      return reply.code(409).send({
+        error: { code: error.code, message: error.message },
+        member: error.member,
+      });
+    }
+    throw error;
+  }
+}
 
 export interface SkillLevelsRoutesOptions {
   readonly service: SkillLevelsService;
@@ -67,23 +88,10 @@ export const skillLevelsRoutes: FastifyPluginAsync<SkillLevelsRoutesOptions> = (
         },
       },
     },
-    async (request, reply) => {
-      try {
-        return await service.setSkillLevel(
-          targetOf(request, request.params),
-          request.body,
-          contextOf(request),
-        );
-      } catch (error) {
-        if (error instanceof SkillLevelStaleError) {
-          return reply.code(409).send({
-            error: { code: error.code, message: error.message },
-            member: error.member,
-          });
-        }
-        throw error;
-      }
-    },
+    async (request, reply) =>
+      answeringStale(reply, () =>
+        service.setSkillLevel(targetOf(request, request.params), request.body, contextOf(request)),
+      ),
   );
 
   typed.put(
@@ -92,7 +100,7 @@ export const skillLevelsRoutes: FastifyPluginAsync<SkillLevelsRoutesOptions> = (
       config: { policy },
       schema: {
         summary: "Set a member's Auto Enroll",
-        description: `Turns Auto Enroll on (with an optional inclusive end date \`until\`, a Pacific/Auckland calendar date that must be today or later: 422 \`fieldErrors.until\` otherwise) or off. Turning it on puts the member at the back of the Auto Enroll order; changing only \`until\` keeps their place; an assignment that already ended (\`until\` before today) counts as off, so renewing it is a new place at the back. Off clears the end date and the place. \`until\` with \`enabled: false\` is 422. Auto Enroll applies to sessions selected after the save: nothing is registered or withdrawn now. ${SHAPE}`,
+        description: `Turns Auto Enroll on (with an optional inclusive end date \`until\`, a Pacific/Auckland calendar date that must be today or later: 422 \`fieldErrors.until\` otherwise) or off. Turning it on puts the member at the back of the Auto Enroll order; changing only \`until\` keeps their place; an assignment that already ended (\`until\` before today) counts as off, so renewing it is a new place at the back. Off clears the end date and the place. \`until\` with \`enabled: false\` is 422. \`expectedEnabled\`, \`expectedUntil\` and \`expectedAssignedAt\` are the member's \`autoEnroll\` as the panel was showing it: when a save would change something and Auto Enroll changed since (another admin saved), the answer is 409 \`auto_enroll_stale\` with the current \`member\`, and nothing is written. Auto Enroll applies to sessions selected after the save: nothing is registered or withdrawn now. ${SHAPE}`,
         operationId: 'setTeamMemberAutoEnroll',
         params: TeamMemberParams,
         body: SetAutoEnrollRequest,
@@ -101,13 +109,15 @@ export const skillLevelsRoutes: FastifyPluginAsync<SkillLevelsRoutesOptions> = (
           401: ErrorResponse,
           403: ErrorResponse,
           404: ErrorResponse,
-          409: ErrorResponse,
+          409: SkillLevelConflictResponse,
           422: ErrorResponse,
         },
       },
     },
-    async (request) =>
-      service.setAutoEnroll(targetOf(request, request.params), request.body, contextOf(request)),
+    async (request, reply) =>
+      answeringStale(reply, () =>
+        service.setAutoEnroll(targetOf(request, request.params), request.body, contextOf(request)),
+      ),
   );
 
   return Promise.resolve();

@@ -226,6 +226,18 @@ describe('toSkillResult (AC-HAPPY-1/3/7/8/10, AC-ERROR-3/6/8/9 web copy)', () =>
     expect(result.close).toBeUndefined();
   });
 
+  it('409 auto_enroll_stale refreshes the panel with the Auto Enroll copy and keeps it open', () => {
+    const result = toSkillResult('autoEnroll', fail(409, 'auto_enroll_stale'), ctx);
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'auto_enroll_stale',
+      message:
+        "This member's Auto Enroll changed since you opened the panel. Check it and save again.",
+      refresh: true,
+    });
+    expect(result.close).toBeUndefined();
+  });
+
   it('409 membership_state_conflict and 404 are member-specific, refresh and close (AC-ERROR-8)', () => {
     for (const failure of [fail(409, 'membership_state_conflict'), fail(404, 'not_found')]) {
       expect(toSkillResult('skill', failure, ctx)).toMatchObject({

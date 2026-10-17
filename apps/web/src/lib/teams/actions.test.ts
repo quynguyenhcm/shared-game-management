@@ -521,7 +521,10 @@ describe('setSkillLevelAction (AC-HAPPY-1/3, AC-ERROR-3/6/8/9)', () => {
 
 describe('setAutoEnrollAction (AC-HAPPY-7/8/10, AC-ERROR-3)', () => {
   const USER_ID = '22222222-2222-4222-8222-222222222222';
-  const BASE = { teamId: TEAM_ID, userId: USER_ID, fullName: 'Priya Patel' };
+  // The hidden fields of a panel that saw Auto Enroll off.
+  const SAW_OFF = { expectedEnabled: 'false', expectedUntil: '', expectedAssignedAt: '' };
+  const SENT_OFF = { expectedEnabled: false, expectedUntil: null, expectedAssignedAt: null };
+  const BASE = { teamId: TEAM_ID, userId: USER_ID, fullName: 'Priya Patel', ...SAW_OFF };
   const MEMBER = (autoEnroll: Record<string, unknown>) => ({
     userId: USER_ID,
     fullName: 'Priya Patel',
@@ -555,7 +558,7 @@ describe('setAutoEnrollAction (AC-HAPPY-7/8/10, AC-ERROR-3)', () => {
       `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/auto-enroll`,
     );
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
-    expect(sentBody(fetchMock)).toEqual({ enabled: true, until: '2026-11-30' });
+    expect(sentBody(fetchMock)).toEqual({ enabled: true, until: '2026-11-30', ...SENT_OFF });
     expect(result.message).toBe('Auto Enroll on for Priya Patel until 30 Nov 2026.');
     expect(mocks.revalidate).toHaveBeenCalled();
   });
@@ -566,7 +569,7 @@ describe('setAutoEnrollAction (AC-HAPPY-7/8/10, AC-ERROR-3)', () => {
       changed: true,
     });
     const result = await setAutoEnrollAction(null, form({ ...BASE, enabled: 'true', until: '' }));
-    expect(sentBody(fetchMock)).toEqual({ enabled: true, until: null });
+    expect(sentBody(fetchMock)).toEqual({ enabled: true, until: null, ...SENT_OFF });
     expect(result.message).toBe('Auto Enroll on for Priya Patel, with no end date.');
   });
 
@@ -576,7 +579,7 @@ describe('setAutoEnrollAction (AC-HAPPY-7/8/10, AC-ERROR-3)', () => {
       changed: true,
     });
     const result = await setAutoEnrollAction(null, form({ ...BASE, until: '2026-11-30' }));
-    expect(sentBody(fetchMock)).toEqual({ enabled: false, until: null });
+    expect(sentBody(fetchMock)).toEqual({ enabled: false, until: null, ...SENT_OFF });
     expect(result.message).toBe('Auto Enroll turned off for Priya Patel.');
   });
 
@@ -612,6 +615,61 @@ describe('setAutoEnrollAction (AC-HAPPY-7/8/10, AC-ERROR-3)', () => {
     });
     expect(result.close).toBeUndefined();
     expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('sends the stored state the panel was showing, including an ended date', async () => {
+    const fetchMock = stubFetch(200, {
+      member: MEMBER({ enabled: true, until: null, assignedAt: '2026-12-02T01:00:00.000Z' }),
+      changed: true,
+    });
+    await setAutoEnrollAction(
+      null,
+      form({
+        ...BASE,
+        enabled: 'true',
+        until: '',
+        expectedEnabled: 'true',
+        expectedUntil: '2026-11-30',
+        expectedAssignedAt: '2026-10-17T01:00:00.000Z',
+      }),
+    );
+    expect(sentBody(fetchMock)).toEqual({
+      enabled: true,
+      until: null,
+      expectedEnabled: true,
+      expectedUntil: '2026-11-30',
+      expectedAssignedAt: '2026-10-17T01:00:00.000Z',
+    });
+  });
+
+  it('a tampered stale token is refused with no request', async () => {
+    const fetchMock = stubFetch(200, {});
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '', expectedEnabled: 'yes' }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+  });
+
+  it('409 auto_enroll_stale refreshes the panel with the Auto Enroll copy and keeps it open', async () => {
+    stubFetch(409, {
+      error: { code: 'auto_enroll_stale', message: 'stale' },
+      member: MEMBER({ enabled: false, until: null, assignedAt: null }),
+    });
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '2026-12-24' }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'auto_enroll_stale',
+      refresh: true,
+      message:
+        "This member's Auto Enroll changed since you opened the panel. Check it and save again.",
+    });
+    expect(result.close).toBeUndefined();
+    expect(mocks.revalidate).toHaveBeenCalled();
   });
 
   it('an unreachable API is the unknown-outcome line and never revalidates', async () => {

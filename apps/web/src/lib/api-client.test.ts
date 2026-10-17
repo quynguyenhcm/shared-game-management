@@ -419,7 +419,13 @@ describe('apiClient team-admin calls (members, moderation, invite code)', () => 
     const enrollResult = await apiClient.setAutoEnroll(
       TEAM_ID,
       USER_ID,
-      { enabled: true, until: '2026-11-30' },
+      {
+        enabled: true,
+        until: '2026-11-30',
+        expectedEnabled: false,
+        expectedUntil: null,
+        expectedAssignedAt: null,
+      },
       { session: 'tok' },
     );
     expect(enrollResult).toMatchObject({ ok: true, data: { changed: false } });

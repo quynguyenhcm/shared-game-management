@@ -38,6 +38,11 @@ function field(formData: FormData, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+/** A hidden "what the panel was showing" field: empty (or missing) means the API returned `null`. */
+function emptyAsNull(value: string | undefined): string | null {
+  return value === undefined || value === '' ? null : value;
+}
+
 function hasErrors(errors: Record<string, string[]>): boolean {
   return Object.keys(errors).length > 0;
 }
@@ -352,11 +357,10 @@ export async function setSkillLevelAction(
 ): Promise<SkillPanelResult> {
   const target = memberTarget(formData);
   if (target === null) return goneMember('skill', field(formData, 'fullName'));
-  const changedAt = field(formData, 'expectedChangedAt');
   const body = SetSkillLevelRequest.safeParse({
     skillLevel: field(formData, 'skillLevel'),
     expectedSkillLevel: field(formData, 'expectedSkillLevel'),
-    expectedChangedAt: changedAt === undefined || changedAt === '' ? null : changedAt,
+    expectedChangedAt: emptyAsNull(field(formData, 'expectedChangedAt')),
   });
   if (!body.success) return invalidPanelInput('skill', body.error);
   return savePanel('skill', target, (options) =>
@@ -364,7 +368,11 @@ export async function setSkillLevelAction(
   );
 }
 
-/** Auto Enroll on (with an optional end date) or off. A date is never sent with the flag off. */
+/**
+ * Auto Enroll on (with an optional end date) or off. A date is never sent with the flag off. The form also sends
+ * the stored state the panel was showing (`expectedEnabled`, `expectedUntil`, `expectedAssignedAt`; empty means
+ * none), so the API refuses a save based on a stale view (409 `auto_enroll_stale`).
+ */
 export async function setAutoEnrollAction(
   _previous: SkillPanelResult | null,
   formData: FormData,
@@ -373,9 +381,15 @@ export async function setAutoEnrollAction(
   if (target === null) return goneMember('autoEnroll', field(formData, 'fullName'));
   const enabled = field(formData, 'enabled') === 'true';
   const typed = field(formData, 'until');
+  const shownEnabled = field(formData, 'expectedEnabled');
   const body = SetAutoEnrollRequest.safeParse({
     enabled,
     until: enabled && typed !== undefined && typed !== '' ? typed : null,
+    // Anything but the two literals stays a non-boolean, so the schema refuses it rather than guessing.
+    expectedEnabled:
+      shownEnabled === 'true' ? true : shownEnabled === 'false' ? false : shownEnabled,
+    expectedUntil: emptyAsNull(field(formData, 'expectedUntil')),
+    expectedAssignedAt: emptyAsNull(field(formData, 'expectedAssignedAt')),
   });
   if (!body.success) return invalidPanelInput('autoEnroll', body.error);
   return savePanel('autoEnroll', target, (options) =>

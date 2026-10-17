@@ -48,6 +48,8 @@ export const ErrorCode = [
   'banking_in_use',
   // skill levels: optimistic concurrency on an admin override (skill-levels-and-auto-enroll, decision 4)
   'skill_level_stale',
+  // ...and on an Auto Enroll save (final review: a stale panel must not re-enrol a member another admin turned off)
+  'auto_enroll_stale',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

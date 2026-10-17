@@ -232,6 +232,8 @@ export const UNCONFIRMED_MESSAGE =
   "We couldn't confirm that was saved. Try again; saving the same change twice is safe.";
 export const SKILL_STALE_MESSAGE =
   "This member's level changed since you opened the panel. Check it and save again.";
+export const AUTO_ENROLL_STALE_MESSAGE =
+  "This member's Auto Enroll changed since you opened the panel. Check it and save again.";
 export const REGENERATE_PROMPT = 'Generate a new link? The old link stops working immediately.';
 export const REGENERATE_SUCCESS = 'New invite link generated. The old link no longer works.';
 export const SELF_DEMOTE_PROMPT = "Remove your own admin rights? You'll lose access to this page.";

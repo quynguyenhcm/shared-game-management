@@ -7,6 +7,7 @@ import {
 } from '@sgm/shared';
 import type { ApiResult } from '../api-client.ts';
 import {
+  AUTO_ENROLL_STALE_MESSAGE,
   NO_ACCESS_HEADING,
   SAVE_FAILED_MESSAGE,
   SKILL_OPTIONS,
@@ -190,6 +191,9 @@ export function toSkillResult(
   }
   if (code === 'skill_level_stale') {
     return { ok: false, kind, code, message: SKILL_STALE_MESSAGE, refresh: true };
+  }
+  if (code === 'auto_enroll_stale') {
+    return { ok: false, kind, code, message: AUTO_ENROLL_STALE_MESSAGE, refresh: true };
   }
   if (code === 'membership_state_conflict' || status === 404) {
     return {

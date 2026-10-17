@@ -16,7 +16,7 @@ import { createSkillProgressionHandler } from '../../src/jobs/skill-progression.
 import { createManualClock } from '../../src/lib/clock.ts';
 import { createKysely, type Database } from '../../src/lib/db/kysely.ts';
 import type { JobContext } from '../../src/lib/jobs/jobs.ts';
-import { SkillLevelStaleError } from '../../src/modules/skill-levels/errors.ts';
+import { MemberStaleError } from '../../src/modules/skill-levels/errors.ts';
 import { createSkillLevelsService } from '../../src/modules/skill-levels/service.ts';
 import { insertTeam } from '../helpers/factories.ts';
 import { waitForLockWaiters } from '../helpers/lock-waiters.ts';
@@ -152,7 +152,7 @@ describe('override vs progression (AC-VERIFY-5)', () => {
       await waitForLockWaiters(database.pool, 2, 'the override queued behind the job');
       await gate.release();
       expect(await sweep).toMatchObject({ promoted: 1, failed: 0 });
-      expect(await outcome).toBeInstanceOf(SkillLevelStaleError);
+      expect(await outcome).toBeInstanceOf(MemberStaleError);
     });
 
     const afterRace = await readMemberState(database.pool, teamId, member.userId);
