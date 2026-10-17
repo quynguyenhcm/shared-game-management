@@ -2,13 +2,15 @@
 slug: skill-levels-and-auto-enroll
 legacy_id:
 feature: skill-levels-and-auto-enroll
-status: REFLECTION_COMPLETE
+status: COMPLETE
 ---
 
 # skill-levels-and-auto-enroll: Skill Levels and Auto Enroll
 
 **Complexity**: Level 3 (inherited from skill-levels-and-auto-enroll)
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
+**Archived**: memory-bank/archive/skill-levels-and-auto-enroll-archive.md
+**Completed**: 2026-10-17
 **Reflection**: memory-bank/reflection/skill-levels-and-auto-enroll-reflection.md
 **Roadmap**: skill-levels-and-auto-enroll
 **Branch**: feature/skill-levels-and-auto-enroll
@@ -470,12 +472,12 @@ Build agents read this block first. Where an AC above says otherwise, this block
 ## Execution State
 
 **Build Status**: IDLE
-**Current Step**: Step 5 - Reflection - COMPLETE (Task Quality: Good / Partial Success; Ecosystem: Moderately Effective)
+**Current Step**: Archive - COMPLETE (2026-10-17)
 **Auto-Build Mode**: YES
-**Current Phase**: 5 of 5 (all phases complete)
+**Current Phase**: COMPLETE (5 of 5 phases built, reflected, archived)
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (verdict: Ready to merge — With fixes; 0 Critical, 3 Important: Compose e2e regression on Members row, Auto Enroll PUT last-writer-wins, clock read before lock in both admin saves)
 **Post-review fixes (2026-10-17, user-requested)**: Important #2 fixed (Auto Enroll optimistic concurrency, 409 `auto_enroll_stale`, AC-ERROR-10). Important #3 fixed (both saves read `clock.now()` after `lockMemberRow`). Important #1 (Compose e2e regression) is still OPEN: run `pnpm run test:e2e` on the Compose stack before merge.
-**Resume From**: n/a (REFLECT → ARCHIVE; run /yay:archive)
+**Resume From**: n/a (COMPLETE)
 **Pre-Flight Plan Scan**: clean (spec/design conflicts pre-resolved by Binding Reconciliation; ACs amended at build time per that block)
 **Previous Phase**: CREATIVE → BUILD
 **Last Completed**: CREATIVE (2026-10-17)
@@ -506,6 +508,7 @@ Build agents read this block first. Where an AC above says otherwise, this block
 - Phase 5 Build: COMPLETE (2026-10-17) - member-skill-summary, skill-enroll-panel (two forms, per-form status lines), use-skill-panel-action, skill-levels-view (+33 tests), Server Actions setSkillLevelAction/setAutoEnrollAction, api-client, labels, manage-view skillControl, page todayNz; unit 1156, combined coverage run 1591/1591 PASS (gate PASS), lint/typecheck/build PASS; review APPROVED; e2e skill-levels.spec.ts passed desktop + 360x740 against next dev + local API
 - Post-review fixes: COMPLETE (2026-10-17) - commit 1aa60e1 (final review Important #2 and #3)
 - Reflection Agent: COMPLETE (2026-10-17) - Output: memory-bank/reflection/skill-levels-and-auto-enroll-reflection.md
+- Archive: COMPLETE (2026-10-17) - Output: memory-bank/archive/skill-levels-and-auto-enroll-archive.md; learned rules consolidated (additive: 4 rules reinforced, 2 promoted)
 
 ### Guide & Recovery Log
 (empty: commit guard passed first try)

@@ -1,6 +1,6 @@
 ---
 version: v1.0.0
-status: planned
+status: complete
 priority: medium
 complexity: 3
 linked_tasks: [skill-levels-and-auto-enroll]
