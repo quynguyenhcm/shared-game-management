@@ -11,6 +11,7 @@ status: COMPLETE
 **Status**: COMPLETE
 **Archived**: memory-bank/archive/skill-levels-and-auto-enroll-archive.md
 **Completed**: 2026-10-17
+**PR Created**: YES — https://github.com/quynguyenhcm/shared-game-management/pull/6 (→ main)
 **Reflection**: memory-bank/reflection/skill-levels-and-auto-enroll-reflection.md
 **Roadmap**: skill-levels-and-auto-enroll
 **Branch**: feature/skill-levels-and-auto-enroll
