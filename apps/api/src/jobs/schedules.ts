@@ -29,6 +29,8 @@ export const SCHEDULES: readonly ScheduleSlot[] = [
   { name: QUEUE_NAMES.dailyOverdue, cron: '0 4 * * *', tz: SCHEDULE_TZ },
   // 05:00 local: after the 02:00-02:59 DST window and after the 03:00/04:00 slots above.
   { name: QUEUE_NAMES.authCleanup, cron: '0 5 * * *', tz: SCHEDULE_TZ },
+  // 05:30 local: the last daily slot, after the DST window and every slot above. Idempotent per member.
+  { name: QUEUE_NAMES.skillProgression, cron: '30 5 * * *', tz: SCHEDULE_TZ },
 ];
 
 export type PreviewFn = (

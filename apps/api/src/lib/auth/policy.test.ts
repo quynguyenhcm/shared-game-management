@@ -127,6 +127,9 @@ describe('route policy registry (AC-VERIFY-3)', () => {
       'DELETE /teams/:teamId/banking',
       'GET /teams/:teamId/gst',
       'PUT /teams/:teamId/gst',
+      // skill-levels-and-auto-enroll (AC-VERIFY-7): the override and Auto Enroll routes.
+      'PUT /teams/:teamId/members/:userId/skill-level',
+      'PUT /teams/:teamId/members/:userId/auto-enroll',
     ]) {
       expect(byRoute.get(route), route).toEqual({
         kind: 'teamRole',
@@ -135,8 +138,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 19 documented team routes exist (14 + the five banking and GST routes), none of them public.
-    expect(byRoute.size).toBe(19);
+    // Exactly the 21 documented team routes exist (14 + five banking and GST + two skill-levels), none public.
+    expect(byRoute.size).toBe(21);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });

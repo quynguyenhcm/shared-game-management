@@ -1,3 +1,4 @@
+import { instantToLocal } from '@sgm/shared';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { RedirectType, notFound, redirect } from 'next/navigation';
@@ -79,6 +80,8 @@ export default async function ManagePage({
   }
 
   const { team } = detail.data;
+  // "Today" for the Auto Enroll end date and its "ended" state is the Pacific/Auckland calendar date (P3).
+  const todayNz = instantToLocal(new Date()).date;
   const notice = noticeText(firstParam(query, 'notice'), { teamName: team.name });
   const current: Record<string, string | undefined> = cursors;
   const pager = (
@@ -116,6 +119,7 @@ export default async function ManagePage({
           members={members.data.members}
           selfUserId={me.id}
           adminCount={members.data.adminCount}
+          todayNz={todayNz}
         />
         <SectionPager label="members" {...membersPager} />
       </ManageSection>

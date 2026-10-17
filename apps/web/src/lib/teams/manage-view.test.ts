@@ -58,7 +58,34 @@ describe('memberRowControls (row rules: AC-ERROR-6/7, no Ban on own row)', () =>
       roleLabel: 'Member',
       roleControl: { kind: 'promote' },
       banControl: { kind: 'ban' },
+      skillControl: { kind: 'panel' },
     });
+  });
+
+  it('every approved row, yourself and admins included, offers the Skill and Auto Enroll panel (AC-ENTRY-1)', () => {
+    for (const [userId, role] of [
+      [ME, 'TEAM_ADMIN'],
+      [OTHER, 'TEAM_ADMIN'],
+      [OTHER, 'MEMBER'],
+    ] as const) {
+      const controls = memberRowControls({
+        member: { ...row(userId, role), status: 'APPROVED' },
+        selfUserId: ME,
+        adminCount: 2,
+      });
+      expect(controls.skillControl).toEqual({ kind: 'panel' });
+    }
+  });
+
+  it('pending, rejected and banned rows never get it (AC-ENTRY-2)', () => {
+    for (const status of ['PENDING', 'REJECTED', 'BANNED'] as const) {
+      const controls = memberRowControls({
+        member: { ...row(OTHER, 'MEMBER'), status },
+        selfUserId: ME,
+        adminCount: 2,
+      });
+      expect(controls.skillControl).toEqual({ kind: 'none' });
+    }
   });
 
   it('another admin can have admin rights removed, but Ban is blocked with the visible reason', () => {

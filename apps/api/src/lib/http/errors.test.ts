@@ -53,6 +53,10 @@ const AUTHORITATIVE_ERROR_CODES = [
   // team-banking-and-gst (architecture doc Q4: publish gate and removal guard)
   'payout_not_configured',
   'banking_in_use',
+  // skill-levels-and-auto-enroll (Binding Reconciliation decision 4: optimistic concurrency on overrides)
+  'skill_level_stale',
+  // ...and on Auto Enroll saves (final review: a stale panel must not re-enrol a member)
+  'auto_enroll_stale',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -65,6 +69,8 @@ const TEAM_ERROR_STATUSES = [
   ['membership_state_conflict', 409],
   ['payout_not_configured', 409],
   ['banking_in_use', 409],
+  ['skill_level_stale', 409],
+  ['auto_enroll_stale', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];

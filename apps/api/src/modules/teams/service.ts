@@ -181,7 +181,7 @@ export function createTeamsService(deps: TeamsServiceDeps): TeamsService {
               { trx },
             );
           }
-          const row = await repo.getMemberRow(trx, teamId, userId);
+          const row = await repo.getMemberRow(trx, teamId, userId, now);
           if (row === undefined) throw new Error('membership vanished inside its own transaction');
           return row;
         });
@@ -435,7 +435,7 @@ export function createTeamsService(deps: TeamsServiceDeps): TeamsService {
         });
       }
       const [page, adminCount] = await Promise.all([
-        repo.listMembers(db, teamId, query.status, cursor),
+        repo.listMembers(db, teamId, query.status, cursor, clock.now()),
         repo.countApprovedAdmins(db, teamId),
       ]);
       return {

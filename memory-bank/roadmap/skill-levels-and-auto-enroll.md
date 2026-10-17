@@ -1,9 +1,9 @@
 ---
 version: v1.0.0
-status: planned
+status: complete
 priority: medium
 complexity: 3
-linked_tasks: []
+linked_tasks: [skill-levels-and-auto-enroll]
 created: 2026-09-29
 ---
 

@@ -301,6 +301,34 @@ describe('the ban commits its job and the handler receives exactly that payload 
   });
 });
 
+describe('a ban clears Auto Enroll in the same UPDATE (skill-levels-and-auto-enroll AC-ERROR-5, D-59)', () => {
+  it('bans an auto-enrolled member with 200 and leaves the three Auto Enroll columns cleared', async () => {
+    behaviour = withdrawActiveRegistrations;
+    const s = await scene();
+    await database.pool.query(
+      `UPDATE team_members SET is_auto_enroll = true, auto_enroll_until = '2027-01-31',
+                               auto_enroll_assigned_at = now() WHERE id = $1`,
+      [s.membershipId],
+    );
+    expect((await ban(s)).statusCode).toBe(200);
+    // Let the member-banned job finish before the next test swaps the shared handler behaviour.
+    await waitForJobState(s.membershipId, 'completed');
+    const { rows } = await database.pool.query(
+      `SELECT status, is_auto_enroll, auto_enroll_until, auto_enroll_assigned_at
+         FROM team_members WHERE id = $1`,
+      [s.membershipId],
+    );
+    expect(rows).toEqual([
+      {
+        status: 'BANNED',
+        is_auto_enroll: false,
+        auto_enroll_until: null,
+        auto_enroll_assigned_at: null,
+      },
+    ]);
+  });
+});
+
 describe('a failing handler never undoes or delays the ban (AC-ERROR-12)', () => {
   it('retries a transient failure to success while the member stays banned and the answer was already 200', async () => {
     let failures = 0;

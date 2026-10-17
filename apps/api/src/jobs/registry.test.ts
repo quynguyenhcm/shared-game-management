@@ -12,6 +12,7 @@ describe('queue registry', () => {
         'post-game-billing',
         'recurrence-materialisation',
         'send-email',
+        'skill-progression',
       ].sort(),
     );
     expect(new Set(QUEUES.map((queue) => queue.name)).size).toBe(QUEUES.length);
@@ -31,6 +32,7 @@ describe('queue registry', () => {
       sendEmail: 'send-email',
       authCleanup: 'auth-cleanup',
       memberBanned: 'member-banned',
+      skillProgression: 'skill-progression',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -43,6 +45,8 @@ describe('queue registry', () => {
     expect(getQueue('auth-cleanup').policy).toBe('exclusive');
     // One ban job per membership (`singletonKey = member-banned:<membershipId>`), enqueued in the ban transaction.
     expect(getQueue('member-banned').policy).toBe('exclusive');
+    // One daily progression sweep at a time; the per-member row lock is the real guard (AC-ASYNC-2).
+    expect(getQueue('skill-progression').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {
