@@ -1,4 +1,4 @@
-import type { TeamRole } from '@sgm/shared';
+import type { MembershipStatus, TeamRole } from '@sgm/shared';
 import { LAST_ADMIN_MESSAGE, adminBanBlockedHint } from './labels.ts';
 
 /**
@@ -51,11 +51,15 @@ export type RoleControl =
 
 export type BanControl = { kind: 'ban' } | { kind: 'blocked'; hint: string } | { kind: 'none' };
 
+/** The "Skill and Auto Enroll" disclosure: offered on approved rows only (admins and yourself included). */
+export type SkillControl = { kind: 'panel' } | { kind: 'none' };
+
 export interface MemberRowControls {
   isSelf: boolean;
   roleLabel: 'Admin' | 'Member';
   roleControl: RoleControl;
   banControl: BanControl;
+  skillControl: SkillControl;
 }
 
 /**
@@ -64,18 +68,24 @@ export interface MemberRowControls {
  * your own row never offers Ban, and the sole admin sees the last-admin hint instead of "Remove admin".
  */
 export function memberRowControls(input: {
-  member: { userId: string; fullName: string; role: TeamRole };
+  member: { userId: string; fullName: string; role: TeamRole; status?: MembershipStatus };
   selfUserId: string;
   adminCount: number;
 }): MemberRowControls {
   const { member, selfUserId, adminCount } = input;
   const isSelf = member.userId === selfUserId;
+  // The Members list only holds approved people, so a row without a status is approved.
+  const skillControl: SkillControl =
+    member.status === undefined || member.status === 'APPROVED'
+      ? { kind: 'panel' }
+      : { kind: 'none' };
   if (member.role !== 'TEAM_ADMIN') {
     return {
       isSelf,
       roleLabel: 'Member',
       roleControl: { kind: 'promote' },
       banControl: { kind: 'ban' },
+      skillControl,
     };
   }
   if (isSelf) {
@@ -87,6 +97,7 @@ export function memberRowControls(input: {
           ? { kind: 'demote_blocked', hint: LAST_ADMIN_MESSAGE }
           : { kind: 'demote_self' },
       banControl: { kind: 'none' },
+      skillControl,
     };
   }
   return {
@@ -94,6 +105,7 @@ export function memberRowControls(input: {
     roleLabel: 'Admin',
     roleControl: { kind: 'demote' },
     banControl: { kind: 'blocked', hint: adminBanBlockedHint(member.fullName) },
+    skillControl,
   };
 }
 

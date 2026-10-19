@@ -47,6 +47,8 @@ export default defineConfig({
         'apps/api/src/modules/teams/**/*.ts',
         // team-banking-and-gst (AC-VERIFY-12): the banking module and the shared NZ validators.
         'apps/api/src/modules/team-banking/**/*.ts',
+        // skill-levels-and-auto-enroll (AC-VERIFY-8): the skill-levels module.
+        'apps/api/src/modules/skill-levels/**/*.ts',
         'packages/shared/src/nz/**/*.ts',
         'apps/web/src/lib/**/*.ts',
       ],

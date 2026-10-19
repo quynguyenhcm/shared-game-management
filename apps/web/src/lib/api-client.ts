@@ -13,6 +13,7 @@ import {
   InviteLookupResponse,
   JoinRequestResponse,
   MeResponse,
+  MemberSkillChangeResponse,
   MembersResponse,
   MineTeamsResponse,
   ModerationResponse,
@@ -39,6 +40,8 @@ import {
   type PutGstRequest,
   type RegisterRequest,
   type ResetPasswordRequest,
+  type SetAutoEnrollRequest,
+  type SetSkillLevelRequest,
 } from '@sgm/shared';
 import type { z } from 'zod';
 import { deriveClientAddress } from './auth/client-address.ts';
@@ -440,6 +443,35 @@ export const apiClient = {
       method: 'POST',
       body,
       schema: ModerationResponse,
+    }),
+
+  /** Admin override of a member's level; the body carries what the panel was showing (optimistic concurrency). */
+  setSkillLevel: (
+    teamId: string,
+    userId: string,
+    body: SetSkillLevelRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/skill-level`,
+      method: 'PUT',
+      body,
+      schema: MemberSkillChangeResponse,
+    }),
+
+  setAutoEnroll: (
+    teamId: string,
+    userId: string,
+    body: SetAutoEnrollRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/auto-enroll`,
+      method: 'PUT',
+      body,
+      schema: MemberSkillChangeResponse,
     }),
 
   teamInviteCode: (teamId: string, options: ApiCallOptions = {}) =>

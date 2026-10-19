@@ -347,6 +347,10 @@ describe('apiClient team-admin calls (members, moderation, invite code)', () => 
     approvedAt: '2026-10-04T01:00:00.000Z',
     bannedAt: null,
     banReason: null,
+    skillOverride: null,
+    skillChangedAt: null,
+    autoEnroll: { enabled: false, until: null, assignedAt: null },
+    skillProgress: { games: 0, required: 40, nextLevel: 'INTERMEDIATE' },
   };
 
   function call(fetchMock: ReturnType<typeof stubJson>) {
@@ -389,6 +393,48 @@ describe('apiClient team-admin calls (members, moderation, invite code)', () => 
     expect(sent.url).toBe(`http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/ban`);
     expect(JSON.parse(sent.init?.body as string)).toEqual({ reason: 'No-shows' });
     expect(sent.headers['content-type']).toBe('application/json');
+  });
+
+  it('setSkillLevel and setAutoEnroll PUT JSON bodies and parse { member, changed }', async () => {
+    const skill = stubJson(200, { member: MEMBER, changed: true });
+    const levelResult = await apiClient.setSkillLevel(
+      TEAM_ID,
+      USER_ID,
+      { skillLevel: 'ADVANCED', expectedSkillLevel: 'BEGINNER', expectedChangedAt: null },
+      { session: 'tok' },
+    );
+    expect(levelResult).toMatchObject({ ok: true, data: { changed: true } });
+    const sentSkill = call(skill);
+    expect(sentSkill.url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/skill-level`,
+    );
+    expect(sentSkill.init?.method).toBe('PUT');
+    expect(JSON.parse(sentSkill.init?.body as string)).toEqual({
+      skillLevel: 'ADVANCED',
+      expectedSkillLevel: 'BEGINNER',
+      expectedChangedAt: null,
+    });
+
+    const enroll = stubJson(200, { member: MEMBER, changed: false });
+    const enrollResult = await apiClient.setAutoEnroll(
+      TEAM_ID,
+      USER_ID,
+      {
+        enabled: true,
+        until: '2026-11-30',
+        expectedEnabled: false,
+        expectedUntil: null,
+        expectedAssignedAt: null,
+      },
+      { session: 'tok' },
+    );
+    expect(enrollResult).toMatchObject({ ok: true, data: { changed: false } });
+    const sentEnroll = call(enroll);
+    expect(sentEnroll.url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/auto-enroll`,
+    );
+    expect(sentEnroll.init?.method).toBe('PUT');
+    expect(sentEnroll.headers['content-type']).toBe('application/json');
   });
 
   it('teamInviteCode GETs and regenerateInviteCode POSTs with no body and no JSON content-type (else the API answers 422)', async () => {

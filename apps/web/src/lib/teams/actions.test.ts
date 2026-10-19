@@ -33,6 +33,8 @@ const {
   demoteSelfAction,
   banMemberAction,
   regenerateInviteAction,
+  setSkillLevelAction,
+  setAutoEnrollAction,
 } = await import('./actions.ts');
 
 const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
@@ -272,6 +274,10 @@ describe('moderation Server Actions (AC-HAPPY-6..12, AC-ERROR-6/7/9/11 web side)
     approvedAt: '2026-10-04T01:00:00.000Z',
     bannedAt: null,
     banReason: null,
+    skillOverride: null,
+    skillChangedAt: null,
+    autoEnroll: { enabled: false, until: null, assignedAt: null },
+    skillProgress: { games: 0, required: 40, nextLevel: 'INTERMEDIATE' },
   };
   const FIELDS = { teamId: TEAM_ID, userId: USER_ID, fullName: 'Ana Lee' };
   const NONE = null;
@@ -402,5 +408,279 @@ describe('moderation Server Actions (AC-HAPPY-6..12, AC-ERROR-6/7/9/11 web side)
     expect(headers['content-type']).toBeUndefined();
     expect(JSON.stringify(result)).not.toContain('NEWCODE');
     expect(mocks.revalidate).toHaveBeenCalledWith(MANAGE);
+  });
+});
+
+describe('setSkillLevelAction (AC-HAPPY-1/3, AC-ERROR-3/6/8/9)', () => {
+  const USER_ID = '22222222-2222-4222-8222-222222222222';
+  const FIELDS = {
+    teamId: TEAM_ID,
+    userId: USER_ID,
+    fullName: 'Priya Patel',
+    skillLevel: 'ADVANCED',
+    expectedSkillLevel: 'BEGINNER',
+    expectedChangedAt: '',
+  };
+  const MEMBER = {
+    userId: USER_ID,
+    fullName: 'Priya Patel',
+    role: 'MEMBER',
+    status: 'APPROVED',
+    skillLevel: 'ADVANCED',
+    requestedAt: '2026-10-03T01:00:00.000Z',
+    approvedAt: '2026-10-04T01:00:00.000Z',
+    bannedAt: null,
+    banReason: null,
+    skillOverride: { byName: 'Aroha Ngata', at: '2026-10-17T01:00:00.000Z' },
+    skillChangedAt: '2026-10-17T01:00:00.000Z',
+    autoEnroll: { enabled: false, until: null, assignedAt: null },
+    skillProgress: null,
+  };
+
+  it('PUTs the level with what the panel was showing, announces the result and revalidates', async () => {
+    const fetchMock = stubFetch(200, { member: MEMBER, changed: true });
+    const result = await setSkillLevelAction(null, form(FIELDS));
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/skill-level`,
+    );
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
+    expect(sentBody(fetchMock)).toEqual({
+      skillLevel: 'ADVANCED',
+      expectedSkillLevel: 'BEGINNER',
+      expectedChangedAt: null,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      message: 'Skill level for Priya Patel set to Advanced.',
+    });
+    expect(mocks.revalidate).toHaveBeenCalledWith(`/teams/${TEAM_ID}/manage`);
+  });
+
+  it('sends a non-empty expectedChangedAt as the instant the API returned', async () => {
+    const fetchMock = stubFetch(200, { member: MEMBER, changed: false });
+    const result = await setSkillLevelAction(
+      null,
+      form({ ...FIELDS, expectedChangedAt: '2026-10-17T01:00:00.000Z' }),
+    );
+    expect(sentBody(fetchMock).expectedChangedAt).toBe('2026-10-17T01:00:00.000Z');
+    expect(result.message).toBe('Priya Patel is already Advanced.');
+  });
+
+  it('no level selected is a field error with no request', async () => {
+    const fetchMock = stubFetch(200, { member: MEMBER, changed: true });
+    const result = await setSkillLevelAction(null, form({ ...FIELDS, skillLevel: '' }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'validation_failed',
+      refresh: false,
+      fieldErrors: { skillLevel: ['Select a skill level.'] },
+    });
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('a stale level refreshes without closing; a 5xx never revalidates', async () => {
+    stubFetch(409, { error: { code: 'skill_level_stale', message: 'stale' }, member: MEMBER });
+    const stale = await setSkillLevelAction(null, form(FIELDS));
+    expect(stale).toMatchObject({ ok: false, code: 'skill_level_stale', refresh: true });
+    expect(mocks.revalidate).toHaveBeenCalledTimes(1);
+
+    mocks.revalidate.mockClear();
+    stubFetch(503, { error: { code: 'service_unavailable', message: 'busy' } });
+    const down = await setSkillLevelAction(null, form(FIELDS));
+    expect(down).toMatchObject({
+      ok: false,
+      message: "We couldn't save that. Nothing was changed. Try again.",
+    });
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('a banned target closes the panel with the member-specific line from the form name', async () => {
+    stubFetch(409, { error: { code: 'membership_state_conflict', message: 'gone' } });
+    const result = await setSkillLevelAction(null, form(FIELDS));
+    expect(result).toMatchObject({
+      ok: false,
+      close: true,
+      message: 'Priya Patel is no longer an approved member. The list has been refreshed.',
+    });
+  });
+
+  it('a non-UUID target is the stale answer and never reaches an API path', async () => {
+    const fetchMock = stubFetch(200, { member: MEMBER, changed: true });
+    const result = await setSkillLevelAction(null, form({ ...FIELDS, userId: '../x' }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, close: true });
+  });
+
+  it('a 401 goes through the session-expired round trip back to the Members section', async () => {
+    stubFetch(401, { error: { code: 'unauthenticated', message: 'no' } });
+    const target = await redirectOf(setSkillLevelAction(null, form(FIELDS)));
+    expect(target).toBe(`/auth/session-expired?returnTo=%2Fteams%2F${TEAM_ID}%2Fmanage:replace`);
+  });
+});
+
+describe('setAutoEnrollAction (AC-HAPPY-7/8/10, AC-ERROR-3)', () => {
+  const USER_ID = '22222222-2222-4222-8222-222222222222';
+  // The hidden fields of a panel that saw Auto Enroll off.
+  const SAW_OFF = { expectedEnabled: 'false', expectedUntil: '', expectedAssignedAt: '' };
+  const SENT_OFF = { expectedEnabled: false, expectedUntil: null, expectedAssignedAt: null };
+  const BASE = { teamId: TEAM_ID, userId: USER_ID, fullName: 'Priya Patel', ...SAW_OFF };
+  const MEMBER = (autoEnroll: Record<string, unknown>) => ({
+    userId: USER_ID,
+    fullName: 'Priya Patel',
+    role: 'MEMBER',
+    status: 'APPROVED',
+    skillLevel: 'BEGINNER',
+    requestedAt: '2026-10-03T01:00:00.000Z',
+    approvedAt: '2026-10-04T01:00:00.000Z',
+    bannedAt: null,
+    banReason: null,
+    skillOverride: null,
+    skillChangedAt: null,
+    autoEnroll,
+    skillProgress: { games: 0, required: 40, nextLevel: 'INTERMEDIATE' },
+  });
+
+  it('ticked with a date sends enabled and until', async () => {
+    const fetchMock = stubFetch(200, {
+      member: MEMBER({
+        enabled: true,
+        until: '2026-11-30',
+        assignedAt: '2026-10-17T01:00:00.000Z',
+      }),
+      changed: true,
+    });
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '2026-11-30' }),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/members/${USER_ID}/auto-enroll`,
+    );
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
+    expect(sentBody(fetchMock)).toEqual({ enabled: true, until: '2026-11-30', ...SENT_OFF });
+    expect(result.message).toBe('Auto Enroll on for Priya Patel until 30 Nov 2026.');
+    expect(mocks.revalidate).toHaveBeenCalled();
+  });
+
+  it('ticked with no date sends until null', async () => {
+    const fetchMock = stubFetch(200, {
+      member: MEMBER({ enabled: true, until: null, assignedAt: '2026-10-17T01:00:00.000Z' }),
+      changed: true,
+    });
+    const result = await setAutoEnrollAction(null, form({ ...BASE, enabled: 'true', until: '' }));
+    expect(sentBody(fetchMock)).toEqual({ enabled: true, until: null, ...SENT_OFF });
+    expect(result.message).toBe('Auto Enroll on for Priya Patel, with no end date.');
+  });
+
+  it('unticked drops any date from the request (off with a date is refused)', async () => {
+    const fetchMock = stubFetch(200, {
+      member: MEMBER({ enabled: false, until: null, assignedAt: null }),
+      changed: true,
+    });
+    const result = await setAutoEnrollAction(null, form({ ...BASE, until: '2026-11-30' }));
+    expect(sentBody(fetchMock)).toEqual({ enabled: false, until: null, ...SENT_OFF });
+    expect(result.message).toBe('Auto Enroll turned off for Priya Patel.');
+  });
+
+  it('a malformed date is a field error with no request', async () => {
+    const fetchMock = stubFetch(200, {});
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '30/11/2026' }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      fieldErrors: { until: ['Choose today or a later date.'] },
+    });
+  });
+
+  it("shows the API's 422 for a past date and keeps the panel open", async () => {
+    stubFetch(422, {
+      error: {
+        code: 'validation_failed',
+        message: 'Invalid',
+        fieldErrors: { until: ['Choose today or a later date.'] },
+      },
+    });
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '2020-01-01' }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      refresh: false,
+      fieldErrors: { until: ['Choose today or a later date.'] },
+    });
+    expect(result.close).toBeUndefined();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it('sends the stored state the panel was showing, including an ended date', async () => {
+    const fetchMock = stubFetch(200, {
+      member: MEMBER({ enabled: true, until: null, assignedAt: '2026-12-02T01:00:00.000Z' }),
+      changed: true,
+    });
+    await setAutoEnrollAction(
+      null,
+      form({
+        ...BASE,
+        enabled: 'true',
+        until: '',
+        expectedEnabled: 'true',
+        expectedUntil: '2026-11-30',
+        expectedAssignedAt: '2026-10-17T01:00:00.000Z',
+      }),
+    );
+    expect(sentBody(fetchMock)).toEqual({
+      enabled: true,
+      until: null,
+      expectedEnabled: true,
+      expectedUntil: '2026-11-30',
+      expectedAssignedAt: '2026-10-17T01:00:00.000Z',
+    });
+  });
+
+  it('a tampered stale token is refused with no request', async () => {
+    const fetchMock = stubFetch(200, {});
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '', expectedEnabled: 'yes' }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+  });
+
+  it('409 auto_enroll_stale refreshes the panel with the Auto Enroll copy and keeps it open', async () => {
+    stubFetch(409, {
+      error: { code: 'auto_enroll_stale', message: 'stale' },
+      member: MEMBER({ enabled: false, until: null, assignedAt: null }),
+    });
+    const result = await setAutoEnrollAction(
+      null,
+      form({ ...BASE, enabled: 'true', until: '2026-12-24' }),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'auto_enroll_stale',
+      refresh: true,
+      message:
+        "This member's Auto Enroll changed since you opened the panel. Check it and save again.",
+    });
+    expect(result.close).toBeUndefined();
+    expect(mocks.revalidate).toHaveBeenCalled();
+  });
+
+  it('an unreachable API is the unknown-outcome line and never revalidates', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('fetch failed'))),
+    );
+    const result = await setAutoEnrollAction(null, form({ ...BASE, enabled: 'true', until: '' }));
+    expect(result.message).toBe(
+      "We couldn't confirm that was saved. Try again; saving the same change twice is safe.",
+    );
+    expect(mocks.revalidate).not.toHaveBeenCalled();
   });
 });

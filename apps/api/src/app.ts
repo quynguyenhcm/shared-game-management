@@ -32,6 +32,8 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import { skillLevelsRoutes } from './modules/skill-levels/routes.ts';
+import { createSkillLevelsService } from './modules/skill-levels/service.ts';
 import { teamBankingRoutes } from './modules/team-banking/routes.ts';
 import { createTeamBankingService } from './modules/team-banking/service.ts';
 import { teamsRoutes } from './modules/teams/routes.ts';
@@ -175,6 +177,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       jobs: deps.jobs,
       webBaseUrl: deps.auth.webBaseUrl,
     }),
+  });
+  await app.register(skillLevelsRoutes, {
+    prefix: '/teams',
+    service: createSkillLevelsService({ db: deps.db, clock: deps.clock }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);
   await app.ready();

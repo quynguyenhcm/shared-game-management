@@ -261,8 +261,8 @@ describe('upgrading a pre-feature database', () => {
   });
 
   it('rolls back to a plain is_payout_configured column, recomputed from the block, and migrates forward again', async () => {
-    // Newest first: the change-key column (D-54) sits on top of the invariants migration.
-    await rollbackMigrations({ databaseUrl: db.url, count: 2 });
+    // Newest first: the skill-level invariants and the change-key column (D-54) sit on top of the invariants migration.
+    await rollbackMigrations({ databaseUrl: db.url, count: 3 });
     const { rows } = await db.pool.query<{
       attgenerated: string;
       attnotnull: boolean;

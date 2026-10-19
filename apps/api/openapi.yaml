@@ -197,6 +197,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -264,6 +266,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -331,6 +335,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -398,6 +404,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -546,6 +554,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -613,6 +623,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -680,6 +692,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -747,6 +761,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -872,6 +888,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -997,6 +1015,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1064,6 +1084,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1131,6 +1153,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1243,6 +1267,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1310,6 +1336,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1377,6 +1405,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1492,6 +1522,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1559,6 +1591,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1787,6 +1821,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1854,6 +1890,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1921,6 +1959,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -1988,6 +2028,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2055,6 +2097,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2122,6 +2166,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2189,6 +2235,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2302,6 +2350,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2369,6 +2419,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2583,6 +2635,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2650,6 +2704,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2717,6 +2773,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2839,6 +2897,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -2938,6 +2998,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3005,6 +3067,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3072,6 +3136,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3159,6 +3225,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3226,6 +3294,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3293,6 +3363,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3360,6 +3432,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3596,6 +3670,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3663,6 +3739,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3810,6 +3888,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -3935,6 +4015,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4074,6 +4156,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4141,6 +4225,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4208,6 +4294,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4275,6 +4363,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4419,6 +4509,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4486,6 +4578,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4621,6 +4715,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4688,6 +4784,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4755,6 +4853,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4822,6 +4922,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4889,6 +4991,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -4986,6 +5090,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5053,6 +5159,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5120,6 +5228,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5217,6 +5327,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5284,6 +5396,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5351,6 +5465,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5463,6 +5579,73 @@ paths:
                           type:
                             - string
                             - "null"
+                        skillOverride:
+                          anyOf:
+                            - type: object
+                              properties:
+                                byName:
+                                  type: string
+                                at:
+                                  type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              required:
+                                - byName
+                                - at
+                              additionalProperties: false
+                            - type: "null"
+                        skillChangedAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                        autoEnroll:
+                          type: object
+                          properties:
+                            enabled:
+                              type: boolean
+                            until:
+                              anyOf:
+                                - type: string
+                                  format: date
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                                - type: "null"
+                            assignedAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                          required:
+                            - enabled
+                            - until
+                            - assignedAt
+                          additionalProperties: false
+                        skillProgress:
+                          anyOf:
+                            - type: object
+                              properties:
+                                games:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 9007199254740991
+                                required:
+                                  type: integer
+                                  minimum: 1
+                                  maximum: 9007199254740991
+                                nextLevel:
+                                  type: string
+                                  enum:
+                                    - BEGINNER
+                                    - INTERMEDIATE
+                                    - ADVANCED
+                              required:
+                                - games
+                                - required
+                                - nextLevel
+                              additionalProperties: false
+                            - type: "null"
                       required:
                         - userId
                         - fullName
@@ -5473,6 +5656,10 @@ paths:
                         - approvedAt
                         - bannedAt
                         - banReason
+                        - skillOverride
+                        - skillChangedAt
+                        - autoEnroll
+                        - skillProgress
                       additionalProperties: false
                   nextCursor:
                     type:
@@ -5535,6 +5722,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5602,6 +5791,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5669,6 +5860,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5771,6 +5964,73 @@ paths:
                         type:
                           - string
                           - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
                     required:
                       - userId
                       - fullName
@@ -5781,6 +6041,10 @@ paths:
                       - approvedAt
                       - bannedAt
                       - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
                     additionalProperties: false
                 required:
                   - member
@@ -5833,6 +6097,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5900,6 +6166,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -5967,6 +6235,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6034,6 +6304,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6101,6 +6373,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6202,6 +6476,73 @@ paths:
                         type:
                           - string
                           - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
                     required:
                       - userId
                       - fullName
@@ -6212,6 +6553,10 @@ paths:
                       - approvedAt
                       - bannedAt
                       - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
                     additionalProperties: false
                 required:
                   - member
@@ -6264,6 +6609,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6331,6 +6678,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6398,6 +6747,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6465,6 +6816,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6532,6 +6885,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6632,6 +6987,73 @@ paths:
                         type:
                           - string
                           - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
                     required:
                       - userId
                       - fullName
@@ -6642,6 +7064,10 @@ paths:
                       - approvedAt
                       - bannedAt
                       - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
                     additionalProperties: false
                 required:
                   - member
@@ -6694,6 +7120,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6761,6 +7189,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6828,6 +7258,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6895,6 +7327,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -6962,6 +7396,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7063,6 +7499,73 @@ paths:
                         type:
                           - string
                           - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
                     required:
                       - userId
                       - fullName
@@ -7073,6 +7576,10 @@ paths:
                       - approvedAt
                       - bannedAt
                       - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
                     additionalProperties: false
                 required:
                   - member
@@ -7125,6 +7632,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7192,6 +7701,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7259,6 +7770,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7326,6 +7839,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7393,6 +7908,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7508,6 +8025,73 @@ paths:
                         type:
                           - string
                           - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
                     required:
                       - userId
                       - fullName
@@ -7518,6 +8102,10 @@ paths:
                       - approvedAt
                       - bannedAt
                       - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
                     additionalProperties: false
                 required:
                   - member
@@ -7570,6 +8158,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7637,6 +8227,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7704,6 +8296,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7771,6 +8365,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7838,6 +8434,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -7986,6 +8584,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8053,6 +8653,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8120,6 +8722,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8187,6 +8791,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8359,6 +8965,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8426,6 +9034,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8493,6 +9103,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8560,6 +9172,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8709,6 +9323,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8776,6 +9392,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8843,6 +9461,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -8910,6 +9530,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9018,6 +9640,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9085,6 +9709,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9152,6 +9778,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9219,6 +9847,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9353,6 +9983,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9420,6 +10052,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9487,6 +10121,8 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:
@@ -9554,6 +10190,1384 @@ paths:
                           - membership_state_conflict
                           - payout_not_configured
                           - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/members/{userId}/skill-level:
+    put:
+      operationId: setTeamMemberSkillLevel
+      summary: Set a member's skill level
+      description: "Overrides an APPROVED member's level, up or down, recording who
+        and when; it also restarts the member's count toward automatic
+        progression (games before the override no longer count). Saving the
+        level the member already has is a no-op. `expectedSkillLevel` and
+        `expectedChangedAt` are the `skillLevel` and `skillChangedAt` the panel
+        was showing: when either is no longer current (another admin saved, or
+        the member was moved up automatically) the answer is 409
+        `skill_level_stale` with the current `member`, and nothing is written.
+        Existing registrations keep their fee. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off): the guard answers 401/403 before the body
+        is read, so an invalid body from a non-admin is still 403. The target is
+        looked up by (team, user): a user with no row in this team is 404
+        `not_found`; a PENDING, REJECTED or BANNED target is 409
+        `membership_state_conflict`. The actor is re-checked as an approved
+        admin under the team-row lock (403 when demoted meanwhile). Admins may
+        change their own row. `changed: false` means nothing was written and no
+        event was logged."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                skillLevel:
+                  type: string
+                  enum:
+                    - BEGINNER
+                    - INTERMEDIATE
+                    - ADVANCED
+                expectedSkillLevel:
+                  type: string
+                  enum:
+                    - BEGINNER
+                    - INTERMEDIATE
+                    - ADVANCED
+                expectedChangedAt:
+                  anyOf:
+                    - type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    - type: "null"
+              required:
+                - skillLevel
+                - expectedSkillLevel
+                - expectedChangedAt
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: userId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                      requestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      approvedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      bannedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      banReason:
+                        type:
+                          - string
+                          - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
+                    required:
+                      - userId
+                      - fullName
+                      - role
+                      - status
+                      - skillLevel
+                      - requestedAt
+                      - approvedAt
+                      - bannedAt
+                      - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
+                    additionalProperties: false
+                  changed:
+                    type: boolean
+                required:
+                  - member
+                  - changed
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                  member:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                      requestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      approvedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      bannedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      banReason:
+                        type:
+                          - string
+                          - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
+                    required:
+                      - userId
+                      - fullName
+                      - role
+                      - status
+                      - skillLevel
+                      - requestedAt
+                      - approvedAt
+                      - bannedAt
+                      - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/members/{userId}/auto-enroll:
+    put:
+      operationId: setTeamMemberAutoEnroll
+      summary: Set a member's Auto Enroll
+      description: "Turns Auto Enroll on (with an optional inclusive end date `until`,
+        a Pacific/Auckland calendar date that must be today or later: 422
+        `fieldErrors.until` otherwise) or off. Turning it on puts the member at
+        the back of the Auto Enroll order; changing only `until` keeps their
+        place; an assignment that already ended (`until` before today) counts as
+        off, so renewing it is a new place at the back. Off clears the end date
+        and the place. `until` with `enabled: false` is 422. `expectedEnabled`,
+        `expectedUntil` and `expectedAssignedAt` are the member's `autoEnroll`
+        as the panel was showing it: when a save would change something and Auto
+        Enroll changed since (another admin saved), the answer is 409
+        `auto_enroll_stale` with the current `member`, and nothing is written.
+        Auto Enroll applies to sessions selected after the save: nothing is
+        registered or withdrawn now. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off): the guard answers 401/403 before the body
+        is read, so an invalid body from a non-admin is still 403. The target is
+        looked up by (team, user): a user with no row in this team is 404
+        `not_found`; a PENDING, REJECTED or BANNED target is 409
+        `membership_state_conflict`. The actor is re-checked as an approved
+        admin under the team-row lock (403 when demoted meanwhile). Admins may
+        change their own row. `changed: false` means nothing was written and no
+        event was logged."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                until:
+                  type:
+                    - string
+                    - "null"
+                expectedEnabled:
+                  type: boolean
+                expectedUntil:
+                  type:
+                    - string
+                    - "null"
+                expectedAssignedAt:
+                  anyOf:
+                    - type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    - type: "null"
+              required:
+                - enabled
+                - until
+                - expectedEnabled
+                - expectedUntil
+                - expectedAssignedAt
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: userId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                      requestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      approvedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      bannedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      banReason:
+                        type:
+                          - string
+                          - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
+                    required:
+                      - userId
+                      - fullName
+                      - role
+                      - status
+                      - skillLevel
+                      - requestedAt
+                      - approvedAt
+                      - bannedAt
+                      - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
+                    additionalProperties: false
+                  changed:
+                    type: boolean
+                required:
+                  - member
+                  - changed
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                  member:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - TEAM_ADMIN
+                          - MEMBER
+                      status:
+                        type: string
+                        enum:
+                          - PENDING
+                          - APPROVED
+                          - REJECTED
+                          - BANNED
+                      skillLevel:
+                        type: string
+                        enum:
+                          - BEGINNER
+                          - INTERMEDIATE
+                          - ADVANCED
+                      requestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      approvedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      bannedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      banReason:
+                        type:
+                          - string
+                          - "null"
+                      skillOverride:
+                        anyOf:
+                          - type: object
+                            properties:
+                              byName:
+                                type: string
+                              at:
+                                type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            required:
+                              - byName
+                              - at
+                            additionalProperties: false
+                          - type: "null"
+                      skillChangedAt:
+                        anyOf:
+                          - type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          - type: "null"
+                      autoEnroll:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          until:
+                            anyOf:
+                              - type: string
+                                format: date
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                              - type: "null"
+                          assignedAt:
+                            anyOf:
+                              - type: string
+                                format: date-time
+                                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                              - type: "null"
+                        required:
+                          - enabled
+                          - until
+                          - assignedAt
+                        additionalProperties: false
+                      skillProgress:
+                        anyOf:
+                          - type: object
+                            properties:
+                              games:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              required:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              nextLevel:
+                                type: string
+                                enum:
+                                  - BEGINNER
+                                  - INTERMEDIATE
+                                  - ADVANCED
+                            required:
+                              - games
+                              - required
+                              - nextLevel
+                            additionalProperties: false
+                          - type: "null"
+                    required:
+                      - userId
+                      - fullName
+                      - role
+                      - status
+                      - skillLevel
+                      - requestedAt
+                      - approvedAt
+                      - bannedAt
+                      - banReason
+                      - skillOverride
+                      - skillChangedAt
+                      - autoEnroll
+                      - skillProgress
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
                       message:
                         type: string
                       fieldErrors:

@@ -85,6 +85,15 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     message:
       'Cancel or complete your published paid sessions, and wait for unpaid payments to be settled, before removing the banking details.',
   },
+  skill_level_stale: {
+    status: 409,
+    message: "This member's level changed since you opened the panel. Check it and save again.",
+  },
+  auto_enroll_stale: {
+    status: 409,
+    message:
+      "This member's Auto Enroll changed since you opened the panel. Check it and save again.",
+  },
 };
 
 export interface AppErrorOptions {

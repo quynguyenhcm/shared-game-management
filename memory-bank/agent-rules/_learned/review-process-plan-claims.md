@@ -2,11 +2,11 @@
 name: Reconcile plan and doc claims against the tree at every review
 globs: ["memory-bank/tasks/*.md", "memory-bank/techContext.md", "memory-bank/systemPatterns.md"]
 paths: ["memory-bank/"]
-topics: ["review", "phase review", "observability", "documentation", "plan", "invariants", "cross-phase", "cross-feature", "creative", "critique", "idempotency", "replay", "reconciliation"]
+topics: ["review", "phase review", "observability", "documentation", "plan", "invariants", "cross-phase", "cross-feature", "creative", "critique", "idempotency", "replay", "reconciliation", "siblings", "concurrency"]
 priority: medium
 auto_generated: true
-derived_from: [platform-foundation, auth-and-user-roles, team-management, team-banking-and-gst]
-evidence_count: 4
+derived_from: [platform-foundation, auth-and-user-roles, team-management, team-banking-and-gst, skill-levels-and-auto-enroll]
+evidence_count: 5
 last_validated: 2026-10-17
 ---
 
@@ -22,3 +22,4 @@ last_validated: 2026-10-17
 - When parallel creative agents disagree, write one binding reconciliation section (or fold the amendments into the ACs) before the first build phase, so build agents read a single ruling per conflict. When the reconciliation drops or reshapes ACs, mark the superseded AC groups (in the archive's Requirements at the latest), or downstream features inherit obsolete criteria.
 - After a review finding about replay, idempotency, locking or claim semantics, list every return path of the handler (changed, no-op, refused, replay) and require a test that asserts the invariant on each, not only on the path the finding named. In team-banking-and-gst a replay fix covered saves that changed something; a save that changed nothing never claimed its key, five phase reviews passed it, and only the final whole-branch review caught it.
 - When a coordinator suggests a fix in a review hand-off, test it against the finding's own scenario before building it. In team-banking-and-gst a suggested "last change key" column could not have detected the replay it was meant to stop; the build agent correctly used a bounded key list.
+- A learned rule is not a check until a reviewer enumerates it. When a phase adds or changes a write on a resource, list every sibling write on the same page or resource and compare their guards (idempotency or stale check), lock order and where each reads the clock; record each difference as fixed or deliberately accepted. In skill-levels-and-auto-enroll the sibling-guard rule already existed, yet five phase reviews passed an unguarded Auto Enroll PUT beside a guarded override PUT, and only the final whole-branch review caught it and a clock-before-lock read.
