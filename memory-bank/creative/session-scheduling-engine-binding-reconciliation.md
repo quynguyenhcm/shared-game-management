@@ -145,3 +145,15 @@ These come from ARCH. They are fixed in the Phase 1 commit, never weakened:
 | ALG | No `deadline_is_default` column | T-8 |
 | ALG | H10 nonexistent-time trigger | T-10 (not adopted) |
 | UJ | AC-NAV-1/2 | T-14 |
+
+## Wave 2 (UI/UX) acceptance
+
+**Chosen**: `session-scheduling-engine-uiux.md` is accepted with its six assumptions confirmed:
+1. A blank "Court hire" means $0.00, which makes a free session. AC-HAPPY-2 is amended to say so.
+2. The list GET returns `isPayoutConfigured`.
+3. Series instance rows carry `activeRegistrationCount`.
+4. The list GET supports keyset paging.
+5. `seriesChangeEffect` gives a per-instance value: `will_update`, `edited`, `closed` or `has_registrations`. There is no `needs_banking` value, because T-5 refuses the whole edit instead.
+6. `bankingReturnTo` already accepts sessions paths.
+
+The rate input moves from Costing into Pricing, and Places comes before Costing. Both supersede the spec's Element text.
