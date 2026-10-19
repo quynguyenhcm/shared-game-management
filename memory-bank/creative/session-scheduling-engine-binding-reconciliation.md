@@ -145,6 +145,9 @@ These come from ARCH. They are fixed in the Phase 1 commit, never weakened:
 | ALG | No `deadline_is_default` column | T-8 |
 | ALG | H10 nonexistent-time trigger | T-10 (not adopted) |
 | UJ | AC-NAV-1/2 | T-14 |
+| ARCH | D-81 `payout_notice_window` column + UPDATE of the locked rule row | T-18 (`payout_notice_claims` table) |
+| ARCH | `runSessionAutoEnrol` unlocked marker read before the allocator call | T-19 (advisory xact lock, re-read, stamp in same tx) |
+| ALG / ARCH | Fee-lock predicate assumed to exist (registration's `withdrawal_kind`) | T-17 (this feature ships the predicate as D-85; registration widens it) |
 
 ## Wave 2 (UI/UX) acceptance
 
@@ -157,3 +160,36 @@ These come from ARCH. They are fixed in the Phase 1 commit, never weakened:
 6. `bankingReturnTo` already accepts sessions paths.
 
 The rate input moves from Costing into Pricing, and Places comes before Costing. Both supersede the spec's Element text.
+
+## Critique rulings (Codex adversarial review, 2026-10-20)
+
+### T-17: the active-registrations predicate ships with this feature, and registration widens it later
+**Chosen**: this feature's migration creates `game_session_has_active_registrations(p_session_id uuid) RETURNS boolean`, which is true when a `registrations` row has `status IN ('CONFIRMED','WAITLISTED')`. It also creates the fee-raise backstop trigger `game_sessions_fee_raise_locked` that uses it.
+- Ledger: **D-85** for the function and trigger together. D-84 stays reserved.
+- registration-and-waitlist's lifecycle migration `CREATE OR REPLACE`s the function to also count `WITHDRAWN` rows with `withdrawal_fee_due` (ALG R-a). This goes in ADR 0019's "offered" section and is re-checked at registration's build gate.
+- The function is safe whichever feature merges first: it reads only columns that exist on `main` today.
+- Tests:
+  - raw SQL: a fee raise with an active registration fails 23514; a decrease succeeds;
+  - a race test: a registration insert against a fee edit, both under the session lock.
+
+### T-18: the banking-email claim is its own table
+**Chosen**: a dedicated table `payout_notice_claims (rule_id uuid REFERENCES recurring_session_rules ON DELETE CASCADE, window_start date, claimed_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (rule_id, window_start))`, claimed with `INSERT … ON CONFLICT DO NOTHING RETURNING` in the instance transaction. The email is enqueued only when a row comes back.
+- This **supersedes ARCH D-81** as written (a column on `recurring_session_rules` plus an UPDATE of the locked rule row), which T-4 already forbade.
+- The D-81 ledger row and the migration's down section are rewritten to match.
+- Test: two concurrent instance transactions for the same rule and window enqueue exactly one email.
+
+### T-19: auto-enrol runs serialised per session
+**Chosen**: the follow-up auto-enrol transaction (`runSessionAutoEnrol`) runs in this order:
+1. Its **first statement** takes `pg_advisory_xact_lock(<sessions-auto-enrol namespace>, hashtext(session_id))`, before any row lock. Taking it first keeps the canonical row-lock order intact, and only this one code path ever uses the lock.
+2. It re-reads `auto_enrol_required`, `auto_enrolled_at` and `status` after the lock. It returns if the session is already enrolled, not PUBLISHED, or not required.
+3. It calls `selectAutoEnrollees`, then `allocator.autoEnrolInSession`, and stamps `auto_enrolled_at` **in the same transaction**, and only when `allocator.enrols === true`.
+
+Effect:
+- An inline materialiser follow-up and a sweep or replayed `session-auto-enrol` job serialise.
+- The second one sees the marker and does nothing, which keeps the once-per-session promise even though pg-boss delivers at least once.
+- Allocator effects and the marker commit or roll back together.
+- The advisory-lock namespace constant goes in `locks.ts` and is recorded in ADR 0019.
+- Race test: inline follow-up against the sweep job against a replayed job gives exactly one `autoEnrolInSession` call (recording double) and one stamp.
+
+### T-20: the task file is brought in line before build
+**Chosen**: the Specification ACs, Success Criteria copy, Scope Boundaries, Implementation Roadmap (new files, queues and handlers) and Test Strategy are rewritten to match this doc and the four design docs' amendment lists, then re-linted. This is done before CREATIVE_COMPLETE.
