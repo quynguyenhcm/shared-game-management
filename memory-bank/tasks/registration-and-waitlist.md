@@ -56,7 +56,7 @@ Registration, FIFO waitlist, debt control and cancellation rules (PRODDUCT-OVERV
 2. Lifecycle `DRAFT -> PUBLISHED -> COMPLETED | CANCELLED`. Registration is open only while `status = 'PUBLISHED' AND now < starts_at`. Cancelling a session, and what happens to its registrations, belongs to session-scheduling-engine.
 3. A player-facing session page that can host the registration panel. Assumed route: `/teams/[teamId]/sessions/[sessionId]`, reached from a team's list of upcoming sessions (and later from the player-dashboard "Currently Opening" tab). If session-scheduling-engine ships no player page, this feature ships that minimal page itself (LOW confidence).
 4. Capacity edits on a PUBLISHED session (raising `max_players` or lowering `reserved_seats`) call this feature's exported `promoteWaitlist(trx, sessionId, now)` in the same transaction, under the D-14 lock. Lowering capacity never demotes a CONFIRMED registration.
-5. The auto-enrol step of recurrence materialisation (workflows §4, skill-levels-and-auto-enroll) registers members through this feature's exported allocator (`registerInSession`), in auto-enrol assignment order, calling the gate first.
+5. The auto-enrol step of recurrence materialisation (workflows §4, skill-levels-and-auto-enroll) registers members through this feature's exported allocator (`autoEnrolInSession` with `{ userId, assignedAt }` entries, re-checked under the member lock, R16), in auto-enrol assignment order, calling the gate first.
 
 ### Invocation Method
 - **Location**: Web app (Next.js App Router).
@@ -91,7 +91,8 @@ Registration, FIFO waitlist, debt control and cancellation rules (PRODDUCT-OVERV
   - An admin who bans a member sees the restored confirmation (AC-HAPPY-10). The member's upcoming registrations become WITHDRAWN within 30 s while the worker runs.
 - **Verifiable at**: the session page; the three API routes; the database rows below; `pgboss.job` for `send-email` (promotion), `member-banned` and `registration-ban-reconcile`; Mailpit in dev and CI; structured `registration.*` log events (AC-VERIFY-6).
 - **Data persisted**:
-  - `registrations`: `status`, `queue_position` (`max + 1` under the session lock; NULL unless WAITLISTED), `guest_count`, `registered_at` (reset when a withdrawn row registers again), `updated_at`, and new columns from one reversible migration (ledger D-47 onwards): `promoted_at timestamptz` (set on WAITLISTED -> CONFIRMED), `withdrawn_at timestamptz`, `withdrawal_kind` (new enum `withdrawal_kind`: `EARLY`, `LATE`, `BANNED`; set iff `status = 'WITHDRAWN'`) and `withdrawal_fee_due boolean NOT NULL DEFAULT false` (true only for `LATE` with nobody promoted; the billing hand-off).
+  - `registrations`: `status`, `queue_position` (`max + 1` under the session lock; NULL unless WAITLISTED), `guest_count`, `registered_at` (reset when a withdrawn row registers again), `updated_at`, and new columns from one reversible migration (ledger D-62 onwards): `promoted_at timestamptz` (set on WAITLISTED -> CONFIRMED), `withdrawn_at timestamptz`, `withdrawal_kind` (new enum `withdrawal_kind`: `EARLY`, `LATE`, `BANNED`; set iff `status = 'WITHDRAWN'`) and `withdrawal_fee_due boolean NOT NULL DEFAULT false` (true only for `LATE` with nobody promoted; the billing hand-off).
+  - `registrations` (added 2026-10-20, R15-R17): `registrant_skill_level skill_tier` and `registrant_sex sex`, the registrant's pricing snapshot, written in the update that makes the row CONFIRMED (register, promotion, auto-enrol, confirmed re-registration). They are never changed while the row stays CONFIRMED or becomes WITHDRAWN, and are re-taken when a withdrawn row is CONFIRMED again; NULL only on a row that has never been CONFIRMED. `source registration_source NOT NULL DEFAULT 'MEMBER'` (new enum: `MEMBER`, `AUTO_ENROL`), set by the entry point that created or re-activated the row.
   - `registration_guests`: `position`, `sex`, `skill_level`, `display_name`, replaced only when a withdrawn row registers again.
   - `send-email` jobs for promotions, and `member-banned` jobs re-enqueued by the sweep.
   - **No rows in `payments`, `payment_line_items`, `credit_transactions` or `player_credits`** (AC-VERIFY-10).
@@ -101,7 +102,7 @@ Registration, FIFO waitlist, debt control and cancellation rules (PRODDUCT-OVERV
 - (a) every `CONFIRMED` registration, which includes players promoted after the deadline: that is how "the promoted player takes the fee" happens, with nothing written at promotion time;
 - (b) every `WITHDRAWN` registration with `withdrawal_fee_due = true`, billed to the withdrawing registrant for the whole party.
 
-Billing computes the fee at charge time from the session's fee columns (registrant: `users.sex`, `team_members.skill_level`; guests: `registration_guests`) and writes the snapshot, line items, wallet deduction or Akahu link per ADR 0012. Ban withdrawals (`BANNED`) and early withdrawals are never billed. Registrations and guest rows are never deleted by this feature, because billing's line items RESTRICT them. Both features read the debt gate's `OVERDUE` status, but only billing writes it.
+Billing computes the fee at charge time from the session's fee columns and the stored pricing attributes (registrant: the `registrant_sex` and `registrant_skill_level` snapshot taken when the row became CONFIRMED, never `users.sex` or `team_members.skill_level` at charge time, per ADR 0017 C-PRICE-1 and R15; guests: `registration_guests`) and writes the snapshot, line items, wallet deduction or Akahu link per ADR 0012. Ban withdrawals (`BANNED`) and early withdrawals are never billed. Registrations and guest rows are never deleted by this feature, because billing's line items RESTRICT them. Both features read the debt gate's `OVERDUE` status, but only billing writes it.
 
 ### Acceptance Criteria
 
@@ -281,7 +282,7 @@ Billing computes the fee at charge time from the session's fee columns (registra
 **Priority**: MUST
 **Given** one new migration `db/migrations/<utc-timestamp>_registration_lifecycle.sql`
 **When** `pnpm run test:integration` runs
-**Then** the migrate, `rollback --all`, migrate round trip is identical, `db/schema-deviations.md` has D-47 onwards (each with a Source) for every new object, `types.generated.ts` matches codegen, and the enum-parity test covers the new `withdrawal_kind` enum (mirrored in `packages/shared/src/types/enums.ts`). Raw SQL proves each rule:
+**Then** the migrate, `rollback --all`, migrate round trip is identical, `db/schema-deviations.md` has D-62 onwards (each with a Source) for every new object, `types.generated.ts` matches codegen, and the enum-parity test covers the new `withdrawal_kind` enum (mirrored in `packages/shared/src/types/enums.ts`). Raw SQL proves each rule:
 - `withdrawn_at` and `withdrawal_kind` are set iff `status = 'WITHDRAWN'` (23514).
 - `withdrawal_fee_due` implies `status = 'WITHDRAWN' AND withdrawal_kind = 'LATE'` (23514).
 - `promoted_at` is NULL while WAITLISTED (23514).
@@ -388,7 +389,7 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
 - a WAITLISTED party that was never promoted.
 
 **When** `listBillableRegistrations(db, sessionId)` runs against real rows
-**Then** it returns the CONFIRMED registrations and the fee-due LATE withdrawal. Each row has `registrationId`, `userId`, `teamId`, `reason` (`CONFIRMED` or `LATE_WITHDRAWAL`), the registrant's sex and team skill level, and the guest rows with sex and skill. Nothing else is returned. A test-only billing stand-in can then insert one valid `payments` row with line items per returned registration (`insertPaymentRows`), and it passes the deferred `payment_lines_match_header` check at COMMIT, which proves the hand-off carries enough data for billing
+**Then** it returns the CONFIRMED registrations and the fee-due LATE withdrawal. Each row has `registrationId`, `userId`, `teamId`, `reason` (`CONFIRMED` or `LATE_WITHDRAWAL`), the registrant's snapshotted sex and skill level (`registrant_sex`, `registrant_skill_level`, R15; a level override or promotion after the row was confirmed does not change them), and the guest rows with sex and skill. Nothing else is returned. A test-only billing stand-in can then insert one valid `payments` row with line items per returned registration (`insertPaymentRows`), and it passes the deferred `payment_lines_match_header` check at COMMIT, which proves the hand-off carries enough data for billing
 
 #### AC-INTEGRATION-4: The full journey works in a real browser on both viewports
 **Priority**: SHOULD
@@ -404,6 +405,36 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
 
 **Then** every step shows the copy above, and the run passes on desktop and 360 x 740 with no critical axe violations
 
+**Added 2026-10-20 (plan amendment, R14-R18; obligations from ADR 0016 team-banking and ADR 0017 skill-levels-and-auto-enroll)**
+
+#### AC-VERIFY-11: The registrant's pricing attributes are snapshotted when a registration becomes CONFIRMED (C-PRICE-1)
+**Priority**: MUST
+**Given** Priya is an approved INTERMEDIATE, FEMALE member of a team whose PUBLISHED session prices `BY_SKILL_LEVEL`
+**When** she is confirmed by each entry point in turn (an immediate register, a waitlist promotion, an auto-enrol, a confirmed re-registration after an early withdrawal), and afterwards an admin overrides her level to ADVANCED (a raw `UPDATE team_members` in the test, since the override route is not a dependency) and her `users.sex` changes
+**Then** each CONFIRMED row stores `registrant_skill_level = 'INTERMEDIATE'` and `registrant_sex = 'FEMALE'`, written in the same `UPDATE` that sets `status = 'CONFIRMED'`. The later changes leave the snapshot and `listBillableRegistrations` unchanged. A WAITLISTED row that was never confirmed has both NULL. A CHECK refuses a CONFIRMED row, or a WITHDRAWN row with `withdrawal_fee_due`, that has either column NULL (SQLSTATE 23514). A withdrawn row confirmed again re-takes the snapshot from the values at that moment. The fee line on the session page names the level it is based on ("Your fee ({level}): {amount}"), per ADR 0017's later obligation.
+
+#### AC-INTEGRATION-5: Auto-enrol re-checks the opt-out under the member lock and never registers a member who turned it off (C-SKL-1 point 4)
+**Priority**: MUST
+**Given** three approved members with Auto Enroll on, passed to `autoEnrolInSession` as `{ userId, assignedAt }` entries in `selectAutoEnrollees` order. Between selection and the call, one has Auto Enroll turned off, one has `auto_enroll_until` set to the day before the session's `date`, and one was turned off and on again (a new `auto_enroll_assigned_at`). The test sets these columns with raw SQL; it does not depend on skill-levels code being merged.
+**When** `autoEnrolInSession` runs. It also runs while another connection holds the member row `FOR NO KEY UPDATE` (an admin save in flight), released after the allocator is seen waiting.
+**Then**:
+- Under its `team_members FOR SHARE` lock, and before the session lock, the allocator re-checks `is_auto_enroll`, `auto_enroll_until IS NULL OR auto_enroll_until >= game_sessions.date`, and `auto_enroll_assigned_at` equal to the entry's `assignedAt`.
+- Each of the three members is skipped with reason `auto_enroll_changed` and no `registrations` row. Valid members in the same call are placed in order.
+- When the waiting save turns Auto Enroll off and commits first, that member is skipped.
+- The canonical lock order (ADR 0016 team-banking: `teams` → `team_members` → `game_sessions` → `registrations`) holds. Nothing takes `teams FOR UPDATE`.
+
+#### AC-HAPPY-11: An auto-enrolled player sees it was automatic and is emailed (ADR 0017 later obligation)
+**Priority**: MUST
+**Given** `autoEnrolInSession` placed Priya in "Tuesday Smashers" on Wed 4 Nov, CONFIRMED or WAITLISTED
+**When** the transaction commits, and Priya opens the session page
+**Then**:
+- The row has `source = 'AUTO_ENROL'`.
+- A `send-email` job is enqueued in the placing transaction. Its subject is "You've been added to {Team name}, {Wed 4 Nov}" (or "...added to the waitlist for..."). The body gives the status, the fee line, and the cancellation deadline. It says: "Your team admin turned on Auto Enroll for you. Withdraw before {deadline} if you can't play."
+- The session page's status area shows "Added automatically (Auto Enroll)" beside "You're in." or the waitlist line.
+- A member re-registering through the panel sets `source = 'MEMBER'`.
+- The email and the label never appear for a `MEMBER` row.
+- Logs carry `source`, never the email address.
+
 ### Scope Boundaries
 - **In scope**:
   - Registration for a PUBLISHED, not-yet-started session by an APPROVED member, with 0 to 2 guests (sex and skill required, name optional).
@@ -413,7 +444,7 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
   - Early, late and ban withdrawal, plus leaving the waitlist.
   - Re-registration after withdrawal.
   - Promotion with emails.
-  - The registration lifecycle migration (D-47 onwards).
+  - The registration lifecycle migration (D-62 onwards).
   - The shared allocator (`registerInSession`, `promoteWaitlist`, `decideAllocation`) exported for auto-enrol and capacity changes.
   - The billing hand-off `listBillableRegistrations`.
   - The real `MemberBannedHandler`, its worker wiring, the `registration-ban-reconcile` sweep, and the restored ban confirmation copy.
@@ -525,7 +556,7 @@ No. Every acceptance criterion is auto-verifiable with fixtures that insert PUBL
 
 ### Per-Phase Test Guidance
 - **Phase 1** (about 20 tests): migration columns, `withdrawal_kind` enum and set-iff-WITHDRAWN CHECK, `withdrawal_fee_due` only on LATE, transition trigger, capacity backstop, new indexes, migrate/rollback round trip, enum parity, shared zod contracts, new error codes, `insertPublishedSession`.
-- **Phase 2** (about 35 tests): the `decideAllocation` matrix; `registerInSession` confirm and waitlist; `promoteWaitlist` first-fit (per creative Q1); withdrawal classification at the exact deadline instant (free) and one microsecond after (late); fee-due marker per creative Q3; re-registration reuses the row and replaces guests; lock order `teams → team_members → game_sessions → registrations`; debt gate at 2 vs 3 OVERDUE; `listBillableRegistrations`; no money rows.
+- **Phase 2** (about 41 tests; +6 from the 2026-10-20 amendment: snapshot on each of the 4 CONFIRMED transitions plus a CHECK refusal, auto-enrol re-check skips and the held-lock race): the `decideAllocation` matrix; `registerInSession` confirm and waitlist; `promoteWaitlist` first-fit (per creative Q1); withdrawal classification at the exact deadline instant (free) and one microsecond after (late); fee-due marker per creative Q3; re-registration reuses the row and replaces guests; lock order `teams → team_members → game_sessions → registrations`; debt gate at 2 vs 3 OVERDUE; `listBillableRegistrations`; no money rows.
 - **Phase 3** (about 25 tests): route policies; guard before validation; cross-team session 404; register 201 with status and rank; withdraw response without the promoted player's identity; closed and not-yet-published sessions; double submit; the promotion email committed with the promotion (rollback leaves neither); log events with asserted fields; OpenAPI drift.
 - **Phase 4** (about 18 tests): the real handler withdraws CONFIRMED and WAITLISTED rows in future PUBLISHED sessions of the team as BANNED with no fee, one session per transaction, then promotes; skips sessions that changed under the lock; permanent vs transient errors; the sweep re-enqueues only BANNED members with active registrations and is idempotent; the team-management contract test passes with the real handler; ban vs register race.
 - **Phase 5** (about 15 tests): Server Actions error mapping; panel states (open, full, registered, waitlisted, withdrawn, debt-blocked, closed); guest fieldsets with no preselection; proxy protection and `returnTo`; restored ban confirmation copy.
@@ -573,7 +604,7 @@ Provisional (pending creative): the defaults above. The creative architecture an
 #### Architecture Documentation
 - Components: `modules/registrations/{routes,service,repo,allocator,transitions,fees,deadline,billing-handoff,ban-handler,reconcile}.ts`; `jobs/ban-reconcile.ts`; shared contracts; the web panel and session page.
 - Data flow: web Server Action → API route (team guard) → service opens a transaction → `assertApprovedMember` (FOR SHARE) → debt read → lock `game_sessions` FOR UPDATE → allocator decides → repo writes rows → enqueue promotion emails in the same transaction → commit.
-- Integration points: team-management (gate, ban port and job), session-scheduling-engine (sessions, page, `promoteWaitlist` on capacity edits), skill-levels-and-auto-enroll (`registerInSession`), wallet-and-akahu-billing (`listBillableRegistrations`, `withdrawal_fee_due`, OVERDUE).
+- Integration points: team-management (gate, ban port and job), session-scheduling-engine (sessions, page, `promoteWaitlist` on capacity edits), skill-levels-and-auto-enroll (`autoEnrolInSession`, R16-R17; ADR 0017), wallet-and-akahu-billing (`listBillableRegistrations`, `withdrawal_fee_due`, OVERDUE).
 
 #### Observability Requirements
 - **Applies**: Yes. Reference `context/observability-requirements.md` during build.
@@ -598,7 +629,7 @@ Provisional (pending creative): the defaults above. The creative architecture an
 - **Risk**: the debt gate is inert until billing writes OVERDUE. **Mitigation**: accepted and documented; tests set OVERDUE directly.
 
 ### New Source Files (pin path + extension)
-- [ ] `db/migrations/<utc>_registration_lifecycle.sql`: `withdrawal_kind` enum, `promoted_at`, `withdrawn_at`, `withdrawal_kind`, `withdrawal_fee_due`, CHECKs, transition trigger, capacity backstop, indexes (D-47 onwards)
+- [ ] `db/migrations/<utc>_registration_lifecycle.sql`: `withdrawal_kind` enum, `promoted_at`, `withdrawn_at`, `withdrawal_kind`, `withdrawal_fee_due`, CHECKs, transition trigger, capacity backstop, indexes (D-62 onwards)
 - [ ] `packages/shared/src/api/registrations.ts` (+ `.test.ts`): zod contracts
 - [ ] `apps/api/src/modules/registrations/routes.ts`
 - [ ] `apps/api/src/modules/registrations/service.ts`
@@ -614,7 +645,7 @@ Provisional (pending creative): the defaults above. The creative architecture an
 - [ ] `apps/api/src/modules/registrations/{allocator,transitions,fees}.test.ts`
 - [ ] `apps/api/src/jobs/ban-reconcile.ts`
 - [ ] `apps/api/test/integration/registrations-{schema,allocator,races,api,ban,billing-handoff,logs}.int.test.ts`
-- [ ] `docs/adr/0016-registration-allocation-and-billing-handoff.md`
+- [ ] `docs/adr/0018-registration-allocation-and-billing-handoff.md`
 - [ ] `apps/web/src/lib/registrations/actions.ts`, `labels.ts` (+ `.test.ts`): no JSX, `.ts`
 - [ ] `apps/web/src/components/registrations/registration-panel.tsx`
 - [ ] `apps/web/src/components/registrations/register-form.tsx`
@@ -624,18 +655,23 @@ Provisional (pending creative): the defaults above. The creative architecture an
 - [ ] extend: `packages/shared/src/api/errors.ts`, `packages/shared/src/index.ts`, `apps/api/src/app.ts`, `apps/api/src/worker.ts`, `apps/api/src/jobs/{registry,bootstrap,schedules}.ts`, `apps/api/src/lib/db/types.generated.ts`, `apps/api/openapi.yaml`, `apps/api/test/helpers/factories.ts`, `apps/api/test/integration/teams-ban-seam.int.test.ts`, `db/schema-deviations.md`, `vitest.config.ts`, `apps/web/src/proxy.ts`, `apps/web/src/lib/api-client.ts`, `apps/web/src/lib/teams/labels.ts`
 
 ### Phases
-**Build gate**: do not start Phase 1 until session-scheduling-engine is merged, then re-check its contract (creative Q5, Q6) and adjust this plan if needed.
-- [ ] **Phase 1: Schema and shared contracts**: the lifecycle migration (D-47 onwards), regenerated types, zod contracts, error codes, `insertPublishedSession`. ACs: AC-VERIFY-2, AC-VERIFY-7.
-- [ ] **Phase 2: Allocator core and billing hand-off** (follows the algorithm and architecture creative docs): `decideAllocation`, `registerInSession`, `promoteWaitlist`, withdrawal classification and liability, debt gate, `listBillableRegistrations`, ADR 0016. ACs: AC-HAPPY-1 to 9 (domain side), AC-ERROR-4, AC-VERIFY-3, 4, 5, 10, AC-INTEGRATION-1 and 3.
-- [ ] **Phase 3: Registration API and promotion emails**: routes, service, policies, team-scoped lookups, refusals, promotion emails in the promoting transaction, `registration.*` logs, OpenAPI with 401/403. ACs: AC-ERROR-1 to 3 and 5 to 8, AC-ASYNC-1, AC-VERIFY-1 and 6.
+**Build gate**: do not start Phase 1 until session-scheduling-engine is merged. Then re-check:
+- its contract (creative Q5, Q6);
+- ADR 0016 (team-banking) and, once PR #6 is merged, ADR 0017 (skill-levels: C-PRICE-1, C-SKL-1, C-SAE input shape);
+- the free ADR/D numbers on `main` (R14).
+
+Adjust this plan if needed.
+- [ ] **Phase 1: Schema and shared contracts**: the lifecycle migration (D-62 onwards, including R15/R17 columns), regenerated types, zod contracts, error codes (incl. `auto_enroll_changed` refusal reason), `insertPublishedSession` (payout-configured team, R18). ACs: AC-VERIFY-2, AC-VERIFY-7, AC-VERIFY-11 (schema half).
+- [ ] **Phase 2: Allocator core and billing hand-off** (follows the algorithm and architecture creative docs): `decideAllocation`, `registerInSession`, `autoEnrolInSession` (R16 opt-out re-check, R17 source), `promoteWaitlist`, the R15 pricing snapshot on every transition into CONFIRMED, withdrawal classification and liability, debt gate, `listBillableRegistrations`, ADR 0018. ACs: AC-HAPPY-1 to 9 (domain side), AC-ERROR-4, AC-VERIFY-3, 4, 5, 10, AC-INTEGRATION-1, 3 and 5, AC-VERIFY-11, AC-HAPPY-11 (domain side).
+- [ ] **Phase 3: Registration API and promotion emails**: routes, service, policies, team-scoped lookups, refusals, promotion emails and the R17 auto-enrol email in the placing transaction, `registration.*` logs, OpenAPI with 401/403. ACs: AC-ERROR-1 to 3 and 5 to 8, AC-ASYNC-1, AC-VERIFY-1 and 6, AC-HAPPY-11 (email).
 - [ ] **Phase 4: Real ban handler and reconciliation sweep** (follows creative Q4): the handler, worker wiring, the `registration-ban-reconcile` queue and slot, the team-management contract test with the real handler. ACs: AC-HAPPY-10 (API side), AC-ERROR-9, AC-ASYNC-2 and 3, AC-INTEGRATION-2.
-- [ ] **Phase 5: Web registration panel** (follows the UI/UX and journey creative docs): session page or panel slot, register form with guests, waitlist and withdraw states, debt block, proxy, api-client, Server Actions, restored ban confirmation. ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 10, AC-ERROR-5 and 8, AC-ASYNC-4.
+- [ ] **Phase 5: Web registration panel** (follows the UI/UX and journey creative docs): session page or panel slot, register form with guests, waitlist and withdraw states, debt block, proxy, api-client, Server Actions, restored ban confirmation, the R17 "Added automatically (Auto Enroll)" label and the R15 fee line naming the level. ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 10, AC-ERROR-5 and 8, AC-ASYNC-4, AC-HAPPY-11 (label).
 - [ ] **Phase 6: E2E, accessibility and docs**: Playwright journeys with axe on both viewports, coverage gate, `systemPatterns.md`/`techContext.md` updates. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-8 and 9, AC-INTEGRATION-4.
 
 ## Creative Phases
 
 Level 4: creative is required.
-- [x] **Algorithm Design** (required): Q1 and Q3. Status: complete, `memory-bank/creative/registration-and-waitlist-allocation-algorithm.md` (first-fit; late fee released on refill; ADR 0016 draft inside).
+- [x] **Algorithm Design** (required): Q1 and Q3. Status: complete, `memory-bank/creative/registration-and-waitlist-allocation-algorithm.md` (first-fit; late fee released on refill; ADR 0018 draft inside).
 - [x] **Architecture Design** (required): Q2, Q4, Q6. Status: complete, `memory-bank/creative/registration-and-waitlist-allocator-architecture.md` (options 2A, 4A, 6A).
 - [x] **User Journey Design** (required for Level 4): Q5 journey. Status: complete, `memory-bank/creative/registration-and-waitlist-registration-user-journey.md` (Dashboard + Detail; this feature owns the player session page and the Upcoming sessions list).
 - [x] **UI/UX Design** (required): Q5 UI. Status: complete, `memory-bank/creative/registration-and-waitlist-registration-panel-uiux.md` (stacked state-driven panel).
@@ -673,15 +709,15 @@ Where this section and a creative doc or an AC disagree, this section wins. Buil
 - Pure rules in `allocation.ts`; refusals are returned values.
 - `SET LOCAL lock_timeout` (2 s HTTP, 5 s jobs) and a 3-attempt retry on 40P01/55P03 for this module's own transactions, with `now` read once before the first attempt.
 - Only `promoteWaitlist` promotes; only `repo.ts` writes `registrations` (grep test).
-- Migration ledger D-47..D-51, plus the R2 index.
+- Migration ledger D-62..D-66, plus the R2 index.
 - Worker pool goes from 2 to 5.
 - This replaces the spec's `promoteWaitlist(trx, sessionId, now)` signature.
 
 **R6 · Ban handler and sweep (Q4).** Architecture doc option 4A: one job per membership, one transaction per session through `withdrawFromSession({ cause: 'ban' })`, continue past a failed session, transient vs permanent classification as listed there. Sweep at `30 5 * * *` Pacific/Auckland, once at worker start, and on demand, capped at 1000 memberships. Ban-triggered promotions release owed fees (R2).
 
-**R7 · Cross-feature contracts (Q6).** Architecture doc option 6A: consumer obligations C-SSE-1..5, C-SAE-1..2, C-BIL-1..3, C-ALL-1 go into ADR 0016 and are re-checked at the build gate. C-BIL is extended: billing reads the hand-off at or after `starts_at`, when the fee flag is final; the list is empty for a CANCELLED or unpublished session. Guest rows carry `guestId` and `position`.
+**R7 · Cross-feature contracts (Q6).** Architecture doc option 6A: consumer obligations C-SSE-1..5, C-SAE-1..2, C-BIL-1..3, C-ALL-1 go into ADR 0018 and are re-checked at the build gate. C-BIL is extended: billing reads the hand-off at or after `starts_at`, when the fee flag is final; the list is empty for a CANCELLED or unpublished session. Guest rows carry `guestId` and `position`.
 
-**R8 · Page ownership and entry (Q5).** User journey doc: this feature owns the player session page `/teams/[teamId]/sessions/[sessionId]` and an "Upcoming sessions" section on `/teams/[teamId]` (APPROVED members only), backed by a new `GET /teams/:teamId/sessions/upcoming` (`teamRole('MEMBER')`, next 10 sessions). New AC-ENTRY-4; add the route to AC-VERIFY-1. session-scheduling-engine owns admin pages under `/teams/[T]/manage/sessions` and follows the slot contract (`SessionSummary` + `RegistrationPanel`, only the panel changes a registration), recorded in ADR 0016. Phase 3 gains the endpoint, Phase 5 the section.
+**R8 · Page ownership and entry (Q5).** User journey doc: this feature owns the player session page `/teams/[teamId]/sessions/[sessionId]` and an "Upcoming sessions" section on `/teams/[teamId]` (APPROVED members only), backed by a new `GET /teams/:teamId/sessions/upcoming` (`teamRole('MEMBER')`, next 10 sessions). New AC-ENTRY-4; add the route to AC-VERIFY-1. session-scheduling-engine owns admin pages under `/teams/[T]/manage/sessions` and follows the slot contract (`SessionSummary` + `RegistrationPanel`, only the panel changes a registration), recorded in ADR 0018. Phase 3 gains the endpoint, Phase 5 the section.
 
 **R9 · Deadline passing while the confirmation is open.** Use the journey doc's API-side check, not the UI/UX doc's web re-check. The withdraw body becomes strict `{ expectLate: boolean }`; when the classification inside the transaction is LATE and `expectLate` is false, the API returns 409 `cancellation_terms_changed` and the page re-opens the confirmation with the late wording. New AC-ERROR-10.
 
@@ -714,13 +750,65 @@ Where this section and a creative doc or an AC disagree, this section wins. Buil
 
 Where these overlap, the order of precedence is R1-R12, then the owning doc for that question (algorithm: Q1/Q3; architecture: Q2/Q4/Q6; journey: Q5 ownership; UI/UX: Q5 layout and copy).
 
+### Plan Amendment 2026-10-20 (binding; supersedes R1-R13 and the creative docs where they conflict)
+
+This amendment follows the rebase onto `main` (team-banking-and-gst merged; ADR 0016 is team-banking's) and the obligations skill-levels-and-auto-enroll recorded in its ADR 0017. That ADR is on PR #6, which is not merged yet. The user decided on 2026-10-20 to amend this plan rather than re-plan from scratch, to base it on `main` only (no stacked PR), to include the Auto Enroll labelling and email now, and to snapshot sex as well as skill level.
+
+**R14 · Numbering.**
+- This feature's ADR is **0018** (`docs/adr/0018-registration-allocation-and-billing-handoff.md`), and its ledger starts at **D-62**.
+- ADR 0016 is team-banking's, and ADR 0017 with D-55..D-61 belong to skill-levels-and-auto-enroll (PR #6).
+- Every "ADR 0016" written in this feature's creative docs means this feature's own ADR, now 0018.
+- Re-check at the build gate: if PR #6 has not merged by then, or other numbers were taken, take the next free numbers on `main` and update this file.
+
+**R15 · Registrant pricing snapshot (ADR 0017 C-PRICE-1; user: sex too).**
+- New `registrations.registrant_skill_level skill_tier` and `registrations.registrant_sex sex`.
+- They are written only by `repo.ts`, in the same `UPDATE` or `INSERT` that makes a row CONFIRMED, read from `team_members.skill_level` and `users.sex` under the member gate's `FOR SHARE` lock that the allocator already holds. Both registrant and auto-enrol paths gate the member before the session lock (architecture doc step 2), so no new lock is needed.
+- A CHECK requires both to be non-NULL when `status = 'CONFIRMED'` or `withdrawal_fee_due`. A transition-trigger rule forbids changing them except on a transition into CONFIRMED.
+- `listBillableRegistrations` returns the snapshot, and C-BIL gains "bill from the snapshot".
+- `decideAllocation` stays pure: the snapshot values are inputs carried with each gated member.
+- The fee estimate shown before confirmation uses the current level and names it. The level used for the charge is the one at confirmation.
+- New AC-VERIFY-11. AC-INTEGRATION-3 is amended.
+
+**R16 · Auto-enrol opt-out re-check (ADR 0017 C-SKL-1 point 4).**
+- `autoEnrolInSession` input becomes `{ teamId, sessionId, entries: readonly { userId, assignedAt }[] }`, with entries in `selectAutoEnrollees` order (the selection also returns `membershipId`, which callers may pass through). This replaces C-SAE-1's `userIds`.
+- In the gate step, under the `team_members FOR SHARE` row lock and before the session lock, the allocator re-checks `is_auto_enroll`, `auto_enroll_until IS NULL OR auto_enroll_until >= game_sessions.date`, and `auto_enroll_assigned_at = entry.assignedAt`, compared at millisecond precision. Any mismatch is a returned refusal `auto_enroll_changed`, a skip, never a throw.
+- The session row's `date` is read without a lock for this comparison; the session lock still comes after all member gates.
+- New AC-INTEGRATION-5, plus a deterministic race test against a held `FOR NO KEY UPDATE`.
+- `auto_enroll_changed` joins the `registration.refused` reasons.
+- C-SAE-1 in ADR 0018 is updated to match, including ADR 0017's lock-order advisory: auto-enrol for a session that already existed runs in a follow-up transaction that has not locked it.
+
+**R17 · Auto-enrolled registrations are labelled and emailed (ADR 0017 later obligation; user: include now).**
+- New enum `registration_source` (`MEMBER`, `AUTO_ENROL`) and `registrations.source NOT NULL DEFAULT 'MEMBER'`. `autoEnrolInSession` sets `AUTO_ENROL`, and any panel register or re-register sets `MEMBER`.
+- A `send-email` job is enqueued in the placing transaction for each auto-enrolled member who was placed (CONFIRMED or WAITLISTED), never for skips. The template goes in `modules/registrations/emails.ts` beside the promotion email, with an idempotency key of `auto-enrol:<registrationId>:<registered_at ISO>`.
+- The session page shows "Added automatically (Auto Enroll)".
+- New AC-HAPPY-11.
+
+**R18 · Team-banking obligations (ADR 0016 team-banking, binding).** Cite ADR 0016 in ADR 0018 and re-check at the build gate:
+- **Lock order:** the canonical order is `teams` → `team_members` → `game_sessions` → `registrations` → `registration_guests`/`payments`. `teams FOR UPDATE` is reserved for leaf transactions (invite regenerate, banking removal). This feature never takes it, and never takes any `teams` lock after locking `game_sessions` or `registrations`.
+- **Fixtures:** `insertPublishedSession` creates its team with `insertTeam({ payoutConfigured: true })`. This adds to R12's fixture list.
+- **Publish gate:** this feature does not publish sessions. It must not bypass or re-implement the publish gate. A PUBLISHED session is assumed to have passed it.
+- **C-BIL-PAY:** this is billing's (`teams FOR KEY SHARE` and a configuration check before a payment insert). The hand-off list stays money-free (AC-VERIFY-10).
+
+**New source files / extends from this amendment:**
+- The lifecycle migration gains `registration_source`, `source`, `registrant_skill_level`, `registrant_sex`, and their CHECKs and trigger rules (D-62 onwards).
+- `emails.ts` gains the auto-enrol template.
+- Extend `apps/api/test/helpers/factories.ts` (`insertPublishedSession` with `payoutConfigured: true`, auto-enrol column setters).
+- `registrations-allocator.int.test.ts` and `registrations-races.int.test.ts` gain AC-INTEGRATION-5. `registrations-billing-handoff.int.test.ts` gains AC-VERIFY-11.
+
+**Phase mapping:**
+- Phase 1: R14 numbering, R15/R17 columns and CHECKs, R18 fixture.
+- Phase 2: R15 snapshot writes, R16 re-check, R17 source on auto-enrol, the AC-VERIFY-11 and AC-INTEGRATION-5 domain halves, ADR 0018.
+- Phase 3: R17 auto-enrol email.
+- Phase 5: the R17 label and the R15 fee-line level.
+- Phase 6: e2e unchanged; auto-enrol has no UI entry, so it is covered by integration tests.
+
 ---
 
 ## Execution State
 
 **Build Status**: IDLE
 **Current Phase**: CREATIVE → BUILD
-**Current Step**: Creative complete and reconciled (R1-R13). Build gated on session-scheduling-engine being merged.
+**Current Step**: Creative complete and reconciled (R1-R13); plan amended 2026-10-20 (R14-R18). Build gated on session-scheduling-engine being merged (re-check ADR 0016, ADR 0017 and free numbers at the gate).
 **Step Started**: 2026-10-16
 **Can Resume**: NO
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
@@ -741,3 +829,4 @@ Where these overlap, the order of precedence is R1-R12, then the owning doc for 
 - UI/UX Creative Design: COMPLETE (2026-10-16) - Output: memory-bank/creative/registration-and-waitlist-registration-panel-uiux.md
 - Step 4.5: Codex design critique - COMPLETE (needs-attention, 4 findings)
 - Creative Reconciliation: COMPLETE (2026-10-16); user decided fee release on refill and confirmed-only re-registration
+- Plan amendment: COMPLETE (2026-10-20). Rebased onto `main` (team-banking-and-gst merged). R14-R18 add numbering (ADR 0018, D-62+), the registrant sex/skill snapshot (C-PRICE-1), the auto-enrol opt-out re-check (C-SKL-1), the auto-enrol source/label/email, and the team-banking ADR 0016 rules. New ACs: AC-VERIFY-11, AC-INTEGRATION-5, AC-HAPPY-11. Taxonomy lint CLEAN (43 ACs). The user approved the amendment, keeping the existing spec and creative docs, with no stacked PR on #6.
