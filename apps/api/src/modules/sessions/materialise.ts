@@ -307,6 +307,6 @@ async function stampBookkeeping(
         .where('id', '=', ref.ruleId)
         .execute();
     },
-    { path: 'materialiser_stamp', log: deps.log },
+    { path: 'materialiser_stamp', teamId: ref.teamId, log: deps.log },
   );
 }

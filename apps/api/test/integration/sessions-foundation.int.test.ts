@@ -15,7 +15,12 @@ import {
   lockSessionAutoEnrol,
   lockTeamKeyShare,
 } from '../../src/modules/sessions/locks.ts';
-import { HTTP_POLICY, runSessionTransaction } from '../../src/modules/sessions/tx.ts';
+import {
+  HTTP_POLICY,
+  runSessionTransaction as runWithOptions,
+  type SessionTxOptions,
+  type SessionTxPolicy,
+} from '../../src/modules/sessions/tx.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { advanceSessionTo, insertRule, insertSession } from '../helpers/factories.ts';
 import { createQueryRecorder, createRecordingDatabase } from '../helpers/query-recorder.ts';
@@ -39,6 +44,16 @@ function recordingDb() {
     recorder,
     db: createRecordingDatabase(new PostgresDialect({ pool: database.pool }), recorder),
   };
+}
+
+/** The production entry point, with the team id every caller must supply defaulted for these seam tests. */
+function runSessionTransaction<T>(
+  db: Parameters<typeof runWithOptions>[0],
+  policy: SessionTxPolicy,
+  fn: Parameters<typeof runWithOptions<T>>[2],
+  options?: SessionTxOptions,
+): Promise<T> {
+  return runWithOptions(db, policy, fn, options ?? { teamId: 'foundation-test' });
 }
 
 describe('lock helpers and the canonical order', () => {
@@ -152,6 +167,7 @@ describe('runSessionTransaction against a real lock', () => {
           return lockSession(trx, { sessionId, teamId: scene.teamId });
         },
         {
+          teamId: scene.teamId,
           sleep: async () => {
             if (!released) {
               released = true;

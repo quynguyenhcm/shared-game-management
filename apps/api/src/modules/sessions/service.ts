@@ -408,7 +408,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               await repo.insertCourts(trx, id, times.courts);
               return { id, replayed: false };
             },
-            { path: 'create', log: ctx.log },
+            { path: 'create', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);
@@ -589,7 +589,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
                 changed: change.changed,
               };
             },
-            { path: 'edit', log: ctx.log },
+            { path: 'edit', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);
@@ -700,7 +700,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
                 autoEnrolQueued: locked.auto_enrol_required,
               };
             },
-            { path: 'publish', log: ctx.log },
+            { path: 'publish', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);
@@ -766,7 +766,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
                 from,
               };
             },
-            { path: 'cancel', log: ctx.log },
+            { path: 'cancel', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);

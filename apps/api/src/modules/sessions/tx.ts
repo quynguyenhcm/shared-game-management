@@ -31,6 +31,8 @@ export const JOB_POLICY: SessionTxPolicy = {
 };
 
 export interface SessionTxOptions {
+  /** The team the transaction acts for: carried on every lock-retry log line (AC-VERIFY-6). */
+  readonly teamId: string;
   /** Which code path is running (`publish`, `edit`, `materialiser`, …): logged on a retry. */
   readonly path?: string;
   readonly log?: { warn(bindings: object, message: string): void };
@@ -58,7 +60,7 @@ export async function runSessionTransaction<T>(
   db: Database,
   policy: SessionTxPolicy,
   fn: (trx: Transaction<DB>) => Promise<T>,
-  options: SessionTxOptions = {},
+  options: SessionTxOptions,
 ): Promise<T> {
   if (!Number.isInteger(policy.lockTimeoutMs) || policy.lockTimeoutMs <= 0) {
     throw new Error('lockTimeoutMs must be a positive integer');
@@ -73,7 +75,12 @@ export async function runSessionTransaction<T>(
       });
     } catch (error) {
       if (!isLockConflict(error)) throw error;
-      const bindings = { path: options.path, attempt, sqlState: sqlState(error) };
+      const bindings = {
+        teamId: options.teamId,
+        path: options.path,
+        attempt,
+        sqlState: sqlState(error),
+      };
       if (attempt >= policy.attempts) {
         options.log?.warn(
           { event: 'session.lock_retry_exhausted', ...bindings },

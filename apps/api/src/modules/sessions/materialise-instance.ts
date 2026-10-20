@@ -124,7 +124,7 @@ export async function materialiseDate(
       await claimPayoutNotice(trx, deps.notice, { ...ref, windowStart });
       return { kind: 'draft', sessionId, reason: gate.reason, ruleVersion: rule.version };
     },
-    { path: 'materialiser', log },
+    { path: 'materialiser', teamId: ref.teamId, log },
   );
 }
 
@@ -264,6 +264,6 @@ export async function retryDraft(
       }
       return { kind: 'published' };
     },
-    { path: 'retry', log },
+    { path: 'retry', teamId: ref.teamId, log },
   );
 }

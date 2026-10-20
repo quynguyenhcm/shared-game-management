@@ -570,8 +570,14 @@ describe('session and series events from the API (AC-VERIFY-6)', () => {
       await holder.query('COMMIT');
       held = false;
       expect((await pending).statusCode).toBe(200);
-      expect(ownFields(retry)).toEqual(['attempt', 'path', 'sqlState']);
-      expect(retry).toMatchObject({ path: 'edit', attempt: 1, sqlState: '55P03', level: 'warn' });
+      expect(ownFields(retry)).toEqual(['attempt', 'path', 'sqlState', 'teamId']);
+      expect(retry).toMatchObject({
+        path: 'edit',
+        attempt: 1,
+        sqlState: '55P03',
+        teamId: c.teamId,
+        level: 'warn',
+      });
     } finally {
       if (held) await holder.query('ROLLBACK');
       holder.release();
@@ -600,7 +606,7 @@ describe('session and series events from the API (AC-VERIFY-6)', () => {
                   .where('id', '=', id)
                   .forUpdate()
                   .execute(),
-              { path: 'logs_probe', log: h.logs.logger },
+              { path: 'logs_probe', teamId: c.teamId, log: h.logs.logger },
             ),
         ),
       ).rejects.toMatchObject({ code: '55P03' });
@@ -609,8 +615,13 @@ describe('session and series events from the API (AC-VERIFY-6)', () => {
       blocker.release();
     }
     const exhausted = one(apiLogs(), 'session.lock_retry_exhausted', { path: 'logs_probe' });
-    expect(ownFields(exhausted)).toEqual(['attempt', 'path', 'sqlState']);
-    expect(exhausted).toMatchObject({ attempt: 2, sqlState: '55P03', traceId: trace?.traceId });
+    expect(ownFields(exhausted)).toEqual(['attempt', 'path', 'sqlState', 'teamId']);
+    expect(exhausted).toMatchObject({
+      attempt: 2,
+      sqlState: '55P03',
+      teamId: c.teamId,
+      traceId: trace?.traceId,
+    });
     expect(only(apiLogs(), 'session.lock_retry', { path: 'logs_probe' })).toHaveLength(1);
   });
 

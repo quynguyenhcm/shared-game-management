@@ -26939,12 +26939,13 @@ paths:
       description: "Queues one materialisation run (`manual`) that retries the series'
         unedited banking-refused drafts through the publish gate. Answers 202;
         `queued` is false when a run was already waiting (a double click leaves
-        one). Edited drafts are never published by it. TEAM_ADMIN of this team
-        only (`allowGlobalAdmin` is off); a series of another team is 404
-        `not_found`. The actor is re-checked as an approved admin under a row
-        lock inside every write (403 when demoted meanwhile). Writes that change
-        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
-        the latest series in `error.current`, and nothing is written."
+        one). Edited drafts are never published by it. An ended series is 409
+        `series_ended`. TEAM_ADMIN of this team only (`allowGlobalAdmin` is
+        off); a series of another team is 404 `not_found`. The actor is
+        re-checked as an approved admin under a row lock inside every write (403
+        when demoted meanwhile). Writes that change a series carry
+        `expectedVersion`: a stale one is 409 `series_stale` with the latest
+        series in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:

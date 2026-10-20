@@ -376,7 +376,7 @@ Scores 1 (poor) to 5 (best). Only the decisive comparisons are shown.
 | `session.cancelled` | info | teamId, sessionId, actorId, fromStatus |
 | `session.stale_refused` | info | teamId, sessionId or ruleId (a series save logs ruleId), actorId, expectedVersion, currentVersion |
 | `session.series.created` / `.updated` / `.ended` / `.publish_drafts_requested` | info | teamId, ruleId, actorId, ruleVersion (created, updated, ended); `.created` adds frequency; `.updated` adds updated, unchanged, promoted, skippedEdited, skippedStarted, skippedClosed, skippedDeadlinePassed, skippedFeeLocked; `.ended` adds recurUntil, removedDrafts, cancelledPublished, keptOffPattern; `.publish_drafts_requested` adds queued |
-| `session.recurrence.sweep_completed` | info | rulesScanned, rulesEnqueued, pendingAutoEnrolEnqueued, durationMs |
+| `session.recurrence.sweep_completed` | info | (no teamId: the sweep spans all teams) rulesScanned, rulesEnqueued, pendingAutoEnrolEnqueued, durationMs |
 | `session.recurrence.run_completed` (per rule job) | info | teamId, ruleId, trigger, windowStart, created, published, savedAsDraft, draftsRetried, autoEnrolled, failed, durationMs |
 | `session.recurrence.instance_created` | info | teamId, ruleId, sessionId, date, status |
 | `session.recurrence.publish_refused` | info | teamId, ruleId, sessionId, reason |
@@ -385,7 +385,7 @@ Scores 1 (poor) to 5 (best). Only the decisive comparisons are shown.
 | `session.auto_enrol.completed` | info | teamId, sessionId, allocator, candidates, confirmed, waitlisted, skipped (map of reason → count) |
 | `session.auto_enrol.port_noop` | info | teamId, sessionId, candidates |
 | `session.auto_enrol.failed` | warn | teamId, sessionId, allocator, sqlState, errorCode |
-| `session.lock_retry` / `session.lock_retry_exhausted` | warn | path, attempt, sqlState |
+| `session.lock_retry` / `session.lock_retry_exhausted` | warn | teamId, path, attempt, sqlState |
 
 ### Distributed Tracing
 - **SDK**: OpenTelemetry (existing setup), W3C Trace Context.

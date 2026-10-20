@@ -138,7 +138,7 @@ export const seriesRoutes: FastifyPluginAsync<SeriesRoutesOptions> = (app, optio
       config: { policy },
       schema: {
         summary: "Publish a series' drafts now",
-        description: `Queues one materialisation run (\`manual\`) that retries the series' unedited banking-refused drafts through the publish gate. Answers 202; \`queued\` is false when a run was already waiting (a double click leaves one). Edited drafts are never published by it. ${SHAPE}`,
+        description: `Queues one materialisation run (\`manual\`) that retries the series' unedited banking-refused drafts through the publish gate. Answers 202; \`queued\` is false when a run was already waiting (a double click leaves one). Edited drafts are never published by it. An ended series is 409 \`series_ended\`. ${SHAPE}`,
         operationId: 'publishTeamSeriesDrafts',
         params: SeriesIdParams,
         body: z.strictObject({}).optional(),

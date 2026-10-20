@@ -155,7 +155,7 @@ export async function runSessionAutoEnrol(
           .execute();
         return { kind, candidates: selected.length, confirmed, waitlisted, skipped };
       },
-      { path: 'auto_enrol', log },
+      { path: 'auto_enrol', teamId: input.teamId, log },
     );
   } catch (error) {
     const failure = classifySessionError(error);

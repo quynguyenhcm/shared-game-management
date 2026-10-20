@@ -49,7 +49,7 @@ describe('runSessionTransaction', () => {
         await trx.selectFrom('teams').select('id').execute();
         return 'done';
       },
-      { sleep },
+      { sleep, teamId: 'team-1' },
     );
     expect(result).toBe('done');
     expect(recorder.statements[0]).toMatch(/set local lock_timeout/i);
@@ -70,7 +70,7 @@ describe('runSessionTransaction', () => {
           if (attempt < 3) throw sqlError(code);
           return Promise.resolve(attempt);
         },
-        { sleep, log, path: 'publish' },
+        { sleep, log, path: 'publish', teamId: 'team-1' },
       );
       expect(result).toBe(3);
       expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([100, 400]);
@@ -83,6 +83,7 @@ describe('runSessionTransaction', () => {
           path: 'publish',
           attempt: 1,
           sqlState: code,
+          teamId: 'team-1',
         }),
         expect.any(String),
       );
@@ -100,12 +101,16 @@ describe('runSessionTransaction', () => {
           calls += 1;
           return Promise.reject(sqlError('55P03'));
         },
-        { sleep, log, path: 'edit' },
+        { sleep, log, path: 'edit', teamId: 'team-1' },
       ),
     ).rejects.toMatchObject({ code: '55P03' });
     expect(calls).toBe(HTTP_POLICY.attempts);
     expect(log.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'session.lock_retry_exhausted', path: 'edit' }),
+      expect.objectContaining({
+        event: 'session.lock_retry_exhausted',
+        path: 'edit',
+        teamId: 'team-1',
+      }),
       expect.any(String),
     );
   });
@@ -121,7 +126,7 @@ describe('runSessionTransaction', () => {
           calls += 1;
           return Promise.reject(sqlError('23505'));
         },
-        { sleep },
+        { sleep, teamId: 'team-1' },
       ),
     ).rejects.toMatchObject({ code: '23505' });
     expect(calls).toBe(1);

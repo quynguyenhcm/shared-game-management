@@ -330,7 +330,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
               await enqueueRun(trx, { id, team_id: teamId }, 'rule_created');
               return { id, replayed: false };
             },
-            { path: 'series_create', log: ctx.log },
+            { path: 'series_create', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);
@@ -521,12 +521,14 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
           try {
             result = await runSessionTransaction(db, HTTP_POLICY, (trx) => apply(trx, false), {
               path: 'series_edit',
+              teamId,
               log: ctx.log,
             });
           } catch (error) {
             if (!(error instanceof GateRequired)) throw error;
             result = await runSessionTransaction(db, HTTP_POLICY, (trx) => apply(trx, true), {
               path: 'series_edit',
+              teamId,
               log: ctx.log,
             });
           }
@@ -653,7 +655,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
                 activeRegistrationCount: registered,
               };
             },
-            { path: 'series_end', log: ctx.log },
+            { path: 'series_end', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);
@@ -694,7 +696,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
               const jobId = await enqueueRun(trx, rule, 'manual');
               return { series: await viewOf(trx, rule), queued: jobId !== null };
             },
-            { path: 'series_publish_drafts', log: ctx.log },
+            { path: 'series_publish_drafts', teamId, log: ctx.log },
           );
         } catch (error) {
           throw mapSessionDbError(error);
