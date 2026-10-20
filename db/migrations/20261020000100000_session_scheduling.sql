@@ -348,8 +348,10 @@ CREATE TRIGGER game_sessions_guard_delete
 -- ---------------------------------------------------------------------------------------------------------
 -- D-76: no court insert, update or delete on a COMPLETED or CANCELLED session (ADR 0017 C-GAME-1 point 3). The
 -- session row is locked FOR NO KEY UPDATE (the mode the touch trigger's UPDATE needs anyway, so no lock upgrade
--- deadlock) so a raw court write racing a completion waits for it and then sees COMPLETED. A missing session row
--- (a cascade delete in progress) is allowed.
+-- deadlock) so a raw court write racing a completion waits for it and then sees COMPLETED. A court UPDATE that moves a
+-- court between two sessions locks the distinct ids in ascending id order, so two opposite moves (A -> B against B -> A)
+-- cannot deadlock (Phase 4 amendment, proven by sessions-races.int.test.ts). A missing session row (a cascade delete in
+-- progress) is allowed.
 -- ---------------------------------------------------------------------------------------------------------
 CREATE FUNCTION session_courts_guard_closed() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
@@ -362,7 +364,8 @@ BEGIN
   ELSIF TG_OP = 'DELETE' THEN
     sids := ARRAY[OLD.session_id];
   ELSE
-    sids := ARRAY[OLD.session_id, NEW.session_id];
+    -- DISTINCT + ORDER BY: a court that stays on its session locks it once; a moved court locks both in id order.
+    sids := ARRAY(SELECT DISTINCT s FROM unnest(ARRAY[OLD.session_id, NEW.session_id]) AS u(s) ORDER BY s);
   END IF;
   FOREACH sid IN ARRAY sids LOOP
     SELECT status INTO current_status FROM game_sessions WHERE id = sid FOR NO KEY UPDATE;

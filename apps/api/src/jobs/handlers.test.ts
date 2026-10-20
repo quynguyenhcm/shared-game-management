@@ -182,6 +182,7 @@ describe('registerJobs', () => {
       crypto: testCrypto(),
       db: {} as never, // the auth-cleanup handler only touches it when a job runs
       sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
       expireSecondsOverride: 5,
     });
     expect(defined.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
@@ -195,6 +196,30 @@ describe('registerJobs', () => {
         'skill-progression',
       ].sort(),
     );
+  });
+
+  it('fails fast when webBaseUrl is missing (12-factor: no localhost fallback), before any queue is defined', async () => {
+    const defined: string[] = [];
+    const runner = {
+      defineQueue: (definition: { name: string }) => {
+        defined.push(definition.name);
+        return Promise.resolve();
+      },
+      work: () => Promise.resolve(),
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    const options = {
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+    };
+    // Cast: the option is required at compile time; this proves the runtime guard for a JS-shaped caller.
+    await expect(registerJobs(options as never)).rejects.toThrow(/webBaseUrl/);
+    await expect(registerJobs({ ...options, webBaseUrl: '' })).rejects.toThrow(/webBaseUrl/);
+    expect(defined).toEqual([]);
   });
 
   it('wires the injected MemberBannedHandler into the member-banned queue, and the no-op by default', async () => {
@@ -214,6 +239,7 @@ describe('registerJobs', () => {
       crypto: testCrypto(),
       db: {} as never,
       sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
     };
     await registerJobs(base);
     const defaultHandler = handlers.get('member-banned');
@@ -251,6 +277,7 @@ describe('skill-progression wiring', () => {
       crypto: testCrypto(),
       db,
       sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
     });
     const handler = handlers.get('skill-progression');
     expect(handler).toBeTypeOf('function');
@@ -290,6 +317,7 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
       crypto: testCrypto(),
       db,
       sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
     });
     const { ctx } = context();
     await expect(
@@ -308,6 +336,7 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
       crypto: testCrypto(),
       db: {} as never,
       sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
     });
     const { ctx } = context();
     await expect(handlers.get('recurrence-rule')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(

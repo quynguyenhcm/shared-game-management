@@ -45,8 +45,8 @@ export interface RegisterJobsOptions {
   readonly sessionAllocator: SessionAllocatorPort;
   /** `RECURRENCE_HORIZON_DAYS` (7-91): how far ahead the series materialiser creates sessions. Defaults to 28. */
   readonly recurrenceHorizonDays?: number;
-  /** `config.auth.webBaseUrl`: origin for the links in the series banking notice. */
-  readonly webBaseUrl?: string;
+  /** `config.auth.webBaseUrl`: origin for the links in the series banking notice. REQUIRED (12-factor: no localhost fallback). */
+  readonly webBaseUrl: string;
   /** Defaults to the registry; tests pass tuned copies. */
   readonly queues?: readonly QueueDefinition[];
   /** Test-only expiry override applied to every queue (JOBS_EXPIRE_SECONDS_OVERRIDE). */
@@ -58,6 +58,10 @@ export interface RegisterJobsOptions {
 /** Creates the queues (idempotent), attaches every handler and registers the cron schedules. */
 export async function registerJobs(options: RegisterJobsOptions): Promise<void> {
   const { runner } = options;
+  // Fail fast, before any queue is defined: the banking-notice links need the real origin.
+  if (typeof options.webBaseUrl !== 'string' || options.webBaseUrl.length === 0) {
+    throw new Error('registerJobs: webBaseUrl is required (set WEB_BASE_URL)');
+  }
   const handlers: Record<string, JobHandler> = {
     // Placeholders first: a slot that has a real handler below overrides its placeholder.
     ...Object.fromEntries(SCHEDULES.map((slot) => [slot.name, placeholderHandler(slot.name)])),
@@ -95,7 +99,7 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
       allocator: options.sessionAllocator,
       jobs: runner,
       horizonDays: options.recurrenceHorizonDays ?? DEFAULT_RECURRENCE_HORIZON_DAYS,
-      webBaseUrl: options.webBaseUrl ?? 'http://localhost:3000',
+      webBaseUrl: options.webBaseUrl,
     }),
   };
 

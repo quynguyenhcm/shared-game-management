@@ -272,7 +272,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
   ): Promise<AppError> {
     context.log.info(
       {
-        event: 'series.stale_refused',
+        event: 'session.stale_refused',
         teamId: rule.team_id,
         ruleId: rule.id,
         actorId: context.actorId,
@@ -340,12 +340,13 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
         if (!created.replayed) {
           ctx.log.info(
             {
-              event: 'series.created',
+              event: 'session.series.created',
               teamId,
               ruleId: created.id,
               actorId,
               frequency: rule.frequency,
-              version: rule.version,
+              // Never `version`: the logger's base `version` is the service version.
+              ruleVersion: rule.version,
             },
             'series created',
           );
@@ -536,12 +537,16 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
         if (result.changed) {
           ctx.log.info(
             {
-              event: 'series.updated',
+              event: 'session.series.updated',
               teamId,
               ruleId,
               actorId,
-              version: result.series.version,
-              ...result.outcome.skipped,
+              ruleVersion: result.series.version,
+              skippedEdited: result.outcome.skipped.edited,
+              skippedStarted: result.outcome.skipped.started,
+              skippedClosed: result.outcome.skipped.closed,
+              skippedDeadlinePassed: result.outcome.skipped.deadlinePassed,
+              skippedFeeLocked: result.outcome.skipped.feeLocked,
               updated: result.outcome.updated,
               unchanged: result.outcome.unchanged,
               promoted: result.promoted,
@@ -656,10 +661,11 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
 
         ctx.log.info(
           {
-            event: 'series.ended',
+            event: 'session.series.ended',
             teamId,
             ruleId,
             actorId,
+            ruleVersion: result.series.version,
             recurUntil: input.lastDate,
             removedDrafts: result.removedDrafts,
             cancelledPublished: result.cancelledPublished,
@@ -682,6 +688,8 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
               if (!(await lockTeamKeyShare(trx, teamId))) throw new AppError('forbidden');
               await assertSessionAdmin(trx, teamId, actorId);
               const rule = await requireRule(trx, teamId, ruleId);
+              // An ended series publishes nothing more: say so instead of queueing a run that will skip it.
+              if (!rule.is_active) throw new AppError('series_ended');
               // `stately`: null means a run for this rule is already queued, and it will read the latest rule.
               const jobId = await enqueueRun(trx, rule, 'manual');
               return { series: await viewOf(trx, rule), queued: jobId !== null };
@@ -693,7 +701,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
         }
         ctx.log.info(
           {
-            event: 'series.publish_drafts_requested',
+            event: 'session.series.publish_drafts_requested',
             teamId,
             ruleId,
             actorId,

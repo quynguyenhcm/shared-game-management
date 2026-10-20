@@ -63,6 +63,7 @@ beforeAll(async () => {
   // The production wiring, with a short retry policy on send-email so AC-ERROR-6 runs in seconds.
   await registerJobs({
     sessionAllocator: noopSessionAllocator,
+    webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier,
     crypto: testCrypto(),

@@ -237,6 +237,7 @@ describe('auth-cleanup queue (production wiring)', () => {
     await producer.start();
     await registerJobs({
       sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
       runner: worker,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),

@@ -370,12 +370,12 @@ Scores 1 (poor) to 5 (best). Only the decisive comparisons are shown.
 
 | Event | Level | Fields (in addition to trace) |
 |---|---|---|
-| `session.created` / `session.updated` | info | teamId, sessionId, actorId, version, changed (field-name list), promoted (count) |
+| `session.created` / `session.updated` | info | teamId, sessionId, actorId, sessionVersion (never `version`: the logger's base `version` is the service version), changed (field-name list), promoted (count) |
 | `session.published` | info | teamId, sessionId, actorId, paid (bool), autoEnrolQueued (bool) |
 | `session.publish_refused` | info | teamId, sessionId, actorId, reason, errorCode `payout_not_configured` |
 | `session.cancelled` | info | teamId, sessionId, actorId, fromStatus |
-| `session.stale_refused` | info | teamId, sessionId or ruleId, actorId, expectedVersion, currentVersion |
-| `session.series.created` / `.updated` / `.ended` | info | teamId, ruleId, actorId, version; `.updated` adds updated, skippedEdited, skippedClosed, cancelled, deletedDrafts |
+| `session.stale_refused` | info | teamId, sessionId or ruleId (a series save logs ruleId), actorId, expectedVersion, currentVersion |
+| `session.series.created` / `.updated` / `.ended` / `.publish_drafts_requested` | info | teamId, ruleId, actorId, ruleVersion (created, updated, ended); `.created` adds frequency; `.updated` adds updated, unchanged, promoted, skippedEdited, skippedStarted, skippedClosed, skippedDeadlinePassed, skippedFeeLocked; `.ended` adds recurUntil, removedDrafts, cancelledPublished, keptOffPattern; `.publish_drafts_requested` adds queued |
 | `session.recurrence.sweep_completed` | info | rulesScanned, rulesEnqueued, pendingAutoEnrolEnqueued, durationMs |
 | `session.recurrence.run_completed` (per rule job) | info | teamId, ruleId, trigger, windowStart, created, published, savedAsDraft, draftsRetried, autoEnrolled, failed, durationMs |
 | `session.recurrence.instance_created` | info | teamId, ruleId, sessionId, date, status |

@@ -91,6 +91,7 @@ beforeAll(async () => {
   await worker.start();
   await registerJobs({
     sessionAllocator: noopSessionAllocator,
+    webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier: delegating,
     crypto: testCrypto(),

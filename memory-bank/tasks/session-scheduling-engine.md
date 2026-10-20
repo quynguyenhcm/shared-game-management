@@ -843,7 +843,7 @@ The plan follows systemPatterns' module shape, P1/P2/P3/P5/P7, default-deny rout
   - The `recurrence-materialisation` sweep, the `recurrence-rule` queue and handler, `materialise.ts`: window, per-instance transactions, gate drafts, `payout_notice_claims` and the admin email, draft retry, inline auto-enrol, pending reconciliation, bookkeeping stamp; boot enqueue; CLI trigger.
   - ACs: AC-HAPPY-5, 6, 7, 10; AC-HAPPY-12 (materialiser path); AC-ASYNC-1..7; AC-ERROR-9, AC-ERROR-12; AC-VERIFY-2 (job and propagation paths); AC-INTEGRATION-2.
   - Gate: re-runs create nothing; one email per rule per NZ week; the recording double sees exactly one R16 call per session; a series edit reports the right counts.
-- [ ] **Phase 4: Concurrency, observability and contracts.**
+- [x] **Phase 4: Concurrency, observability and contracts.**
   - Race matrix R1-R14, T-17, T-18, T-19 and the `stately` test; log fields; `sessions-contracts.int.test.ts` for registration's build gate, with the marker proof.
   - ACs: AC-VERIFY-3, AC-VERIFY-6, AC-INTEGRATION-1.
   - Gate: no `40P01` and no lock retry logged; every event's fields asserted; contract file header lists what registration re-checks.
@@ -893,12 +893,12 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 
 ## Execution State
 
-**Build Status**: IDLE (Phase 3 of 6 COMPLETE)
+**Build Status**: IDLE (Phase 4 of 6 COMPLETE)
 **Auto-Build Mode**: YES
-**Current Build**: Phase 3: Series and materialiser (session-scheduling-engine) - COMPLETE
-**Phase Number**: 3 of 6
+**Current Build**: Phase 4: Concurrency, observability and contracts (session-scheduling-engine) - COMPLETE
+**Phase Number**: 4 of 6
 **Is Multi-Phase**: YES
-**Can Resume**: YES (next: Phase 4)
+**Can Resume**: YES (next: Phase 5)
 
 ### Current Build Step
 **Step**: Step 11 - Git completion
@@ -920,6 +920,11 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 - Phase 3 Step 7 verifier: PASS - unit 1499/1499, integration 559/559, full build, lint, typecheck
 - Phase 3 Step 8 code review (anthropic self-review; Codex launch failed: `timeout` missing on macOS): APPROVED, 0 blocking, 6 suggestions
 - Phase 3 ACs covered: AC-HAPPY-5, 6, 7, 10; AC-HAPPY-12 (materialiser); AC-ASYNC-1..7; AC-ERROR-9, 12; AC-VERIFY-2 (job and propagation); AC-INTEGRATION-2
+
+- Phase 4 Step 3 TDD (sequential): 4A races/hardening (46 tests: sessions-races 42, lock-order 3, bootstrap 1), 4B logs/contracts/parity (29 integration tests). New race tests are characterization tests, mutation-checked only for contracts/parity; RED proven for bootstrap, court-guard lock order, publishDrafts-ended, retryDraft-inactive, log renames.
+- Phase 4 Step 7 verifier: PASS - unit 1503/1503 (one 5 s timeout in time.test.ts under concurrent load; rerun alone passes), integration 630/630, build, lint, typecheck
+- Phase 4 Step 8 code review (anthropic; Codex not used - `timeout` missing on macOS): APPROVED, 0 blocking, 8 suggestions
+- Phase 4 ACs covered: AC-VERIFY-3, AC-VERIFY-6, AC-INTEGRATION-1; AC-INTEGRATION-2 (gate-refused hand publish), AC-ASYNC-5 (T-19)
 
 ### Sub-Agents
 - TDD 1A (migration, fixtures): COMPLETE
@@ -972,6 +977,18 @@ Phase 3 | reviewer-accepted deviations:
 - Phase 3 | suggestions deferred | make `webBaseUrl` required in RegisterJobsOptions (bootstrap.ts localhost fallback); publishDrafts on an ended series should 409; retryDraft does not re-check rule active; series.ts is 708 lines (extract `propagate`); `as never` casts in series-repo.ts; stampBookkeeping outside per-date try/catch.
 - Phase 3 | carry-forwards | list rows still carry no series name (rule table has no name column; Phase 5 decision); `seriesChangeEffect` not exposed on series GET (Phase 5); GateRequired rerun path untested (Phase 4 race test); `session_courts_guard_closed` unsorted lock order still open; `session.recurrence.*` spans not added; getting-started docs in Phase 6; Codex review pass not run.
 
+Phase 3 | reviewer-accepted deviations (ledger, added at Phase 4 start):
+- Phase 3 | reviewer-accepted | series.ts end() | AC-HAPPY-10 mentions a "partial failure" banner, but End series is one transaction (T-6) so there is no partial-failure response; Phase 5 must confirm the UI needs no such banner.
+- Phase 3 | reviewer-accepted | emails.ts:49 | idempotency key `:<recipientId>` - AC-ASYNC-3 text should be updated to match.
+
+Phase 4 Part B | log events (AC-VERIFY-6): series events renamed to `session.series.*` (and a stale series save to `session.stale_refused` with `ruleId`) so the AC and ARCH names hold; `version` event fields renamed `sessionVersion`/`ruleVersion` because they shadowed the logger's base service `version`; `series.updated` skip counts are `skippedEdited|Started|Closed|DeadlinePassed|FeeLocked`; `session.series.ended` gained `ruleVersion`. `lock_retry*` and `sweep_completed` carry no `teamId` (ARCH fields only). No extra `session.recurrence.*` spans: the job wrapper's CONSUMER span covers sweep and rule runs.
+
+Phase 4 | reviewer-accepted deviations:
+- Phase 4 | migration | `session_courts_guard_closed` sorted lock order done by amending the unmerged Phase 1 migration (a forward migration broke four schema round-trip tests); dev/CI databases that applied the old body need `pnpm db:reset`. D-76 updated.
+- Phase 4 | logging | series events renamed `session.series.*`; `version` field renamed `sessionVersion`/`ruleVersion` (it shadowed the logger's service `version`); `session.series.updated` logs `skipped*` counts; ARCH table updated. `teamId` absent on `lock_retry*` and `sweep_completed` (ARCH table lists none; AC says each line) - human to confirm.
+- Phase 4 | spans | no `session.recurrence.*` child spans added: the job wrapper's CONSUMER span carries the trace; ARCH child spans (`instance`, `auto_enrol`, `publish`, `series.propagate`) not required by any AC.
+- Phase 4 | suggestions deferred | openapi `publishTeamSeriesDrafts` description lacks 409 `series_ended`; `lockRuleInstances` (date,id) vs trigger (id) order theoretical, note in ADR 0019; `waitForLockWaiters` counts advisory-lock waiters (latent flake, filter by locktype); series.ts 716 lines (extract `propagate`); activeRegistrationCount is `countActiveRegistrations`.
+
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 4 (`/yay:build session-scheduling-engine`)
+**Resume From**: Phase 5 (`/yay:build session-scheduling-engine`)

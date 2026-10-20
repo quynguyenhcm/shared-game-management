@@ -34,6 +34,7 @@ await registerJobs({
   crypto: createCrypto(keyProviderFromConfig(config)),
   db: createKysely(pool),
   sessionAllocator: noopSessionAllocator,
+  webBaseUrl: 'https://app.example.test',
   expireSecondsOverride: config.jobs.expireSecondsOverride,
   extraQueues: [
     {

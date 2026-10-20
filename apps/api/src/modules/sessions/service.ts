@@ -423,7 +423,8 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               teamId,
               sessionId: created.id,
               actorId,
-              version: row.version,
+              // Never `version`: the logger's base `version` is the service version.
+              sessionVersion: row.version,
               changed: [],
               promoted: 0,
             },
@@ -601,7 +602,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               teamId,
               sessionId,
               actorId,
-              version: result.session.version,
+              sessionVersion: result.session.version,
               changed: result.changed,
               promoted: result.promoted,
             },

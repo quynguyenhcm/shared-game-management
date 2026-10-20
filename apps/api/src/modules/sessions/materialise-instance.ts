@@ -220,6 +220,16 @@ export async function retryDraft(
     async (trx): Promise<RetryOutcome> => {
       if (!(await lockTeamKeyShare(trx, ref.teamId)))
         return { kind: 'skipped', reason: 'team_missing' };
+      // The rule may have been ended or shortened since the job listed its drafts: an edit or End that committed wins (T-1 order:
+      // teams, then the rule, then the gate and the session). A draft the rule no longer generates is left for End series / the admin.
+      const rule = await lockRule(trx, ref);
+      if (
+        rule === undefined ||
+        !rule.is_active ||
+        recurrenceDates(recurrenceRuleOf(rule), { from: seen.date, to: seen.date }).length === 0
+      ) {
+        return { kind: 'skipped', reason: 'rule_changed' };
+      }
       const gate = await checkTeamCanPublishPaidSession(trx, {
         teamId: ref.teamId,
         pricingStructure: seen.pricing_structure,
