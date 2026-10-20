@@ -94,6 +94,27 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     message:
       "This member's Auto Enroll changed since you opened the panel. Check it and save again.",
   },
+  session_stale: {
+    status: 409,
+    message: 'This session changed since you opened it. Review the latest version and save again.',
+  },
+  series_stale: {
+    status: 409,
+    message: 'This series changed since you opened it. Review the latest version and save again.',
+  },
+  session_started: {
+    status: 409,
+    message: "This session has started, so it can't be changed or cancelled.",
+  },
+  session_not_editable: { status: 409, message: "This session can't be changed any more." },
+  session_state_conflict: {
+    status: 409,
+    message: 'This session was already published or cancelled. The page has been refreshed.',
+  },
+  session_fee_locked: {
+    status: 409,
+    message: 'Players have registered, so fees can only be lowered.',
+  },
 };
 
 export interface AppErrorOptions {

@@ -826,7 +826,7 @@ The plan follows systemPatterns' module shape, P1/P2/P3/P5/P7, default-deny rout
   - `memory-bank/systemPatterns.md` and `techContext.md` (Documentation agent)
 
 ### Phases
-- [ ] **Phase 1: Schema, shared core and fixture fixes.**
+- [x] **Phase 1: Schema, shared core and fixture fixes.**
   - The migration (D-70..D-83, D-85); types regen; ledger rows.
   - Pure `recurrence`, `instance`, `reconcile`, `costing` and `lifecycle`; zod contracts; error codes; `transitions.ts` and the hand-written fixture.
   - Fix the tests the new CHECKs and matrix break, in the same commit (T-16): `publishable`, `advanceSessionTo`, `insertSession` defaults, `insertRule`/`insertRuleCourt`.
@@ -893,27 +893,46 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: CREATIVE → BUILD
-**Last Completed**: CREATIVE - all phases complete, critique resolved (2026-10-20)
-**Can Resume**: NO
-**Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention; 4 findings resolved by T-17..T-20)
+**Build Status**: IDLE (Phase 1 of 6 COMPLETE)
+**Auto-Build Mode**: YES
+**Current Build**: Phase 1: Schema, shared core and fixture fixes (session-scheduling-engine) - COMPLETE
+**Phase Number**: 1 of 6
+**Is Multi-Phase**: YES
+**Can Resume**: YES (next: Phase 2)
 
-### Active Sub-Agents
-- Algorithm Design: COMPLETE
-- Architecture Design: COMPLETE
-- User Journey Design: COMPLETE
-- UI/UX Design: COMPLETE
+### Current Build Step
+**Step**: Step 11 - Git completion
+**Status**: COMPLETE
 
 ### Completed Steps
-- Step 0.1 - task provisioned on feature/session-scheduling-engine, linked to roadmap feature
-- Step 3 - Spec Writer Agent (Opus) - COMPLETE; taxonomy lint CLEAN (37 ACs); human approved 2026-10-20
-- Decision: conflict 7 (numbering) resolved by user - this feature takes ADR 0019 and ledger D-70 onwards
-- Steps 4-6 - codebase analysis, implementation plan (6 phases), Test Strategy (~105 tests), creative phases flagged (Algorithm, Architecture, User Journey, UI/UX)
-- Algorithm Creative Design: COMPLETE (2026-10-20) - Output: memory-bank/creative/session-scheduling-engine-recurrence-algorithm.md
-- Architecture Creative Design: COMPLETE (2026-10-20) - Output: memory-bank/creative/session-scheduling-engine-architecture.md
-- User Journey Creative Design: COMPLETE (2026-10-20) - Output: memory-bank/creative/session-scheduling-engine-admin-user-journey.md
-- Binding reconciliation: COMPLETE (2026-10-20) - Output: memory-bank/creative/session-scheduling-engine-binding-reconciliation.md (user rulings P-1 auto-enrol all sessions, P-2 player notification deferred, P-3 series pattern fixed)
-- UI/UX Creative Design: COMPLETE (2026-10-20) - Output: memory-bank/creative/session-scheduling-engine-uiux.md
-- Design critique (Codex adversarial-review): needs-attention; 4 findings resolved via reconciliation T-17..T-20
-- Task file rewritten to match the creative design (T-20): 48 ACs, taxonomy lint CLEAN, ~125 tests planned
+- Build gate (2026-10-20): ADR 0019, migration 20261020000100000 and D-70..D-85 free on origin/main; registration C-SSE-1..5/C-SAE-1..2 and `promoteWaitlist(ctx, { teamId, sessionId })` re-read at origin/feature/registration-and-waitlist tip b8da4b6 (match ARCH SA-4); raw status updates/inserts in apps/api/test/** grepped and fixed (T-16)
+- Step 0.5-2: COMPLETE
+- Step 3 TDD (two parallel agents, disjoint files): 1A DB (28 integration tests, RED->GREEN), 1B shared core (195 unit tests, RED->GREEN)
+- Step 7 verifier: PASS - unit 1396/1396, integration 465/465, build, lint, typecheck
+- Step 8 code review: APPROVED, no blocking issues
+- Phase 1 ACs covered: AC-VERIFY-1, AC-VERIFY-4, AC-VERIFY-5, AC-ERROR-6, AC-HAPPY-2 (pure), AC-ERROR-2, AC-ERROR-4/5/10 (DB halves)
+
+### Sub-Agents
+- TDD 1A (migration, fixtures): COMPLETE
+- TDD 1B (shared core): COMPLETE
+- Verifier: COMPLETE (PASS)
+- Code reviewer: COMPLETE (APPROVED)
+
+### Guard & Recovery Log
+(see commit guard result in phase commit message)
+
+### Deviations
+Carry-forward notes for Phase 2+ (from TDD agents and review, not blockers):
+- Court-only edits do not bump `game_sessions.version` (D-72 exclusion of starts_at/ends_at); the service must bump `updated_at`/version explicitly when it edits courts.
+- `deadline_is_default` has no auto-flip for raw writers; the service must write the flag with any explicit deadline.
+- `advanceSessionTo` cannot yet walk PUBLISHED -> CANCELLED (LIFECYCLE_PATH); fix when a test needs it.
+- `session_courts_guard_closed` locks sessions in unsorted [OLD, NEW] order (unlikely deadlock); sort ids if touched.
+- Phase 2 `AppError`/handler must carry the extra fields of `SessionErrorResponse` (`dstOptions`, `raisedFields`, `current`).
+- D-85 DB trigger alone is not a full guard under READ COMMITTED; Phase 2 session lock plus Phase 4 T-17 cover it.
+- Binding T-10 wording ("any court time between 02:00 and 03:00") vs code/ALG ("wholly inside the gap"): code follows ALG; reconcile wording in ADR 0019.
+- `apps/api/openapi.yaml` regenerated (error codes are diff-tested).
+- Worktree has a gitignored `.env` from `scripts/setup.ts`.
+
+### Resumption Notes
+**Can Resume**: YES
+**Resume From**: Phase 2 (`/yay:build session-scheduling-engine`)

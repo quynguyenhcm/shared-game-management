@@ -191,10 +191,10 @@ describe('BY_SEX pricing and sex OTHER (AC-VERIFY-8)', () => {
     }
     await expectPgError(
       db.pool.query(
-        `INSERT INTO recurring_session_rules (team_id, day_of_week, default_location, default_address,
+        `INSERT INTO recurring_session_rules (team_id, day_of_week, starts_on, default_location, default_address,
                                               default_max_players, default_start_time, default_end_time,
                                               pricing_structure, fee_male, fee_female)
-         VALUES ($1, 3, 'Test Hall', '1 Test Street', 12, '19:00', '21:00', 'BY_SEX', '17.00', '16.00')`,
+         VALUES ($1, 3, '2026-10-07', 'Test Hall', '1 Test Street', 12, '19:00', '21:00', 'BY_SEX', '17.00', '16.00')`,
         [teamId],
       ),
       '23514',

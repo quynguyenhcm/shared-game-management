@@ -50,6 +50,13 @@ export const ErrorCode = [
   'skill_level_stale',
   // ...and on an Auto Enroll save (final review: a stale panel must not re-enrol a member another admin turned off)
   'auto_enroll_stale',
+  // session scheduling (session-scheduling-engine, Binding Reconciliation T-7, T-11, T-12; architecture SA-6, SA-7)
+  'session_stale',
+  'series_stale',
+  'session_started',
+  'session_not_editable',
+  'session_state_conflict',
+  'session_fee_locked',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

@@ -360,7 +360,13 @@ describe('game_sessions_paid_requires_payout (publish trigger)', () => {
   it('lets free sessions through for an unconfigured team and ignores non-published statuses', async () => {
     const teamId = await insertTeam(db.pool);
     await publish(await insertSession(db.pool, teamId, { flat: '0.00' }));
-    await publish(await insertSession(db.pool, teamId, { flat: null }));
+    // No fee at all counts as free for the payout rule, but a FLAT session cannot go live without its rate
+    // (C-SSE-1, D-77): the refusal is that CHECK, never the payout trigger.
+    await expectPgError(
+      publish(await insertSession(db.pool, teamId, { flat: null })),
+      '23514',
+      'game_sessions_flat_fee_when_live',
+    );
     await publish(
       await insertSession(db.pool, teamId, {
         pricing: 'BY_SEX',
@@ -409,12 +415,26 @@ describe('game_sessions_paid_requires_payout (publish trigger)', () => {
           row.name.startsWith('M6') ||
           row.name.startsWith('M3 FLAT') ||
           row.name.startsWith('M1 FLAT feeFlat') ||
-          row.name.startsWith('M1 BY_SKILL_LEVEL feeBeginner')),
+          row.name.startsWith('M1 BY_SKILL_LEVEL feeBeginner') ||
+          row.name.startsWith('M1 BY_SKILL_LEVEL feeIntermediate') ||
+          row.name.startsWith('M1 BY_SKILL_LEVEL feeAdvanced')),
     );
     expect(rows.length).toBeGreaterThanOrEqual(20);
     for (const row of rows) {
       const sessionId = await insertSession(db.pool, teamId, sessionFor(row));
-      if (row.expectedPaid) {
+      if (!row.publishable) {
+        // Incomplete for C-SSE-1 (D-77): the live-session CHECK refuses it. The payout trigger fires first, so
+        // a paid row on this unconfigured team is refused by the gate instead; either way it never goes live.
+        const info = await pgError(publish(sessionId));
+        const live =
+          row.pricingStructure === 'FLAT'
+            ? 'game_sessions_flat_fee_when_live'
+            : 'game_sessions_skill_fees_when_live';
+        expect({ name: row.name, constraint: info.constraint }).toEqual({
+          name: row.name,
+          constraint: row.expectedPaid ? 'game_sessions_paid_requires_payout' : live,
+        });
+      } else if (row.expectedPaid) {
         const info = await pgError(publish(sessionId));
         expect({ name: row.name, constraint: info.constraint }).toEqual({
           name: row.name,

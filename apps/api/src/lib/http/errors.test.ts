@@ -57,6 +57,13 @@ const AUTHORITATIVE_ERROR_CODES = [
   'skill_level_stale',
   // ...and on Auto Enroll saves (final review: a stale panel must not re-enrol a member)
   'auto_enroll_stale',
+  // session-scheduling-engine (Binding Reconciliation T-7, T-11, T-12)
+  'session_stale',
+  'series_stale',
+  'session_started',
+  'session_not_editable',
+  'session_state_conflict',
+  'session_fee_locked',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -71,6 +78,12 @@ const TEAM_ERROR_STATUSES = [
   ['banking_in_use', 409],
   ['skill_level_stale', 409],
   ['auto_enroll_stale', 409],
+  ['session_stale', 409],
+  ['series_stale', 409],
+  ['session_started', 409],
+  ['session_not_editable', 409],
+  ['session_state_conflict', 409],
+  ['session_fee_locked', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];

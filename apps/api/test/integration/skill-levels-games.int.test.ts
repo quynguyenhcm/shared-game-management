@@ -75,10 +75,7 @@ async function seedSession(
   status: SessionStatus,
   date = '2026-10-07',
 ): Promise<{ id: string; endsAt: Date }> {
-  const id = await insertSession(database.pool, teamId, { flat: '0.00' }, { date });
-  if (status !== 'DRAFT') {
-    await database.pool.query('UPDATE game_sessions SET status = $2 WHERE id = $1', [id, status]);
-  }
+  const id = await insertSession(database.pool, teamId, { flat: '0.00' }, { date, status });
   const { rows } = await database.pool.query<{ ends_at: Date }>(
     'SELECT ends_at FROM game_sessions WHERE id = $1',
     [id],

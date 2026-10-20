@@ -20,6 +20,8 @@
     "columns": {
       "game_sessions.starts_at": "ColumnType<Date | null, never, never>",
       "game_sessions.ends_at": "ColumnType<Date | null, never, never>",
+      "game_sessions.version": "ColumnType<number, never, never>",
+      "recurring_session_rules.version": "ColumnType<number, never, never>",
       "auth_identities.password_email": "ColumnType<string | null, never, never>",
       "payments.gst_amount": "ColumnType<MoneyString, never, never>",
       "payments.subtotal_amount": "ColumnType<MoneyString, never, never>",

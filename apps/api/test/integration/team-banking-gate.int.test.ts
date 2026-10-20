@@ -45,7 +45,6 @@ import {
   createTestDatabase,
   expectPgError,
   pgError,
-  type PgErrorInfo,
   type TestDatabase,
 } from '../helpers/test-db.ts';
 
@@ -516,28 +515,45 @@ describe('AC-VERIFY-8 and AC-INTEGRATION-2: isPaidSession is the twin of game_se
     expect(disagree).toEqual([]);
   });
 
-  it('publishes every insertable matrix row as a real session through the trigger: refused for an unconfigured team exactly when isPaidSession says paid, accepted for a configured one', async () => {
+  it('publishes every publishable matrix row as a real session through the trigger: refused for an unconfigured team exactly when isPaidSession says paid, accepted for a configured one; the other insertable rows are refused by the D-77 CHECK', async () => {
     const bare = await insertTeam(database.pool);
     const ready = await insertTeam(database.pool, { payoutConfigured: true });
-    const rows = PAID_SESSION_MATRIX.filter((row) => row.insertable);
-    expect(rows).toHaveLength(81);
+    const insertable = PAID_SESSION_MATRIX.filter((row) => row.insertable);
+    expect(insertable).toHaveLength(65);
+    const rows = insertable.filter((row) => row.publishable);
+    expect(rows).toHaveLength(10);
     const wrong: string[] = [];
+    const constraintOf = async (sessionId: string): Promise<string | undefined> =>
+      (
+        await publishRaw(sessionId).then(
+          () => undefined,
+          (error: unknown) => ({ constraint: (error as { constraint?: string }).constraint }),
+        )
+      )?.constraint;
     for (const row of rows) {
       const paid = isPaidSession(row.pricingStructure, row.fees);
       const refusedSession = await insertSession(database.pool, bare, sessionFor(row));
-      const info: PgErrorInfo | undefined = await publishRaw(refusedSession).then(
-        () => undefined,
-        (error: unknown) => ({
-          code: (error as { code?: string }).code,
-          constraint: (error as { constraint?: string }).constraint,
-          message: String(error),
-        }),
-      );
-      const refused = info?.constraint === 'game_sessions_paid_requires_payout';
-      if (refused !== paid || (info !== undefined && !refused)) wrong.push(`bare: ${row.name}`);
+      const refused = (await constraintOf(refusedSession)) === 'game_sessions_paid_requires_payout';
+      if (refused !== paid || (refused && (await statusOf(refusedSession)) !== 'DRAFT')) {
+        wrong.push(`bare: ${row.name}`);
+      }
+      if (!refused && (await statusOf(refusedSession)) !== 'PUBLISHED')
+        wrong.push(`bare: ${row.name}`);
       const okSession = await insertSession(database.pool, ready, sessionFor(row));
       await publishRaw(okSession);
       if ((await statusOf(okSession)) !== 'PUBLISHED') wrong.push(`ready: ${row.name}`);
+    }
+    // Insertable but incomplete for a live session (FLAT without fee_flat, BY_SKILL_LEVEL without all three skill
+    // fees): D-77 refuses the publish even for a configured team, and the session stays a DRAFT.
+    for (const row of insertable.filter((candidate) => !candidate.publishable)) {
+      const sessionId = await insertSession(database.pool, ready, sessionFor(row));
+      const expected =
+        row.pricingStructure === 'FLAT'
+          ? 'game_sessions_flat_fee_when_live'
+          : 'game_sessions_skill_fees_when_live';
+      if ((await constraintOf(sessionId)) !== expected || (await statusOf(sessionId)) !== 'DRAFT') {
+        wrong.push(`incomplete: ${row.name}`);
+      }
     }
     expect(wrong).toEqual([]);
   });
