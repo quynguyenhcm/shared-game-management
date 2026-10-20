@@ -12578,6 +12578,10 @@ paths:
                                 - edited
                                 - admin
                             - type: "null"
+                        seriesName:
+                          type:
+                            - string
+                            - "null"
                         version:
                           type: integer
                           minimum: 1
@@ -12641,6 +12645,7 @@ paths:
                         - deadlineIsDefault
                         - isInstanceOverridden
                         - draftReason
+                        - seriesName
                         - version
                         - activeRegistrationCount
                         - feesLocked
@@ -13123,6 +13128,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -13186,6 +13195,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -13201,6 +13211,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -13303,9 +13315,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -13331,6 +13428,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -13577,6 +13678,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -13640,6 +13745,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -13655,6 +13761,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -13757,9 +13865,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -13785,6 +13978,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -14070,6 +14267,10 @@ paths:
                               - edited
                               - admin
                           - type: "null"
+                      seriesName:
+                        type:
+                          - string
+                          - "null"
                       version:
                         type: integer
                         minimum: 1
@@ -14133,6 +14334,7 @@ paths:
                       - deadlineIsDefault
                       - isInstanceOverridden
                       - draftReason
+                      - seriesName
                       - version
                       - activeRegistrationCount
                       - feesLocked
@@ -14274,6 +14476,10 @@ paths:
                               - edited
                               - admin
                           - type: "null"
+                      seriesName:
+                        type:
+                          - string
+                          - "null"
                       version:
                         type: integer
                         minimum: 1
@@ -14337,6 +14543,7 @@ paths:
                       - deadlineIsDefault
                       - isInstanceOverridden
                       - draftReason
+                      - seriesName
                       - version
                       - activeRegistrationCount
                       - feesLocked
@@ -14819,6 +15026,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -14882,6 +15093,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -14897,6 +15109,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -14999,9 +15213,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -15027,6 +15326,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -15273,6 +15576,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -15336,6 +15643,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -15351,6 +15659,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -15453,9 +15763,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -15481,6 +15876,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -15644,6 +16043,10 @@ paths:
                               - edited
                               - admin
                           - type: "null"
+                      seriesName:
+                        type:
+                          - string
+                          - "null"
                       version:
                         type: integer
                         minimum: 1
@@ -15707,6 +16110,7 @@ paths:
                       - deadlineIsDefault
                       - isInstanceOverridden
                       - draftReason
+                      - seriesName
                       - version
                       - activeRegistrationCount
                       - feesLocked
@@ -16181,6 +16585,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -16244,6 +16652,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -16259,6 +16668,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -16361,9 +16772,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -16389,6 +16885,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -16635,6 +17135,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -16698,6 +17202,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -16713,6 +17218,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -16815,9 +17322,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -16843,6 +17435,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -17138,6 +17734,10 @@ paths:
                               - edited
                               - admin
                           - type: "null"
+                      seriesName:
+                        type:
+                          - string
+                          - "null"
                       version:
                         type: integer
                         minimum: 1
@@ -17201,6 +17801,7 @@ paths:
                       - deadlineIsDefault
                       - isInstanceOverridden
                       - draftReason
+                      - seriesName
                       - version
                       - activeRegistrationCount
                       - feesLocked
@@ -17683,6 +18284,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -17746,6 +18351,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -17761,6 +18367,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -17863,9 +18471,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -17891,6 +18584,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -18137,6 +18834,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -18200,6 +18901,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -18215,6 +18917,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -18317,9 +19021,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -18345,6 +19134,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -18527,6 +19320,10 @@ paths:
                               - edited
                               - admin
                           - type: "null"
+                      seriesName:
+                        type:
+                          - string
+                          - "null"
                       version:
                         type: integer
                         minimum: 1
@@ -18590,6 +19387,7 @@ paths:
                       - deadlineIsDefault
                       - isInstanceOverridden
                       - draftReason
+                      - seriesName
                       - version
                       - activeRegistrationCount
                       - feesLocked
@@ -19072,6 +19870,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -19135,6 +19937,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -19150,6 +19953,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -19252,9 +20057,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -19280,6 +20170,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -19526,6 +20420,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -19589,6 +20487,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -19604,6 +20503,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -19706,9 +20607,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -19734,6 +20720,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -19914,6 +20904,10 @@ paths:
                               - edited
                               - admin
                           - type: "null"
+                      seriesName:
+                        type:
+                          - string
+                          - "null"
                       version:
                         type: integer
                         minimum: 1
@@ -19977,6 +20971,7 @@ paths:
                       - deadlineIsDefault
                       - isInstanceOverridden
                       - draftReason
+                      - seriesName
                       - version
                       - activeRegistrationCount
                       - feesLocked
@@ -20456,6 +21451,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -20519,6 +21518,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -20534,6 +21534,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -20636,9 +21638,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -20664,6 +21751,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -20910,6 +22001,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -20973,6 +22068,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -20988,6 +22084,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -21090,9 +22188,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -21118,6 +22301,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -21304,6 +22491,8 @@ paths:
                         type: string
                         format: uuid
                         pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
                       frequency:
                         type: string
                         enum:
@@ -21406,9 +22595,94 @@ paths:
                             - startTime
                             - endTime
                           additionalProperties: false
+                      isPayoutConfigured:
+                        type: boolean
+                      bankingDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      editedDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      instances:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            date:
+                              type: string
+                            startsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            endsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            status:
+                              type: string
+                              enum:
+                                - DRAFT
+                                - PUBLISHED
+                                - COMPLETED
+                                - CANCELLED
+                            phase:
+                              type: string
+                              enum:
+                                - upcoming
+                                - started
+                                - ended
+                            draftReason:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - banking
+                                    - edited
+                                    - admin
+                                - type: "null"
+                            isInstanceOverridden:
+                              type: boolean
+                            activeRegistrationCount:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                            version:
+                              type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            seriesChangeEffect:
+                              type: string
+                              enum:
+                                - will_update
+                                - edited
+                                - closed
+                                - has_registrations
+                          required:
+                            - id
+                            - date
+                            - startsAt
+                            - endsAt
+                            - status
+                            - phase
+                            - draftReason
+                            - isInstanceOverridden
+                            - activeRegistrationCount
+                            - version
+                            - seriesChangeEffect
+                          additionalProperties: false
                     required:
                       - id
                       - teamId
+                      - name
                       - frequency
                       - dayOfWeek
                       - startsOn
@@ -21434,6 +22708,10 @@ paths:
                       - feeIntermediate
                       - feeAdvanced
                       - courts
+                      - isPayoutConfigured
+                      - bankingDrafts
+                      - editedDrafts
+                      - instances
                     additionalProperties: false
                 required:
                   - series
@@ -21456,6 +22734,8 @@ paths:
                         type: string
                         format: uuid
                         pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
                       frequency:
                         type: string
                         enum:
@@ -21558,9 +22838,94 @@ paths:
                             - startTime
                             - endTime
                           additionalProperties: false
+                      isPayoutConfigured:
+                        type: boolean
+                      bankingDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      editedDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      instances:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            date:
+                              type: string
+                            startsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            endsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            status:
+                              type: string
+                              enum:
+                                - DRAFT
+                                - PUBLISHED
+                                - COMPLETED
+                                - CANCELLED
+                            phase:
+                              type: string
+                              enum:
+                                - upcoming
+                                - started
+                                - ended
+                            draftReason:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - banking
+                                    - edited
+                                    - admin
+                                - type: "null"
+                            isInstanceOverridden:
+                              type: boolean
+                            activeRegistrationCount:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                            version:
+                              type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            seriesChangeEffect:
+                              type: string
+                              enum:
+                                - will_update
+                                - edited
+                                - closed
+                                - has_registrations
+                          required:
+                            - id
+                            - date
+                            - startsAt
+                            - endsAt
+                            - status
+                            - phase
+                            - draftReason
+                            - isInstanceOverridden
+                            - activeRegistrationCount
+                            - version
+                            - seriesChangeEffect
+                          additionalProperties: false
                     required:
                       - id
                       - teamId
+                      - name
                       - frequency
                       - dayOfWeek
                       - startsOn
@@ -21586,6 +22951,10 @@ paths:
                       - feeIntermediate
                       - feeAdvanced
                       - courts
+                      - isPayoutConfigured
+                      - bankingDrafts
+                      - editedDrafts
+                      - instances
                     additionalProperties: false
                 required:
                   - series
@@ -22056,6 +23425,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -22119,6 +23492,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -22134,6 +23508,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -22236,9 +23612,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -22264,6 +23725,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -22510,6 +23975,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -22573,6 +24042,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -22588,6 +24058,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -22690,9 +24162,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -22718,6 +24275,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -22773,6 +24334,8 @@ paths:
                         type: string
                         format: uuid
                         pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
                       frequency:
                         type: string
                         enum:
@@ -22875,9 +24438,94 @@ paths:
                             - startTime
                             - endTime
                           additionalProperties: false
+                      isPayoutConfigured:
+                        type: boolean
+                      bankingDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      editedDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      instances:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            date:
+                              type: string
+                            startsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            endsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            status:
+                              type: string
+                              enum:
+                                - DRAFT
+                                - PUBLISHED
+                                - COMPLETED
+                                - CANCELLED
+                            phase:
+                              type: string
+                              enum:
+                                - upcoming
+                                - started
+                                - ended
+                            draftReason:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - banking
+                                    - edited
+                                    - admin
+                                - type: "null"
+                            isInstanceOverridden:
+                              type: boolean
+                            activeRegistrationCount:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                            version:
+                              type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            seriesChangeEffect:
+                              type: string
+                              enum:
+                                - will_update
+                                - edited
+                                - closed
+                                - has_registrations
+                          required:
+                            - id
+                            - date
+                            - startsAt
+                            - endsAt
+                            - status
+                            - phase
+                            - draftReason
+                            - isInstanceOverridden
+                            - activeRegistrationCount
+                            - version
+                            - seriesChangeEffect
+                          additionalProperties: false
                     required:
                       - id
                       - teamId
+                      - name
                       - frequency
                       - dayOfWeek
                       - startsOn
@@ -22903,6 +24551,10 @@ paths:
                       - feeIntermediate
                       - feeAdvanced
                       - courts
+                      - isPayoutConfigured
+                      - bankingDrafts
+                      - editedDrafts
+                      - instances
                     additionalProperties: false
                 required:
                   - series
@@ -23373,6 +25025,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -23436,6 +25092,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -23451,6 +25108,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -23553,9 +25212,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -23581,6 +25325,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -23827,6 +25575,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -23890,6 +25642,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -23905,6 +25658,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -24007,9 +25762,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -24035,6 +25875,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -24234,6 +26078,8 @@ paths:
                         type: string
                         format: uuid
                         pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
                       frequency:
                         type: string
                         enum:
@@ -24336,9 +26182,94 @@ paths:
                             - startTime
                             - endTime
                           additionalProperties: false
+                      isPayoutConfigured:
+                        type: boolean
+                      bankingDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      editedDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      instances:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            date:
+                              type: string
+                            startsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            endsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            status:
+                              type: string
+                              enum:
+                                - DRAFT
+                                - PUBLISHED
+                                - COMPLETED
+                                - CANCELLED
+                            phase:
+                              type: string
+                              enum:
+                                - upcoming
+                                - started
+                                - ended
+                            draftReason:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - banking
+                                    - edited
+                                    - admin
+                                - type: "null"
+                            isInstanceOverridden:
+                              type: boolean
+                            activeRegistrationCount:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                            version:
+                              type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            seriesChangeEffect:
+                              type: string
+                              enum:
+                                - will_update
+                                - edited
+                                - closed
+                                - has_registrations
+                          required:
+                            - id
+                            - date
+                            - startsAt
+                            - endsAt
+                            - status
+                            - phase
+                            - draftReason
+                            - isInstanceOverridden
+                            - activeRegistrationCount
+                            - version
+                            - seriesChangeEffect
+                          additionalProperties: false
                     required:
                       - id
                       - teamId
+                      - name
                       - frequency
                       - dayOfWeek
                       - startsOn
@@ -24364,6 +26295,10 @@ paths:
                       - feeIntermediate
                       - feeAdvanced
                       - courts
+                      - isPayoutConfigured
+                      - bankingDrafts
+                      - editedDrafts
+                      - instances
                     additionalProperties: false
                   outcome:
                     type: object
@@ -24881,6 +26816,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -24944,6 +26883,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -24959,6 +26899,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -25061,9 +27003,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -25089,6 +27116,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -25335,6 +27366,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -25398,6 +27433,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -25413,6 +27449,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -25515,9 +27553,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -25543,6 +27666,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -25623,6 +27750,8 @@ paths:
                         type: string
                         format: uuid
                         pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
                       frequency:
                         type: string
                         enum:
@@ -25725,9 +27854,94 @@ paths:
                             - startTime
                             - endTime
                           additionalProperties: false
+                      isPayoutConfigured:
+                        type: boolean
+                      bankingDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      editedDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      instances:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            date:
+                              type: string
+                            startsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            endsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            status:
+                              type: string
+                              enum:
+                                - DRAFT
+                                - PUBLISHED
+                                - COMPLETED
+                                - CANCELLED
+                            phase:
+                              type: string
+                              enum:
+                                - upcoming
+                                - started
+                                - ended
+                            draftReason:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - banking
+                                    - edited
+                                    - admin
+                                - type: "null"
+                            isInstanceOverridden:
+                              type: boolean
+                            activeRegistrationCount:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                            version:
+                              type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            seriesChangeEffect:
+                              type: string
+                              enum:
+                                - will_update
+                                - edited
+                                - closed
+                                - has_registrations
+                          required:
+                            - id
+                            - date
+                            - startsAt
+                            - endsAt
+                            - status
+                            - phase
+                            - draftReason
+                            - isInstanceOverridden
+                            - activeRegistrationCount
+                            - version
+                            - seriesChangeEffect
+                          additionalProperties: false
                     required:
                       - id
                       - teamId
+                      - name
                       - frequency
                       - dayOfWeek
                       - startsOn
@@ -25753,6 +27967,10 @@ paths:
                       - feeIntermediate
                       - feeAdvanced
                       - courts
+                      - isPayoutConfigured
+                      - bankingDrafts
+                      - editedDrafts
+                      - instances
                     additionalProperties: false
                   removedDrafts:
                     type: integer
@@ -26262,6 +28480,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -26325,6 +28547,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -26340,6 +28563,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -26442,9 +28667,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -26470,6 +28780,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -26716,6 +29030,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -26779,6 +29097,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -26794,6 +29113,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -26896,9 +29217,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -26924,6 +29330,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -26990,6 +29400,8 @@ paths:
                         type: string
                         format: uuid
                         pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
                       frequency:
                         type: string
                         enum:
@@ -27092,9 +29504,94 @@ paths:
                             - startTime
                             - endTime
                           additionalProperties: false
+                      isPayoutConfigured:
+                        type: boolean
+                      bankingDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      editedDrafts:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      instances:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            date:
+                              type: string
+                            startsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            endsAt:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                - type: "null"
+                            status:
+                              type: string
+                              enum:
+                                - DRAFT
+                                - PUBLISHED
+                                - COMPLETED
+                                - CANCELLED
+                            phase:
+                              type: string
+                              enum:
+                                - upcoming
+                                - started
+                                - ended
+                            draftReason:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - banking
+                                    - edited
+                                    - admin
+                                - type: "null"
+                            isInstanceOverridden:
+                              type: boolean
+                            activeRegistrationCount:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                            version:
+                              type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            seriesChangeEffect:
+                              type: string
+                              enum:
+                                - will_update
+                                - edited
+                                - closed
+                                - has_registrations
+                          required:
+                            - id
+                            - date
+                            - startsAt
+                            - endsAt
+                            - status
+                            - phase
+                            - draftReason
+                            - isInstanceOverridden
+                            - activeRegistrationCount
+                            - version
+                            - seriesChangeEffect
+                          additionalProperties: false
                     required:
                       - id
                       - teamId
+                      - name
                       - frequency
                       - dayOfWeek
                       - startsOn
@@ -27120,6 +29617,10 @@ paths:
                       - feeIntermediate
                       - feeAdvanced
                       - courts
+                      - isPayoutConfigured
+                      - bankingDrafts
+                      - editedDrafts
+                      - instances
                     additionalProperties: false
                   queued:
                     type: boolean
@@ -27593,6 +30094,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -27656,6 +30161,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -27671,6 +30177,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -27773,9 +30281,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -27801,6 +30394,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code
@@ -28047,6 +30644,10 @@ paths:
                                       - edited
                                       - admin
                                   - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
                               version:
                                 type: integer
                                 minimum: 1
@@ -28110,6 +30711,7 @@ paths:
                               - deadlineIsDefault
                               - isInstanceOverridden
                               - draftReason
+                              - seriesName
                               - version
                               - activeRegistrationCount
                               - feesLocked
@@ -28125,6 +30727,8 @@ paths:
                                 type: string
                                 format: uuid
                                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
                               frequency:
                                 type: string
                                 enum:
@@ -28227,9 +30831,94 @@ paths:
                                     - startTime
                                     - endTime
                                   additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
                             required:
                               - id
                               - teamId
+                              - name
                               - frequency
                               - dayOfWeek
                               - startsOn
@@ -28255,6 +30944,10 @@ paths:
                               - feeIntermediate
                               - feeAdvanced
                               - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
                             additionalProperties: false
                     required:
                       - code

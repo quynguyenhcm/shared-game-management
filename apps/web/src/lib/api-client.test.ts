@@ -548,3 +548,167 @@ describe('apiClient banking and GST calls (team-banking-and-gst)', () => {
     });
   });
 });
+
+describe('apiClient sessions calls (session-scheduling-engine)', () => {
+  const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+  const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+  const RULE_ID = '41111111-1111-4111-8111-111111111111';
+
+  function sent(fetchMock: ReturnType<typeof stubJson>) {
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    return { url: String(url), init, headers: (init?.headers ?? {}) as Record<string, string> };
+  }
+
+  it('listSessions GETs one view with the cursor and limit as an encoded query', async () => {
+    const fetchMock = stubJson(200, { sessions: [], nextCursor: null, isPayoutConfigured: false });
+    const result = await apiClient.listSessions(
+      TEAM_ID,
+      { view: 'past', cursor: 'a b/c', limit: 25 },
+      { session: 'tok' },
+    );
+    expect(result).toMatchObject({ ok: true, data: { isPayoutConfigured: false } });
+    const call = sent(fetchMock);
+    expect(call.url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/sessions?view=past&limit=25&cursor=a+b%2Fc`,
+    );
+    expect(call.init?.method).toBe('GET');
+    expect(call.headers.authorization).toBe('Bearer tok');
+  });
+
+  it('createSession POSTs the wire body as JSON and updateSession PUTs it to the session', async () => {
+    const body = { createKey: 'k', location: 'Rosedale' } as never;
+    const post = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.createSession(TEAM_ID, body, { session: 'tok' });
+    expect(sent(post).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/sessions`);
+    expect(sent(post).init?.method).toBe('POST');
+    expect(JSON.parse(sent(post).init?.body as string)).toEqual({
+      createKey: 'k',
+      location: 'Rosedale',
+    });
+
+    const put = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.updateSession(TEAM_ID, SESSION_ID, body, { session: 'tok' });
+    expect(sent(put).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/sessions/${SESSION_ID}`);
+    expect(sent(put).init?.method).toBe('PUT');
+  });
+
+  it('getSession, publishSession and cancelSession use the session paths; the commands carry expectedVersion', async () => {
+    const get = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.getSession(TEAM_ID, SESSION_ID, { session: 'tok' });
+    expect(sent(get).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/sessions/${SESSION_ID}`);
+    expect(sent(get).init?.method).toBe('GET');
+
+    const publish = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.publishSession(TEAM_ID, SESSION_ID, { expectedVersion: 4 }, { session: 'tok' });
+    expect(sent(publish).url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/sessions/${SESSION_ID}/publish`,
+    );
+    expect(JSON.parse(sent(publish).init?.body as string)).toEqual({ expectedVersion: 4 });
+
+    const cancel = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.cancelSession(TEAM_ID, SESSION_ID, { expectedVersion: 4 }, { session: 'tok' });
+    expect(sent(cancel).url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/sessions/${SESSION_ID}/cancel`,
+    );
+  });
+
+  it('series calls use /session-series: create, read, save, end and publish-drafts (no JSON body)', async () => {
+    const body = { createKey: 'k' } as never;
+    const create = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.createSeries(TEAM_ID, body, { session: 'tok' });
+    expect(sent(create).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/session-series`);
+    expect(sent(create).init?.method).toBe('POST');
+
+    const read = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.getSeries(TEAM_ID, RULE_ID, { session: 'tok' });
+    expect(sent(read).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/session-series/${RULE_ID}`);
+
+    const save = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.updateSeries(TEAM_ID, RULE_ID, body, { session: 'tok' });
+    expect(sent(save).init?.method).toBe('PUT');
+
+    const end = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.endSeries(
+      TEAM_ID,
+      RULE_ID,
+      { expectedVersion: 2, lastDate: '2026-12-16', alsoCancelPublished: true },
+      { session: 'tok' },
+    );
+    expect(sent(end).url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/session-series/${RULE_ID}/end`,
+    );
+    expect(JSON.parse(sent(end).init?.body as string)).toEqual({
+      expectedVersion: 2,
+      lastDate: '2026-12-16',
+      alsoCancelPublished: true,
+    });
+
+    const drafts = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.publishSeriesDrafts(TEAM_ID, RULE_ID, { session: 'tok' });
+    expect(sent(drafts).url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/session-series/${RULE_ID}/publish-drafts`,
+    );
+    expect(sent(drafts).init?.method).toBe('POST');
+    expect(sent(drafts).init?.body).toBeUndefined();
+    expect(sent(drafts).headers['content-type']).toBeUndefined();
+  });
+
+  it('a 422 keeps fieldErrors and the DST options the API sent, so the form can offer the choices', async () => {
+    const dst = {
+      field: 'courts.2.startTime',
+      date: '2026-09-27',
+      time: '02:30',
+      kind: 'nonexistent',
+      options: [
+        { choice: 'shiftedForward', localTime: '03:30', instant: '2026-09-26T14:30:00.000Z' },
+        { choice: 'shiftedBackward', localTime: '01:30', instant: '2026-09-26T12:30:00.000Z' },
+      ],
+    };
+    stubJson(422, {
+      error: {
+        code: 'validation_failed',
+        message: 'x',
+        fieldErrors: { 'courts.2.startTime': ['local_time_nonexistent'] },
+        dstOptions: [dst],
+      },
+    });
+    const result = await apiClient.createSession(TEAM_ID, {} as never, { session: 'tok' });
+    expect(result).toMatchObject({
+      ok: false,
+      status: 422,
+      dstOptions: [dst],
+      error: { fieldErrors: { 'courts.2.startTime': ['local_time_nonexistent'] } },
+    });
+  });
+
+  it('a 409 session_fee_locked keeps raisedFields; a malformed extra never hides the error code', async () => {
+    stubJson(409, {
+      error: { code: 'session_fee_locked', message: 'x', raisedFields: ['fee_flat'] },
+    });
+    await expect(
+      apiClient.updateSession(TEAM_ID, SESSION_ID, {} as never, { session: 'tok' }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 409,
+      raisedFields: ['fee_flat'],
+      error: { code: 'session_fee_locked' },
+    });
+
+    stubJson(409, {
+      error: { code: 'session_stale', message: 'x', current: { not: 'a session' }, dstOptions: 7 },
+    });
+    const stale = await apiClient.updateSession(TEAM_ID, SESSION_ID, {} as never, {
+      session: 'tok',
+    });
+    expect(stale).toMatchObject({ ok: false, status: 409, error: { code: 'session_stale' } });
+    expect(stale).not.toHaveProperty('dstOptions');
+  });
+
+  it('never lets a hostile id change the path', async () => {
+    const fetchMock = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.getSession(TEAM_ID, '../banking', { session: 'tok' });
+    expect(sent(fetchMock).url).toBe(
+      `http://localhost:4000/teams/${TEAM_ID}/sessions/..%2Fbanking`,
+    );
+  });
+});

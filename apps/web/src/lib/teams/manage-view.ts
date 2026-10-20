@@ -7,8 +7,20 @@ import { LAST_ADMIN_MESSAGE, adminBanBlockedHint } from './labels.ts';
  * is unit-tested once; the components only render what these return.
  */
 
-/** Every status region and confirm slot of the manage area: People sections, then the banking page's two. */
-export type SectionId = 'requests' | 'members' | 'invite' | 'banned' | 'banking' | 'gst';
+/**
+ * Every status region and confirm slot of the manage area: People sections, the banking page's two, then
+ * one per Sessions page (the list, the session editor and the series page each render one section).
+ */
+export type SectionId =
+  | 'requests'
+  | 'members'
+  | 'invite'
+  | 'banned'
+  | 'banking'
+  | 'gst'
+  | 'sessions'
+  | 'session'
+  | 'series';
 
 /** The People sections that page with a keyset cursor. */
 type PagedSection = 'requests' | 'members' | 'banned';

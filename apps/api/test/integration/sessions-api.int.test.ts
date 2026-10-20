@@ -1483,6 +1483,59 @@ describe('fees can only go down once players have registered (AC-ERROR-10)', () 
 // The admin list
 // ---------------------------------------------------------------------------------------------
 
+describe('series name on session rows (derived from the rule, no N+1)', () => {
+  it('list rows and the detail GET carry seriesName for series dates and null for one-offs, with one rule read per list', async () => {
+    const c = await scene({ payout: true });
+    const weekly = await insertRule(database.pool, c.teamId);
+    const monthly = await insertRule(database.pool, c.teamId, {
+      frequency: 'MONTHLY',
+      monthlyWeek: 1,
+      startsOn: '2026-11-04',
+    });
+    const a = await insertSession(
+      database.pool,
+      c.teamId,
+      {},
+      { date: '2026-11-04', recurringRuleId: weekly },
+    );
+    const b = await insertSession(
+      database.pool,
+      c.teamId,
+      {},
+      { date: '2026-11-11', recurringRuleId: weekly },
+    );
+    const m = await insertSession(
+      database.pool,
+      c.teamId,
+      {},
+      { date: '2026-11-18', recurringRuleId: monthly },
+    );
+    const oneOff = await insertSession(database.pool, c.teamId, {}, { date: '2026-11-25' });
+
+    recorder.reset();
+    const res = await call('GET', `${base(c)}?view=drafts`, c.admin);
+    expect(res.statusCode, res.body).toBe(200);
+    const names = new Map(
+      res.json<{ sessions: SessionResponse[] }>().sessions.map((x) => [x.id, x.seriesName]),
+    );
+    expect(names.get(a)).toBe('Wednesdays at Test Hall');
+    expect(names.get(b)).toBe('Wednesdays at Test Hall');
+    expect(names.get(m)).toBe('First Wednesday of the month at Test Hall');
+    expect(names.get(oneOff)).toBeNull();
+    expect(
+      recorder.statements.filter((sql) => /from "recurring_session_rules"/.test(sql)),
+    ).toHaveLength(1);
+
+    for (const [id, expected] of [
+      [a, 'Wednesdays at Test Hall'],
+      [oneOff, null],
+    ] as const) {
+      const one = await call('GET', `${base(c)}/${id}`, c.admin);
+      expect(sessionOf(one).seriesName).toBe(expected);
+    }
+  });
+});
+
 describe('the admin list (spec "API")', () => {
   it('splits upcoming, drafts and past by status and the API clock, in order, with isPayoutConfigured', async () => {
     // 07:00Z on 6 Oct 2026: the 6 Oct 19:00 NZDT session (06:00Z..08:00Z) has started.

@@ -284,13 +284,20 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
 
   /** The admin view of `row`, read through `reader` (the pool, or the writer's own transaction). */
   async function viewOf(reader: Database, row: SessionRow, now: Date): Promise<SessionResponse> {
-    const [courts, counts] = await Promise.all([
+    const [courts, counts, names] = await Promise.all([
       repo.listCourts(reader, row.id),
       repo.countActiveRegistrations(reader, [row.id]),
+      repo.listRuleNames(
+        reader,
+        row.team_id,
+        row.recurring_rule_id === null ? [] : [row.recurring_rule_id],
+      ),
     ]);
     return toSessionResponse(row, courts, {
       now,
       activeRegistrationCount: counts.get(row.id) ?? 0,
+      seriesName:
+        row.recurring_rule_id === null ? null : (names.get(row.recurring_rule_id) ?? null),
     });
   }
 
@@ -338,15 +345,25 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
         repo.readPayoutConfigured(db, teamId),
       ]);
       const ids = page.rows.map((row) => row.id);
-      const [courts, counts] = await Promise.all([
+      const ruleIds = [
+        ...new Set(
+          page.rows.flatMap((row) =>
+            row.recurring_rule_id === null ? [] : [row.recurring_rule_id],
+          ),
+        ),
+      ];
+      const [courts, counts, names] = await Promise.all([
         repo.listCourtsFor(db, ids),
         repo.countActiveRegistrations(db, ids),
+        repo.listRuleNames(db, teamId, ruleIds),
       ]);
       return {
         sessions: page.rows.map((row) =>
           toSessionResponse(row, courts.get(row.id) ?? [], {
             now,
             activeRegistrationCount: counts.get(row.id) ?? 0,
+            seriesName:
+              row.recurring_rule_id === null ? null : (names.get(row.recurring_rule_id) ?? null),
           }),
         ),
         nextCursor: page.nextCursor,

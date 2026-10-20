@@ -44,7 +44,12 @@ const ZERO_MONEY = '0.00' as MoneyString;
 export function toSessionResponse(
   row: SessionRow,
   courts: readonly CourtRow[],
-  options: { readonly now: Date; readonly activeRegistrationCount: number },
+  options: {
+    readonly now: Date;
+    readonly activeRegistrationCount: number;
+    /** `seriesName` of the session's rule; null for a one-off. */
+    readonly seriesName: string | null;
+  },
 ): SessionResponse {
   const count = options.activeRegistrationCount;
   return {
@@ -76,6 +81,7 @@ export function toSessionResponse(
     deadlineIsDefault: row.deadline_is_default,
     isInstanceOverridden: row.is_instance_overridden,
     draftReason: draftReasonOf(row),
+    seriesName: options.seriesName,
     version: row.version,
     activeRegistrationCount: count,
     feesLocked: row.status === 'PUBLISHED' && count > 0 ? 'raise_only_blocked' : 'none',

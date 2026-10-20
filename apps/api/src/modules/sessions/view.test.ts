@@ -96,8 +96,10 @@ describe('toSessionResponse', () => {
     const response = toSessionResponse(row(), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      seriesName: null,
     });
     expect(SessionResponse.safeParse(response).success).toBe(true);
+    expect(response.seriesName).toBeNull();
     expect(response).toMatchObject({
       status: 'DRAFT',
       phase: 'upcoming',
@@ -115,6 +117,7 @@ describe('toSessionResponse', () => {
       version: 1,
       feesLocked: 'none',
       activeRegistrationCount: 0,
+      seriesName: null,
     });
     expect(response.courts.map((c) => [c.identifier, c.startTime, c.endTime])).toEqual([
       ['Court 2', '08:00', '09:00'],
@@ -122,26 +125,39 @@ describe('toSessionResponse', () => {
     ]);
   });
 
+  it('carries the series name it is given', () => {
+    const response = toSessionResponse(row(), courts, {
+      now: at('2026-10-06T00:00:00Z'),
+      activeRegistrationCount: 0,
+      seriesName: 'Wednesdays at Hall',
+    });
+    expect(response.seriesName).toBe('Wednesdays at Hall');
+  });
+
   it('locks fees only on a PUBLISHED session with an active registration, and reports a null start without courts', () => {
     const published = toSessionResponse(row({ status: 'PUBLISHED' }), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 2,
+      seriesName: null,
     });
     expect(published.feesLocked).toBe('raise_only_blocked');
     expect(published.draftReason).toBeNull();
     const none = toSessionResponse(row({ status: 'PUBLISHED' }), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      seriesName: null,
     });
     expect(none.feesLocked).toBe('none');
     const draftWithPlayers = toSessionResponse(row(), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 2,
+      seriesName: null,
     });
     expect(draftWithPlayers.feesLocked).toBe('none');
     const empty = toSessionResponse(row({ starts_at: null, ends_at: null }), [], {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      seriesName: null,
     });
     expect(empty).toMatchObject({ startsAt: null, endsAt: null, phase: 'upcoming', courts: [] });
   });

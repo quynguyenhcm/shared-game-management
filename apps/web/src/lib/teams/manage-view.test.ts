@@ -27,6 +27,9 @@ describe('MANAGE_SECTIONS and jumpLinks (UI/UX amendment 1: Join requests, Membe
       ['banned', 'Banned members'],
     ]);
     expect(sectionHeadingId('members')).toBe('members-heading');
+    expect(sectionHeadingId('sessions')).toBe('sessions-heading');
+    expect(sectionHeadingId('session')).toBe('session-heading');
+    expect(sectionHeadingId('series')).toBe('series-heading');
   });
 
   it('shows the pending count on the first link, with a plus when a next page exists', () => {

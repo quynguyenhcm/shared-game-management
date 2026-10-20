@@ -70,7 +70,12 @@ import {
 } from './rule-template.ts';
 import type { SessionsContext } from './service.ts';
 import * as seriesRepo from './series-repo.ts';
-import { existingInstanceOf, toSeriesResponse, type RuleCourtRow } from './series-view.ts';
+import {
+  buildSeriesExtras,
+  existingInstanceOf,
+  toSeriesResponse,
+  type RuleCourtRow,
+} from './series-view.ts';
 import { HTTP_POLICY, runSessionTransaction } from './tx.ts';
 import type { SessionRow } from './view.ts';
 
@@ -252,7 +257,36 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
   const { db, clock, jobs, allocator } = deps;
 
   async function viewOf(reader: Database, rule: LockedRule): Promise<SeriesResponse> {
-    return toSeriesResponse(rule, await seriesRepo.listRuleCourts(reader, rule.id));
+    const now = clock.now();
+    const rows = await seriesRepo.listSeriesPageInstances(reader, {
+      ruleId: rule.id,
+      teamId: rule.team_id,
+      today: instantToLocal(now).date,
+    });
+    const ids = rows.map((row) => row.id);
+    const [templateCourts, courtsByRow, counts, draftCounts, isPayoutConfigured] =
+      await Promise.all([
+        seriesRepo.listRuleCourts(reader, rule.id),
+        repo.listCourtsFor(reader, ids),
+        repo.countActiveRegistrations(reader, ids),
+        seriesRepo.countRuleDrafts(reader, { ruleId: rule.id, teamId: rule.team_id }),
+        repo.readPayoutConfigured(reader, rule.team_id),
+      ]);
+    return toSeriesResponse(
+      rule,
+      templateCourts,
+      buildSeriesExtras({
+        rule,
+        templateCourts,
+        rows,
+        courtsByRow,
+        counts,
+        draftCounts,
+        isPayoutConfigured,
+        now,
+        today: instantToLocal(now).date,
+      }),
+    );
   }
 
   async function requireRule(
@@ -416,7 +450,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
           if (sameRuleContent(rule, values, input.recurUntil, courtsBefore, input.courts)) {
             // SA-6: a save that would change nothing is a 200 with the current rule, whatever the version.
             return {
-              series: toSeriesResponse(rule, courtsBefore),
+              series: await viewOf(trx, rule),
               outcome: summariseReconciliation([]),
               changed: false,
               promoted: 0,

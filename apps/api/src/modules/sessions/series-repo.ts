@@ -169,3 +169,44 @@ export async function deleteDraft(db: Database, sessionId: string): Promise<bool
     .executeTakeFirst();
   return result.numDeletedRows === 1n;
 }
+
+/** The most instances the series page lists. */
+export const SERIES_INSTANCE_LIMIT = 100;
+
+/**
+ * The series page's instances, unlocked: dated today or later, plus any DRAFT (a past draft still needs the admin), soonest
+ * first, capped at `SERIES_INSTANCE_LIMIT`.
+ */
+export function listSeriesPageInstances(
+  db: Database,
+  input: { readonly ruleId: string; readonly teamId: string; readonly today: LocalDate },
+): Promise<SessionRow[]> {
+  return db
+    .selectFrom('game_sessions')
+    .selectAll()
+    .where('recurring_rule_id', '=', input.ruleId)
+    .where('team_id', '=', input.teamId)
+    .where((eb) => eb.or([eb('date', '>=', input.today), eb('status', '=', 'DRAFT')]))
+    .orderBy('date', 'asc')
+    .orderBy('id', 'asc')
+    .limit(SERIES_INSTANCE_LIMIT)
+    .execute();
+}
+
+/** All of the rule's DRAFT instances by reason: banking (not edited) and edited. */
+export async function countRuleDrafts(
+  db: Database,
+  input: { readonly ruleId: string; readonly teamId: string },
+): Promise<{ banking: number; edited: number }> {
+  const rows = await db
+    .selectFrom('game_sessions')
+    .select(['is_instance_overridden', (eb) => eb.fn.countAll<string>().as('n')])
+    .where('recurring_rule_id', '=', input.ruleId)
+    .where('team_id', '=', input.teamId)
+    .where('status', '=', 'DRAFT')
+    .groupBy('is_instance_overridden')
+    .execute();
+  const counts = { banking: 0, edited: 0 };
+  for (const row of rows) counts[row.is_instance_overridden ? 'edited' : 'banking'] = Number(row.n);
+  return counts;
+}

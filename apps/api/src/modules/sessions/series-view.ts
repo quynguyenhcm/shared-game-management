@@ -5,6 +5,11 @@
  */
 import {
   ZERO,
+  planSeriesReconciliation,
+  seriesName,
+  type LocalDate,
+  type SeriesInstanceResponse,
+  type SeriesRule,
   parseLocalTime,
   parseMoney,
   suggestedRate,
@@ -16,7 +21,8 @@ import {
 } from '@sgm/shared';
 import { trimTime } from './content.ts';
 import type { LockedRule } from './locks.ts';
-import type { CourtRow, SessionRow } from './view.ts';
+import { recurrenceRuleOf, templateOf } from './rule-template.ts';
+import { draftReasonOf, phaseOf, type CourtRow, type SessionRow } from './view.ts';
 
 export interface RuleCourtRow {
   readonly court_identifier: string;
@@ -32,13 +38,32 @@ export const isMaterialising = (
   rule: Pick<LockedRule, 'version' | 'materialised_version'>,
 ): boolean => rule.materialised_version === null || rule.materialised_version < rule.version;
 
+/** The read-model parts of a series response that come from queries rather than from the rule row. */
+export type SeriesViewExtras = Pick<
+  SeriesResponse,
+  'isPayoutConfigured' | 'bankingDrafts' | 'editedDrafts' | 'instances'
+>;
+
+export function seriesNameOf(
+  rule: Pick<LockedRule, 'frequency' | 'day_of_week' | 'monthly_week' | 'default_location'>,
+): string {
+  return seriesName({
+    frequency: rule.frequency,
+    dayOfWeek: rule.day_of_week,
+    monthlyWeek: rule.monthly_week,
+    location: rule.default_location,
+  });
+}
+
 export function toSeriesResponse(
   rule: LockedRule,
   courts: readonly RuleCourtRow[],
+  extras: SeriesViewExtras,
 ): SeriesResponse {
   return {
     id: rule.id,
     teamId: rule.team_id,
+    name: seriesNameOf(rule),
     frequency: rule.frequency,
     dayOfWeek: rule.day_of_week,
     startsOn: rule.starts_on,
@@ -77,6 +102,7 @@ export function toSeriesResponse(
         startTime: trimTime(court.start_time),
         endTime: trimTime(court.end_time),
       })),
+    ...extras,
   };
 }
 
@@ -126,5 +152,97 @@ export function existingInstanceOf(
     deadlineIsDefault: row.deadline_is_default,
     isInstanceOverridden: row.is_instance_overridden,
     activeRegistrationCount,
+  };
+}
+
+export interface SeriesExtrasInput {
+  readonly rule: LockedRule;
+  readonly templateCourts: readonly RuleCourtRow[];
+  /** The rule's sessions from today forward plus any DRAFT, soonest first, already capped. */
+  readonly rows: readonly SessionRow[];
+  readonly courtsByRow: ReadonlyMap<string, readonly CourtRow[]>;
+  readonly counts: ReadonlyMap<string, number>;
+  readonly draftCounts: { readonly banking: number; readonly edited: number };
+  readonly isPayoutConfigured: boolean;
+  readonly now: Date;
+  /** NZ local date of `now`. */
+  readonly today: LocalDate;
+}
+
+type Effect = SeriesInstanceResponse['seriesChangeEffect'];
+
+/**
+ * The series page's read model. The effect of each instance is what the next series save would do to it, taken from
+ * `planSeriesReconciliation` against the rule as it is now (no second copy of the rules): skipped instances are `edited`,
+ * `closed` (closed, started, past deadline) or `has_registrations` (fee-locked); an instance a save would update is
+ * `has_registrations` when it is PUBLISHED with players (its fees can then only go down), otherwise `will_update`.
+ * Off-pattern instances are kept as they are (`edited`), and anything before today is `closed`.
+ */
+export function buildSeriesExtras(input: SeriesExtrasInput): SeriesViewExtras {
+  const seriesRule: SeriesRule = { ...recurrenceRuleOf(input.rule), ...templateOf(input.rule) };
+  const rows = [...input.rows].sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1,
+  );
+  const instances = rows.map((row) =>
+    existingInstanceOf(row, input.courtsByRow.get(row.id) ?? [], input.counts.get(row.id) ?? 0),
+  );
+  const actions = planSeriesReconciliation({
+    rule: seriesRule,
+    courts: [...input.templateCourts]
+      .sort((a, b) => a.position - b.position)
+      .map((court) =>
+        courtTemplateOf({
+          id: '',
+          court_identifier: court.court_identifier,
+          start_time: court.start_time,
+          end_time: court.end_time,
+        }),
+      ),
+    instances,
+    today: input.today,
+    now: input.now,
+  });
+  const actionOf = new Map(actions.map((action) => [action.sessionId, action]));
+
+  const effectOf = (row: SessionRow, count: number): Effect => {
+    const action = actionOf.get(row.id);
+    if (action === undefined) return 'closed';
+    switch (action.kind) {
+      case 'skip':
+        return action.reason === 'edited'
+          ? 'edited'
+          : action.reason === 'fee_locked'
+            ? 'has_registrations'
+            : 'closed';
+      case 'keep_off_pattern':
+        return 'edited';
+      case 'update':
+      case 'unchanged':
+      case 'delete':
+      case 'cancel':
+        return row.status === 'PUBLISHED' && count > 0 ? 'has_registrations' : 'will_update';
+    }
+  };
+
+  return {
+    isPayoutConfigured: input.isPayoutConfigured,
+    bankingDrafts: input.draftCounts.banking,
+    editedDrafts: input.draftCounts.edited,
+    instances: rows.map((row) => {
+      const count = input.counts.get(row.id) ?? 0;
+      return {
+        id: row.id,
+        date: row.date,
+        startsAt: row.starts_at?.toISOString() ?? null,
+        endsAt: row.ends_at?.toISOString() ?? null,
+        status: row.status,
+        phase: phaseOf(row.starts_at, row.ends_at, input.now),
+        draftReason: draftReasonOf(row),
+        isInstanceOverridden: row.is_instance_overridden,
+        activeRegistrationCount: count,
+        version: row.version,
+        seriesChangeEffect: effectOf(row, count),
+      };
+    }),
   };
 }

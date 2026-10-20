@@ -43,6 +43,9 @@ const empty = <T>(value: T): Record<SectionId, T> => ({
   banned: value,
   banking: value,
   gst: value,
+  sessions: value,
+  session: value,
+  series: value,
 });
 
 export function initialManageState(): ManageState {

@@ -468,6 +468,8 @@ export const SessionResponse = z.object({
   isInstanceOverridden: z.boolean(),
   /** Set only on a DRAFT. */
   draftReason: DraftReason.nullable(),
+  /** Derived from the series rule (`seriesName`); null for a one-off session. */
+  seriesName: z.string().nullable(),
   version: z.number().int().min(1),
   activeRegistrationCount: count,
   feesLocked: FeesLocked,
@@ -511,9 +513,35 @@ export const SeriesCourtResponse = z.object({
   endTime: z.string(),
 });
 
+/** What a series save would do to one existing instance (UI/UX assumption 5; there is no `needs_banking`). */
+export const SeriesChangeEffectValue = z.enum([
+  'will_update',
+  'edited',
+  'closed',
+  'has_registrations',
+]);
+
+/** One of the series' dates as the series page lists it: from today forward plus any DRAFT. */
+export const SeriesInstanceResponse = z.object({
+  id: z.uuid(),
+  date: z.string(),
+  startsAt: isoInstant.nullable(),
+  endsAt: isoInstant.nullable(),
+  status: z.enum(SessionStatus),
+  phase: SessionPhase,
+  draftReason: DraftReason.nullable(),
+  isInstanceOverridden: z.boolean(),
+  activeRegistrationCount: count,
+  version: z.number().int().min(1),
+  seriesChangeEffect: SeriesChangeEffectValue,
+});
+export type SeriesInstanceResponse = z.infer<typeof SeriesInstanceResponse>;
+
 export const SeriesResponse = z.object({
   id: z.uuid(),
   teamId: z.uuid(),
+  /** Derived from the pattern and location (`seriesName`), not stored. */
+  name: z.string(),
   frequency: z.enum(RecurrenceFrequency),
   dayOfWeek: z.number().int(),
   startsOn: z.string(),
@@ -540,6 +568,13 @@ export const SeriesResponse = z.object({
   feeIntermediate: nullableMoney,
   feeAdvanced: nullableMoney,
   courts: z.array(SeriesCourtResponse),
+  isPayoutConfigured: z.boolean(),
+  /** The rule's DRAFT instances the materialiser could not publish (banking). */
+  bankingDrafts: count,
+  /** The rule's DRAFT instances the admin edited. */
+  editedDrafts: count,
+  /** Sessions from NZ-today forward plus any DRAFT, soonest first, at most 100. */
+  instances: z.array(SeriesInstanceResponse),
 });
 export type SeriesResponse = z.infer<typeof SeriesResponse>;
 

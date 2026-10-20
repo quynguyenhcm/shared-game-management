@@ -847,7 +847,7 @@ The plan follows systemPatterns' module shape, P1/P2/P3/P5/P7, default-deny rout
   - Race matrix R1-R14, T-17, T-18, T-19 and the `stately` test; log fields; `sessions-contracts.int.test.ts` for registration's build gate, with the marker proof.
   - ACs: AC-VERIFY-3, AC-VERIFY-6, AC-INTEGRATION-1.
   - Gate: no `40P01` and no lock retry logged; every event's fields asserted; contract file header lists what registration re-checks.
-- [ ] **Phase 5: Admin web UI.**
+- [x] **Phase 5: Admin web UI.**
   - Manage-area entry; list; one-off, instance and series editors; series page with waiting state, banking notices and End series; court table, costing, pricing, deadline, DST choice and pattern fieldsets; `InlineConfirm`/`ConfirmPanel` changes; read-only summaries; banking `returnTo` from three pages.
   - Build order: `session-form-state.ts` and `sessions-view.ts` first (pure, table-tested from the copy deck), then fieldsets, then forms and pages.
   - ACs: AC-ENTRY-1, AC-ENTRY-2, AC-HAPPY-14, AC-HAPPY-15, AC-ERROR-11, UI halves of AC-HAPPY-1..13, AC-ASYNC-3, AC-ASYNC-6, AC-ASYNC-7, AC-ERROR-1..5, 7, 10, 12.
@@ -893,12 +893,12 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 
 ## Execution State
 
-**Build Status**: IDLE (Phase 4 of 6 COMPLETE)
+**Build Status**: IDLE (Phase 5 of 6 COMPLETE)
 **Auto-Build Mode**: YES
-**Current Build**: Phase 4: Concurrency, observability and contracts (session-scheduling-engine) - COMPLETE
-**Phase Number**: 4 of 6
+**Current Build**: Phase 5: Admin web UI (session-scheduling-engine) - COMPLETE
+**Phase Number**: 5 of 6
 **Is Multi-Phase**: YES
-**Can Resume**: YES (next: Phase 5)
+**Can Resume**: YES (next: Phase 6)
 
 ### Current Build Step
 **Step**: Step 11 - Git completion
@@ -925,6 +925,11 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 - Phase 4 Step 7 verifier: PASS - unit 1503/1503 (one 5 s timeout in time.test.ts under concurrent load; rerun alone passes), integration 630/630, build, lint, typecheck
 - Phase 4 Step 8 code review (anthropic; Codex not used - `timeout` missing on macOS): APPROVED, 0 blocking, 8 suggestions
 - Phase 4 ACs covered: AC-VERIFY-3, AC-VERIFY-6, AC-INTEGRATION-1; AC-INTEGRATION-2 (gate-refused hand publish), AC-ASYNC-5 (T-19)
+
+- Phase 5 Step 3 TDD (sequential): 5A API additions (seriesName, series name/instances/seriesChangeEffect/draft counts/isPayoutConfigured), 5B pure view models + fieldsets (212 tests), 5C actions, forms, five pages (222 tests); RED observed for each (5A integration tests first run after implementation).
+- Phase 5 Step 7 verifier: PASS - unit 1938/1938, integration 633/633, build, lint, typecheck (full suites)
+- Phase 5 Step 8 code review (anthropic; Codex not used - `timeout` missing on macOS): APPROVED, 0 blocking, 4 suggestions
+- Phase 5 ACs covered (UI halves, component/view-model/static-markup tests only): AC-ENTRY-1, 2, AC-HAPPY-14, 15, AC-ERROR-11, AC-HAPPY-1..13, AC-ASYNC-3, 6, 7, AC-ERROR-1..5, 7, 10, 12. NO browser or 360 px walk was done; owed to Phase 6 Playwright/axe and /yay:uat.
 
 ### Sub-Agents
 - TDD 1A (migration, fixtures): COMPLETE
@@ -987,10 +992,23 @@ Phase 4 | reviewer-accepted deviations:
 - Phase 4 | migration | `session_courts_guard_closed` sorted lock order done by amending the unmerged Phase 1 migration (a forward migration broke four schema round-trip tests); dev/CI databases that applied the old body need `pnpm db:reset`. D-76 updated.
 - Phase 4 | logging | series events renamed `session.series.*`; `version` field renamed `sessionVersion`/`ruleVersion` (it shadowed the logger's service `version`); `session.series.updated` logs `skipped*` counts; ARCH table updated. `teamId` is carried on `lock_retry*` (added in Phase 4 remediation: `SessionTxOptions.teamId`); `sweep_completed` keeps no `teamId` because it spans all teams - HUMAN RULING (user, 2026-10-20); AC-VERIFY-6 amended with the sweep carve-out.
 - Phase 4 | reviewer-accepted | db/migrations/20261020000100000_session_scheduling.sql | session_courts_guard_closed fix amended in place on the unmerged migration; must remain a single in-place migration through merge; dev/CI DBs need `pnpm db:reset`.
-- Phase 4 | reviewer-accepted | no `session.recurrence.*` child spans; job CONSUMER span carries trace; no AC requires them.
 - Phase 4 | spans | no `session.recurrence.*` child spans added: the job wrapper's CONSUMER span carries the trace; ARCH child spans (`instance`, `auto_enrol`, `publish`, `series.propagate`) not required by any AC.
 - Phase 4 | suggestions deferred | openapi `publishTeamSeriesDrafts` description lacks 409 `series_ended`; `lockRuleInstances` (date,id) vs trigger (id) order theoretical, note in ADR 0019; `waitForLockWaiters` counts advisory-lock waiters (latent flake, filter by locktype); series.ts 716 lines (extract `propagate`); activeRegistrationCount is `countActiveRegistrations`.
 
+- Phase 4 | DONE_WITH_CONCERNS | remediation 22002cd | teamId fix tests edited with the code (no observed RED); full suites not re-run after the Prettier fix (covered by Phase 5 verifier).
+
+Phase 5 | decisions (carry-forwards from Phase 3/4 resolved):
+- Phase 5 | series label | no schema column: shared `seriesName()` derives "Wednesdays at {location}" etc.; exposed as `seriesName` on SessionResponse and `name` on SeriesResponse (UJ copy deck).
+- Phase 5 | seriesChangeEffect | exposed API-side on series GET `instances` (will_update|edited|closed|has_registrations; past-deadline maps to closed; fee-locked to has_registrations), with `isPayoutConfigured`, `bankingDrafts`, `editedDrafts`. `nextDate` omitted (not cheap); web hard-codes a 28-day horizon line.
+- Phase 5 | AC-HAPPY-10 "partial failure" banner | not built: End series is one transaction (T-6), so the UI has no partial state. AC text should drop it.
+- Phase 5 | cancelled/deletedDrafts on session.series.updated | not built: copy does not need them (series save never cancels or deletes; End response carries removedDrafts/cancelledPublished/activeRegistrationCount).
+- Phase 5 | AC-ERROR-8 | cross-team id stays 404; UI treats 404 as not-found. Human still to decide on 403.
+- Phase 5 | reviewer-accepted | seriesGroups on the list only shows series with a loaded date (no list-series endpoint); a freshly created, still-materialising series has no list row until its first date loads. "Nothing changed" is inferred from version equality.
+- Phase 5 | reviewer-accepted | `apiFetch` now keeps `dstOptions`/`raisedFields` from error bodies; two extra notices `publish_incomplete`, `series_already_ended`; Number-of-courts defaults and some copy written where the deck was silent; copy-deck example "27 Sep 2026 is the 5th Sunday" is wrong (it is the 4th and last).
+- Phase 5 | process | 5A integration tests first ran after implementation (unit RED observed); no browser/360 px/axe walk performed; unit tests are node-env static markup (no DOM), so focus/Escape/timers are untested until Phase 6.
+- Phase 5 | suggestions deferred | note in sessions-paths.ts that helpers take validated UUIDs only; test for series_stale redirect with existing query; "showing first 100" line if instances cap can bite.
+- Phase 4/5 | git | Phase 4 commits 2668987 and 22002cd were found on a detached HEAD, not on feature/session-scheduling-engine (branch and origin were still at dd13c74); branch moved to include them at Phase 5 commit and pushed.
+
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 5 (`/yay:build session-scheduling-engine`)
+**Resume From**: Phase 6 (`/yay:build session-scheduling-engine`)

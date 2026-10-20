@@ -9,6 +9,7 @@ import type { Database } from '../../lib/db/kysely.ts';
 import type { GameSessions } from '../../lib/db/types.generated.ts';
 import { AppError } from '../../lib/http/errors.ts';
 import type { StoredCourt } from './content.ts';
+import { seriesNameOf } from './series-view.ts';
 import type { CourtRow, SessionRow } from './view.ts';
 
 export function findSession(
@@ -294,4 +295,25 @@ export async function listSessionsPage(
     rows,
     nextCursor: fetched.length > input.limit && last !== undefined ? encodeCursor(last) : null,
   };
+}
+
+/**
+ * The pattern and location of the rules behind a page of sessions, keyed by rule id: one query for the whole page, so a
+ * list never reads a rule per row. Team-scoped like every other read.
+ */
+export async function listRuleNames(
+  db: Database,
+  teamId: string,
+  ruleIds: readonly string[],
+): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  if (ruleIds.length === 0) return names;
+  const rows = await db
+    .selectFrom('recurring_session_rules')
+    .select(['id', 'frequency', 'day_of_week', 'monthly_week', 'default_location'])
+    .where('team_id', '=', teamId)
+    .where('id', 'in', [...ruleIds])
+    .execute();
+  for (const row of rows) names.set(row.id, seriesNameOf(row));
+  return names;
 }

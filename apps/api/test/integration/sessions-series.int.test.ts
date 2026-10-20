@@ -448,6 +448,104 @@ describe('create a series (AC-HAPPY-5)', () => {
 // AC-HAPPY-6: one date is an override
 // ---------------------------------------------------------------------------------------------
 
+describe('series read model for the admin UI', () => {
+  it('names the series, reports the payout flag and draft counts, and lists instances with one of four change effects', async () => {
+    const c = await scene({ payout: true });
+    const ruleId = await insertRule(database.pool, c.teamId);
+    const elsewhere = await insertRule(database.pool, c.otherTeamId);
+    const mk = (date: string, status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED') =>
+      insertSession(database.pool, c.teamId, {}, { date, status, recurringRuleId: ruleId });
+    const pastDraft = await mk('2026-09-23', 'DRAFT');
+    await mk('2026-09-30', 'COMPLETED');
+    const banking = await mk('2026-10-14', 'DRAFT');
+    const registered = await mk('2026-10-21', 'PUBLISHED');
+    const edited = await mk('2026-10-28', 'PUBLISHED');
+    const cancelled = await mk('2026-11-04', 'CANCELLED');
+    const editedDraft = await mk('2026-11-11', 'DRAFT');
+    await insertSession(
+      database.pool,
+      c.otherTeamId,
+      {},
+      { date: '2026-10-14', recurringRuleId: elsewhere },
+    );
+    await insertRegistration(database.pool, {
+      sessionId: registered,
+      teamId: c.teamId,
+      userId: c.memberId,
+      status: 'CONFIRMED',
+    });
+    await database.pool.query(
+      `UPDATE game_sessions SET is_instance_overridden = true WHERE id = ANY($1::uuid[])`,
+      [[edited, editedDraft]],
+    );
+    await database.pool.query(
+      `UPDATE game_sessions SET cancellation_deadline = starts_at - interval '2 days' WHERE id = ANY($1::uuid[])`,
+      [[registered, edited]],
+    );
+
+    const res = await call('GET', `${base(c)}/${ruleId}`, c.admin);
+    expect(res.statusCode, res.body).toBe(200);
+    const series = seriesOf(res);
+    expect(series).toMatchObject({
+      name: 'Wednesdays at Test Hall',
+      isPayoutConfigured: true,
+      bankingDrafts: 2,
+      editedDrafts: 1,
+    });
+    expect(series.instances.map((i) => [i.id, i.seriesChangeEffect])).toEqual([
+      [pastDraft, 'closed'],
+      [banking, 'will_update'],
+      [registered, 'has_registrations'],
+      [edited, 'edited'],
+      [cancelled, 'closed'],
+      [editedDraft, 'edited'],
+    ]);
+    const row = series.instances.find((i) => i.id === registered);
+    expect(row).toMatchObject({
+      date: '2026-10-21',
+      status: 'PUBLISHED',
+      phase: 'upcoming',
+      draftReason: null,
+      isInstanceOverridden: false,
+      activeRegistrationCount: 1,
+    });
+    expect(row?.startsAt).toEqual(expect.any(String));
+    expect(series.instances.find((i) => i.id === banking)?.draftReason).toBe('banking');
+    expect(series.instances.find((i) => i.id === editedDraft)?.draftReason).toBe('edited');
+  });
+
+  it('reports isPayoutConfigured false for a team without banking, and every embedding response carries the read model', async () => {
+    const c = await scene({ payout: false });
+    const { ruleId, body, version } = await seriesWithInstances(c);
+    const got = seriesOf(await call('GET', `${base(c)}/${ruleId}`, c.admin));
+    expect(got.isPayoutConfigured).toBe(false);
+    expect(got.instances).toHaveLength(4);
+
+    const put = await call(
+      'PUT',
+      `${base(c)}/${ruleId}`,
+      c.admin,
+      editBody(body, version, { maxPlayers: 20 }),
+    );
+    expect(put.statusCode, put.body).toBe(200);
+    expect(seriesOf(put)).toMatchObject({
+      name: 'Wednesdays at Rosedale Badminton Centre',
+      isPayoutConfigured: false,
+    });
+    // The first date's deadline (two days before it) has passed on this clock, so it is closed; the later dates update.
+    expect(seriesOf(put).instances.map((i) => i.seriesChangeEffect)).toEqual([
+      'closed',
+      'will_update',
+      'will_update',
+      'will_update',
+    ]);
+
+    const publish = await call('POST', `${base(c)}/${ruleId}/publish-drafts`, c.admin, {});
+    expect(publish.statusCode).toBe(202);
+    expect(seriesOf(publish).instances).toHaveLength(4);
+  });
+});
+
 describe('editing one date of a series (AC-HAPPY-6)', () => {
   it('marks the instance edited only on a real change, never on a no-op, and refuses to move its date', async () => {
     const c = await scene();

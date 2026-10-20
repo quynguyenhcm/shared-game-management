@@ -6,10 +6,11 @@ import { MANAGE_AREAS, manageAreaLinks } from './manage-areas.ts';
 const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
 
 describe('manage area registry (UI/UX Q2: the plug-in seam for later admin areas)', () => {
-  it('holds People at the manage root and Banking and GST under /banking', () => {
+  it('holds People at the manage root, Banking and GST under /banking and Sessions under /sessions (AC-ENTRY-1)', () => {
     expect(MANAGE_AREAS.map((area) => [area.id, area.label, area.segment])).toEqual([
       ['people', 'People', ''],
       ['banking', 'Banking and GST', 'banking'],
+      ['sessions', 'Sessions', 'sessions'],
     ]);
   });
 
@@ -20,6 +21,12 @@ describe('manage area registry (UI/UX Q2: the plug-in seam for later admin areas
         id: 'banking',
         label: 'Banking and GST',
         href: `/teams/${TEAM_ID}/manage/banking`,
+        current: false,
+      },
+      {
+        id: 'sessions',
+        label: 'Sessions',
+        href: `/teams/${TEAM_ID}/manage/sessions`,
         current: false,
       },
     ]);

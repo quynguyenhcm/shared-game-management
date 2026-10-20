@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ErrorCode } from './errors.ts';
 import {
   CancelSessionResponse,
+  SeriesDetailResponse,
   CreateSeriesRequest,
   CreateSessionRequest,
   EndSeriesRequest,
@@ -453,6 +454,7 @@ describe('responses and the error envelope', () => {
     deadlineIsDefault: true,
     isInstanceOverridden: false,
     draftReason: null,
+    seriesName: null,
     version: 3,
     activeRegistrationCount: 0,
     feesLocked: 'none',
@@ -464,6 +466,74 @@ describe('responses and the error envelope', () => {
     expect(SessionResponse.safeParse({ ...session, feeFlat: 11 }).success).toBe(false);
     expect(SessionResponse.safeParse({ ...session, courtCost: '120' }).success).toBe(false);
     expect(SessionResponse.safeParse({ ...session, feesLocked: 'maybe' }).success).toBe(false);
+  });
+
+  it('carries the series name as a string or null, and nothing else', () => {
+    expect(
+      SessionResponse.safeParse({ ...session, seriesName: 'Wednesdays at Hall' }).success,
+    ).toBe(true);
+    expect(SessionResponse.safeParse({ ...session, seriesName: 5 }).success).toBe(false);
+    expect(SessionResponse.safeParse({ ...session, seriesName: undefined }).success).toBe(false);
+  });
+
+  it('a series response carries its name, payout flag, draft counts and instances with one of four effects', () => {
+    const instance = {
+      id: UUID,
+      date: '2026-10-28',
+      startsAt: '2026-10-28T06:00:00.000Z',
+      endsAt: null,
+      status: 'DRAFT',
+      phase: 'upcoming',
+      draftReason: 'banking',
+      isInstanceOverridden: false,
+      activeRegistrationCount: 0,
+      version: 1,
+      seriesChangeEffect: 'will_update',
+    };
+    const series = {
+      id: UUID,
+      teamId: UUID,
+      name: 'Wednesdays at Hall',
+      frequency: 'WEEKLY',
+      dayOfWeek: 3,
+      startsOn: '2026-10-07',
+      monthlyWeek: null,
+      recurUntil: null,
+      isActive: true,
+      version: 1,
+      materialising: false,
+      location: 'Hall',
+      address: '1 Street',
+      maxPlayers: 24,
+      reservedSeats: 0,
+      courtCost: '240.00',
+      extraExpenses: '0.00',
+      calculatedRatePerPlayer: '10.00',
+      customPlayerRate: null,
+      pricingStructure: 'FLAT',
+      feeFlat: '10.00',
+      feeMale: null,
+      feeFemale: null,
+      feeOther: null,
+      feeBeginner: null,
+      feeIntermediate: null,
+      feeAdvanced: null,
+      courts: [],
+      isPayoutConfigured: false,
+      bankingDrafts: 1,
+      editedDrafts: 0,
+      instances: [instance],
+    };
+    expect(SeriesDetailResponse.safeParse({ series }).success).toBe(true);
+    for (const effect of ['will_update', 'edited', 'closed', 'has_registrations']) {
+      const ok = { ...series, instances: [{ ...instance, seriesChangeEffect: effect }] };
+      expect(SeriesDetailResponse.safeParse({ series: ok }).success).toBe(true);
+    }
+    const bad = { ...series, instances: [{ ...instance, seriesChangeEffect: 'needs_banking' }] };
+    expect(SeriesDetailResponse.safeParse({ series: bad }).success).toBe(false);
+    expect(SeriesDetailResponse.safeParse({ series: { ...series, name: undefined } }).success).toBe(
+      false,
+    );
   });
 
   it('cancel and list responses wrap the session with the counts the page shows', () => {
