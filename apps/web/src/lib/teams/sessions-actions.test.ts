@@ -339,6 +339,50 @@ describe('saveSessionAction: Save draft and Save changes', () => {
     ).resolves.toBe(`${SESSION_URL}?notice=changes_saved:replace`);
   });
 
+  it('the first edit of a published series date with a fee change and nobody registered still says it is now marked Edited', async () => {
+    stubFetch([
+      200,
+      write(
+        {
+          status: 'PUBLISHED',
+          version: 4,
+          recurringRuleId: RULE_ID,
+          seriesName: 'Wednesdays at Rosedale',
+          isInstanceOverridden: true,
+          activeRegistrationCount: 0,
+        },
+        { material: true },
+      ),
+    ]);
+    await expect(
+      redirectOf(
+        saveSessionAction({}, form({ ...EDIT_FORM, status: 'PUBLISHED', intent: 'save' })),
+      ),
+    ).resolves.toBe(`${SESSION_URL}?notice=instance_saved_first&date=2026-11-04:replace`);
+  });
+
+  it('the first edit of a published series date with registered players keeps the "let them know" banner', async () => {
+    stubFetch([
+      200,
+      write(
+        {
+          status: 'PUBLISHED',
+          version: 4,
+          recurringRuleId: RULE_ID,
+          seriesName: 'Wednesdays at Rosedale',
+          isInstanceOverridden: true,
+          activeRegistrationCount: 5,
+        },
+        { material: true },
+      ),
+    ]);
+    await expect(
+      redirectOf(
+        saveSessionAction({}, form({ ...EDIT_FORM, status: 'PUBLISHED', intent: 'save' })),
+      ),
+    ).resolves.toBe(`${SESSION_URL}?notice=changes_saved&registered=5&material=1:replace`);
+  });
+
   it('the first edit of a series date marks it Edited and names the date (AC-HAPPY-6)', async () => {
     stubFetch([
       200,
@@ -783,14 +827,14 @@ describe('endSeriesAction (AC-HAPPY-10; a ModerationAction)', () => {
 describe('publishDraftsAction (AC-ASYNC-7)', () => {
   const fields = { teamId: TEAM_ID, ruleId: RULE_ID };
 
-  it('POSTs with no body and lands on the series page with the publishing notice', async () => {
+  it('POSTs an empty JSON object and lands on the series page with the publishing notice', async () => {
     const fetchMock = stubFetch([202, { series: seriesFixture(), queued: true }]);
     await expect(redirectOf(publishDraftsAction(null, form(fields)))).resolves.toBe(
       `${SERIES_URL}?notice=publishing_drafts:replace`,
     );
     const call = callOf(fetchMock, 0);
     expect(call.url).toBe(`${API}/session-series/${RULE_ID}/publish-drafts`);
-    expect(call.body).toBeUndefined();
+    expect(call.body).toEqual({});
   });
 
   it('a double click (queued false) is the same landing', async () => {

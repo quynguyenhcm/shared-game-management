@@ -29,6 +29,7 @@
   - Deduplication via `singletonKey` (concurrent duplicates removed; handler must be idempotent for at-least-once delivery)
   - Visibility: job state in SQL (`pgboss.job`, `pgboss.archive`); visible failure tracking
   - **`member-banned` queue** (team-management): policy `exclusive`, `singletonKey = member-banned:<membershipId>`, id-only payload, 7-day retention. Its handler is a no-op until registration-and-waitlist injects the real one via `registerJobs({ memberBannedHandler })`; a permanent failure is logged as `team.member.banned.hook_failed` and re-run with `cli jobs trigger member-banned` (ADR 0015)
+  - **Session queues** (session-scheduling-engine, ADR 0019): `recurrence-materialisation` (slot `0 3 * * *` Pacific/Auckland, `exclusive`, also enqueued at every worker boot), `recurrence-rule` (policy `stately`, `singletonKey = recurrence-rule:<ruleId>`, one queued and one active run per series), and `session-auto-enrol` (`exclusive`, `singletonKey = session-auto-enrol:<sessionId>`). Manual runs: `cli jobs trigger recurrence-rule '<json>'` and `cli jobs trigger session-auto-enrol '<json>'`
 
 ### API & Communication
 - **REST API**: Fastify 5 with zod type provider
@@ -205,6 +206,12 @@ The `.github/workflows/ci.yml` runs:
 Total time: ~5 min (varies with cache and Postgres startup). Each step must exit 0 for the job to pass.
 
 ## Recent Technology Changes
+
+### 2026-10-20 - Session scheduling engine (session-scheduling-engine)
+- **What Changed**: no new libraries or infrastructure. Migration `20261020000100000` (ledger D-70 to D-83 and D-85): series anchor and court template, optimistic-concurrency `version`, lifecycle and immutability triggers, the 48 hour default deadline, content CHECKs and the fee-raise lock. New env var `RECURRENCE_HORIZON_DAYS` (7 to 91, default 28, read by api and worker). Three new pg-boss queues (see Background Jobs & Scheduling).
+- **Reason**: sessions and recurring series need a horizon-based materialiser that runs in the worker, and database-enforced rules for completed and closed sessions (`docs/adr/0019-session-scheduling-engine.md`).
+- **Impact**: the sweep and boot sweep need a running worker to create series sessions. The `game_sessions` triggers run in name order (see `systemPatterns.md`). The vitest coverage gate now also covers `modules/sessions`, the session jobs, `session-allocator.ts` and `packages/shared/src/sessions`.
+- **Migration Notes**: the migration was amended in place before merge. Any dev or CI database that applied the earlier draft must run `pnpm run db:reset`.
 
 ### 2026-10-16 - Team banking and GST (team-banking-and-gst)
 - **What Changed**: no new libraries or infrastructure. Two migrations (`20261016000100000` invariants and generated `is_payout_configured`; `20261016000200000` change keys, D-47 to D-54). Team bank account name and number are stored through the existing `FieldCrypto`. Shared NZ validators in `packages/shared/src/nz/`. Logger redaction gained anchored banking-key patterns.

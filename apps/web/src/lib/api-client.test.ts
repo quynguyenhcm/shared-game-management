@@ -654,8 +654,9 @@ describe('apiClient sessions calls (session-scheduling-engine)', () => {
       `http://localhost:4000/teams/${TEAM_ID}/session-series/${RULE_ID}/publish-drafts`,
     );
     expect(sent(drafts).init?.method).toBe('POST');
-    expect(sent(drafts).init?.body).toBeUndefined();
-    expect(sent(drafts).headers['content-type']).toBeUndefined();
+    // The documented request body is an (empty) JSON object: a bodiless POST reaches the API as `null` and is refused.
+    expect(JSON.parse(sent(drafts).init?.body as string)).toEqual({});
+    expect(sent(drafts).headers['content-type']).toBe('application/json');
   });
 
   it('a 422 keeps fieldErrors and the DST options the API sent, so the form can offer the choices', async () => {

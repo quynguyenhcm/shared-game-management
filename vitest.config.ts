@@ -49,6 +49,12 @@ export default defineConfig({
         'apps/api/src/modules/team-banking/**/*.ts',
         // skill-levels-and-auto-enroll (AC-VERIFY-8): the skill-levels module.
         'apps/api/src/modules/skill-levels/**/*.ts',
+        // session-scheduling-engine (AC-VERIFY-8): the sessions module, its recurrence and auto-enrol jobs, the
+        // allocator composition root and the shared session rules.
+        'apps/api/src/modules/sessions/**/*.ts',
+        'apps/api/src/jobs/{recurrence-materialisation,recurrence-rule,session-auto-enrol}.ts',
+        'apps/api/src/session-allocator.ts',
+        'packages/shared/src/sessions/**/*.ts',
         'packages/shared/src/nz/**/*.ts',
         'apps/web/src/lib/**/*.ts',
       ],

@@ -715,12 +715,16 @@ export const apiClient = {
       schema: EndSeriesResponse,
     }),
 
-  /** POST with NO body and no JSON content-type: "Publish drafts now" answers 202. */
+  /**
+   * "Publish drafts now" answers 202. The body is an empty JSON object, as the OpenAPI contract says: a POST with no
+   * body arrives at the API as `null` and fails its body schema (found by the sessions browser journey).
+   */
   publishSeriesDrafts: (teamId: string, ruleId: string, options: ApiCallOptions = {}) =>
     apiFetch({
       ...options,
       path: `/teams/${encodeURIComponent(teamId)}/session-series/${encodeURIComponent(ruleId)}/publish-drafts`,
       method: 'POST',
+      body: {},
       schema: PublishDraftsResponse,
     }),
 };

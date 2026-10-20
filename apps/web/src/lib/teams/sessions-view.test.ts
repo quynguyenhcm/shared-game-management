@@ -12,6 +12,7 @@ import {
   cancelPrompt,
   changeNoticeLine,
   createSeriesPrompt,
+  defaultEndDate,
   dstView,
   endSeriesImpact,
   feeSummary,
@@ -972,5 +973,13 @@ describe('notices: closed code list, codes-only query, fixed text', () => {
       'notice=series_ended&cancelled=3&date=2026-12-16',
     );
     expect(noticeQuery('draft_saved')).toBe('notice=draft_saved');
+  });
+});
+
+describe('defaultEndDate', () => {
+  it('is today once the series has started, and the first session while it has not (the API refuses a last date before the first)', () => {
+    expect(defaultEndDate('2026-10-20', '2026-10-14')).toBe('2026-10-20');
+    expect(defaultEndDate('2026-10-20', '2026-10-20')).toBe('2026-10-20');
+    expect(defaultEndDate('2026-10-20', '2026-10-23')).toBe('2026-10-23');
   });
 });

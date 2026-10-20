@@ -7,7 +7,7 @@ status: CREATIVE_COMPLETE
 # session-scheduling-engine: Session Scheduling Engine
 
 **Complexity**: Level 4
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: session-scheduling-engine
 **Branch**: feature/session-scheduling-engine
 **Worktree**: ~/yay-wt/shared-game-management/session-scheduling-engine
@@ -852,7 +852,7 @@ The plan follows systemPatterns' module shape, P1/P2/P3/P5/P7, default-deny rout
   - Build order: `session-form-state.ts` and `sessions-view.ts` first (pure, table-tested from the copy deck), then fieldsets, then forms and pages.
   - ACs: AC-ENTRY-1, AC-ENTRY-2, AC-HAPPY-14, AC-HAPPY-15, AC-ERROR-11, UI halves of AC-HAPPY-1..13, AC-ASYNC-3, AC-ASYNC-6, AC-ASYNC-7, AC-ERROR-1..5, 7, 10, 12.
   - Gate: component and view-model tests green; manual walk at 360 px with no horizontal scroll.
-- [ ] **Phase 6: End-to-end journey, accessibility, ADR and docs (final phase: complete entry-to-success flow).**
+- [x] **Phase 6: End-to-end journey, accessibility, ADR and docs (final phase: complete entry-to-success flow).**
   - `sessions.spec.ts` covers the full admin journey from the manage nav through series creation, banking hand-off, "Publish drafts now", an edited instance, a series edit, a cancel, a one-off with DST and rate pinning, and End series, plus axe scans.
   - ADR 0019 from the ARCH outline: every contract honoured and offered, trigger order, advisory-lock namespace, registration hand-offs.
   - Coverage gate include; `.env.example` and getting-started docs.
@@ -893,12 +893,12 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 
 ## Execution State
 
-**Build Status**: IDLE (Phase 5 of 6 COMPLETE)
+**Build Status**: COMPLETE (Phase 6 of 6 COMPLETE)
 **Auto-Build Mode**: YES
-**Current Build**: Phase 5: Admin web UI (session-scheduling-engine) - COMPLETE
-**Phase Number**: 5 of 6
+**Current Build**: Phase 6: End-to-end journey, accessibility, ADR and docs (session-scheduling-engine) - COMPLETE
+**Phase Number**: 6 of 6
 **Is Multi-Phase**: YES
-**Can Resume**: YES (next: Phase 6)
+**Can Resume**: NO (build complete; next: /yay:reflect session-scheduling-engine)
 
 ### Current Build Step
 **Step**: Step 11 - Git completion
@@ -930,6 +930,12 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 - Phase 5 Step 7 verifier: PASS - unit 1938/1938, integration 633/633, build, lint, typecheck (full suites)
 - Phase 5 Step 8 code review (anthropic; Codex not used - `timeout` missing on macOS): APPROVED, 0 blocking, 4 suggestions
 - Phase 5 ACs covered (UI halves, component/view-model/static-markup tests only): AC-ENTRY-1, 2, AC-HAPPY-14, 15, AC-ERROR-11, AC-HAPPY-1..13, AC-ASYNC-3, 6, 7, AC-ERROR-1..5, 7, 10, 12. NO browser or 360 px walk was done; owed to Phase 6 Playwright/axe and /yay:uat.
+
+- Phase 6 Step 3 (two agents, disjoint files): e2e TDD (apps/web/e2e/sessions.spec.ts, desktop + 360 px, axe, DB and Mailpit assertions, 3 product fixes with unit tests); documentation (ADR 0019, getting-started, coverage include, systemPatterns, techContext).
+- Phase 6 Step 7 verifier: PASS - unit 1952/1952, integration 637/637, coverage gate (aggregate stmt 96.3 / branch 90.0), build, lint, typecheck, Playwright sessions.spec.ts 2/2 (desktop, mobile); re-run after prettier fix; spec re-run 2/2 after review tweaks.
+- Phase 6 Step 8 code review (anthropic; Codex not used - `timeout` missing on macOS): APPROVED, 0 blocking; 3 suggestions applied (stale doc lines, config path, `/^Draft ·/` assertion).
+- Phase 6 ACs covered: AC-INTEGRATION-3, AC-VERIFY-7 (ADR 0019), AC-VERIFY-8.
+- BUILD_COMPLETE: all 6 phases done.
 
 ### Sub-Agents
 - TDD 1A (migration, fixtures): COMPLETE
@@ -1018,6 +1024,20 @@ Phase 5 | decisions (carry-forwards from Phase 3/4 resolved):
 - Phase 5 remediation | resolved | copy deck | the 5th-weekday example is now "29 Nov 2026 is the 5th Sunday" in the UI/UX doc and the task plan (27 Sep 2026 is the 4th and last Sunday); the web tests already quoted 29 Nov.
 - Phase 5 remediation | process | RED observed for the 4 new API integration tests (404/undefined before implementation) and 13 web tests; the two small `series-view.test.ts` unit tests (`horizonDays`, `toSeriesListItem`) were written alongside the code. Code review: Anthropic reviewer used (codex backend unusable here, `timeout` missing on macOS).
 
+Phase 5 | reviewer-accepted deviations (added at Phase 6):
+- Phase 5 | reviewer-accepted | apps/api/src/app.ts:73,210 | `recurrenceHorizonDays` optional in AppDeps, defaulting to 28; main.ts passes config. A future entrypoint that forgets it gets 28 silently - tidy-up candidate.
+- Phase 5 | reviewer-accepted | sessions list + new-series pages throw if listSeries fails (fail-fast).
+- Phase 5 | reviewer-accepted | series-repo.ts listRules unpaginated (per-team counts small).
+
+Phase 6 | decisions and deviations:
+- Phase 6 | product bugs found by the browser journey and fixed: (1) "Publish drafts now" sent a bodiless POST and the API returned 400 (`publishSeriesDrafts` now sends `{}`; API-side `.nullish()` is an optional follow-up); (2) first edit of a published date with a fee move showed bare "Changes saved." (savedNotice); (3) End series confirm defaulted "Last date" to today even when the first session is in the future (`defaultEndDate`). Fix tests written with the code; no RED observed.
+- Phase 6 | not verified in a browser: screen reader, full Tab-order walk, moderate/minor axe impacts, confirming the publish panel, the series list "{n} upcoming" text; the End series panel and states other than those listed were scanned at the project viewport only (360 px walk: list, new session, new series, series page, series edit, published editor, read-only summary, draft editor, DST choice, publish/create/cancel confirms). Other e2e specs, not re-run.
+- Phase 6 | e2e uses `docker compose pause worker` briefly to observe the waiting line, `E2E_DATABASE_URL` default is the compose dev DB.
+- Phase 6 | coverage: branch coverage per file is below 80 on series-view.ts (79.6), series.ts (76.7), materialise-notice.ts (75.0), shared series-name.ts (66.7); the gate is aggregate so it passes. Follow-up candidate.
+- Phase 6 | "showing first 100" line not added: SERIES_INSTANCE_LIMIT only bites after ~86 stacked past drafts.
+- Phase 6 | open for the human: AC-ERROR-8 404-vs-403 (recorded in ADR 0019); AC text drift (AC-ASYNC-3 email key, AC-HAPPY-10 partial-failure banner).
+- Phase 6 | stale notes: Phase 2 `session_courts_guard_closed` unsorted and CLI TRIGGERABLE notes are resolved in code.
+
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 6 (`/yay:build session-scheduling-engine`)
+**Resume From**: none (BUILD_COMPLETE); run /yay:reflect session-scheduling-engine

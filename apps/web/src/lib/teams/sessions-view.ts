@@ -990,6 +990,14 @@ export interface EndSeriesImpact {
   checkboxLabel: string | null;
 }
 
+/**
+ * The "Last date" an End series confirm starts with: today, or the first session's date while the series has not
+ * started yet (the API refuses a last date before the first date, so today would open a confirm that cannot succeed).
+ */
+export function defaultEndDate(today: string, startsOn: string): string {
+  return today < startsOn ? startsOn : today;
+}
+
 export function endSeriesImpact(
   instances: readonly Pick<
     SeriesInstanceResponse,

@@ -353,21 +353,26 @@ function savedNotice(
 ): SavedNotice {
   // A save that changes nothing is a 200 that writes nothing, so the version did not move.
   if (session.version === expectedVersion) return { code: 'nothing_changed', counts: {} };
-  if (session.status === 'PUBLISHED' && (write.material || write.promoted > 0)) {
-    return {
-      code: 'changes_saved',
-      counts: nonZero({
-        // The registered count is only worth telling when a field players care about changed (P-2).
-        registered: write.material ? session.activeRegistrationCount : 0,
-        promoted: write.promoted,
-        material: write.material ? 1 : 0,
-      }),
-    };
-  }
   const firstEdit =
     session.recurringRuleId !== null &&
     formField(formData, 'overridden') === 'false' &&
     session.isInstanceOverridden;
+  // "Let them know" lines (registered players, promotions) outrank the first-edit banner; with nobody to tell, a
+  // series date's first edit still says it is now marked Edited, even when a fee or time moved.
+  const mustTell = write.promoted > 0 || (write.material && session.activeRegistrationCount > 0);
+  if (session.status === 'PUBLISHED' && (write.material || write.promoted > 0)) {
+    if (mustTell || !firstEdit) {
+      return {
+        code: 'changes_saved',
+        counts: nonZero({
+          // The registered count is only worth telling when a field players care about changed (P-2).
+          registered: write.material ? session.activeRegistrationCount : 0,
+          promoted: write.promoted,
+          material: write.material ? 1 : 0,
+        }),
+      };
+    }
+  }
   if (firstEdit) return { code: 'instance_saved_first', counts: {}, date: session.date };
   return { code: session.status === 'DRAFT' ? 'draft_saved' : 'changes_saved', counts: {} };
 }

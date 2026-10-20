@@ -31,6 +31,7 @@ import {
 import {
   NOTICE_COUNT_KEYS,
   SERIES_COPY,
+  defaultEndDate,
   editDateLink,
   formatDayShort,
   horizonLine,
@@ -243,7 +244,7 @@ export default async function SeriesPage({
             action={endSeriesAction}
             fields={{ teamId, ruleId, expectedVersion: String(series.version) }}
             instances={series.instances}
-            defaultLastDate={todayNz}
+            defaultLastDate={defaultEndDate(todayNz, series.startsOn)}
           />
         }
       />

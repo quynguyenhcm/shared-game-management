@@ -3,7 +3,8 @@ import { bankingPageUrl } from './banking-view.ts';
 /**
  * The URLs of the Sessions area (UI/UX "Page inventory and URL grammar"). Pure, so the pages, the Server
  * Actions' redirects and the banking hand-off all build the same paths. Ids are always UUIDs the page has
- * already checked, so they are placed in the path as they are.
+ * already checked, so they are placed in the path as they are: every helper here takes validated UUIDs only
+ * (pages and Server Actions check `z.uuid()` first) and does no encoding of its own, so never pass raw user input.
  */
 
 export const sessionsPath = (teamId: string): string => `/teams/${teamId}/manage/sessions`;
