@@ -39,14 +39,18 @@ export default async function NewSeriesPage({
   if (token === null) return redirect(loginUrl({ returnTo: here }), RedirectType.replace);
 
   const options = { session: token, incoming: await headers() };
-  const [detail, banking] = await Promise.all([
+  // The series list is read only for `horizonDays`: the API owns how far ahead sessions are added.
+  const [detail, banking, seriesList] = await Promise.all([
     apiClient.teamDetail(teamId, options),
     apiClient.teamBanking(teamId, options),
+    apiClient.listSeries(teamId, options),
   ]);
-  if (guardResults([detail, banking], { here, action: 'new_series_load' }) === 'no_access') {
+  if (
+    guardResults([detail, banking, seriesList], { here, action: 'new_series_load' }) === 'no_access'
+  ) {
     return <NoAccess />;
   }
-  if (!detail.ok || !banking.ok) {
+  if (!detail.ok || !banking.ok || !seriesList.ok) {
     throw new Error('The new series page could not be loaded because the API is unavailable.');
   }
 
@@ -63,6 +67,7 @@ export default async function NewSeriesPage({
         createKey={randomUUID()}
         bankingHref={bankingHandoff(teamId, here)}
         isPayoutConfigured={banking.data.banking.isPayoutConfigured}
+        horizonDays={seriesList.data.horizonDays}
       />
     </ManageProvider>
   );

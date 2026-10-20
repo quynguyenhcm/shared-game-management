@@ -576,7 +576,7 @@ All pages sit in `ManageLayout` (`max-w-3xl`, `gap-8`). Each renders `ManageArea
 │ [ Create series                ] │  opens the confirm panel
 └──────────────────────────────────┘
 ```
-- **Monthly**: when "Monthly" is chosen, the derived line shows the ordinal ("On the first Wednesday of each month from 4 Nov 2026"). Only when the first date is both the 4th and the last of its weekday (ALG J6, V12/V13) does a radio pair appear: "Which one? (•) 4th Wednesday ( ) Last Wednesday". A 5th-weekday first date shows the fixed line "27 Sep 2026 is the 5th Sunday, so it repeats on the last Sunday of each month." The ordinal and weekday are derived from the first date; the form never asks for them separately.
+- **Monthly**: when "Monthly" is chosen, the derived line shows the ordinal ("On the first Wednesday of each month from 4 Nov 2026"). Only when the first date is both the 4th and the last of its weekday (ALG J6, V12/V13) does a radio pair appear: "Which one? (•) 4th Wednesday ( ) Last Wednesday". A 5th-weekday first date shows the fixed line "29 Nov 2026 is the 5th Sunday, so it repeats on the last Sunday of each month." (27 Sep 2026 is the 4th and last Sunday, so it gets the 4th/Last choice instead.) The ordinal and weekday are derived from the first date; the form never asks for them separately.
 - **After creation** (P-3): Repeats and First session become `dl` rows with the fixed-pattern sentence. "Repeat until" has `min` set to the saved value when one exists and cannot be set earlier (shortening is End series, T-6). An empty value clears it.
 
 #### End series confirm (series page, 360 px)
@@ -818,7 +818,7 @@ Material fields for the "Let them know" line: date (one-off only), earliest cour
 | Fields | First session · Repeat until (optional) |
 | Derived line | Every {Wednesday} from {4 Nov 2026}[ until {16 Dec 2026}] · Every second {Wednesday} from … · On the {first} {Wednesday} of each month from … |
 | Monthly picker | Which one? · 4th {Wednesday} · Last {Wednesday} |
-| Monthly, 5th weekday | {27 Sep 2026} is the 5th {Sunday}, so it repeats on the last {Sunday} of each month. |
+| Monthly, 5th weekday | {29 Nov 2026} is the 5th {Sunday}, so it repeats on the last {Sunday} of each month. |
 | Publish hint | Sessions are added {28} days ahead and published automatically, so members can register as soon as each one appears. |
 | Create prompt | Create this series? Sessions from {Wed 4 Nov} are added now and published for registration. Members on Auto Enroll are added to each one. [+ Each player is charged after the game: {fee summary}.] [+ Your team's bank account isn't set up, so the sessions will be saved as drafts until it is.] |
 | Create buttons | Create series / Creating… · Keep editing |

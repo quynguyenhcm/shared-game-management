@@ -1,10 +1,16 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RULE_ID, TEAM_ID, sessionFixture } from '../../../../../lib/teams/sessions-fixtures.ts';
+import {
+  RULE_ID,
+  TEAM_ID,
+  seriesListItemFixture,
+  sessionFixture,
+} from '../../../../../lib/teams/sessions-fixtures.ts';
 
 const mocks = vi.hoisted(() => ({
   teamDetail: vi.fn(),
   listSessions: vi.fn(),
+  listSeries: vi.fn(),
   warn: vi.fn(),
 }));
 
@@ -33,7 +39,11 @@ vi.mock('../../../../../lib/log.ts', () => ({
   log: { info: vi.fn(), warn: mocks.warn, error: vi.fn() },
 }));
 vi.mock('../../../../../lib/api-client.ts', () => ({
-  apiClient: { teamDetail: mocks.teamDetail, listSessions: mocks.listSessions },
+  apiClient: {
+    teamDetail: mocks.teamDetail,
+    listSessions: mocks.listSessions,
+    listSeries: mocks.listSeries,
+  },
 }));
 
 const page = await import('./page.tsx');
@@ -63,7 +73,14 @@ const bankingDraft = sessionFixture({
   seriesName: 'Wednesdays at Rosedale',
 });
 
-type Results = { detail?: unknown; upcoming?: unknown; drafts?: unknown; past?: unknown };
+type Results = {
+  detail?: unknown;
+  upcoming?: unknown;
+  drafts?: unknown;
+  past?: unknown;
+  series?: unknown;
+};
+const seriesBody = (series: unknown[] = []) => ok({ series, horizonDays: 28 });
 
 async function render(
   query: Record<string, string> = {},
@@ -71,6 +88,7 @@ async function render(
   teamId = TEAM_ID,
 ): Promise<string> {
   mocks.teamDetail.mockResolvedValue(results.detail ?? TEAM);
+  mocks.listSeries.mockResolvedValue(results.series ?? seriesBody());
   mocks.listSessions.mockImplementation((_team: string, q: { view: string }) =>
     Promise.resolve(
       (q.view === 'upcoming'
@@ -90,6 +108,7 @@ async function render(
 beforeEach(() => {
   mocks.teamDetail.mockReset();
   mocks.listSessions.mockReset();
+  mocks.listSeries.mockReset();
   mocks.warn.mockReset();
 });
 
@@ -134,12 +153,13 @@ describe('sessions list page: shell (AC-ENTRY-1, AC-ENTRY-2)', () => {
 });
 
 describe('sessions list page: sections and the banking notice (AC-ASYNC-3, AC-HAPPY-14)', () => {
-  it('shows every section with its rows, and a series row from the loaded dates', async () => {
+  it('shows every section with its rows, and a series row from the series list', async () => {
     const html = await render(
       {},
       {
         upcoming: listBody([published]),
         drafts: listBody([bankingDraft], { isPayoutConfigured: false }),
+        series: seriesBody([seriesListItemFixture()]),
       },
     );
     for (const title of ['Upcoming', 'Drafts', 'Series', 'Past and cancelled']) {
@@ -147,6 +167,29 @@ describe('sessions list page: sections and the banking notice (AC-ASYNC-3, AC-HA
     }
     expect(html).toContain('Wed 4 Nov 2026, 8:00-10:00 am');
     expect(html).toMatch(new RegExp(`href="/teams/${TEAM_ID}/manage/sessions/series/${RULE_ID}"`));
+  });
+
+  it('builds the Series section from the series list, not from the loaded dates (AC-ENTRY-2, AC-ASYNC-6, AC-HAPPY-15)', async () => {
+    const html = await render(
+      {},
+      {
+        series: seriesBody([
+          seriesListItemFixture({ materialising: true }),
+          seriesListItemFixture({
+            id: '51111111-1111-4111-8111-111111111111',
+            name: 'Sundays at Albany',
+            isActive: false,
+            recurUntil: '2026-12-16',
+          }),
+        ]),
+      },
+    );
+    expect(mocks.listSeries).toHaveBeenCalledWith(TEAM_ID, expect.anything());
+    expect(html).toContain('>Wednesdays at Rosedale</a>');
+    expect(html).toContain('Adding sessions…');
+    expect(html).toContain('>Sundays at Albany</a>');
+    expect(html).toContain('Ended 16 Dec 2026');
+    expect(html).not.toContain('No recurring series yet.');
   });
 
   it('shows one page-level banking notice when a banking draft waits and banking is missing, linking with the list as returnTo', async () => {
@@ -218,6 +261,12 @@ describe('sessions list page: guards (AC-ERROR-8)', () => {
     );
   });
 
+  it('403 on the series list renders NoAccess too, with no session data', async () => {
+    const html = await render({}, { series: fail(403, 'forbidden') });
+    expect(html).toContain('You don&#x27;t have access to manage this team.');
+    expect(html).not.toContain('New session');
+  });
+
   it('403 renders NoAccess: no area nav and no list', async () => {
     const html = await render({}, { upcoming: fail(403, 'forbidden') });
     expect(html).toContain('You don&#x27;t have access to manage this team.');
@@ -230,6 +279,9 @@ describe('sessions list page: guards (AC-ERROR-8)', () => {
       'NOT_FOUND',
     );
     await expect(render({}, { past: fail(503, 'service_unavailable') })).rejects.toThrow(
+      /API is unavailable/,
+    );
+    await expect(render({}, { series: fail(503, 'service_unavailable') })).rejects.toThrow(
       /API is unavailable/,
     );
     expect(mocks.warn).toHaveBeenCalledWith(

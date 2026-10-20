@@ -13243,6 +13243,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -13411,6 +13415,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -13793,6 +13798,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -13961,6 +13970,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -15141,6 +15151,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -15309,6 +15323,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -15691,6 +15706,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -15859,6 +15878,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -16700,6 +16720,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -16868,6 +16892,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -17250,6 +17275,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -17418,6 +17447,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -18399,6 +18429,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -18567,6 +18601,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -18949,6 +18984,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -19117,6 +19156,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -19985,6 +20025,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -20153,6 +20197,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -20535,6 +20580,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -20703,6 +20752,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -21566,6 +21616,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -21734,6 +21788,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -22116,6 +22171,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -22284,6 +22343,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -22523,6 +22583,10 @@ paths:
                         maximum: 9007199254740991
                       materialising:
                         type: boolean
+                      horizonDays:
+                        type: integer
+                        minimum: 7
+                        maximum: 91
                       location:
                         type: string
                       address:
@@ -22691,6 +22755,7 @@ paths:
                       - isActive
                       - version
                       - materialising
+                      - horizonDays
                       - location
                       - address
                       - maxPlayers
@@ -22766,6 +22831,10 @@ paths:
                         maximum: 9007199254740991
                       materialising:
                         type: boolean
+                      horizonDays:
+                        type: integer
+                        minimum: 7
+                        maximum: 91
                       location:
                         type: string
                       address:
@@ -22934,6 +23003,7 @@ paths:
                       - isActive
                       - version
                       - materialising
+                      - horizonDays
                       - location
                       - address
                       - maxPlayers
@@ -23540,6 +23610,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -23708,6 +23782,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -24090,6 +24165,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -24258,6 +24337,1419 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
+                              - location
+                              - address
+                              - maxPlayers
+                              - reservedSeats
+                              - courtCost
+                              - extraExpenses
+                              - calculatedRatePerPlayer
+                              - customPlayerRate
+                              - pricingStructure
+                              - feeFlat
+                              - feeMale
+                              - feeFemale
+                              - feeOther
+                              - feeBeginner
+                              - feeIntermediate
+                              - feeAdvanced
+                              - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
+                            additionalProperties: false
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+    get:
+      operationId: listTeamSeries
+      summary: List the team's series
+      description: "Every series of the team, active ones first, each with its name,
+        `isActive`, `materialising`, `recurUntil` (the end date once ended) and
+        `version`, plus `horizonDays`, the configured materialisation horizon.
+        It is read from the series themselves, not from the sessions loaded on a
+        page, so a series still being created, an ended one and one with no
+        dates yet all appear. TEAM_ADMIN of this team only (`allowGlobalAdmin`
+        is off); a series of another team is 404 `not_found`. The actor is
+        re-checked as an approved admin under a row lock inside every write (403
+        when demoted meanwhile). Writes that change a series carry
+        `expectedVersion`: a stale one is 409 `series_stale` with the latest
+        series in `error.current`, and nothing is written."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  series:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        name:
+                          type: string
+                        startsOn:
+                          type: string
+                        recurUntil:
+                          type:
+                            - string
+                            - "null"
+                        isActive:
+                          type: boolean
+                        version:
+                          type: integer
+                          minimum: 1
+                          maximum: 9007199254740991
+                        materialising:
+                          type: boolean
+                      required:
+                        - id
+                        - name
+                        - startsOn
+                        - recurUntil
+                        - isActive
+                        - version
+                        - materialising
+                      additionalProperties: false
+                  horizonDays:
+                    type: integer
+                    minimum: 7
+                    maximum: 91
+                required:
+                  - series
+                  - horizonDays
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                      dstOptions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                            date:
+                              type: string
+                            time:
+                              type: string
+                            kind:
+                              type: string
+                              enum:
+                                - nonexistent
+                                - ambiguous
+                            options:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  choice:
+                                    type: string
+                                    enum:
+                                      - shiftedForward
+                                      - shiftedBackward
+                                      - earlier
+                                      - later
+                                  localTime:
+                                    type: string
+                                  instant:
+                                    type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                required:
+                                  - choice
+                                  - localTime
+                                  - instant
+                                additionalProperties: false
+                          required:
+                            - field
+                            - date
+                            - time
+                            - kind
+                            - options
+                          additionalProperties: false
+                      raisedFields:
+                        type: array
+                        items:
+                          type: string
+                      current:
+                        anyOf:
+                          - type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              teamId:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              recurringRuleId:
+                                anyOf:
+                                  - type: string
+                                    format: uuid
+                                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                  - type: "null"
+                              status:
+                                type: string
+                                enum:
+                                  - DRAFT
+                                  - PUBLISHED
+                                  - COMPLETED
+                                  - CANCELLED
+                              phase:
+                                type: string
+                                enum:
+                                  - upcoming
+                                  - started
+                                  - ended
+                              date:
+                                type: string
+                              location:
+                                type: string
+                              address:
+                                type: string
+                              maxPlayers:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              reservedSeats:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              courtCost: {}
+                              extraExpenses: {}
+                              calculatedRatePerPlayer:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              customPlayerRate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              pricingStructure:
+                                type: string
+                                enum:
+                                  - FLAT
+                                  - BY_SEX
+                                  - BY_SKILL_LEVEL
+                              feeFlat:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeMale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeFemale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeOther:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeBeginner:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeIntermediate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeAdvanced:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              startsAt:
+                                anyOf:
+                                  - type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                  - type: "null"
+                              endsAt:
+                                anyOf:
+                                  - type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                  - type: "null"
+                              cancellationDeadline:
+                                anyOf:
+                                  - type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                  - type: "null"
+                              deadlineIsDefault:
+                                type: boolean
+                              isInstanceOverridden:
+                                type: boolean
+                              draftReason:
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - banking
+                                      - edited
+                                      - admin
+                                  - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
+                              version:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              activeRegistrationCount:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              feesLocked:
+                                type: string
+                                enum:
+                                  - none
+                                  - raise_only_blocked
+                              courts:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    identifier:
+                                      type: string
+                                    startTime:
+                                      type: string
+                                    endTime:
+                                      type: string
+                                  required:
+                                    - id
+                                    - identifier
+                                    - startTime
+                                    - endTime
+                                  additionalProperties: false
+                            required:
+                              - id
+                              - teamId
+                              - recurringRuleId
+                              - status
+                              - phase
+                              - date
+                              - location
+                              - address
+                              - maxPlayers
+                              - reservedSeats
+                              - courtCost
+                              - extraExpenses
+                              - calculatedRatePerPlayer
+                              - customPlayerRate
+                              - pricingStructure
+                              - feeFlat
+                              - feeMale
+                              - feeFemale
+                              - feeOther
+                              - feeBeginner
+                              - feeIntermediate
+                              - feeAdvanced
+                              - startsAt
+                              - endsAt
+                              - cancellationDeadline
+                              - deadlineIsDefault
+                              - isInstanceOverridden
+                              - draftReason
+                              - seriesName
+                              - version
+                              - activeRegistrationCount
+                              - feesLocked
+                              - courts
+                            additionalProperties: false
+                          - type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              teamId:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
+                              frequency:
+                                type: string
+                                enum:
+                                  - WEEKLY
+                                  - FORTNIGHTLY
+                                  - MONTHLY
+                              dayOfWeek:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              startsOn:
+                                type: string
+                              monthlyWeek:
+                                anyOf:
+                                  - type: integer
+                                    minimum: -9007199254740991
+                                    maximum: 9007199254740991
+                                  - type: "null"
+                              recurUntil:
+                                type:
+                                  - string
+                                  - "null"
+                              isActive:
+                                type: boolean
+                              version:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              materialising:
+                                type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
+                              location:
+                                type: string
+                              address:
+                                type: string
+                              maxPlayers:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              reservedSeats:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              courtCost: {}
+                              extraExpenses: {}
+                              calculatedRatePerPlayer:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              customPlayerRate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              pricingStructure:
+                                type: string
+                                enum:
+                                  - FLAT
+                                  - BY_SEX
+                                  - BY_SKILL_LEVEL
+                              feeFlat:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeMale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeFemale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeOther:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeBeginner:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeIntermediate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeAdvanced:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              courts:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    identifier:
+                                      type: string
+                                    startTime:
+                                      type: string
+                                    endTime:
+                                      type: string
+                                  required:
+                                    - identifier
+                                    - startTime
+                                    - endTime
+                                  additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
+                            required:
+                              - id
+                              - teamId
+                              - name
+                              - frequency
+                              - dayOfWeek
+                              - startsOn
+                              - monthlyWeek
+                              - recurUntil
+                              - isActive
+                              - version
+                              - materialising
+                              - horizonDays
+                              - location
+                              - address
+                              - maxPlayers
+                              - reservedSeats
+                              - courtCost
+                              - extraExpenses
+                              - calculatedRatePerPlayer
+                              - customPlayerRate
+                              - pricingStructure
+                              - feeFlat
+                              - feeMale
+                              - feeFemale
+                              - feeOther
+                              - feeBeginner
+                              - feeIntermediate
+                              - feeAdvanced
+                              - courts
+                              - isPayoutConfigured
+                              - bankingDrafts
+                              - editedDrafts
+                              - instances
+                            additionalProperties: false
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                      dstOptions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field:
+                              type: string
+                            date:
+                              type: string
+                            time:
+                              type: string
+                            kind:
+                              type: string
+                              enum:
+                                - nonexistent
+                                - ambiguous
+                            options:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  choice:
+                                    type: string
+                                    enum:
+                                      - shiftedForward
+                                      - shiftedBackward
+                                      - earlier
+                                      - later
+                                  localTime:
+                                    type: string
+                                  instant:
+                                    type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                required:
+                                  - choice
+                                  - localTime
+                                  - instant
+                                additionalProperties: false
+                          required:
+                            - field
+                            - date
+                            - time
+                            - kind
+                            - options
+                          additionalProperties: false
+                      raisedFields:
+                        type: array
+                        items:
+                          type: string
+                      current:
+                        anyOf:
+                          - type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              teamId:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              recurringRuleId:
+                                anyOf:
+                                  - type: string
+                                    format: uuid
+                                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                  - type: "null"
+                              status:
+                                type: string
+                                enum:
+                                  - DRAFT
+                                  - PUBLISHED
+                                  - COMPLETED
+                                  - CANCELLED
+                              phase:
+                                type: string
+                                enum:
+                                  - upcoming
+                                  - started
+                                  - ended
+                              date:
+                                type: string
+                              location:
+                                type: string
+                              address:
+                                type: string
+                              maxPlayers:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              reservedSeats:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              courtCost: {}
+                              extraExpenses: {}
+                              calculatedRatePerPlayer:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              customPlayerRate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              pricingStructure:
+                                type: string
+                                enum:
+                                  - FLAT
+                                  - BY_SEX
+                                  - BY_SKILL_LEVEL
+                              feeFlat:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeMale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeFemale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeOther:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeBeginner:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeIntermediate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeAdvanced:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              startsAt:
+                                anyOf:
+                                  - type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                  - type: "null"
+                              endsAt:
+                                anyOf:
+                                  - type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                  - type: "null"
+                              cancellationDeadline:
+                                anyOf:
+                                  - type: string
+                                    format: date-time
+                                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                  - type: "null"
+                              deadlineIsDefault:
+                                type: boolean
+                              isInstanceOverridden:
+                                type: boolean
+                              draftReason:
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - banking
+                                      - edited
+                                      - admin
+                                  - type: "null"
+                              seriesName:
+                                type:
+                                  - string
+                                  - "null"
+                              version:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              activeRegistrationCount:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              feesLocked:
+                                type: string
+                                enum:
+                                  - none
+                                  - raise_only_blocked
+                              courts:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    identifier:
+                                      type: string
+                                    startTime:
+                                      type: string
+                                    endTime:
+                                      type: string
+                                  required:
+                                    - id
+                                    - identifier
+                                    - startTime
+                                    - endTime
+                                  additionalProperties: false
+                            required:
+                              - id
+                              - teamId
+                              - recurringRuleId
+                              - status
+                              - phase
+                              - date
+                              - location
+                              - address
+                              - maxPlayers
+                              - reservedSeats
+                              - courtCost
+                              - extraExpenses
+                              - calculatedRatePerPlayer
+                              - customPlayerRate
+                              - pricingStructure
+                              - feeFlat
+                              - feeMale
+                              - feeFemale
+                              - feeOther
+                              - feeBeginner
+                              - feeIntermediate
+                              - feeAdvanced
+                              - startsAt
+                              - endsAt
+                              - cancellationDeadline
+                              - deadlineIsDefault
+                              - isInstanceOverridden
+                              - draftReason
+                              - seriesName
+                              - version
+                              - activeRegistrationCount
+                              - feesLocked
+                              - courts
+                            additionalProperties: false
+                          - type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              teamId:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              name:
+                                type: string
+                              frequency:
+                                type: string
+                                enum:
+                                  - WEEKLY
+                                  - FORTNIGHTLY
+                                  - MONTHLY
+                              dayOfWeek:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              startsOn:
+                                type: string
+                              monthlyWeek:
+                                anyOf:
+                                  - type: integer
+                                    minimum: -9007199254740991
+                                    maximum: 9007199254740991
+                                  - type: "null"
+                              recurUntil:
+                                type:
+                                  - string
+                                  - "null"
+                              isActive:
+                                type: boolean
+                              version:
+                                type: integer
+                                minimum: 1
+                                maximum: 9007199254740991
+                              materialising:
+                                type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
+                              location:
+                                type: string
+                              address:
+                                type: string
+                              maxPlayers:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              reservedSeats:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              courtCost: {}
+                              extraExpenses: {}
+                              calculatedRatePerPlayer:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              customPlayerRate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              pricingStructure:
+                                type: string
+                                enum:
+                                  - FLAT
+                                  - BY_SEX
+                                  - BY_SKILL_LEVEL
+                              feeFlat:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeMale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeFemale:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeOther:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeBeginner:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeIntermediate:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              feeAdvanced:
+                                anyOf:
+                                  - {}
+                                  - type: "null"
+                              courts:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    identifier:
+                                      type: string
+                                    startTime:
+                                      type: string
+                                    endTime:
+                                      type: string
+                                  required:
+                                    - identifier
+                                    - startTime
+                                    - endTime
+                                  additionalProperties: false
+                              isPayoutConfigured:
+                                type: boolean
+                              bankingDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              editedDrafts:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              instances:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                    date:
+                                      type: string
+                                    startsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    endsAt:
+                                      anyOf:
+                                        - type: string
+                                          format: date-time
+                                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                        - type: "null"
+                                    status:
+                                      type: string
+                                      enum:
+                                        - DRAFT
+                                        - PUBLISHED
+                                        - COMPLETED
+                                        - CANCELLED
+                                    phase:
+                                      type: string
+                                      enum:
+                                        - upcoming
+                                        - started
+                                        - ended
+                                    draftReason:
+                                      anyOf:
+                                        - type: string
+                                          enum:
+                                            - banking
+                                            - edited
+                                            - admin
+                                        - type: "null"
+                                    isInstanceOverridden:
+                                      type: boolean
+                                    activeRegistrationCount:
+                                      type: integer
+                                      minimum: 0
+                                      maximum: 9007199254740991
+                                    version:
+                                      type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    seriesChangeEffect:
+                                      type: string
+                                      enum:
+                                        - will_update
+                                        - edited
+                                        - closed
+                                        - has_registrations
+                                  required:
+                                    - id
+                                    - date
+                                    - startsAt
+                                    - endsAt
+                                    - status
+                                    - phase
+                                    - draftReason
+                                    - isInstanceOverridden
+                                    - activeRegistrationCount
+                                    - version
+                                    - seriesChangeEffect
+                                  additionalProperties: false
+                            required:
+                              - id
+                              - teamId
+                              - name
+                              - frequency
+                              - dayOfWeek
+                              - startsOn
+                              - monthlyWeek
+                              - recurUntil
+                              - isActive
+                              - version
+                              - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -24366,6 +25858,10 @@ paths:
                         maximum: 9007199254740991
                       materialising:
                         type: boolean
+                      horizonDays:
+                        type: integer
+                        minimum: 7
+                        maximum: 91
                       location:
                         type: string
                       address:
@@ -24534,6 +26030,7 @@ paths:
                       - isActive
                       - version
                       - materialising
+                      - horizonDays
                       - location
                       - address
                       - maxPlayers
@@ -25140,6 +26637,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -25308,6 +26809,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -25690,6 +27192,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -25858,6 +27364,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -26110,6 +27617,10 @@ paths:
                         maximum: 9007199254740991
                       materialising:
                         type: boolean
+                      horizonDays:
+                        type: integer
+                        minimum: 7
+                        maximum: 91
                       location:
                         type: string
                       address:
@@ -26278,6 +27789,7 @@ paths:
                       - isActive
                       - version
                       - materialising
+                      - horizonDays
                       - location
                       - address
                       - maxPlayers
@@ -26931,6 +28443,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -27099,6 +28615,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -27481,6 +28998,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -27649,6 +29170,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -27782,6 +29304,10 @@ paths:
                         maximum: 9007199254740991
                       materialising:
                         type: boolean
+                      horizonDays:
+                        type: integer
+                        minimum: 7
+                        maximum: 91
                       location:
                         type: string
                       address:
@@ -27950,6 +29476,7 @@ paths:
                       - isActive
                       - version
                       - materialising
+                      - horizonDays
                       - location
                       - address
                       - maxPlayers
@@ -28595,6 +30122,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -28763,6 +30294,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -29145,6 +30677,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -29313,6 +30849,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -29432,6 +30969,10 @@ paths:
                         maximum: 9007199254740991
                       materialising:
                         type: boolean
+                      horizonDays:
+                        type: integer
+                        minimum: 7
+                        maximum: 91
                       location:
                         type: string
                       address:
@@ -29600,6 +31141,7 @@ paths:
                       - isActive
                       - version
                       - materialising
+                      - horizonDays
                       - location
                       - address
                       - maxPlayers
@@ -30209,6 +31751,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -30377,6 +31923,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers
@@ -30759,6 +32306,10 @@ paths:
                                 maximum: 9007199254740991
                               materialising:
                                 type: boolean
+                              horizonDays:
+                                type: integer
+                                minimum: 7
+                                maximum: 91
                               location:
                                 type: string
                               address:
@@ -30927,6 +32478,7 @@ paths:
                               - isActive
                               - version
                               - materialising
+                              - horizonDays
                               - location
                               - address
                               - maxPlayers

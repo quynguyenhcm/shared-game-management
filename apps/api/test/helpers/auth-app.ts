@@ -78,6 +78,8 @@ export interface AuthTestOptions {
   readonly sessionAllocator?: AppDeps['sessionAllocator'];
   /** A Kysely handle to use instead of one over `pool` (the sessions tests record executed statements). */
   readonly db?: Database;
+  /** `RECURRENCE_HORIZON_DAYS` as the API reports it on series reads; the app default when omitted. */
+  readonly recurrenceHorizonDays?: number;
 }
 
 export async function buildAuthTestApp(
@@ -107,6 +109,9 @@ export async function buildAuthTestApp(
     }),
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
     sessionAllocator: options.sessionAllocator ?? noopSessionAllocator,
+    ...(options.recurrenceHorizonDays === undefined
+      ? {}
+      : { recurrenceHorizonDays: options.recurrenceHorizonDays }),
     ...(options.extraPlugins === undefined ? {} : { extraPlugins: options.extraPlugins }),
   };
   const app = await buildApp(deps);

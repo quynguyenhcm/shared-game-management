@@ -31,7 +31,7 @@ import {
   listHeading,
   noticeBanner,
   parseNotice,
-  seriesGroups,
+  seriesRows,
   showListBankingNotice,
 } from '../../../../../lib/teams/sessions-view.ts';
 
@@ -40,7 +40,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * The "Sessions" area (UI/UX D4): Upcoming, Drafts, Series, Past and cancelled, each paged on its own keyset
- * cursor, with one page-level banking notice. One parallel load (team plus the three list views); a 403 renders
+ * cursor, with one page-level banking notice. One parallel load (team, the three list views and the series list); a 403 renders
  * the no-access page and never any session data (AC-ERROR-8). The API is the authority: this page only shows
  * what it answered, and labels come from the API's `phase` and `draftReason` (the web never reads the clock).
  */
@@ -73,19 +73,22 @@ export default async function SessionsPage({
       cursors[name] === undefined ? { view: name } : { view: name, cursor: cursors[name] },
       options,
     );
-  const [detail, upcoming, drafts, past] = await Promise.all([
+  const [detail, upcoming, drafts, past, seriesList] = await Promise.all([
     apiClient.teamDetail(teamId, options),
     view('upcoming'),
     view('drafts'),
     view('past'),
+    apiClient.listSeries(teamId, options),
   ]);
   if (
-    guardResults([detail, upcoming, drafts, past], { here, action: 'sessions_list_load' }) ===
-    'no_access'
+    guardResults([detail, upcoming, drafts, past, seriesList], {
+      here,
+      action: 'sessions_list_load',
+    }) === 'no_access'
   ) {
     return <NoAccess />;
   }
-  if (!detail.ok || !upcoming.ok || !drafts.ok || !past.ok) {
+  if (!detail.ok || !upcoming.ok || !drafts.ok || !past.ok || !seriesList.ok) {
     throw new Error('The sessions page could not be loaded because the API is unavailable.');
   }
 
@@ -136,7 +139,7 @@ export default async function SessionsPage({
         upcoming={upcoming.data}
         drafts={drafts.data}
         past={past.data}
-        series={seriesGroups(loaded)}
+        series={seriesRows(seriesList.data.series, loaded)}
         current={cursors}
       />
     </ManageProvider>

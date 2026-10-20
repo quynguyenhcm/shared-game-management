@@ -3,6 +3,7 @@ import { ErrorCode } from './errors.ts';
 import {
   CancelSessionResponse,
   SeriesDetailResponse,
+  SeriesListResponse,
   CreateSeriesRequest,
   CreateSessionRequest,
   EndSeriesRequest,
@@ -519,6 +520,7 @@ describe('responses and the error envelope', () => {
       feeIntermediate: null,
       feeAdvanced: null,
       courts: [],
+      horizonDays: 28,
       isPayoutConfigured: false,
       bankingDrafts: 1,
       editedDrafts: 0,
@@ -534,6 +536,22 @@ describe('responses and the error envelope', () => {
     expect(SeriesDetailResponse.safeParse({ series: { ...series, name: undefined } }).success).toBe(
       false,
     );
+  });
+
+  it('the series list carries one row per series and the horizon (7-91)', () => {
+    const row = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Wednesdays at Hall',
+      startsOn: '2026-10-07',
+      recurUntil: null,
+      isActive: true,
+      version: 1,
+      materialising: true,
+    };
+    expect(SeriesListResponse.safeParse({ series: [row], horizonDays: 28 }).success).toBe(true);
+    expect(SeriesListResponse.safeParse({ series: [], horizonDays: 91 }).success).toBe(true);
+    expect(SeriesListResponse.safeParse({ series: [], horizonDays: 6 }).success).toBe(false);
+    expect(SeriesListResponse.safeParse({ series: [row] }).success).toBe(false);
   });
 
   it('cancel and list responses wrap the session with the counts the page shows', () => {

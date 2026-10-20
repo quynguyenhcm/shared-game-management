@@ -17,6 +17,7 @@ import {
   type ExistingInstance,
   type MoneyString,
   type RuleCourtTemplate,
+  type SeriesListItem,
   type SeriesResponse,
 } from '@sgm/shared';
 import { trimTime } from './content.ts';
@@ -55,10 +56,24 @@ export function seriesNameOf(
   });
 }
 
+/** One Series-section row of the Sessions page: the rule alone, no dates. */
+export function toSeriesListItem(rule: LockedRule): SeriesListItem {
+  return {
+    id: rule.id,
+    name: seriesNameOf(rule),
+    startsOn: rule.starts_on,
+    recurUntil: rule.recur_until,
+    isActive: rule.is_active,
+    version: rule.version,
+    materialising: isMaterialising(rule),
+  };
+}
+
 export function toSeriesResponse(
   rule: LockedRule,
   courts: readonly RuleCourtRow[],
   extras: SeriesViewExtras,
+  horizonDays: number,
 ): SeriesResponse {
   return {
     id: rule.id,
@@ -72,6 +87,7 @@ export function toSeriesResponse(
     isActive: rule.is_active,
     version: rule.version,
     materialising: isMaterialising(rule),
+    horizonDays,
     location: rule.default_location,
     address: rule.default_address,
     maxPlayers: rule.default_max_players,

@@ -619,6 +619,11 @@ describe('apiClient sessions calls (session-scheduling-engine)', () => {
     expect(sent(create).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/session-series`);
     expect(sent(create).init?.method).toBe('POST');
 
+    const list = stubJson(404, { error: { code: 'not_found', message: 'x' } });
+    await apiClient.listSeries(TEAM_ID, { session: 'tok' });
+    expect(sent(list).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/session-series`);
+    expect(sent(list).init?.method).toBe('GET');
+
     const read = stubJson(404, { error: { code: 'not_found', message: 'x' } });
     await apiClient.getSeries(TEAM_ID, RULE_ID, { session: 'tok' });
     expect(sent(read).url).toBe(`http://localhost:4000/teams/${TEAM_ID}/session-series/${RULE_ID}`);

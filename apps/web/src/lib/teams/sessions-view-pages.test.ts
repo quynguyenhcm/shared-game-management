@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SERIES_HORIZON_DAYS,
   horizonLine,
   nextSeriesDate,
   noSessionsYetLine,
@@ -81,24 +80,30 @@ const WEEKLY = {
 } as const;
 
 describe('the horizon line and the empty series line (copy deck "Series")', () => {
-  it('the horizon is 28 days, the API default', () => {
-    expect(SERIES_HORIZON_DAYS).toBe(28);
+  it('has no horizon of its own: it is a required argument, the API value (7-91), never a web constant', () => {
+    expect(nextSeriesDate(WEEKLY, '2026-11-04', 56)).toEqual({
+      date: '2027-01-06',
+      addedOn: '2026-11-11',
+    });
+    expect(horizonLine({ date: '2027-01-06', addedOn: '2026-11-11' }, 56)).toBe(
+      'Sessions are added 56 days ahead. The next one, Wed 6 Jan, will be added on Wed 11 Nov.',
+    );
   });
 
   it('the next date is the first one after today plus the horizon, and it is added that many days before', () => {
     // Today Wed 4 Nov: the window ends Wed 2 Dec, so the next to be added is Wed 9 Dec, on Wed 11 Nov.
-    expect(nextSeriesDate(WEEKLY, '2026-11-04')).toEqual({
+    expect(nextSeriesDate(WEEKLY, '2026-11-04', 28)).toEqual({
       date: '2026-12-09',
       addedOn: '2026-11-11',
     });
-    expect(horizonLine({ date: '2026-12-09', addedOn: '2026-11-11' })).toBe(
+    expect(horizonLine({ date: '2026-12-09', addedOn: '2026-11-11' }, 28)).toBe(
       'Sessions are added 28 days ahead. The next one, Wed 9 Dec, will be added on Wed 11 Nov.',
     );
   });
 
   it('a first date beyond the window is the first one to be added', () => {
     const later = { ...WEEKLY, startsOn: '2027-01-06' };
-    expect(nextSeriesDate(later, '2026-11-04')).toEqual({
+    expect(nextSeriesDate(later, '2026-11-04', 28)).toEqual({
       date: '2027-01-06',
       addedOn: '2026-12-09',
     });
@@ -108,7 +113,7 @@ describe('the horizon line and the empty series line (copy deck "Series")', () =
   });
 
   it('follows the pattern: fortnightly skips a week and monthly keeps its ordinal', () => {
-    expect(nextSeriesDate({ ...WEEKLY, frequency: 'FORTNIGHTLY' }, '2026-11-04')?.date).toBe(
+    expect(nextSeriesDate({ ...WEEKLY, frequency: 'FORTNIGHTLY' }, '2026-11-04', 28)?.date).toBe(
       '2026-12-16',
     );
     expect(
@@ -121,12 +126,13 @@ describe('the horizon line and the empty series line (copy deck "Series")', () =
           recurUntil: null,
         },
         '2026-11-04',
+        28,
       )?.date,
     ).toBe('2027-01-06');
   });
 
   it('is null once the end date has been reached, so the line is omitted', () => {
-    expect(nextSeriesDate({ ...WEEKLY, recurUntil: '2026-12-02' }, '2026-11-04')).toBeNull();
+    expect(nextSeriesDate({ ...WEEKLY, recurUntil: '2026-12-02' }, '2026-11-04', 28)).toBeNull();
   });
 });
 

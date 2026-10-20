@@ -29,6 +29,7 @@ import {
   RemoveBankingResponse,
   ResetPasswordResponse,
   SeriesDetailResponse,
+  SeriesListResponse,
   SeriesSaveResponse,
   SessionDetailResponse,
   SessionListResponse,
@@ -673,6 +674,14 @@ export const apiClient = {
       method: 'POST',
       body,
       schema: SeriesDetailResponse,
+    }),
+
+  listSeries: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series`,
+      method: 'GET',
+      schema: SeriesListResponse,
     }),
 
   getSeries: (teamId: string, ruleId: string, options: ApiCallOptions = {}) =>

@@ -12,7 +12,6 @@ import { formFeeSummary, initialSessionForm } from '../../lib/teams/session-form
 import {
   CREATE_SERIES_CONFIRM,
   SERIES_COPY,
-  SERIES_HORIZON_DAYS,
   createSeriesPrompt,
   seriesEffect,
   sessionErrorBanner,
@@ -55,6 +54,7 @@ export function SeriesForm({
   createKey,
   bankingHref,
   isPayoutConfigured,
+  horizonDays,
   cancelHref,
   defaultConfirmOpen = false,
 }: {
@@ -64,6 +64,8 @@ export function SeriesForm({
   createKey?: string;
   bankingHref: string;
   isPayoutConfigured: boolean;
+  /** `horizonDays` from the API (`RECURRENCE_HORIZON_DAYS`): how far ahead sessions are added. */
+  horizonDays: number;
   /** Edit mode: the series page without `?edit=`. */
   cancelHref?: string;
   /** Render the create confirm open on first render (tests). */
@@ -118,7 +120,7 @@ export function SeriesForm({
         {...(series === undefined ? {} : { saved: series })}
         errors={fieldErrors}
         dispatch={dispatch}
-        horizonDays={SERIES_HORIZON_DAYS}
+        horizonDays={horizonDays}
       />
       <DetailsFieldset state={state} errors={fieldErrors} dispatch={dispatch} date="none" />
       <CourtTable

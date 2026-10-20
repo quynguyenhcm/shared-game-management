@@ -546,6 +546,101 @@ describe('series read model for the admin UI', () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------
+// Series list read (AC-ENTRY-2, AC-ASYNC-6, AC-HAPPY-15): the Sessions page's Series section
+// ---------------------------------------------------------------------------------------------
+
+interface SeriesListBody {
+  series: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    materialising: boolean;
+    recurUntil: string | null;
+    startsOn: string;
+    version: number;
+  }[];
+  horizonDays: number;
+}
+
+describe('series list read for the Sessions page', () => {
+  it('lists a just-created, still-materialising series, then clears the flag once the run completes', async () => {
+    const c = await scene();
+    const created = seriesOf(await call('POST', base(c), c.admin, createBody()));
+    const before = await call('GET', base(c), c.admin);
+    expect(before.statusCode, before.body).toBe(200);
+    expect(before.headers['cache-control']).toBe('no-store');
+    expect(before.json<SeriesListBody>().series).toEqual([
+      {
+        id: created.id,
+        name: 'Wednesdays at Rosedale Badminton Centre',
+        isActive: true,
+        materialising: true,
+        recurUntil: null,
+        startsOn: '2026-10-07',
+        version: 1,
+      },
+    ]);
+    await materialiseRule(materialiseDeps(), {
+      ruleId: created.id,
+      teamId: c.teamId,
+      trigger: 'rule_created',
+    });
+    const after = (await call('GET', base(c), c.admin)).json<SeriesListBody>();
+    expect(after.series.map((s) => [s.id, s.materialising])).toEqual([[created.id, false]]);
+  });
+
+  it('lists an ended series with its end date, and a series with no sessions at all, active ones first', async () => {
+    const c = await scene();
+    const ended = await insertRule(database.pool, c.teamId, {
+      isActive: false,
+      startsOn: '2026-08-05',
+      recurUntil: '2026-09-16',
+    });
+    const empty = await insertRule(database.pool, c.teamId, {
+      dayOfWeek: 6,
+      startsOn: '2026-10-10',
+    });
+    const res = await call('GET', base(c), c.admin);
+    expect(res.statusCode, res.body).toBe(200);
+    const listed = res.json<SeriesListBody>().series;
+    expect(listed.map((s) => s.id)).toEqual([empty, ended]);
+    expect(listed[0]).toMatchObject({ name: 'Saturdays at Test Hall', isActive: true });
+    expect(listed[1]).toMatchObject({ isActive: false, recurUntil: '2026-09-16' });
+    expect(await sessionsOf(empty)).toHaveLength(0);
+  });
+
+  it('lists only this team, answers an empty list when there is none, and refuses anonymous, member and other-team admin', async () => {
+    const c = await scene();
+    expect((await call('GET', base(c), c.admin)).json<SeriesListBody>().series).toEqual([]);
+    await insertRule(database.pool, c.otherTeamId);
+    expect((await call('GET', base(c), c.admin)).json<SeriesListBody>().series).toEqual([]);
+    expect((await call('GET', base(c), null)).statusCode).toBe(401);
+    for (const token of [c.member, c.otherAdmin]) {
+      const res = await call('GET', base(c), token);
+      expect(res.statusCode).toBe(403);
+      expect(errorOf(res).code).toBe('forbidden');
+    }
+  });
+
+  it('reports the configured materialisation horizon on the list and on every series read, never a copy in the web', async () => {
+    const c = await scene();
+    const ruleId = await insertRule(database.pool, c.teamId);
+    expect((await call('GET', base(c), c.admin)).json<SeriesListBody>().horizonDays).toBe(28);
+    expect(seriesOf(await call('GET', `${base(c)}/${ruleId}`, c.admin)).horizonDays).toBe(28);
+
+    const wide = await buildAuthTestApp(database.pool, { recurrenceHorizonDays: 56 });
+    try {
+      const get = (url: string) =>
+        wide.app.inject({ method: 'GET', url, headers: bearer(c.admin) });
+      expect((await get(base(c))).json<SeriesListBody>().horizonDays).toBe(56);
+      expect(seriesOf(await get(`${base(c)}/${ruleId}`)).horizonDays).toBe(56);
+    } finally {
+      await wide.close();
+    }
+  });
+});
+
 describe('editing one date of a series (AC-HAPPY-6)', () => {
   it('marks the instance edited only on a real change, never on a no-op, and refuses to move its date', async () => {
     const c = await scene();

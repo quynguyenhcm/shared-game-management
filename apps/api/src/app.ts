@@ -35,6 +35,7 @@ import type { LoginThrottle } from './modules/auth/throttle.ts';
 import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
 import { sessionsRoutes } from './modules/sessions/routes.ts';
 import { createSessionsService } from './modules/sessions/service.ts';
+import { DEFAULT_RECURRENCE_HORIZON_DAYS } from './modules/sessions/materialise.ts';
 import { createSeriesService } from './modules/sessions/series.ts';
 import { skillLevelsRoutes } from './modules/skill-levels/routes.ts';
 import { createSkillLevelsService } from './modules/skill-levels/service.ts';
@@ -69,6 +70,8 @@ export interface AppDeps extends HealthDeps {
    * `createSessionAllocator`, so an entrypoint that forgets it does not compile.
    */
   readonly sessionAllocator: SessionAllocatorPort;
+  /** `RECURRENCE_HORIZON_DAYS` (7-91), reported on series reads; the materialiser default (28) when omitted. */
+  readonly recurrenceHorizonDays?: number;
   /** Test seam: extra plugins registered after the auth module (guard fixture routes). They need a policy too. */
   readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
@@ -204,6 +207,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       clock: deps.clock,
       jobs: deps.jobs,
       allocator: deps.sessionAllocator,
+      horizonDays: deps.recurrenceHorizonDays ?? DEFAULT_RECURRENCE_HORIZON_DAYS,
     }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);

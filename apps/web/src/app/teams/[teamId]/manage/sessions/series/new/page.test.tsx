@@ -5,6 +5,7 @@ import { TEAM_ID } from '../../../../../../../lib/teams/sessions-fixtures.ts';
 const mocks = vi.hoisted(() => ({
   teamDetail: vi.fn(),
   teamBanking: vi.fn(),
+  listSeries: vi.fn(),
   warn: vi.fn(),
 }));
 
@@ -33,7 +34,11 @@ vi.mock('../../../../../../../lib/log.ts', () => ({
   log: { info: vi.fn(), warn: mocks.warn, error: vi.fn() },
 }));
 vi.mock('../../../../../../../lib/api-client.ts', () => ({
-  apiClient: { teamDetail: mocks.teamDetail, teamBanking: mocks.teamBanking },
+  apiClient: {
+    teamDetail: mocks.teamDetail,
+    teamBanking: mocks.teamBanking,
+    listSeries: mocks.listSeries,
+  },
 }));
 
 const page = await import('./page.tsx');
@@ -58,9 +63,13 @@ const banking = (isPayoutConfigured: boolean) =>
     },
   });
 
-async function render(results: { banking?: unknown } = {}, teamId = TEAM_ID): Promise<string> {
+async function render(
+  results: { banking?: unknown; series?: unknown } = {},
+  teamId = TEAM_ID,
+): Promise<string> {
   mocks.teamDetail.mockResolvedValue(TEAM);
   mocks.teamBanking.mockResolvedValue(results.banking ?? banking(true));
+  mocks.listSeries.mockResolvedValue(results.series ?? ok({ series: [], horizonDays: 28 }));
   const element = await NewSeriesPage({
     params: Promise.resolve({ teamId }),
     searchParams: Promise.resolve({}),
@@ -71,6 +80,7 @@ async function render(results: { banking?: unknown } = {}, teamId = TEAM_ID): Pr
 beforeEach(() => {
   mocks.teamDetail.mockReset();
   mocks.teamBanking.mockReset();
+  mocks.listSeries.mockReset();
 });
 
 describe('new series page (S0)', () => {
@@ -87,6 +97,20 @@ describe('new series page (S0)', () => {
     expect(html).toContain('Sessions are added 28 days ahead and published automatically');
     expect(html).toMatch(/name="createKey"[^>]*value="[0-9a-f-]{36}"/);
     expect(html).toContain('>Create series<');
+  });
+
+  it('reads the horizon from the API for the form hint instead of keeping its own', async () => {
+    const html = await render({ series: ok({ series: [], horizonDays: 56 }) });
+    expect(html).toContain('Sessions are added 56 days ahead and published automatically');
+    expect(html).not.toContain('28 days ahead');
+  });
+
+  it('403 on the series read is NoAccess; a 5xx throws to the error page', async () => {
+    const html = await render({ series: fail(403, 'forbidden') });
+    expect(html).not.toContain('<form');
+    await expect(render({ series: fail(503, 'service_unavailable') })).rejects.toThrow(
+      /API is unavailable/,
+    );
   });
 
   it('rejects a non-UUID team id; 401 returns here; 403 is NoAccess', async () => {

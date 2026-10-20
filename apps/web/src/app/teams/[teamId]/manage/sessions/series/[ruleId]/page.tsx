@@ -157,6 +157,7 @@ export default async function SeriesPage({
           series={series}
           bankingHref={bankingHref}
           isPayoutConfigured={series.isPayoutConfigured}
+          horizonDays={series.horizonDays}
           cancelHref={viewPath}
         />
       </ManageProvider>
@@ -167,7 +168,7 @@ export default async function SeriesPage({
   const todayNz = instantToLocal(new Date()).date;
   const { listed, past } = splitSeriesInstances(series.instances);
   const bankingNotice = series.isActive ? seriesBankingNotice(series) : null;
-  const next = series.isActive ? nextSeriesDate(series, todayNz) : null;
+  const next = series.isActive ? nextSeriesDate(series, todayNz, series.horizonDays) : null;
   return (
     <ManageProvider>
       <title>{`${series.name} – ${team.name} – Shared Game Management`}</title>
@@ -211,7 +212,7 @@ export default async function SeriesPage({
         )}
         {next === null || series.materialising ? null : (
           <p className="text-base text-slate-900">
-            {listed.length === 0 ? noSessionsYetLine(next) : horizonLine(next)}
+            {listed.length === 0 ? noSessionsYetLine(next) : horizonLine(next, series.horizonDays)}
           </p>
         )}
         {past.length === 0 ? null : (

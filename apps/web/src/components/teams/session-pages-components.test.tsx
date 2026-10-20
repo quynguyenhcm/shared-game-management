@@ -6,6 +6,7 @@ import {
   TEAM_ID,
   instanceFixture,
   seriesFixture,
+  seriesListItemFixture,
   sessionFixture,
 } from '../../lib/teams/sessions-fixtures.ts';
 
@@ -26,7 +27,7 @@ const { SessionList } = await import('./session-list.tsx');
 const { CancelSessionConfirm } = await import('./cancel-session-confirm.tsx');
 const { PublishDraftsButton } = await import('./publish-drafts-button.tsx');
 const { ManageProvider } = await import('./manage-context.tsx');
-const { seriesGroups } = await import('../../lib/teams/sessions-view.ts');
+const { seriesRows } = await import('../../lib/teams/sessions-view.ts');
 
 const BANKING = `/teams/${TEAM_ID}/manage/banking?returnTo=%2Fteams%2F${TEAM_ID}%2Fmanage%2Fsessions`;
 
@@ -197,6 +198,7 @@ describe('SeriesForm: create (UI/UX D3, series form create)', () => {
       createKey={CREATE_KEY}
       bankingHref={BANKING}
       isPayoutConfigured={false}
+      horizonDays={56}
     />,
   );
 
@@ -216,6 +218,11 @@ describe('SeriesForm: create (UI/UX D3, series form create)', () => {
     expect(html).not.toContain('name="deadlineMode"');
   });
 
+  it('says the horizon it was given, not a built-in one', () => {
+    expect(html).toContain('Sessions are added 56 days ahead and published automatically');
+    expect(html).not.toContain('28 days ahead');
+  });
+
   it('posts the createKey and has one Create series button that opens the confirm (type=button)', () => {
     expect(html).toMatch(/name="createKey"[^>]*value="2f6c1c1e/);
     expect(html).toMatch(/<button[^>]*type="button"[^>]*aria-expanded="false"[^>]*>Create series/);
@@ -229,6 +236,7 @@ describe('SeriesForm: create (UI/UX D3, series form create)', () => {
         createKey={CREATE_KEY}
         bankingHref={BANKING}
         isPayoutConfigured={false}
+        horizonDays={56}
         defaultConfirmOpen
       />,
     );
@@ -256,6 +264,7 @@ describe('SeriesForm: edit (P-3 fixed pattern, T-5 effect line)', () => {
       series={series}
       bankingHref={BANKING}
       isPayoutConfigured
+      horizonDays={series.horizonDays}
       cancelHref={`/teams/${TEAM_ID}/manage/sessions/series/${RULE_ID}`}
     />,
   );
@@ -329,7 +338,7 @@ describe('SessionList (UI/UX D4: four sections, flat rows)', () => {
         upcoming={{ sessions: [published], nextCursor: null }}
         drafts={{ sessions: [draft], nextCursor: null }}
         past={{ sessions: [], nextCursor: null }}
-        series={seriesGroups([published])}
+        series={seriesRows([seriesListItemFixture()], [published])}
       />,
     );
     expect(html).toMatch(
@@ -345,6 +354,33 @@ describe('SessionList (UI/UX D4: four sections, flat rows)', () => {
     expect(html).toContain('Draft · bank account needed');
   });
 
+  it('a series row shows its status line: Adding sessions…, Active or Ended {date}, even with no loaded dates', () => {
+    const html = renderToStaticMarkup(
+      <SessionList
+        {...base}
+        upcoming={{ sessions: [], nextCursor: null }}
+        drafts={{ sessions: [], nextCursor: null }}
+        past={{ sessions: [], nextCursor: null }}
+        series={seriesRows(
+          [
+            seriesListItemFixture({ materialising: true }),
+            seriesListItemFixture({
+              id: '51111111-1111-4111-8111-111111111111',
+              name: 'Sundays at Albany',
+              isActive: false,
+              recurUntil: '2026-12-16',
+            }),
+          ],
+          [],
+        )}
+      />,
+    );
+    expect(html).toContain('Adding sessions…');
+    expect(html).toContain('Ended 16 Dec 2026');
+    expect(html).toContain('>Sundays at Albany</a>');
+    expect(html).not.toContain('No recurring series yet.');
+  });
+
   it('a series row links to the series page with its upcoming count', () => {
     const html = renderToStaticMarkup(
       <SessionList
@@ -352,7 +388,7 @@ describe('SessionList (UI/UX D4: four sections, flat rows)', () => {
         upcoming={{ sessions: [published], nextCursor: null }}
         drafts={{ sessions: [], nextCursor: null }}
         past={{ sessions: [], nextCursor: null }}
-        series={seriesGroups([{ ...published, phase: 'upcoming' }])}
+        series={seriesRows([seriesListItemFixture()], [{ ...published, phase: 'upcoming' }])}
       />,
     );
     expect(html).toMatch(

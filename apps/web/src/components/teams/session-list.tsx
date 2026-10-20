@@ -5,7 +5,7 @@ import {
   sessionLabel,
   sessionWhen,
   type ListSectionId,
-  type SeriesGroup,
+  type SeriesRow,
 } from '../../lib/teams/sessions-view.ts';
 import {
   listPagerHrefs,
@@ -83,7 +83,7 @@ export function SessionList({
   upcoming: SessionPage;
   drafts: SessionPage;
   past: SessionPage;
-  series: readonly SeriesGroup[];
+  series: readonly SeriesRow[];
   /** The cursors in the URL now, so each section's links keep the others'. */
   current: Record<string, string | undefined>;
 }) {
@@ -121,7 +121,10 @@ export function SessionList({
                     >
                       {group.name}
                     </a>
-                    <p className="text-base text-slate-900">{group.upcomingText}</p>
+                    <p className="text-base text-slate-900">{group.statusText}</p>
+                    {group.upcomingText === null ? null : (
+                      <p className="text-base text-slate-900">{group.upcomingText}</p>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -25,6 +25,18 @@ export function findRule(
     .executeTakeFirst();
 }
 
+/** The team's series, active first, then oldest first (a stable order for the Sessions page's Series section). */
+export function listRules(db: Database, teamId: string): Promise<LockedRule[]> {
+  return db
+    .selectFrom('recurring_session_rules')
+    .selectAll()
+    .where('team_id', '=', teamId)
+    .orderBy('is_active', 'desc')
+    .orderBy('created_at', 'asc')
+    .orderBy('id', 'asc')
+    .execute();
+}
+
 export function findRuleByCreateKey(
   db: Database,
   teamId: string,

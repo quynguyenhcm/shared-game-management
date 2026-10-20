@@ -551,6 +551,8 @@ export const SeriesResponse = z.object({
   version: z.number().int().min(1),
   /** True while the last per-rule run trails `version` ("We're adding the sessions…"). */
   materialising: z.boolean(),
+  /** How many days ahead the materialiser adds sessions (`RECURRENCE_HORIZON_DAYS`, 7-91): the web never keeps its own copy. */
+  horizonDays: z.number().int().min(7).max(91),
   location: z.string(),
   address: z.string(),
   maxPlayers: z.number().int(),
@@ -577,6 +579,27 @@ export const SeriesResponse = z.object({
   instances: z.array(SeriesInstanceResponse),
 });
 export type SeriesResponse = z.infer<typeof SeriesResponse>;
+
+/** One row of the Sessions page's Series section: enough to name, status and link a series without loading its dates. */
+export const SeriesListItem = z.object({
+  id: z.uuid(),
+  /** Derived from the pattern and location (`seriesName`), not stored. */
+  name: z.string(),
+  startsOn: z.string(),
+  recurUntil: z.string().nullable(),
+  isActive: z.boolean(),
+  version: z.number().int().min(1),
+  /** True while the last per-rule run trails `version` ("Adding sessions…"). */
+  materialising: z.boolean(),
+});
+export type SeriesListItem = z.infer<typeof SeriesListItem>;
+
+/** The team's series, active ones first; `horizonDays` is the materialisation horizon (see `SeriesResponse`). */
+export const SeriesListResponse = z.object({
+  series: z.array(SeriesListItem),
+  horizonDays: z.number().int().min(7).max(91),
+});
+export type SeriesListResponse = z.infer<typeof SeriesListResponse>;
 
 /** Read or create a series. */
 export const SeriesDetailResponse = z.object({ series: SeriesResponse });

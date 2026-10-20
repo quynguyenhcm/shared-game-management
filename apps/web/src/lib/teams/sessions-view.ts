@@ -11,6 +11,7 @@ import {
   type DstOptionsEntry,
   type Money,
   type SeriesInstanceResponse,
+  type SeriesListItem,
   type SeriesResponse,
   type SessionResponse,
 } from '@sgm/shared';
@@ -299,41 +300,43 @@ export function showListBankingNotice(
   );
 }
 
-export interface SeriesGroup {
+export interface SeriesRow {
   ruleId: string;
   name: string;
-  upcoming: number;
-  upcomingText: string;
+  /** `Active`, `Adding sessions…` or `Ended 16 Dec 2026`. */
+  statusText: string;
+  /** Null when no loaded date is upcoming: the list cannot know a count past the pages it loaded. */
+  upcomingText: string | null;
 }
 
 /**
- * The Series section's rows. No list-series endpoint exists, so a series is known from the sessions the page
- * loaded: one group per rule, counted by its upcoming dates.
+ * The Series section's rows, one per series from the series list read (`GET /session-series`), so a series that is
+ * still being created, has ended, or has no date on the loaded pages still has its row. The upcoming count can only
+ * come from the sessions the page loaded, so it is shown only when it is above zero.
  */
-export function seriesGroups(
-  sessions: readonly Pick<SessionResponse, 'recurringRuleId' | 'seriesName' | 'status' | 'phase'>[],
-): SeriesGroup[] {
-  const groups = new Map<string, { name: string; upcoming: number }>();
+export function seriesRows(
+  series: readonly SeriesListItem[],
+  sessions: readonly Pick<SessionResponse, 'recurringRuleId' | 'status' | 'phase'>[],
+): SeriesRow[] {
+  const upcoming = new Map<string, number>();
   for (const session of sessions) {
     if (session.recurringRuleId === null) continue;
-    const group = groups.get(session.recurringRuleId) ?? {
-      name: session.seriesName ?? 'Series',
-      upcoming: 0,
-    };
     if (
       (session.status === 'PUBLISHED' || session.status === 'DRAFT') &&
       session.phase === 'upcoming'
     ) {
-      group.upcoming += 1;
+      upcoming.set(session.recurringRuleId, (upcoming.get(session.recurringRuleId) ?? 0) + 1);
     }
-    groups.set(session.recurringRuleId, group);
   }
-  return [...groups].map(([ruleId, group]) => ({
-    ruleId,
-    name: group.name,
-    upcoming: group.upcoming,
-    upcomingText: `${group.upcoming} upcoming`,
-  }));
+  return series.map((item) => {
+    const count = upcoming.get(item.id) ?? 0;
+    return {
+      ruleId: item.id,
+      name: item.name,
+      statusText: seriesStatusLabel(item),
+      upcomingText: count === 0 ? null : `${count} upcoming`,
+    };
+  });
 }
 
 /** `Active`, `Adding sessions…` or `Ended 16 Dec 2026`. */
@@ -871,9 +874,6 @@ export function seriesBankingNotice(
 // Series page: the horizon, the empty state and which dates are listed
 // ---------------------------------------------------------------------------------------------
 
-/** How far ahead the materialiser adds sessions (the API's `RECURRENCE_HORIZON_DAYS` default). */
-export const SERIES_HORIZON_DAYS = 28;
-
 export interface NextSeriesDate {
   /** The next date the series will add (`YYYY-MM-DD`). */
   date: string;
@@ -888,7 +888,8 @@ export interface NextSeriesDate {
 export function nextSeriesDate(
   series: PatternFields & Pick<SeriesResponse, 'startsOn' | 'recurUntil'>,
   today: string,
-  horizonDays: number = SERIES_HORIZON_DAYS,
+  /** The API's `horizonDays` (`RECURRENCE_HORIZON_DAYS`): the web keeps no copy of it. */
+  horizonDays: number,
 ): NextSeriesDate | null {
   const from = fromEpochDay(epochDay(parseLocalDate(today)) + horizonDays + 1);
   const to = fromEpochDay(epochDay(from) + 400);
@@ -907,10 +908,7 @@ export function nextSeriesDate(
   return { date, addedOn: fromEpochDay(epochDay(date) - horizonDays) };
 }
 
-export function horizonLine(
-  next: NextSeriesDate,
-  horizonDays: number = SERIES_HORIZON_DAYS,
-): string {
+export function horizonLine(next: NextSeriesDate, horizonDays: number): string {
   return `Sessions are added ${horizonDays} days ahead. The next one, ${formatDayShort(next.date)}, will be added on ${formatDayShort(next.addedOn)}.`;
 }
 

@@ -9,6 +9,7 @@ import {
   PublishDraftsResponse,
   SeriesDetailResponse,
   SeriesIdParams,
+  SeriesListResponse,
   SeriesSaveResponse,
   SessionErrorResponse,
   TeamIdParams,
@@ -69,6 +70,21 @@ export const seriesRoutes: FastifyPluginAsync<SeriesRoutesOptions> = (app, optio
       void reply.code(replayed ? 200 : 201);
       return response;
     },
+  );
+
+  typed.get(
+    '/:teamId/session-series',
+    {
+      config: { policy },
+      schema: {
+        summary: "List the team's series",
+        description: `Every series of the team, active ones first, each with its name, \`isActive\`, \`materialising\`, \`recurUntil\` (the end date once ended) and \`version\`, plus \`horizonDays\`, the configured materialisation horizon. It is read from the series themselves, not from the sessions loaded on a page, so a series still being created, an ended one and one with no dates yet all appear. ${SHAPE}`,
+        operationId: 'listTeamSeries',
+        params: TeamIdParams,
+        response: { 200: SeriesListResponse, ...ERRORS },
+      },
+    },
+    async (request) => service.list(request.params.teamId),
   );
 
   typed.get(

@@ -27,6 +27,7 @@ import {
   type LocalDate,
   type PublishDraftsResponse,
   type SeriesDetailResponse,
+  type SeriesListResponse,
   type SeriesResponse,
   type SeriesRule,
   type SeriesSaveResponse,
@@ -73,6 +74,7 @@ import * as seriesRepo from './series-repo.ts';
 import {
   buildSeriesExtras,
   existingInstanceOf,
+  toSeriesListItem,
   toSeriesResponse,
   type RuleCourtRow,
 } from './series-view.ts';
@@ -87,9 +89,12 @@ export interface SeriesServiceDeps {
   readonly jobs: Pick<JobRunner, 'enqueue'>;
   /** The seat allocator seam: promotion after a capacity raise on a published instance. */
   readonly allocator: SessionAllocatorPort;
+  /** `RECURRENCE_HORIZON_DAYS`: reported on every series read so the web keeps no copy of it. */
+  readonly horizonDays: number;
 }
 
 export interface SeriesService {
+  list(teamId: string): Promise<SeriesListResponse>;
   get(teamId: string, ruleId: string): Promise<SeriesDetailResponse>;
   create(
     teamId: string,
@@ -254,7 +259,7 @@ async function lockedInstances(
 // ---------------------------------------------------------------------------------------------
 
 export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
-  const { db, clock, jobs, allocator } = deps;
+  const { db, clock, jobs, allocator, horizonDays } = deps;
 
   async function viewOf(reader: Database, rule: LockedRule): Promise<SeriesResponse> {
     const now = clock.now();
@@ -286,6 +291,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
         now,
         today: instantToLocal(now).date,
       }),
+      horizonDays,
     );
   }
 
@@ -327,6 +333,11 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
     enqueueRuleMaterialisation(jobs, { ruleId: rule.id, teamId: rule.team_id, trigger }, { trx });
 
   return {
+    async list(teamId) {
+      const rules = await seriesRepo.listRules(db, teamId);
+      return { series: rules.map(toSeriesListItem), horizonDays };
+    },
+
     async get(teamId, ruleId) {
       return { series: await viewOf(db, await requireRule(db, teamId, ruleId)) };
     },

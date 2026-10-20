@@ -5,6 +5,7 @@ import type {
   SessionResponse,
 } from '@sgm/shared';
 import { describe, expect, it } from 'vitest';
+import { seriesListItemFixture } from './sessions-fixtures.ts';
 import {
   LIST_SECTIONS,
   REFRESH_DELAYS_MS,
@@ -30,7 +31,7 @@ import {
   seriesBankingNotice,
   seriesDetailsRows,
   seriesEffect,
-  seriesGroups,
+  seriesRows,
   seriesPatternLabel,
   seriesSavedLines,
   deadlineReadout,
@@ -224,18 +225,53 @@ describe('status labels (T-11, copy deck "Status labels" and "Draft labels")', (
 });
 
 describe('series on the list', () => {
-  it('groups the sessions it was given by series and counts upcoming ones (no list-series endpoint exists)', () => {
+  it('builds a row per listed series, with its status, and counts upcoming dates from the sessions it was given', () => {
     const rule = '41111111-1111-4111-8111-111111111111';
     const other = '51111111-1111-4111-8111-111111111111';
-    const groups = seriesGroups([
-      session({ recurringRuleId: rule, seriesName: 'Wednesdays at Rosedale' }),
-      session({ recurringRuleId: rule, seriesName: 'Wednesdays at Rosedale', phase: 'ended' }),
-      session({ recurringRuleId: other, seriesName: 'Sundays at Albany' }),
-      session(),
+    const rows = seriesRows(
+      [
+        seriesListItemFixture({ id: rule }),
+        seriesListItemFixture({
+          id: other,
+          name: 'Sundays at Albany',
+          isActive: false,
+          recurUntil: '2026-12-16',
+        }),
+      ],
+      [
+        session({ recurringRuleId: rule }),
+        session({ recurringRuleId: rule, phase: 'ended' }),
+        session({ recurringRuleId: other }),
+        session(),
+      ],
+    );
+    expect(rows).toEqual([
+      {
+        ruleId: rule,
+        name: 'Wednesdays at Rosedale',
+        statusText: 'Active',
+        upcomingText: '1 upcoming',
+      },
+      {
+        ruleId: other,
+        name: 'Sundays at Albany',
+        statusText: 'Ended 16 Dec 2026',
+        upcomingText: '1 upcoming',
+      },
     ]);
-    expect(groups).toEqual([
-      { ruleId: rule, name: 'Wednesdays at Rosedale', upcoming: 1, upcomingText: '1 upcoming' },
-      { ruleId: other, name: 'Sundays at Albany', upcoming: 1, upcomingText: '1 upcoming' },
+  });
+
+  it('a series with no loaded dates, or still being created, still has a row and says no count it cannot know', () => {
+    const rows = seriesRows(
+      [
+        seriesListItemFixture({ materialising: true }),
+        seriesListItemFixture({ id: '51111111-1111-4111-8111-111111111111' }),
+      ],
+      [],
+    );
+    expect(rows.map((r) => [r.statusText, r.upcomingText])).toEqual([
+      ['Adding sessions…', null],
+      ['Active', null],
     ]);
   });
 

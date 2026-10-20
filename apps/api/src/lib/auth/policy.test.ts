@@ -138,8 +138,9 @@ describe('route policy registry (AC-VERIFY-3)', () => {
       'PUT /teams/:teamId/sessions/:sessionId',
       'POST /teams/:teamId/sessions/:sessionId/publish',
       'POST /teams/:teamId/sessions/:sessionId/cancel',
-      // ...and the five series routes (create, read, edit, End series, Publish drafts now).
+      // ...and the six series routes (create, list, read, edit, End series, Publish drafts now).
       'POST /teams/:teamId/session-series',
+      'GET /teams/:teamId/session-series',
       'GET /teams/:teamId/session-series/:ruleId',
       'PUT /teams/:teamId/session-series/:ruleId',
       'POST /teams/:teamId/session-series/:ruleId/end',
@@ -152,8 +153,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 32 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + five series), none public.
-    expect(byRoute.size).toBe(32);
+    // Exactly the 33 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series), none public.
+    expect(byRoute.size).toBe(33);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });

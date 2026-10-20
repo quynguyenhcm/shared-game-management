@@ -62,6 +62,7 @@ const app = await buildApp({
   loginThrottle,
   oauthProviders,
   sessionAllocator,
+  recurrenceHorizonDays: config.recurrence.horizonDays,
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

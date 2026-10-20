@@ -1,4 +1,9 @@
-import type { SeriesInstanceResponse, SeriesResponse, SessionResponse } from '@sgm/shared';
+import type {
+  SeriesInstanceResponse,
+  SeriesListItem,
+  SeriesResponse,
+  SessionResponse,
+} from '@sgm/shared';
 
 /**
  * Wire-shaped fixtures for the Sessions action, page and component tests. They are the exact JSON the API
@@ -98,6 +103,7 @@ export function seriesFixture(overrides: Overrides<SeriesResponse> = {}): Series
     isActive: true,
     version: 2,
     materialising: false,
+    horizonDays: 28,
     location: 'Rosedale',
     address: '1 Court Rd',
     maxPlayers: 18,
@@ -124,4 +130,17 @@ export function seriesFixture(overrides: Overrides<SeriesResponse> = {}): Series
     instances: [instanceFixture()],
     ...overrides,
   } as SeriesResponse;
+}
+
+export function seriesListItemFixture(overrides: Partial<SeriesListItem> = {}): SeriesListItem {
+  return {
+    id: RULE_ID,
+    name: 'Wednesdays at Rosedale',
+    startsOn: '2026-11-04',
+    recurUntil: null,
+    isActive: true,
+    version: 2,
+    materialising: false,
+    ...overrides,
+  };
 }

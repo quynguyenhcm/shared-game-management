@@ -128,6 +128,14 @@ describe('series page: summary first (UI/UX D3 option 1, S2)', () => {
     expect(horizon).toBeLessThan(html.indexOf('>Series details</h2>'));
   });
 
+  it('says the horizon the API reports, never a built-in 28', async () => {
+    const html = await render({}, { series: detail({ horizonDays: 56 }) });
+    expect(html).toContain(
+      'Sessions are added 56 days ahead. The next one, Wed 6 Jan, will be added on Wed 11 Nov.',
+    );
+    expect(html).not.toContain('28 days ahead');
+  });
+
   it('the details block has the rows, "Change series details" (?edit=details) and End series', async () => {
     const html = await render();
     expect(html).toContain('>Series details</h2>');

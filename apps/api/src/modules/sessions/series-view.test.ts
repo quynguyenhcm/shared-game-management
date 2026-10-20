@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseMoney } from '@sgm/shared';
 import type { LockedRule } from './locks.ts';
-import { buildSeriesExtras, existingInstanceOf, toSeriesResponse } from './series-view.ts';
+import {
+  buildSeriesExtras,
+  existingInstanceOf,
+  toSeriesListItem,
+  toSeriesResponse,
+} from './series-view.ts';
 import type { SessionRow } from './view.ts';
 
 const ruleRow = (over: Partial<LockedRule> = {}): LockedRule =>
@@ -43,12 +48,12 @@ const NO_EXTRAS = {
 
 describe('toSeriesResponse', () => {
   it('derives the name from the pattern and location and passes the extras through', () => {
-    const response = toSeriesResponse(ruleRow(), [], {
-      ...NO_EXTRAS,
-      isPayoutConfigured: true,
-      bankingDrafts: 2,
-      editedDrafts: 1,
-    });
+    const response = toSeriesResponse(
+      ruleRow(),
+      [],
+      { ...NO_EXTRAS, isPayoutConfigured: true, bankingDrafts: 2, editedDrafts: 1 },
+      28,
+    );
     expect(response).toMatchObject({
       name: 'Wednesdays at Hall',
       isPayoutConfigured: true,
@@ -57,19 +62,19 @@ describe('toSeriesResponse', () => {
       instances: [],
     });
     expect(
-      toSeriesResponse(ruleRow({ frequency: 'MONTHLY', monthly_week: -1 }), [], NO_EXTRAS).name,
+      toSeriesResponse(ruleRow({ frequency: 'MONTHLY', monthly_week: -1 }), [], NO_EXTRAS, 28).name,
     ).toBe('Last Wednesday of the month at Hall');
   });
 
   it('reports materialising while the last run trails the version (or never ran), and not once it caught up', () => {
     expect(
-      toSeriesResponse(ruleRow({ materialised_version: null }), [], NO_EXTRAS).materialising,
+      toSeriesResponse(ruleRow({ materialised_version: null }), [], NO_EXTRAS, 28).materialising,
     ).toBe(true);
     expect(
-      toSeriesResponse(ruleRow({ materialised_version: 2 }), [], NO_EXTRAS).materialising,
+      toSeriesResponse(ruleRow({ materialised_version: 2 }), [], NO_EXTRAS, 28).materialising,
     ).toBe(true);
     expect(
-      toSeriesResponse(ruleRow({ materialised_version: 3 }), [], NO_EXTRAS).materialising,
+      toSeriesResponse(ruleRow({ materialised_version: 3 }), [], NO_EXTRAS, 28).materialising,
     ).toBe(false);
   });
 
@@ -81,6 +86,7 @@ describe('toSeriesResponse', () => {
         { court_identifier: 'Court 1', start_time: '19:00:00', end_time: '21:00:00', position: 1 },
       ],
       NO_EXTRAS,
+      28,
     );
     expect(response.courts).toEqual([
       { identifier: 'Court 1', startTime: '19:00', endTime: '21:00' },
@@ -93,6 +99,29 @@ describe('toSeriesResponse', () => {
       courtCost: '240.00',
       feeFlat: '10.00',
     });
+  });
+});
+
+describe('the materialisation horizon and the list row', () => {
+  it('reports the configured horizon on the series response', () => {
+    expect(toSeriesResponse(ruleRow(), [], NO_EXTRAS, 56).horizonDays).toBe(56);
+  });
+
+  it('maps a rule to its list row: name, status flags, end date, no dates', () => {
+    expect(toSeriesListItem(ruleRow({ materialised_version: 2 }))).toEqual({
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Wednesdays at Hall',
+      startsOn: '2026-10-07',
+      recurUntil: null,
+      isActive: true,
+      version: 3,
+      materialising: true,
+    });
+    expect(
+      toSeriesListItem(
+        ruleRow({ is_active: false, recur_until: '2026-12-16' as LockedRule['recur_until'] }),
+      ),
+    ).toMatchObject({ isActive: false, recurUntil: '2026-12-16', materialising: false });
   });
 });
 
