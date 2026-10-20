@@ -3,6 +3,7 @@ import type { FieldCrypto } from '../lib/crypto/crypto.ts';
 import type { Database } from '../lib/db/kysely.ts';
 import type { JobHandler, JobRunner, QueueDefinition } from '../lib/jobs/jobs.ts';
 import type { Notifier } from '../lib/notifications/notifier.ts';
+import type { SessionAllocatorPort } from '../modules/sessions/allocator-port.ts';
 import { noopMemberBannedHandler, type MemberBannedHandler } from '../modules/teams/ban-hook.ts';
 import { createAuthCleanupHandler } from './auth-cleanup.ts';
 import { heartbeatHandler } from './heartbeat.ts';
@@ -10,6 +11,7 @@ import { createMemberBannedJobHandler } from './member-banned.ts';
 import { QUEUES, QUEUE_NAMES, withExpireOverride } from './registry.ts';
 import { SCHEDULES, placeholderHandler, registerSchedules } from './schedules.ts';
 import { createSendEmailHandler } from './send-email.ts';
+import { createSessionAutoEnrolHandler } from './session-auto-enrol.ts';
 import { createSkillProgressionHandler } from './skill-progression.ts';
 
 export interface ExtraQueue {
@@ -32,6 +34,11 @@ export interface RegisterJobsOptions {
    * this option is the only place the port is injected.
    */
   readonly memberBannedHandler?: MemberBannedHandler;
+  /**
+   * Seat allocator seam for the sessions jobs (architecture SA-4). REQUIRED: `worker.ts` builds it with
+   * `createSessionAllocator`, so an entrypoint that forgets it does not compile.
+   */
+  readonly sessionAllocator: SessionAllocatorPort;
   /** Defaults to the registry; tests pass tuned copies. */
   readonly queues?: readonly QueueDefinition[];
   /** Test-only expiry override applied to every queue (JOBS_EXPIRE_SECONDS_OVERRIDE). */
@@ -62,6 +69,11 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
     [QUEUE_NAMES.skillProgression]: createSkillProgressionHandler({
       db: options.db,
       clock: options.clock ?? systemClock,
+    }),
+    [QUEUE_NAMES.sessionAutoEnrol]: createSessionAutoEnrolHandler({
+      db: options.db,
+      clock: options.clock ?? systemClock,
+      allocator: options.sessionAllocator,
     }),
   };
 

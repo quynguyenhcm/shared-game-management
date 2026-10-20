@@ -12,6 +12,7 @@ describe('queue registry', () => {
         'post-game-billing',
         'recurrence-materialisation',
         'send-email',
+        'session-auto-enrol',
         'skill-progression',
       ].sort(),
     );
@@ -33,6 +34,7 @@ describe('queue registry', () => {
       authCleanup: 'auth-cleanup',
       memberBanned: 'member-banned',
       skillProgression: 'skill-progression',
+      sessionAutoEnrol: 'session-auto-enrol',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -47,6 +49,13 @@ describe('queue registry', () => {
     expect(getQueue('member-banned').policy).toBe('exclusive');
     // One daily progression sweep at a time; the per-member row lock is the real guard (AC-ASYNC-2).
     expect(getQueue('skill-progression').policy).toBe('exclusive');
+    // One auto-enrol follow-up per session (`singletonKey = session-auto-enrol:<sessionId>`); the D-80 marker,
+    // stamped under the advisory lock, is the durable once-only guard (T-19).
+    expect(getQueue('session-auto-enrol').policy).toBe('exclusive');
+  });
+
+  it('adds only the auto-enrol follow-up queue in the one-off phase (recurrence-rule arrives with series)', () => {
+    expect(QUEUES.map((queue) => queue.name)).not.toContain('recurrence-rule');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {

@@ -225,7 +225,7 @@ export interface SessionFees {
 
 export type SessionStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED';
 
-/** The legal lifecycle paths of the DB matrix (D-75): DRAFT → PUBLISHED → COMPLETED, and → CANCELLED from either. */
+/** The legal lifecycle paths of the DB matrix (D-75): DRAFT → PUBLISHED → COMPLETED, and → CANCELLED from DRAFT or PUBLISHED. */
 const LIFECYCLE_PATH: Readonly<Record<SessionStatus, readonly SessionStatus[]>> = {
   DRAFT: [],
   PUBLISHED: ['PUBLISHED'],
@@ -251,7 +251,18 @@ export async function advanceSessionTo(
   if (current === target) return;
   const path = LIFECYCLE_PATH[target];
   const at = path.indexOf(current);
-  const remaining = current === 'DRAFT' ? path : at >= 0 ? path.slice(at + 1) : [];
+  // CANCELLED is one legal step from DRAFT or PUBLISHED (neither is on its own path); everything else continues
+  // along the target's path from where the session is.
+  const remaining =
+    target === 'CANCELLED'
+      ? current === 'DRAFT' || current === 'PUBLISHED'
+        ? path
+        : []
+      : current === 'DRAFT'
+        ? path
+        : at >= 0
+          ? path.slice(at + 1)
+          : [];
   if (remaining.length === 0) {
     throw new Error(`advanceSessionTo: ${current} → ${target} is not a legal path`);
   }

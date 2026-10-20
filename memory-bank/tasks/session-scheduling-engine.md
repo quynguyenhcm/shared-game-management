@@ -832,7 +832,7 @@ The plan follows systemPatterns' module shape, P1/P2/P3/P5/P7, default-deny rout
   - Fix the tests the new CHECKs and matrix break, in the same commit (T-16): `publishable`, `advanceSessionTo`, `insertSession` defaults, `insertRule`/`insertRuleCourt`.
   - ACs: AC-VERIFY-1, AC-VERIFY-4, AC-VERIFY-5, AC-ERROR-6, AC-HAPPY-2 (pure half), AC-ERROR-2, AC-ERROR-4, AC-ERROR-5 and AC-ERROR-10 (DB halves).
   - Gate: migrate, rollback, migrate is identical; trigger order and 48 h parity asserted; vector tables pass; the existing suite is green.
-- [ ] **Phase 2: One-off sessions API, allocator seam and auto-enrol follow-up.**
+- [x] **Phase 2: One-off sessions API, allocator seam and auto-enrol follow-up.**
   - `allocator-port.ts`, `session-allocator.ts` and its wiring in `main.ts`, `worker.ts`, `buildApp` and `registerJobs`; `locks.ts`, `tx.ts`; the query recorder.
   - Sessions module (routes, service, repo, errors): create with `createKey`, edit, save-then-publish through the gate, cancel with counts, capacity edit (C-SSE-3), default deadline, DST refusal, fee lock, `expectedVersion` on every write, actor re-check, policies.
   - Auto-enrol follow-up for API publishes (P-1 makes one-off publishes auto-enrol): `auto-enrol.ts`, the `session-auto-enrol` queue and `jobs/session-auto-enrol.ts`.
@@ -893,12 +893,12 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 
 ## Execution State
 
-**Build Status**: IDLE (Phase 1 of 6 COMPLETE)
+**Build Status**: IDLE (Phase 2 of 6 COMPLETE)
 **Auto-Build Mode**: YES
-**Current Build**: Phase 1: Schema, shared core and fixture fixes (session-scheduling-engine) - COMPLETE
-**Phase Number**: 1 of 6
+**Current Build**: Phase 2: One-off sessions API, allocator seam and auto-enrol follow-up (session-scheduling-engine) - COMPLETE
+**Phase Number**: 2 of 6
 **Is Multi-Phase**: YES
-**Can Resume**: YES (next: Phase 2)
+**Can Resume**: YES (next: Phase 3)
 
 ### Current Build Step
 **Step**: Step 11 - Git completion
@@ -911,6 +911,11 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 - Step 7 verifier: PASS - unit 1396/1396, integration 465/465, build, lint, typecheck
 - Step 8 code review: APPROVED, no blocking issues
 - Phase 1 ACs covered: AC-VERIFY-1, AC-VERIFY-4, AC-VERIFY-5, AC-ERROR-6, AC-HAPPY-2 (pure), AC-ERROR-2, AC-ERROR-4/5/10 (DB halves)
+
+- Phase 2 Step 3 TDD: 2A foundation (allocator port/wiring, locks, tx, recorder, AppError extras), 2B sessions API + auto-enrol; RED->GREEN both
+- Phase 2 Step 7 verifier: PASS - unit 1459/1459, integration 514/514, build, lint, typecheck
+- Phase 2 Step 8 code review (codex + anthropic): CHANGES_REQUIRED x2 blocking (edit PUBLISHED into passed start; malformed cursor 500), fixed via TDD; final unit 1459, integration 518/518, lint/typecheck clean
+- Phase 2 ACs covered: AC-HAPPY-1..4, 8, 9, 11, 13; AC-HAPPY-12 (manual); AC-ASYNC-2 (handler); AC-ERROR-1 (API), 3, 5, 7, 8, 10; AC-VERIFY-2 (manual); AC-VERIFY-9
 
 ### Sub-Agents
 - TDD 1A (migration, fixtures): COMPLETE
@@ -933,6 +938,21 @@ Carry-forward notes for Phase 2+ (from TDD agents and review, not blockers):
 - `apps/api/openapi.yaml` regenerated (error codes are diff-tested).
 - Worktree has a gitignored `.env` from `scripts/setup.ts`.
 
+Phase 1 | reviewer-accepted deviations:
+- Phase 1 | apps/api/test/integration/sessions-schema.int.test.ts:921-960 | 48 h parity proven by behaviour (SQL default == defaultCancellationDeadline, exactly 2 days across DST, TS constant == 48), not by reading the interval literal.
+- Phase 1 | packages/shared/src/api/sessions.ts | AC-ERROR-2 "session date in the past" is clock-relative (T-11 keeps it out of SQL); owed by the Phase 2 service (delivered: 422 `date`).
+
+Phase 2 | reviewer-accepted deviations:
+- Phase 2 | service.ts | Cancel on an already CANCELLED session is 409 `session_not_editable` (spec line 307, AC-ERROR-5) rather than an idempotent 200; replayed publish of PUBLISHED is 200.
+- Phase 2 | routes | Another team's session id under your own team path is 404 `not_found` (no existence probe); AC-ERROR-8 401/403 applies to the team guard.
+- Phase 2 | repo.ts | `activeRegistrationCount` is a TS read of registrations (CONFIRMED, WAITLISTED); registration's widening of the D-85 predicate must widen it too. Add to ADR 0019 hand-off list; consider a TS/SQL parity test in Phase 4.
+- Phase 2 | service.ts | An explicit deadline is parked on the default with an extra UPDATE when an edit could trip the non-deferrable `deadline <= starts_at` CHECK; version may bump more than once on such edits.
+- Phase 2 | content.ts | List rows carry endsAt and draftReason but no series name (rule table has no name column); revisit in Phase 3/5.
+- Phase 2 | service.ts | Edit of a PUBLISHED session into a passed start refused with 409 `session_started` (review fix).
+- Phase 2 | not delivered | CLI `jobs trigger session-auto-enrol` is not in TRIGGERABLE; non-blocking.
+- Phase 2 | suggestions deferred | split service.ts (823 lines) per use case; double log on stale refusal; `as never` casts in repo.ts need a comment; spot-check openapi.yaml diff (8.7k lines) in the PR.
+- Phase 2 | Phase 4 owes | T-17 registration-insert vs fee-edit race under the session lock; Phase 3 adds the `recurrence-rule` queue (bootstrap already accepts sessionAllocator).
+
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 2 (`/yay:build session-scheduling-engine`)
+**Resume From**: Phase 3 (`/yay:build session-scheduling-engine`)

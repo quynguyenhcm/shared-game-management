@@ -62,6 +62,9 @@ export const SESSION_FIELD_MESSAGES = {
   shortenUseEndSeries: 'To stop the series sooner, use End series.',
   patternFixed: 'To change the day or how often it repeats, end this series and start a new one.',
   reloadAndRetry: 'Reload the page and try again.',
+  datePast: "Choose today's date or a later one.",
+  datePatternFixed: 'To move this night, cancel it and create a one-off session.',
+  deadlineAfterStart: 'The deadline must be before the first court starts.',
 } as const;
 
 const M = SESSION_FIELD_MESSAGES;
@@ -399,6 +402,29 @@ const count = z.number().int().min(0);
 
 export const SessionPhase = z.enum(['upcoming', 'started', 'ended']);
 export const FeesLocked = z.enum(['none', 'raise_only_blocked']);
+/** Why a DRAFT is a draft: a refused banking gate (series), an admin edit of a series date, or the admin's own draft. */
+export const DraftReason = z.enum(['banking', 'edited', 'admin']);
+export type DraftReason = z.infer<typeof DraftReason>;
+
+export const SESSION_LIST_VIEWS = ['upcoming', 'drafts', 'past'] as const;
+export const SESSION_LIST_DEFAULT_LIMIT = 25;
+export const SESSION_LIST_MAX_LIMIT = 100;
+
+export const SessionIdParams = z.object({ teamId: z.uuid(), sessionId: z.uuid() });
+export type SessionIdParams = z.infer<typeof SessionIdParams>;
+
+/** `GET /teams/:teamId/sessions`: one section of the admin list, keyset-paged (soonest first, past most recent first). */
+export const ListSessionsQuery = z.strictObject({
+  view: z.enum(SESSION_LIST_VIEWS),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(SESSION_LIST_MAX_LIMIT)
+    .default(SESSION_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).max(300).optional(),
+});
+export type ListSessionsQuery = z.infer<typeof ListSessionsQuery>;
 
 export const SessionCourtResponse = z.object({
   id: z.uuid(),
@@ -432,15 +458,34 @@ export const SessionResponse = z.object({
   feeIntermediate: nullableMoney,
   feeAdvanced: nullableMoney,
   startsAt: isoInstant.nullable(),
+  /** Latest court end; null while the session has no court. */
+  endsAt: isoInstant.nullable(),
   cancellationDeadline: isoInstant.nullable(),
   deadlineIsDefault: z.boolean(),
   isInstanceOverridden: z.boolean(),
+  /** Set only on a DRAFT. */
+  draftReason: DraftReason.nullable(),
   version: z.number().int().min(1),
   activeRegistrationCount: count,
   feesLocked: FeesLocked,
   courts: z.array(SessionCourtResponse),
 });
 export type SessionResponse = z.infer<typeof SessionResponse>;
+
+export const SessionDetailResponse = z.object({ session: SessionResponse });
+export type SessionDetailResponse = z.infer<typeof SessionDetailResponse>;
+
+/**
+ * An edit, a create or a publish. `promoted` is how many players the allocator moved off the waitlist because a
+ * capacity edit raised public capacity (C-SSE-3); `material` says whether a field players care about changed
+ * (date, earliest start, latest end, location, address, deadline or fees), so the admin is told to let them know.
+ */
+export const SessionWriteResponse = z.object({
+  session: SessionResponse,
+  promoted: count,
+  material: z.boolean(),
+});
+export type SessionWriteResponse = z.infer<typeof SessionWriteResponse>;
 
 export const SessionListResponse = z.object({
   sessions: z.array(SessionResponse),

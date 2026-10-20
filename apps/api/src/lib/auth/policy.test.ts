@@ -130,6 +130,14 @@ describe('route policy registry (AC-VERIFY-3)', () => {
       // skill-levels-and-auto-enroll (AC-VERIFY-7): the override and Auto Enroll routes.
       'PUT /teams/:teamId/members/:userId/skill-level',
       'PUT /teams/:teamId/members/:userId/auto-enroll',
+      // session-scheduling-engine (AC-ERROR-8): the one-off session routes. The member routes
+      // (`GET /teams/:teamId/sessions/upcoming`, registration) are reserved for registration-and-waitlist.
+      'GET /teams/:teamId/sessions',
+      'POST /teams/:teamId/sessions',
+      'GET /teams/:teamId/sessions/:sessionId',
+      'PUT /teams/:teamId/sessions/:sessionId',
+      'POST /teams/:teamId/sessions/:sessionId/publish',
+      'POST /teams/:teamId/sessions/:sessionId/cancel',
     ]) {
       expect(byRoute.get(route), route).toEqual({
         kind: 'teamRole',
@@ -138,8 +146,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 21 documented team routes exist (14 + five banking and GST + two skill-levels), none public.
-    expect(byRoute.size).toBe(21);
+    // Exactly the 27 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions), none public.
+    expect(byRoute.size).toBe(27);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });

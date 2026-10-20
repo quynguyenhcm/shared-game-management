@@ -19,6 +19,7 @@ import { freePort, spawnNode } from '../helpers/spawn-node.ts';
 import { testCrypto } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { sleep, waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 const config = loadConfig();
 
@@ -61,6 +62,7 @@ beforeAll(async () => {
   await producer.start();
   // The production wiring, with a short retry policy on send-email so AC-ERROR-6 runs in seconds.
   await registerJobs({
+    sessionAllocator: noopSessionAllocator,
     runner: worker,
     notifier,
     crypto: testCrypto(),

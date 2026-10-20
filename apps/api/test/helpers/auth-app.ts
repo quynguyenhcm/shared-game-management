@@ -12,6 +12,7 @@ import { createCrypto } from '../../src/lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely, type Database } from '../../src/lib/db/kysely.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 import { buildOAuthProviders } from '../../src/modules/auth/providers/registry.ts';
 import { createPasswordHasher, type PasswordHasher } from '../../src/modules/auth/password.ts';
 import { createLoginThrottle } from '../../src/modules/auth/throttle.ts';
@@ -73,6 +74,10 @@ export interface AuthTestOptions {
   readonly logger?: Logger;
   /** Job producer; defaults to a no-op. Reset tests pass a real pg-boss producer or a failing one. */
   readonly jobs?: AppDeps['jobs'];
+  /** The sessions allocator seam; defaults to the no-op. Sessions tests inject the recording double. */
+  readonly sessionAllocator?: AppDeps['sessionAllocator'];
+  /** A Kysely handle to use instead of one over `pool` (the sessions tests record executed statements). */
+  readonly db?: Database;
 }
 
 export async function buildAuthTestApp(
@@ -82,7 +87,7 @@ export async function buildAuthTestApp(
   const config = testConfig(options.env ?? {});
   const clock = createManualClock(START_TIME);
   const logs = captureLogs();
-  const db = createKysely(pool);
+  const db = options.db ?? createKysely(pool);
   const hasher = createSpyHasher();
   const deps: AppDeps = {
     logger: options.logger ?? logs.logger,
@@ -101,6 +106,7 @@ export async function buildAuthTestApp(
       config: config.auth,
     }),
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
+    sessionAllocator: options.sessionAllocator ?? noopSessionAllocator,
     ...(options.extraPlugins === undefined ? {} : { extraPlugins: options.extraPlugins }),
   };
   const app = await buildApp(deps);

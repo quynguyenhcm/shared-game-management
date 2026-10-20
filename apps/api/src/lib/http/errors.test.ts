@@ -6,7 +6,7 @@ import {
 } from 'fastify-type-provider-zod';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ErrorCode, ErrorResponse } from '@sgm/shared';
+import { ErrorCode, ErrorResponse, SessionErrorResponse, type SessionResponse } from '@sgm/shared';
 import {
   AppError,
   ERROR_DEFAULTS,
@@ -270,6 +270,73 @@ describe('registerErrorHandling', () => {
       error: { code: 'internal_error', message: ERROR_DEFAULTS.internal_error.message },
     });
     expect(boom.body).not.toContain('secret internal detail');
+  });
+});
+
+describe('session error extras (SessionErrorResponse)', () => {
+  const dstOptions = [
+    {
+      field: 'courts.0.startTime',
+      date: '2026-09-27',
+      time: '02:30',
+      kind: 'nonexistent' as const,
+      options: [
+        {
+          choice: 'shiftedForward' as const,
+          localTime: '03:30',
+          instant: '2026-09-26T14:30:00.000Z',
+        },
+        {
+          choice: 'shiftedBackward' as const,
+          localTime: '01:30',
+          instant: '2026-09-26T13:30:00.000Z',
+        },
+      ],
+    },
+  ];
+
+  it('carries dstOptions beside fieldErrors on a 422', async () => {
+    const app = await build();
+    app.get('/dst', () => {
+      throw new AppError('validation_failed', {
+        fieldErrors: { 'courts.0.startTime': ['local_time_nonexistent'] },
+        dstOptions,
+      });
+    });
+    const response = await app.inject({ method: 'GET', url: '/dst' });
+    expect(response.statusCode).toBe(422);
+    const body = SessionErrorResponse.parse(response.json());
+    expect(body.error.dstOptions).toEqual(dstOptions);
+    expect(body.error.fieldErrors).toEqual({ 'courts.0.startTime': ['local_time_nonexistent'] });
+  });
+
+  it('carries raisedFields on session_fee_locked', async () => {
+    const app = await build();
+    app.get('/locked', () => {
+      throw new AppError('session_fee_locked', { raisedFields: ['feeMale', 'feeOther'] });
+    });
+    const response = await app.inject({ method: 'GET', url: '/locked' });
+    expect(response.statusCode).toBe(409);
+    expect(SessionErrorResponse.parse(response.json()).error).toMatchObject({
+      code: 'session_fee_locked',
+      raisedFields: ['feeMale', 'feeOther'],
+    });
+  });
+
+  it('carries the current row on a stale save (409), without touching other errors', async () => {
+    const app = await build();
+    const current = { id: 'abc', version: 4 } as unknown as SessionResponse;
+    app.get('/stale', () => {
+      throw new AppError('session_stale', { current });
+    });
+    const stale = await app.inject({ method: 'GET', url: '/stale' });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toEqual({
+      error: { code: 'session_stale', message: ERROR_DEFAULTS.session_stale.message, current },
+    });
+    // A plain AppError still has exactly the shared shape.
+    const plain = await app.inject({ method: 'GET', url: '/app-error' });
+    expect(Object.keys(plain.json<{ error: object }>().error)).toEqual(['code', 'message']);
   });
 });
 

@@ -34,6 +34,7 @@ import { testCrypto } from '../helpers/app-deps.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 const MINUTE = 60_000;
 type Provider = 'google' | 'facebook';
@@ -63,6 +64,7 @@ beforeAll(async () => {
   await producer.start();
   await worker.start();
   await registerJobs({
+    sessionAllocator: noopSessionAllocator,
     runner: worker,
     notifier: memory,
     crypto: testCrypto(),

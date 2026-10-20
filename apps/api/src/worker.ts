@@ -8,6 +8,8 @@ import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
 import { createNotifier } from './lib/notifications/notifier.ts';
+import { createSessionAllocator } from './session-allocator.ts';
+import { systemClock } from './lib/clock.ts';
 
 // Boot order (AC-ERROR-1): config validation first; nothing binds a port or takes jobs before it passes.
 const config = loadConfigOrExit();
@@ -63,12 +65,19 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 
 try {
   await runner.start();
+  const db = createKysely(pool);
   await registerJobs({
     runner,
     notifier,
     // Opens the sealed reset emails; the keyring is validated here at boot, as in the API.
     crypto: createCrypto(keyProviderFromConfig(config)),
-    db: createKysely(pool),
+    db,
+    sessionAllocator: createSessionAllocator({
+      db,
+      jobs: runner,
+      clock: systemClock,
+      webBaseUrl: config.auth.webBaseUrl,
+    }),
     expireSecondsOverride: config.jobs.expireSecondsOverride,
   });
 } catch (error) {

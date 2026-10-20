@@ -4,6 +4,7 @@ import { NonRetryableJobError } from '../lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../lib/notifications/adapters/in-memory.ts';
 import type { EmailMessage } from '../lib/notifications/notifier.ts';
 import { testCrypto } from '../../test/helpers/app-deps.ts';
+import { noopSessionAllocator } from '../modules/sessions/allocator-port.ts';
 import { registerJobs } from './bootstrap.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { QUEUES } from './registry.ts';
@@ -180,6 +181,7 @@ describe('registerJobs', () => {
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
       db: {} as never, // the auth-cleanup handler only touches it when a job runs
+      sessionAllocator: noopSessionAllocator,
       expireSecondsOverride: 5,
     });
     expect(defined.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
@@ -211,6 +213,7 @@ describe('registerJobs', () => {
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
       db: {} as never,
+      sessionAllocator: noopSessionAllocator,
     };
     await registerJobs(base);
     const defaultHandler = handlers.get('member-banned');
@@ -242,7 +245,13 @@ describe('skill-progression wiring', () => {
         throw new Error('db down');
       },
     } as never;
-    await registerJobs({ runner, notifier: createInMemoryNotifier(), crypto: testCrypto(), db });
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+    });
     const handler = handlers.get('skill-progression');
     expect(handler).toBeTypeOf('function');
     const { ctx } = context();

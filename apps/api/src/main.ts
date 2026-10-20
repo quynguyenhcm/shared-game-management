@@ -10,6 +10,7 @@ import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
 import { buildOAuthProviders } from './modules/auth/providers/registry.ts';
 import { createPasswordHasher } from './modules/auth/password.ts';
 import { createLoginThrottle } from './modules/auth/throttle.ts';
+import { createSessionAllocator } from './session-allocator.ts';
 
 // Boot order (AC-ERROR-1): config validation first; nothing binds a port before it passes.
 const config = loadConfigOrExit();
@@ -39,6 +40,13 @@ const jobs = createJobRunner({
   poolMax: 2,
 });
 await jobs.start();
+// The ONE place registration-and-waitlist wires its allocator (also called by worker.ts): see session-allocator.ts.
+const sessionAllocator = createSessionAllocator({
+  db,
+  jobs,
+  clock: systemClock,
+  webBaseUrl: config.auth.webBaseUrl,
+});
 
 const app = await buildApp({
   logger,
@@ -53,6 +61,7 @@ const app = await buildApp({
   passwordHasher,
   loginThrottle,
   oauthProviders,
+  sessionAllocator,
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

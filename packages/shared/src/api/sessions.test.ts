@@ -6,8 +6,12 @@ import {
   CreateSessionRequest,
   EndSeriesRequest,
   SESSION_FIELD_MESSAGES,
+  ListSessionsQuery,
   SessionCommandRequest,
+  SessionDetailResponse,
   SessionErrorResponse,
+  SessionIdParams,
+  SessionWriteResponse,
   SessionFieldCode,
   SessionListResponse,
   SessionResponse,
@@ -444,9 +448,11 @@ describe('responses and the error envelope', () => {
     feeIntermediate: null,
     feeAdvanced: null,
     startsAt: '2026-10-28T06:00:00.000Z',
+    endsAt: '2026-10-28T08:00:00.000Z',
     cancellationDeadline: '2026-10-26T06:00:00.000Z',
     deadlineIsDefault: true,
     isInstanceOverridden: false,
+    draftReason: null,
     version: 3,
     activeRegistrationCount: 0,
     feesLocked: 'none',
@@ -474,6 +480,28 @@ describe('responses and the error envelope', () => {
         isPayoutConfigured: false,
       }).success,
     ).toBe(true);
+  });
+
+  it('wraps one session for the detail and write responses, and the list query is strict and coerced', () => {
+    expect(SessionDetailResponse.safeParse({ session }).success).toBe(true);
+    expect(SessionWriteResponse.safeParse({ session, promoted: 2, material: true }).success).toBe(
+      true,
+    );
+    expect(SessionWriteResponse.safeParse({ session, promoted: -1, material: true }).success).toBe(
+      false,
+    );
+    expect(SessionResponse.safeParse({ ...session, draftReason: 'bank' }).success).toBe(false);
+    expect(SessionIdParams.safeParse({ teamId: UUID, sessionId: 'nope' }).success).toBe(false);
+
+    expect(ListSessionsQuery.parse({ view: 'drafts' })).toEqual({ view: 'drafts', limit: 25 });
+    expect(ListSessionsQuery.parse({ view: 'past', limit: '50', cursor: 'abc' })).toEqual({
+      view: 'past',
+      limit: 50,
+      cursor: 'abc',
+    });
+    expect(ListSessionsQuery.safeParse({ view: 'all' }).success).toBe(false);
+    expect(ListSessionsQuery.safeParse({ view: 'upcoming', limit: 101 }).success).toBe(false);
+    expect(ListSessionsQuery.safeParse({ view: 'upcoming', other: 1 }).success).toBe(false);
   });
 
   it('the new error codes are part of the shared list', () => {

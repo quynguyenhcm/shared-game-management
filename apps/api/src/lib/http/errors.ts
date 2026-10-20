@@ -1,6 +1,13 @@
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
-import type { ErrorCode, ErrorResponse } from '@sgm/shared';
+import type {
+  DstOptionsEntry,
+  ErrorCode,
+  ErrorResponse,
+  SeriesResponse,
+  SessionErrorResponse,
+  SessionResponse,
+} from '@sgm/shared';
 
 interface ErrorDefault {
   readonly status: number;
@@ -125,6 +132,12 @@ export interface AppErrorOptions {
   readonly retryAfterSeconds?: number;
   /** Only for `oauth_account_exists`. */
   readonly email?: string;
+  /** Session routes: what a DST-gap or overlap time can be stored as instead (422 `validation_failed`). */
+  readonly dstOptions?: readonly DstOptionsEntry[];
+  /** Session routes: the fee fields the request tried to raise (409 `session_fee_locked`). */
+  readonly raisedFields?: readonly string[];
+  /** Session routes: the latest row on a stale save (409 `session_stale` / `series_stale`). */
+  readonly current?: SessionResponse | SeriesResponse;
   readonly cause?: unknown;
 }
 
@@ -135,6 +148,9 @@ export class AppError extends Error {
   readonly fieldErrors: Readonly<Record<string, readonly string[]>> | undefined;
   readonly retryAfterSeconds: number | undefined;
   readonly email: string | undefined;
+  readonly dstOptions: readonly DstOptionsEntry[] | undefined;
+  readonly raisedFields: readonly string[] | undefined;
+  readonly current: SessionResponse | SeriesResponse | undefined;
 
   constructor(code: ErrorCode, options: AppErrorOptions = {}) {
     super(options.message ?? ERROR_DEFAULTS[code].message, { cause: options.cause });
@@ -144,6 +160,9 @@ export class AppError extends Error {
     this.fieldErrors = options.fieldErrors;
     this.retryAfterSeconds = options.retryAfterSeconds;
     this.email = options.email;
+    this.dstOptions = options.dstOptions;
+    this.raisedFields = options.raisedFields;
+    this.current = options.current;
   }
 }
 
@@ -206,11 +225,14 @@ function send(
     message?: string;
     fieldErrors?: Record<string, readonly string[]>;
     email?: string;
+    dstOptions?: readonly DstOptionsEntry[];
+    raisedFields?: readonly string[];
+    current?: SessionResponse | SeriesResponse;
   } = {},
   retryAfterSeconds?: number,
   status: number = ERROR_DEFAULTS[code].status,
 ): FastifyReply {
-  const body: ErrorResponse = {
+  const body: ErrorResponse | SessionErrorResponse = {
     error: {
       code,
       message: options.message ?? ERROR_DEFAULTS[code].message,
@@ -218,6 +240,9 @@ function send(
         ? {}
         : { fieldErrors: { ...options.fieldErrors } as Record<string, string[]> }),
       ...(options.email === undefined ? {} : { email: options.email }),
+      ...(options.dstOptions === undefined ? {} : { dstOptions: [...options.dstOptions] }),
+      ...(options.raisedFields === undefined ? {} : { raisedFields: [...options.raisedFields] }),
+      ...(options.current === undefined ? {} : { current: options.current }),
     },
   };
   if (retryAfterSeconds !== undefined) void reply.header('retry-after', String(retryAfterSeconds));
@@ -243,6 +268,9 @@ function handleError(
         message: error.message,
         ...(error.fieldErrors === undefined ? {} : { fieldErrors: { ...error.fieldErrors } }),
         ...(error.email === undefined ? {} : { email: error.email }),
+        ...(error.dstOptions === undefined ? {} : { dstOptions: error.dstOptions }),
+        ...(error.raisedFields === undefined ? {} : { raisedFields: error.raisedFields }),
+        ...(error.current === undefined ? {} : { current: error.current }),
       },
       error.retryAfterSeconds,
     );
