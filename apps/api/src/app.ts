@@ -35,6 +35,7 @@ import type { LoginThrottle } from './modules/auth/throttle.ts';
 import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
 import { sessionsRoutes } from './modules/sessions/routes.ts';
 import { createSessionsService } from './modules/sessions/service.ts';
+import { createSeriesService } from './modules/sessions/series.ts';
 import { skillLevelsRoutes } from './modules/skill-levels/routes.ts';
 import { createSkillLevelsService } from './modules/skill-levels/service.ts';
 import { teamBankingRoutes } from './modules/team-banking/routes.ts';
@@ -193,6 +194,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(sessionsRoutes, {
     prefix: '/teams',
     service: createSessionsService({
+      db: deps.db,
+      clock: deps.clock,
+      jobs: deps.jobs,
+      allocator: deps.sessionAllocator,
+    }),
+    series: createSeriesService({
       db: deps.db,
       clock: deps.clock,
       jobs: deps.jobs,

@@ -1,6 +1,7 @@
 /**
  * Cron slots that downstream features fill in (architecture Q4, AC-ASYNC-2). All are evaluated in
- * Pacific/Auckland. Foundation wires no-op placeholder handlers that only log.
+ * Pacific/Auckland. Foundation wires no-op placeholder handlers that only log; a slot whose feature has shipped (the
+ * recurrence sweep, billing later) gets its real handler in `bootstrap.ts`, which replaces the placeholder.
  *
  * DST rule: a calendar-anchored slot must never fire between 02:00 and 02:59 local time. On the day
  * DST starts that hour does not exist and on the day it ends it happens twice, so the job would be
@@ -23,6 +24,8 @@ export interface ScheduleSlot {
 }
 
 export const SCHEDULES: readonly ScheduleSlot[] = [
+  // Sweep fan-out (session-scheduling-engine): one `recurrence-rule` job per active rule, one `session-auto-enrol` job per pending
+  // session. Also queued once at every worker boot.
   { name: QUEUE_NAMES.recurrenceMaterialisation, cron: '0 3 * * *', tz: SCHEDULE_TZ },
   // Sweep: a later feature enqueues one `bill-session:<session_id>` job per due session.
   { name: QUEUE_NAMES.postGameBilling, cron: '*/5 * * * *', tz: SCHEDULE_TZ, intervalSweep: true },

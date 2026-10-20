@@ -109,6 +109,10 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     status: 409,
     message: 'This series changed since you opened it. Review the latest version and save again.',
   },
+  series_ended: {
+    status: 409,
+    message: 'This series has ended. To run it again, create a new series.',
+  },
   session_started: {
     status: 409,
     message: "This session has started, so it can't be changed or cancelled.",

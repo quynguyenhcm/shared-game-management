@@ -138,6 +138,8 @@ const envSchema = z.object({
   JOBS_EXPIRE_SECONDS_OVERRIDE: z.coerce.number().int().min(1).optional(),
   JOBS_SUPERVISE_INTERVAL_SECONDS: z.coerce.number().int().min(1).default(60),
   JOBS_POLL_INTERVAL_SECONDS: z.coerce.number().min(0.5).default(2),
+  // Series materialisation horizon in days (session-scheduling-engine A2, T-4): the window is today..today+H inclusive.
+  RECURRENCE_HORIZON_DAYS: intInRange(7, 91, 28),
 });
 
 export type OtelSampler = z.infer<typeof envSchema>['OTEL_TRACES_SAMPLER'];
@@ -207,6 +209,10 @@ export interface Config {
     /** How often pg-boss reclaims expired active jobs; bounds crash recovery (default 60 s). */
     readonly superviseIntervalSeconds: number;
     readonly pollIntervalSeconds: number;
+  };
+  readonly recurrence: {
+    /** How many days ahead the materialiser creates series sessions (`RECURRENCE_HORIZON_DAYS`, 7-91, default 28). */
+    readonly horizonDays: number;
   };
 }
 
@@ -423,6 +429,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       superviseIntervalSeconds: data.JOBS_SUPERVISE_INTERVAL_SECONDS,
       pollIntervalSeconds: data.JOBS_POLL_INTERVAL_SECONDS,
     },
+    recurrence: { horizonDays: data.RECURRENCE_HORIZON_DAYS },
   };
 }
 

@@ -60,6 +60,7 @@ const AUTHORITATIVE_ERROR_CODES = [
   // session-scheduling-engine (Binding Reconciliation T-7, T-11, T-12)
   'session_stale',
   'series_stale',
+  'series_ended',
   'session_started',
   'session_not_editable',
   'session_state_conflict',
@@ -80,6 +81,7 @@ const TEAM_ERROR_STATUSES = [
   ['auto_enroll_stale', 409],
   ['session_stale', 409],
   ['series_stale', 409],
+  ['series_ended', 409],
   ['session_started', 409],
   ['session_not_editable', 409],
   ['session_state_conflict', 409],

@@ -11,7 +11,14 @@ import type { Clock } from '../lib/clock.ts';
 import type { Database } from '../lib/db/kysely.ts';
 import { NonRetryableJobError, type JobHandler } from '../lib/jobs/jobs.ts';
 import type { SessionAllocatorPort } from '../modules/sessions/allocator-port.ts';
-import { SessionAutoEnrolPayload, runSessionAutoEnrol } from '../modules/sessions/auto-enrol.ts';
+import {
+  SessionAutoEnrolPayload,
+  runSessionAutoEnrol,
+  sessionAutoEnrolKey,
+} from '../modules/sessions/auto-enrol.ts';
+
+// The job's public contract, for the CLI trigger (which may not import the sessions module directly).
+export { SessionAutoEnrolPayload, sessionAutoEnrolKey };
 
 export interface SessionAutoEnrolJobDeps {
   readonly db: Database;

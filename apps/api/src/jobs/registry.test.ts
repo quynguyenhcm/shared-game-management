@@ -11,6 +11,7 @@ describe('queue registry', () => {
         'member-banned',
         'post-game-billing',
         'recurrence-materialisation',
+        'recurrence-rule',
         'send-email',
         'session-auto-enrol',
         'skill-progression',
@@ -35,6 +36,7 @@ describe('queue registry', () => {
       memberBanned: 'member-banned',
       skillProgression: 'skill-progression',
       sessionAutoEnrol: 'session-auto-enrol',
+      recurrenceRule: 'recurrence-rule',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -54,8 +56,11 @@ describe('queue registry', () => {
     expect(getQueue('session-auto-enrol').policy).toBe('exclusive');
   });
 
-  it('adds only the auto-enrol follow-up queue in the one-off phase (recurrence-rule arrives with series)', () => {
-    expect(QUEUES.map((queue) => queue.name)).not.toContain('recurrence-rule');
+  it('runs one series at a time per key, with a trailing run, on a stately queue (SA-1, AC-ASYNC-1)', () => {
+    // `singletonKey = recurrence-rule:<ruleId>`: one queued and one active job per rule, so an edit that commits during a run
+    // queues exactly one trailing run that reads the latest rule. The sweep is exclusive: one sweep at a time.
+    expect(getQueue('recurrence-rule').policy).toBe('stately');
+    expect(getQueue('recurrence-materialisation').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {

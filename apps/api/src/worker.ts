@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { registerJobs } from './jobs/bootstrap.ts';
+import { enqueueBootSweeps, registerJobs } from './jobs/bootstrap.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
@@ -78,8 +78,12 @@ try {
       clock: systemClock,
       webBaseUrl: config.auth.webBaseUrl,
     }),
+    recurrenceHorizonDays: config.recurrence.horizonDays,
+    webBaseUrl: config.auth.webBaseUrl,
     expireSecondsOverride: config.jobs.expireSecondsOverride,
   });
+  // Reconcile at every boot: series dates and pending auto-enrol (the sweep also runs at 03:00).
+  await enqueueBootSweeps(runner, logger);
 } catch (error) {
   logger.fatal({ err: error }, 'worker failed to start');
   process.exit(1);

@@ -53,6 +53,7 @@ export const ErrorCode = [
   // session scheduling (session-scheduling-engine, Binding Reconciliation T-7, T-11, T-12; architecture SA-6, SA-7)
   'session_stale',
   'series_stale',
+  'series_ended',
   'session_started',
   'session_not_editable',
   'session_state_conflict',

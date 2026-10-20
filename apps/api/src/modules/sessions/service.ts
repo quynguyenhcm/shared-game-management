@@ -34,11 +34,7 @@ import type { Clock } from '../../lib/clock.ts';
 import type { Database } from '../../lib/db/kysely.ts';
 import { AppError } from '../../lib/http/errors.ts';
 import type { JobRunner } from '../../lib/jobs/jobs.ts';
-import {
-  checkTeamCanPublishPaidSession,
-  isPaidSession,
-  type PublishGateFees,
-} from '../team-banking/publish-gate.ts';
+import { isPaidSession, type PublishGateFees } from '../team-banking/publish-gate.ts';
 import type { SessionAllocatorPort } from './allocator-port.ts';
 import { sessionAutoEnrolKey } from './auto-enrol.ts';
 import {
@@ -49,12 +45,14 @@ import {
   resolveSessionTimes,
   sessionFeesOf,
   sortCourts,
+  stampFor,
   trimTime,
   type FeeColumns,
   type ResolvedDeadline,
   type SessionContent,
 } from './content.ts';
 import { mapSessionDbError } from './errors.ts';
+import { gateOrRefuse } from './gate-step.ts';
 import { assertSessionAdmin, lockSession, lockTeamKeyShare, type LockedSession } from './locks.ts';
 import * as repo from './repo.ts';
 import { decideSessionAction } from './transitions.ts';
@@ -200,13 +198,6 @@ function columnValues(input: {
   };
 }
 
-/**
- * The `updated_at` a write stamps: the injected clock, but never at or before the stored value, so a court-only edit (no
- * other column changes) is still a content change and bumps the version even when the clock has not moved.
- */
-const stampFor = (now: Date, row: Pick<SessionRow, 'updated_at'>): Date =>
-  new Date(Math.max(now.getTime(), row.updated_at.getTime() + 1));
-
 function invalid(
   fieldErrors: Record<string, string[]>,
   dstOptions: readonly DstOptionsEntry[] = [],
@@ -331,45 +322,6 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
       'stale session save refused',
     );
     return new AppError('session_stale', { current: await viewOf(reader, row, context.now) });
-  }
-
-  /**
-   * The publish gate for a write that could make a PUBLISHED paid session (before any `game_sessions` lock). A refusal
-   * is logged with its reason and surfaces as 409 `payout_not_configured`, with nothing saved.
-   */
-  async function gate(
-    trx: Database,
-    input: {
-      teamId: string;
-      sessionId: string;
-      actorId: string;
-      fees: FeeColumns | PublishGateFees;
-      pricingStructure: SessionRow['pricing_structure'];
-      path: 'manual' | 'edit';
-      log: SessionsLogger;
-    },
-  ): Promise<void> {
-    const result = await checkTeamCanPublishPaidSession(trx, {
-      teamId: input.teamId,
-      pricingStructure: input.pricingStructure,
-      fees: input.fees,
-      log: input.log,
-      actorId: input.actorId,
-    });
-    if (result.ok) return;
-    input.log.info(
-      {
-        event: 'session.publish_refused',
-        teamId: input.teamId,
-        sessionId: input.sessionId,
-        actorId: input.actorId,
-        path: input.path,
-        reason: result.reason,
-        errorCode: 'payout_not_configured',
-      },
-      'session publish refused: no usable payout details',
-    );
-    throw new AppError('payout_not_configured');
   }
 
   return {
@@ -544,9 +496,9 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
             async (trx) => {
               if (!(await lockTeamKeyShare(trx, teamId))) throw new AppError('forbidden');
               if (needsGate) {
-                await gate(trx, {
+                await gateOrRefuse(trx, {
                   teamId,
-                  sessionId,
+                  subject: { sessionId },
                   actorId,
                   fees: fees.fees,
                   pricingStructure: fees.fees.pricingStructure,
@@ -683,9 +635,9 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
             async (trx) => {
               if (!(await lockTeamKeyShare(trx, teamId))) throw new AppError('forbidden');
               if (needsGate) {
-                await gate(trx, {
+                await gateOrRefuse(trx, {
                   teamId,
-                  sessionId,
+                  subject: { sessionId },
                   actorId,
                   fees: gateFeesOf(s0),
                   pricingStructure: s0.pricing_structure,

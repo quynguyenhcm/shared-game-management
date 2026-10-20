@@ -472,3 +472,10 @@ export function contentChange(before: SessionContent, after: SessionContent): Co
 export const publicCapacity = (
   content: Pick<SessionContent, 'maxPlayers' | 'reservedSeats'>,
 ): number => content.maxPlayers - content.reservedSeats;
+
+/**
+ * The `updated_at` a write stamps: the injected clock, but never at or before the stored value, so a court-only edit (no
+ * other column changes) is still a content change and bumps the version even when the clock has not moved.
+ */
+export const stampFor = (now: Date, row: { readonly updated_at: Date }): Date =>
+  new Date(Math.max(now.getTime(), row.updated_at.getTime() + 1));

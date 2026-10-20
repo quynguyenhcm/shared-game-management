@@ -508,6 +508,7 @@ describe('responses and the error envelope', () => {
     for (const code of [
       'session_stale',
       'series_stale',
+      'series_ended',
       'session_started',
       'session_not_editable',
       'session_state_conflict',

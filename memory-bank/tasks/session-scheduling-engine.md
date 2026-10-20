@@ -838,7 +838,7 @@ The plan follows systemPatterns' module shape, P1/P2/P3/P5/P7, default-deny rout
   - Auto-enrol follow-up for API publishes (P-1 makes one-off publishes auto-enrol): `auto-enrol.ts`, the `session-auto-enrol` queue and `jobs/session-auto-enrol.ts`.
   - ACs: AC-HAPPY-1..4, 8, 9, 11, 13; AC-HAPPY-12 (manual paths); AC-ASYNC-2 (handler); AC-ERROR-1 (API), 3, 5, 7, 8, 10; AC-VERIFY-2 (manual paths); AC-VERIFY-9.
   - Gate: `sessions-api.int.test.ts` green; the recorder proves gate before lock on the manual paths; `session-allocator.test.ts` and `boundaries.test.ts` green.
-- [ ] **Phase 3: Series and materialiser.**
+- [x] **Phase 3: Series and materialiser.**
   - Series create, edit with synchronous propagation and counts (T-5), end (T-6), publish-drafts; fixed pattern (P-3); instance overrides.
   - The `recurrence-materialisation` sweep, the `recurrence-rule` queue and handler, `materialise.ts`: window, per-instance transactions, gate drafts, `payout_notice_claims` and the admin email, draft retry, inline auto-enrol, pending reconciliation, bookkeeping stamp; boot enqueue; CLI trigger.
   - ACs: AC-HAPPY-5, 6, 7, 10; AC-HAPPY-12 (materialiser path); AC-ASYNC-1..7; AC-ERROR-9, AC-ERROR-12; AC-VERIFY-2 (job and propagation paths); AC-INTEGRATION-2.
@@ -893,12 +893,12 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 
 ## Execution State
 
-**Build Status**: IDLE (Phase 2 of 6 COMPLETE)
+**Build Status**: IDLE (Phase 3 of 6 COMPLETE)
 **Auto-Build Mode**: YES
-**Current Build**: Phase 2: One-off sessions API, allocator seam and auto-enrol follow-up (session-scheduling-engine) - COMPLETE
-**Phase Number**: 2 of 6
+**Current Build**: Phase 3: Series and materialiser (session-scheduling-engine) - COMPLETE
+**Phase Number**: 3 of 6
 **Is Multi-Phase**: YES
-**Can Resume**: YES (next: Phase 3)
+**Can Resume**: YES (next: Phase 4)
 
 ### Current Build Step
 **Step**: Step 11 - Git completion
@@ -916,6 +916,10 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 - Phase 2 Step 7 verifier: PASS - unit 1459/1459, integration 514/514, build, lint, typecheck
 - Phase 2 Step 8 code review (codex + anthropic): CHANGES_REQUIRED x2 blocking (edit PUBLISHED into passed start; malformed cursor 500), fixed via TDD; final unit 1459, integration 518/518, lint/typecheck clean
 - Phase 2 ACs covered: AC-HAPPY-1..4, 8, 9, 11, 13; AC-HAPPY-12 (manual); AC-ASYNC-2 (handler); AC-ERROR-1 (API), 3, 5, 7, 8, 10; AC-VERIFY-2 (manual); AC-VERIFY-9
+- Phase 3 Step 3 TDD (sequential): 3A materialiser/jobs (53 RED incl. 27 int), 3B series API (19 RED); GREEN both. Part A drafted code before tests; RED proven non-destructively on a `git archive HEAD` copy.
+- Phase 3 Step 7 verifier: PASS - unit 1499/1499, integration 559/559, full build, lint, typecheck
+- Phase 3 Step 8 code review (anthropic self-review; Codex launch failed: `timeout` missing on macOS): APPROVED, 0 blocking, 6 suggestions
+- Phase 3 ACs covered: AC-HAPPY-5, 6, 7, 10; AC-HAPPY-12 (materialiser); AC-ASYNC-1..7; AC-ERROR-9, 12; AC-VERIFY-2 (job and propagation); AC-INTEGRATION-2
 
 ### Sub-Agents
 - TDD 1A (migration, fixtures): COMPLETE
@@ -953,6 +957,21 @@ Phase 2 | reviewer-accepted deviations:
 - Phase 2 | suggestions deferred | split service.ts (823 lines) per use case; double log on stale refusal; `as never` casts in repo.ts need a comment; spot-check openapi.yaml diff (8.7k lines) in the PR.
 - Phase 2 | Phase 4 owes | T-17 registration-insert vs fee-edit race under the session lock; Phase 3 adds the `recurrence-rule` queue (bootstrap already accepts sessionAllocator).
 
+Phase 2 | reviewer-accepted deviations (added at Phase 3 start):
+- Phase 2 | reviewer-accepted | apps/api/src/modules/sessions/service.ts + routes.ts:40 | AC-ERROR-8 lists "an id that belongs to another team" among 401/403 cases; API answers 404 not_found (non-revealing). Literal departure - human to decide whether to align to 403.
+- Phase 2 | reviewer-accepted | service.ts:~322 | `session.stale_refused` logged inside the tx callback; harmless because stale refusals are not retried.
+- Phase 2 | DONE_WITH_CONCERNS | build-orchestrator | the two blocking review fixes (PUBLISHED edit into the past -> 409; malformed cursor -> 422) were not re-reviewed and `build` was not re-run after them (tests/lint/typecheck were). Phase 3 verifier ran the full build: PASS.
+
+Phase 3 | reviewer-accepted deviations:
+- Phase 3 | emails.ts:49 | AC-ASYNC-3 key `payout-missing:<ruleId>:<windowStart>` became `...:<recipientId>` so every admin is emailed (shared key would dedupe all but the first); claim row stays one per rule per NZ Monday. Update AC text.
+- Phase 3 | materialise.ts:171-181 | AC-HAPPY-12: a newly materialised instance's auto-enrol runs inline after commit (BIND T-2 wins), not as an enqueued job in the publish tx; retried drafts do enqueue. Failure is swallowed; sweep/boot re-offers via the D-80 marker.
+- Phase 3 | materialise-instance.ts | gate runs before the started-date clock check (one gate read for a started date, nothing created); a refused retry claims the weekly notice (can send the week's first email).
+- Phase 3 | materialise.ts | `materialised_version` stamped even when failures are all permanent (clears the waiting state); only transient failure leaves it pending (interpretation of D-82).
+- Phase 3 | errors | new 409 `series_ended` code (edit/end on an inactive series); confirm spec/openapi.
+- Phase 3 | process | Part A TDD agent wrote implementation before tests; RED proven on a clean archive copy.
+- Phase 3 | suggestions deferred | make `webBaseUrl` required in RegisterJobsOptions (bootstrap.ts localhost fallback); publishDrafts on an ended series should 409; retryDraft does not re-check rule active; series.ts is 708 lines (extract `propagate`); `as never` casts in series-repo.ts; stampBookkeeping outside per-date try/catch.
+- Phase 3 | carry-forwards | list rows still carry no series name (rule table has no name column; Phase 5 decision); `seriesChangeEffect` not exposed on series GET (Phase 5); GateRequired rerun path untested (Phase 4 race test); `session_courts_guard_closed` unsorted lock order still open; `session.recurrence.*` spans not added; getting-started docs in Phase 6; Codex review pass not run.
+
 ### Resumption Notes
 **Can Resume**: YES
-**Resume From**: Phase 3 (`/yay:build session-scheduling-engine`)
+**Resume From**: Phase 4 (`/yay:build session-scheduling-engine`)

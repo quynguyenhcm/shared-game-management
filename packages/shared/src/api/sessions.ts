@@ -413,6 +413,9 @@ export const SESSION_LIST_MAX_LIMIT = 100;
 export const SessionIdParams = z.object({ teamId: z.uuid(), sessionId: z.uuid() });
 export type SessionIdParams = z.infer<typeof SessionIdParams>;
 
+export const SeriesIdParams = z.object({ teamId: z.uuid(), ruleId: z.uuid() });
+export type SeriesIdParams = z.infer<typeof SeriesIdParams>;
+
 /** `GET /teams/:teamId/sessions`: one section of the admin list, keyset-paged (soonest first, past most recent first). */
 export const ListSessionsQuery = z.strictObject({
   view: z.enum(SESSION_LIST_VIEWS),
@@ -539,6 +542,14 @@ export const SeriesResponse = z.object({
   courts: z.array(SeriesCourtResponse),
 });
 export type SeriesResponse = z.infer<typeof SeriesResponse>;
+
+/** Read or create a series. */
+export const SeriesDetailResponse = z.object({ series: SeriesResponse });
+export type SeriesDetailResponse = z.infer<typeof SeriesDetailResponse>;
+
+/** "Publish drafts now": `queued` is false when a run for this series was already waiting (it will read the latest rule). */
+export const PublishDraftsResponse = z.object({ series: SeriesResponse, queued: z.boolean() });
+export type PublishDraftsResponse = z.infer<typeof PublishDraftsResponse>;
 
 /** The counts of a series save (T-5), from `summariseReconciliation`. */
 export const SeriesSaveOutcome = z.object({

@@ -260,3 +260,58 @@ describe('skill-progression wiring', () => {
     );
   });
 });
+
+describe('recurrence wiring (session-scheduling-engine)', () => {
+  function wired() {
+    const handlers = new Map<string, (data: object, ctx: JobContext) => Promise<void>>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: (data: object, ctx: JobContext) => Promise<void>) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    return { handlers, runner };
+  }
+
+  it('works the recurrence-materialisation slot with the real sweep, not the placeholder', async () => {
+    const { handlers, runner } = wired();
+    // A database that is down: the placeholder would complete, the real sweep must fail.
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down');
+      },
+    } as never;
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+    });
+    const { ctx } = context();
+    await expect(
+      handlers.get('recurrence-materialisation')?.(
+        {},
+        { ...ctx, signal: new AbortController().signal },
+      ),
+    ).rejects.toThrow(/db down/);
+  });
+
+  it('works the recurrence-rule queue with a handler that rejects a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+    });
+    const { ctx } = context();
+    await expect(handlers.get('recurrence-rule')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(
+      NonRetryableJobError,
+    );
+  });
+});

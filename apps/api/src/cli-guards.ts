@@ -1,5 +1,7 @@
 import { AssignableGlobalRole, normaliseEmail } from '@sgm/shared';
 import type { Config } from './lib/config/config.ts';
+import { RecurrenceRulePayload, recurrenceRuleKey } from './jobs/recurrence-rule.ts';
+import { SessionAutoEnrolPayload, sessionAutoEnrolKey } from './jobs/session-auto-enrol.ts';
 import { MemberBannedPayload, memberBannedSingletonKey } from './modules/teams/ban-hook.ts';
 
 export type SetRoleArgs =
@@ -90,4 +92,67 @@ export function parseMemberBannedTrigger(raw: string | undefined): MemberBannedT
     payload: parsed.data,
     singletonKey: memberBannedSingletonKey(parsed.data.membershipId),
   };
+}
+
+export type SessionJobTrigger<T> =
+  { readonly payload: T; readonly singletonKey: string } | { readonly error: string };
+
+function parseKeyed<T>(
+  raw: string | undefined,
+  schema: {
+    safeParse(
+      input: unknown,
+    ):
+      | { success: true; data: T }
+      | { success: false; error: { issues: readonly { path: readonly PropertyKey[] }[] } };
+  },
+  keyOf: (payload: T) => string,
+  name: string,
+  usage: string,
+): SessionJobTrigger<T> {
+  if (raw === undefined) return { error: usage };
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return { error: `The payload is not valid JSON. ${usage}` };
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    // Field paths only: the input is not echoed.
+    const fields = [
+      ...new Set(parsed.error.issues.map((issue) => issue.path.map(String).join('.') || '(root)')),
+    ];
+    return { error: `Invalid ${name} payload (${fields.join(', ')}). ${usage}` };
+  }
+  return { payload: parsed.data, singletonKey: keyOf(parsed.data) };
+}
+
+/**
+ * Validates `jobs trigger recurrence-rule '<json>'` (re-run one series' materialisation) with the handler's own strict schema, and
+ * keys the job like the ones series create and edit enqueue, so a hand-typed trigger and a queued run collapse into one.
+ */
+export function parseRecurrenceRuleTrigger(
+  raw: string | undefined,
+): SessionJobTrigger<RecurrenceRulePayload> {
+  return parseKeyed(
+    raw,
+    RecurrenceRulePayload,
+    (payload) => recurrenceRuleKey(payload.ruleId),
+    'recurrence-rule',
+    'Usage: jobs trigger recurrence-rule \'{"ruleId":…,"teamId":…,"trigger":"manual"}\'',
+  );
+}
+
+/** Validates `jobs trigger session-auto-enrol '<json>'` (re-offer one session's auto-enrol), keyed like a publish's job. */
+export function parseSessionAutoEnrolTrigger(
+  raw: string | undefined,
+): SessionJobTrigger<SessionAutoEnrolPayload> {
+  return parseKeyed(
+    raw,
+    SessionAutoEnrolPayload,
+    (payload) => sessionAutoEnrolKey(payload.sessionId),
+    'session-auto-enrol',
+    'Usage: jobs trigger session-auto-enrol \'{"sessionId":…,"teamId":…,"trigger":"manual"}\'',
+  );
 }

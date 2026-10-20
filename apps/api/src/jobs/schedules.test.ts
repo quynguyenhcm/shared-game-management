@@ -73,6 +73,19 @@ describe('schedule slots', () => {
     expect(findDstHourFirings(slot as ScheduleSlot, preview)).toEqual([]);
   });
 
+  it('fires the recurrence sweep at 03:00 local on both sides of each DST change and exempts nothing (AC-ASYNC-1)', () => {
+    const slot = SCHEDULES.find((candidate) => candidate.name === 'recurrence-materialisation');
+    expect(slot).toMatchObject({ cron: '0 3 * * *', tz: SCHEDULE_TZ });
+    expect(slot?.intervalSweep).toBeUndefined();
+    const next = (from: string): string | undefined =>
+      preview('0 3 * * *', { tz: SCHEDULE_TZ, from: new Date(from), count: 1 })[0]?.toISOString();
+    // 03:00 NZST (+12) is 15:00Z the day before; 03:00 NZDT (+13) is 14:00Z. DST starts 2026-09-27, ends 2027-04-04.
+    expect(next('2026-09-25T14:00:00Z')).toBe('2026-09-25T15:00:00.000Z');
+    expect(next('2026-09-25T16:00:00Z')).toBe('2026-09-26T14:00:00.000Z');
+    expect(next('2027-04-02T10:00:00Z')).toBe('2027-04-02T14:00:00.000Z');
+    expect(next('2027-04-02T15:00:00Z')).toBe('2027-04-03T15:00:00.000Z');
+  });
+
   it('exempts only the flagged idempotent interval sweep', () => {
     expect(SCHEDULES.filter((slot) => slot.intervalSweep).map((slot) => slot.name)).toEqual([
       'post-game-billing',

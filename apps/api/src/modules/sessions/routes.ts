@@ -17,9 +17,13 @@ import {
 import { requireTeamRole } from '../../lib/auth/policy.ts';
 import { requireAuth } from '../../lib/auth/request-auth.ts';
 import type { SessionsContext, SessionsService } from './service.ts';
+import { seriesRoutes } from './series-routes.ts';
+import type { SeriesService } from './series.ts';
 
 export interface SessionsRoutesOptions {
   readonly service: SessionsService;
+  /** The series use cases, served under the same prefix by `seriesRoutes`. */
+  readonly series: SeriesService;
 }
 
 const contextOf = (request: FastifyRequest): SessionsContext => ({ log: request.log });
@@ -41,10 +45,10 @@ const SHAPE =
 
 /**
  * `/teams/:teamId/sessions` (session-scheduling-engine, one-off sessions): the admin list, create with replay, read, edit,
- * publish and cancel. Strict shared bodies; `cache-control: no-store` on every answer, errors included. The member routes
+ * publish and cancel; and, through `seriesRoutes`, `/teams/:teamId/session-series`. Strict shared bodies; `cache-control: no-store` on every answer, errors included. The member routes
  * `GET /teams/:teamId/sessions/upcoming` and `…/:sessionId/registration*` are reserved for registration-and-waitlist.
  */
-export const sessionsRoutes: FastifyPluginAsync<SessionsRoutesOptions> = (app, options) => {
+export const sessionsRoutes: FastifyPluginAsync<SessionsRoutesOptions> = async (app, options) => {
   const { service } = options;
   const typed = app.withTypeProvider<ZodTypeProvider>();
   const policy = requireTeamRole('TEAM_ADMIN');
@@ -180,5 +184,6 @@ export const sessionsRoutes: FastifyPluginAsync<SessionsRoutesOptions> = (app, o
       ),
   );
 
-  return Promise.resolve();
+  // Registered after the hook above, so the series routes are `no-store` too.
+  await app.register(seriesRoutes, { service: options.series });
 };
