@@ -10,6 +10,8 @@ status: COMPLETE
 **Status**: COMPLETE
 **Archived**: memory-bank/archive/session-scheduling-engine-archive.md
 **Completed**: 2026-10-24
+**PR Created**: YES
+**PR URL**: https://github.com/quynguyenhcm/shared-game-management/pull/7
 **Reflection**: memory-bank/reflection/session-scheduling-engine-reflection.md
 **Roadmap**: session-scheduling-engine
 **Branch**: feature/session-scheduling-engine
