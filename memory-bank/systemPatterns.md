@@ -111,6 +111,8 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Allocator seam**: `SessionAllocatorPort` (`allocator-port.ts`) is owned here. Registration-and-waitlist implements it. Until then `createSessionAllocator` returns `noopSessionAllocator`, which has `enrols: false`. `buildApp` and `registerJobs` require the port, and no session-side code writes `registrations`.
 - **Auto-enrol obligation**: a durable marker (`game_sessions.auto_enrolled_at`, D-80) is stamped only by a real allocator. The follow-up transaction runs after the session commits, never under its lock, so a pending session is reconciled by the sweep.
 - **Trade-offs**: the rules have a SQL trigger, TypeScript and a parity test for each (matrix, deadline, D-85 predicate); a change must update all of them. The series sweep fans out to per-rule and per-session jobs, so one bad rule cannot block another.
+- **Pre-merge migration amendments**: while a feature branch is unmerged, its own migration may be amended in place (Phase 4 did this to sort the ids in `session_courts_guard_closed`, D-76). Record it as a merge constraint in the ADR and the task ledger, and tell developers to run `pnpm db:reset`. Once the migration is on `main`, fix it with a forward migration only.
+- **Config at the composition root**: values derived from config (`webBaseUrl`, the recurrence horizon) are passed explicitly from `main.ts` and `worker.ts`, with no `?? <literal>` fallback in `buildApp` or the job bootstrap. The web app reads such values from the API response that owns them (`horizonDays` on the series reads) and never keeps its own copy. `AppDeps.recurrenceHorizonDays` is still optional with a default of 28, and making it required is a follow-up.
 
 ## Integration Patterns
 

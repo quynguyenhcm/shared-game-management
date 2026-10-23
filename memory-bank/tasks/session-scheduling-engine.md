@@ -1,13 +1,15 @@
 ---
 slug: session-scheduling-engine
 feature: session-scheduling-engine
-status: REFLECTION_COMPLETE
+status: COMPLETE
 ---
 
 # session-scheduling-engine: Session Scheduling Engine
 
 **Complexity**: Level 4
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
+**Archived**: memory-bank/archive/session-scheduling-engine-archive.md
+**Completed**: 2026-10-24
 **Reflection**: memory-bank/reflection/session-scheduling-engine-reflection.md
 **Roadmap**: session-scheduling-engine
 **Branch**: feature/session-scheduling-engine
@@ -123,7 +125,7 @@ Multi-court session setup, costing and recurrence (PRODDUCT-OVERVIEW §4; workfl
     - D-83: dev/test row cleanup before the CHECKs (`NOT VALID` then `VALIDATE`).
     - D-84: reserved (publish lead time, not built).
     - D-85: function `game_session_has_active_registrations(p_session_id uuid)` and trigger `game_sessions_fee_raise_locked` (T-17).
-  - `pgboss.job`: `recurrence-materialisation`, `recurrence-rule` and `session-auto-enrol` runs; `send-email` with `idempotencyKey = payout-missing:<ruleId>:<windowStart>`, enqueued only when a `payout_notice_claims` row was newly claimed.
+  - `pgboss.job`: `recurrence-materialisation`, `recurrence-rule` and `session-auto-enrol` runs; `send-email` with `idempotencyKey = payout-missing:<ruleId>:<windowStart>:<recipientId>`, enqueued only when a `payout_notice_claims` row was newly claimed.
 - **Observable within**: immediate for every admin write, including series-edit propagation to existing instances (one synchronous transaction, T-5). New series dates are async: visible within about 5 s (one 2 s poll plus the run); the daily sweep runs at 03:00 Pacific/Auckland and at every worker boot. Auto-enrol registrations appear once registration-and-waitlist injects an allocator with `enrols: true`; until then sessions stay pending and the first sweep after that deploy enrols them (D-80).
 
 ### Acceptance Criteria
@@ -203,7 +205,7 @@ Multi-court session setup, costing and recurrence (PRODDUCT-OVERVIEW §4; workfl
 **Priority**: MUST
 **Given** an active series with, after a chosen last date, two unedited DRAFT instances, one edited DRAFT and three PUBLISHED instances with registered players
 **When** the admin chooses "End series", picks "Last date" (default today) and confirms "End series"
-**Then** the confirm "End this series? No sessions will be added after the last date." shows a polite status that updates on the date's `change` event: "{d} unedited draft sessions after this date will be deleted." and "{e} edited drafts and {p} published sessions after this date will be kept.", and an unticked checkbox "Also cancel the {p} published sessions after this date"; ticked, the status reads "…and the {p} published sessions will be cancelled." plus "{n} players are registered for them. We won't email them, so let them know."; on confirm (with `expectedVersion`) `recur_until` is set to the last date, `is_active` becomes false when that date is today or earlier, unedited DRAFTs after it are deleted, edited DRAFTs and PUBLISHED sessions are kept unless the box was ticked, in which case each PUBLISHED one is cancelled under the cancel rules (AC-HAPPY-9), and one `recurrence-rule` job (`rule_ended`) is enqueued; instances on or before the last date are untouched and no later run materialises after it; the banner reads "Series ended. No new sessions will be added after {date}." plus "{c} sessions after that date were cancelled." and "{n} players were registered for them. Let them know." when they apply, or "Series ended. {c} of {p} sessions after that date were cancelled. Cancel the rest from the list." after a partial failure; the series row shows "Ended {date}" and the page "Ended. Last session {date}. To run it again, create a new series." (T-6)
+**Then** the confirm "End this series? No sessions will be added after the last date." shows a polite status that updates on the date's `change` event: "{d} unedited draft sessions after this date will be deleted." and "{e} edited drafts and {p} published sessions after this date will be kept.", and an unticked checkbox "Also cancel the {p} published sessions after this date"; ticked, the status reads "…and the {p} published sessions will be cancelled." plus "{n} players are registered for them. We won't email them, so let them know."; on confirm (with `expectedVersion`) `recur_until` is set to the last date, `is_active` becomes false when that date is today or earlier, unedited DRAFTs after it are deleted, edited DRAFTs and PUBLISHED sessions are kept unless the box was ticked, in which case each PUBLISHED one is cancelled under the cancel rules (AC-HAPPY-9), and one `recurrence-rule` job (`rule_ended`) is enqueued; instances on or before the last date are untouched and no later run materialises after it; the banner reads "Series ended. No new sessions will be added after {date}." plus "{c} sessions after that date were cancelled." and "{n} players were registered for them. Let them know." when they apply; End series is one transaction (T-6), so a failed cancel rolls back the whole end and there is no partial-failure banner (amended at archive 2026-10-24); the series row shows "Ended {date}" and the page "Ended. Last session {date}. To run it again, create a new series." (T-6)
 
 #### AC-HAPPY-11: The cancellation deadline defaults to 48 hours before start, is kept by the DB, and can be set
 **Priority**: MUST
@@ -251,7 +253,7 @@ Multi-court session setup, costing and recurrence (PRODDUCT-OVERVIEW §4; workfl
 **Priority**: MUST
 **Given** team T is not payout-configured and its series is paid
 **When** the materialiser runs
-**Then** each new paid instance is checked with `checkTeamCanPublishPaidSession` before any `game_sessions` lock, and on refusal is inserted as DRAFT, not skipped; this is not a job failure; `session.recurrence.publish_refused` is logged with `teamId`, `ruleId`, `sessionId`, `reason`; in the same transaction `INSERT INTO payout_notice_claims (rule_id, window_start) … ON CONFLICT DO NOTHING RETURNING` claims the window, where `windowStart` is the Monday of the run's NZ week (a run on 2026-10-20 gives `2026-10-19`; T-4, T-18), and only when a row comes back is a `send-email` enqueued to every approved admin with `idempotencyKey = payout-missing:<ruleId>:<windowStart>`, subject "Sessions not published for {team name}: bank account needed", links to `/teams/T/manage/banking` and the series page, and no amounts, bank values or member names; the rule row is never updated by the claim; a second run in the same NZ week sends nothing and a run in the next week sends one; the series page shows "{n} sessions in this series were saved as drafts because your team's bank account isn't set up. Members can't register for them yet." with "Set up banking and GST" (`returnTo` = the series page), and those rows are labelled "Draft · bank account needed" (ADR 0016 recurrence contract points 1, 2, 4, 5)
+**Then** each new paid instance is checked with `checkTeamCanPublishPaidSession` before any `game_sessions` lock, and on refusal is inserted as DRAFT, not skipped; this is not a job failure; `session.recurrence.publish_refused` is logged with `teamId`, `ruleId`, `sessionId`, `reason`; in the same transaction `INSERT INTO payout_notice_claims (rule_id, window_start) … ON CONFLICT DO NOTHING RETURNING` claims the window, where `windowStart` is the Monday of the run's NZ week (a run on 2026-10-20 gives `2026-10-19`; T-4, T-18), and only when a row comes back is a `send-email` enqueued to every approved admin with `idempotencyKey = payout-missing:<ruleId>:<windowStart>:<recipientId>` (one key per recipient; the claim row stays one per rule per NZ week — amended at archive 2026-10-24), subject "Sessions not published for {team name}: bank account needed", links to `/teams/T/manage/banking` and the series page, and no amounts, bank values or member names; the rule row is never updated by the claim; a second run in the same NZ week sends nothing and a run in the next week sends one; the series page shows "{n} sessions in this series were saved as drafts because your team's bank account isn't set up. Members can't register for them yet." with "Set up banking and GST" (`returnTo` = the series page), and those rows are labelled "Draft · bank account needed" (ADR 0016 recurrence contract points 1, 2, 4, 5)
 
 #### AC-ASYNC-4: Materialiser drafts are published on a later run once banking is set up
 **Priority**: MUST
@@ -895,14 +897,14 @@ All creative phases are COMPLETE (2026-10-20). The task file was rewritten to ma
 ## Execution State
 
 **Build Status**: IDLE
-**Current Phase**: REFLECT → ARCHIVE
+**Current Phase**: COMPLETE
 **Reflection Agent**: COMPLETE (2026-10-24) - Output: memory-bank/reflection/session-scheduling-engine-reflection.md (Task Quality: Good; Ecosystem: Moderately Effective)
 **Auto-Build Mode**: YES
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable (2026-10-20; verdict: ready to merge with fixes — 0 Critical, 2 Important, 8 Minor)
 **Current Build**: Phase 6: End-to-end journey, accessibility, ADR and docs (session-scheduling-engine) - COMPLETE
 **Phase Number**: 6 of 6
 **Is Multi-Phase**: YES
-**Can Resume**: NO (reflection complete; next: /yay:archive session-scheduling-engine)
+**Can Resume**: NO
 
 ### Current Build Step
 **Step**: Step 11 - Git completion
