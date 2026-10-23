@@ -57,7 +57,7 @@ const fail = (status: number, code = 'internal_error') => ({
 });
 const TEAM = ok({ team: { id: TEAM_ID, name: 'Rosedale Badminton', memberCount: 12 } });
 const listBody = (sessions: unknown[] = [], over: Record<string, unknown> = {}) =>
-  ok({ sessions, nextCursor: null, isPayoutConfigured: true, ...over });
+  ok({ sessions, nextCursor: null, isPayoutConfigured: true, bankingDrafts: 0, ...over });
 
 const published = sessionFixture({
   id: 'a1111111-1111-4111-8111-111111111111',
@@ -196,8 +196,8 @@ describe('sessions list page: sections and the banking notice (AC-ASYNC-3, AC-HA
     const html = await render(
       {},
       {
-        upcoming: listBody([], { isPayoutConfigured: false }),
-        drafts: listBody([bankingDraft], { isPayoutConfigured: false }),
+        upcoming: listBody([], { isPayoutConfigured: false, bankingDrafts: 1 }),
+        drafts: listBody([bankingDraft], { isPayoutConfigured: false, bankingDrafts: 1 }),
       },
     );
     expect(html).toContain(
@@ -210,10 +210,29 @@ describe('sessions list page: sections and the banking notice (AC-ASYNC-3, AC-HA
     expect(html.match(/Set up banking and GST/g)).toHaveLength(1);
   });
 
+  it('shows the notice from the API count when no refused draft is among the loaded rows, and not from a loaded row when the count is zero (AC-ENTRY-2)', async () => {
+    const beyondPageOne = await render(
+      {},
+      {
+        upcoming: listBody([published], { isPayoutConfigured: false, bankingDrafts: 1 }),
+        drafts: listBody([sessionFixture()], { isPayoutConfigured: false, bankingDrafts: 1 }),
+      },
+    );
+    expect(beyondPageOne.match(/Set up banking and GST/g)).toHaveLength(1);
+    const countZero = await render(
+      {},
+      {
+        upcoming: listBody([], { isPayoutConfigured: false, bankingDrafts: 0 }),
+        drafts: listBody([bankingDraft], { isPayoutConfigured: false, bankingDrafts: 0 }),
+      },
+    );
+    expect(countZero).not.toContain('Set up banking and GST');
+  });
+
   it('no banking notice once banking is set up, and none without a banking draft', async () => {
     const configured = await render(
       {},
-      { drafts: listBody([bankingDraft], { isPayoutConfigured: true }) },
+      { drafts: listBody([bankingDraft], { isPayoutConfigured: true, bankingDrafts: 1 }) },
     );
     expect(configured).not.toContain('Set up banking and GST');
     expect(configured).toContain('Draft · publishes overnight');

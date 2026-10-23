@@ -120,7 +120,7 @@ export default async function SessionsPage({
         </a>
       </div>
       <p className="text-base">{LIST_COPY.createHint}</p>
-      {showListBankingNotice(loaded, isPayoutConfigured) ? (
+      {showListBankingNotice(upcoming.data.bankingDrafts, isPayoutConfigured) ? (
         <aside
           aria-labelledby="banking-notice"
           className="flex flex-col gap-1 rounded-md border-2 border-slate-900 p-4"

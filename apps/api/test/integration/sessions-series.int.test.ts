@@ -300,11 +300,12 @@ const SERIES_LOCK_OR_WRITE =
 // ---------------------------------------------------------------------------------------------
 
 describe('access control', () => {
-  it('answers 401 anonymously, 403 to a member and another team admin, and 404 for another team series, changing nothing', async () => {
+  it('answers 401 anonymously, 403 to a member, another team admin and for a series of another team (ruled 2026-10-24), and 404 for an id that does not exist, changing nothing', async () => {
     const c = await scene();
     const ruleId = await insertRule(database.pool, c.teamId);
     const foreign = await insertRule(database.pool, c.otherTeamId);
     const before = await rule(ruleId);
+    const foreignBefore = await rule(foreign);
     const routes: ['GET' | 'POST' | 'PUT', string, object | undefined][] = [
       ['POST', base(c), createBody()],
       ['GET', `${base(c)}/${ruleId}`, undefined],
@@ -329,9 +330,13 @@ describe('access control', () => {
       ['POST', '/publish-drafts', {}],
     ] as const) {
       const res = await call(method, `${base(c)}/${foreign}${suffix}`, c.admin, payload);
-      expect(res.statusCode, `${method} ${suffix}`).toBe(404);
-      expect(errorOf(res).code).toBe('not_found');
+      expect(res.statusCode, `${method} ${suffix}`).toBe(403);
+      expect(errorOf(res).code).toBe('forbidden');
+      const missing = await call(method, `${base(c)}/${randomUUID()}${suffix}`, c.admin, payload);
+      expect(missing.statusCode, `missing ${method} ${suffix}`).toBe(404);
+      expect(errorOf(missing).code).toBe('not_found');
     }
+    expect(await rule(foreign)).toEqual(foreignBefore);
     expect(await rule(ruleId)).toEqual(before);
     expect(enqueued).toHaveLength(0);
   });
@@ -1154,6 +1159,88 @@ describe('End series (AC-HAPPY-10)', () => {
     );
     expect(again.statusCode).toBe(409);
     expect(errorOf(again).code).toBe('series_ended');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// P-3 / T-6: a series past its last date is ended, read-time (nothing flips is_active later)
+// ---------------------------------------------------------------------------------------------
+
+describe('a series past its last date is ended (P-3, T-6)', () => {
+  /** 13:00 NZDT on the given 2026 October day (the injected clock; no sleeping). */
+  const nzDay = (day: number): Date => new Date(Date.UTC(2026, 9, day, 0, 0, 0));
+  interface ListBody {
+    series: { id: string; isActive: boolean; recurUntil: string | null }[];
+  }
+
+  it('is still active ON its last date, then reads as ended the day after: GET, list order, edit, End and Publish drafts all refuse', async () => {
+    const c = await scene();
+    const { ruleId, body } = await seriesWithInstances(c, { recurUntil: '2026-10-14' });
+    const later = await insertRule(database.pool, c.teamId, {
+      dayOfWeek: 6,
+      startsOn: '2026-10-10',
+    });
+
+    // The last date itself: the series is still active (its last session may be today).
+    h.clock.set(nzDay(14));
+    const onLastDate = await call('GET', `${base(c)}/${ruleId}`, c.admin);
+    expect(seriesOf(onLastDate)).toMatchObject({ isActive: true, recurUntil: '2026-10-14' });
+    const listOn = (await call('GET', base(c), c.admin)).json<ListBody>().series;
+    expect(listOn.find((s) => s.id === ruleId)?.isActive).toBe(true);
+    const publishOn = await call('POST', `${base(c)}/${ruleId}/publish-drafts`, c.admin, {});
+    expect(publishOn.statusCode, publishOn.body).toBe(202);
+
+    // The day after: ended, though no job ever flipped the stored flag.
+    h.clock.set(nzDay(15));
+    const before = await rule(ruleId);
+    expect(before.is_active).toBe(true);
+    const got = await call('GET', `${base(c)}/${ruleId}`, c.admin);
+    expect(got.statusCode, got.body).toBe(200);
+    expect(seriesOf(got)).toMatchObject({ isActive: false, recurUntil: '2026-10-14' });
+    const listed = (await call('GET', base(c), c.admin)).json<ListBody>().series;
+    expect(listed.map((s) => [s.id, s.isActive])).toEqual([
+      [later, true],
+      [ruleId, false],
+    ]);
+    expect(listed[1]?.recurUntil).toBe('2026-10-14');
+
+    enqueued.length = 0;
+    for (const recurUntil of [null, '2026-12-30']) {
+      const put = await call(
+        'PUT',
+        `${base(c)}/${ruleId}`,
+        c.admin,
+        editBody(body, before.version, { recurUntil }),
+      );
+      expect(put.statusCode, `PUT recurUntil ${String(recurUntil)}`).toBe(409);
+      expect(errorOf(put).code).toBe('series_ended');
+    }
+    const end = await call('POST', `${base(c)}/${ruleId}/end`, c.admin, {
+      expectedVersion: before.version,
+      lastDate: '2026-10-20',
+    });
+    expect(end.statusCode, end.body).toBe(409);
+    expect(errorOf(end).code).toBe('series_ended');
+    const publish = await call('POST', `${base(c)}/${ruleId}/publish-drafts`, c.admin, {});
+    expect(publish.statusCode, publish.body).toBe(409);
+    expect(errorOf(publish).code).toBe('series_ended');
+
+    // Nothing restarted it.
+    expect(await rule(ruleId)).toEqual(before);
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it('shows a series ended by End series (future last date) as ended once that date has passed', async () => {
+    const c = await scene();
+    const s = await seriesWithInstances(c);
+    const res = await call('POST', `${base(c)}/${s.ruleId}/end`, c.admin, {
+      expectedVersion: s.version,
+      lastDate: '2026-10-14',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(seriesOf(res).isActive).toBe(true);
+    h.clock.set(nzDay(15));
+    expect(seriesOf(await call('GET', `${base(c)}/${s.ruleId}`, c.admin)).isActive).toBe(false);
   });
 });
 

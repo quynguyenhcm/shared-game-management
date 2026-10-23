@@ -327,7 +327,7 @@ Multi-court session setup, costing and recurrence (PRODDUCT-OVERVIEW §4; workfl
 **Priority**: MUST
 **Given** each route of the sessions module
 **When** it is called anonymously, by a MEMBER, by a PENDING or BANNED member, or by an admin of another team, or with an id that belongs to another team, or by an admin demoted or banned while their write waits
-**Then** it answers 401 or 403 (and the same 403 for an unknown team), never reveals another team's session; inside every write transaction `assertSessionAdmin` re-reads the actor's `team_members` row `FOR SHARE` and a demoted or banned actor gets 403 `forbidden`; `buildApp` refuses to start if any route lacks a `config.policy` (default-deny, ADR 0013)
+**Then** it answers 401 or 403 (and the same 403 for an unknown team), never reveals another team's session (an id that belongs to another team is the same 403 `forbidden`; an id that exists nowhere is 404, ruled 2026-10-24); inside every write transaction `assertSessionAdmin` re-reads the actor's `team_members` row `FOR SHARE` and a demoted or banned actor gets 403 `forbidden`; `buildApp` refuses to start if any route lacks a `config.policy` (default-deny, ADR 0013)
 
 #### AC-ERROR-9: One bad instance never stops the materialiser
 **Priority**: MUST
@@ -972,7 +972,7 @@ Phase 1 | reviewer-accepted deviations:
 
 Phase 2 | reviewer-accepted deviations:
 - Phase 2 | service.ts | Cancel on an already CANCELLED session is 409 `session_not_editable` (spec line 307, AC-ERROR-5) rather than an idempotent 200; replayed publish of PUBLISHED is 200.
-- Phase 2 | routes | Another team's session id under your own team path is 404 `not_found` (no existence probe); AC-ERROR-8 401/403 applies to the team guard.
+- Phase 2 | routes | Another team's session id under your own team path was 404 `not_found` (no existence probe); AC-ERROR-8 401/403 applied to the team guard. RESOLVED 2026-10-24 (human ruling): now 403 `forbidden`; an id that exists nowhere stays 404 (see ADR 0019 (e)).
 - Phase 2 | repo.ts | `activeRegistrationCount` is a TS read of registrations (CONFIRMED, WAITLISTED); registration's widening of the D-85 predicate must widen it too. Add to ADR 0019 hand-off list; consider a TS/SQL parity test in Phase 4.
 - Phase 2 | service.ts | An explicit deadline is parked on the default with an extra UPDATE when an edit could trip the non-deferrable `deadline <= starts_at` CHECK; version may bump more than once on such edits.
 - Phase 2 | content.ts | List rows carry endsAt and draftReason but no series name (rule table has no name column); revisit in Phase 3/5.
@@ -982,7 +982,7 @@ Phase 2 | reviewer-accepted deviations:
 - Phase 2 | Phase 4 owes | T-17 registration-insert vs fee-edit race under the session lock; Phase 3 adds the `recurrence-rule` queue (bootstrap already accepts sessionAllocator).
 
 Phase 2 | reviewer-accepted deviations (added at Phase 3 start):
-- Phase 2 | reviewer-accepted | apps/api/src/modules/sessions/service.ts + routes.ts:40 | AC-ERROR-8 lists "an id that belongs to another team" among 401/403 cases; API answers 404 not_found (non-revealing). Literal departure - human to decide whether to align to 403.
+- Phase 2 | reviewer-accepted | apps/api/src/modules/sessions/service.ts + routes.ts:40 | AC-ERROR-8 lists "an id that belongs to another team" among 401/403 cases; API answers 404 not_found (non-revealing). Literal departure - human to decide whether to align to 403. RESOLVED 2026-10-24: the human ruled 403; session and series routes now answer 403 for another team's id and 404 only for an id that exists nowhere (ADR 0019 (e)).
 - Phase 2 | reviewer-accepted | service.ts:~322 | `session.stale_refused` logged inside the tx callback; harmless because stale refusals are not retried.
 - Phase 2 | DONE_WITH_CONCERNS | build-orchestrator | the two blocking review fixes (PUBLISHED edit into the past -> 409; malformed cursor -> 422) were not re-reviewed and `build` was not re-run after them (tests/lint/typecheck were). Phase 3 verifier ran the full build: PASS.
 
@@ -1016,7 +1016,7 @@ Phase 5 | decisions (carry-forwards from Phase 3/4 resolved):
 - Phase 5 | seriesChangeEffect | exposed API-side on series GET `instances` (will_update|edited|closed|has_registrations; past-deadline maps to closed; fee-locked to has_registrations), with `isPayoutConfigured`, `bankingDrafts`, `editedDrafts`. `nextDate` omitted (not cheap); web hard-codes a 28-day horizon line.
 - Phase 5 | AC-HAPPY-10 "partial failure" banner | not built: End series is one transaction (T-6), so the UI has no partial state. AC text should drop it.
 - Phase 5 | cancelled/deletedDrafts on session.series.updated | not built: copy does not need them (series save never cancels or deletes; End response carries removedDrafts/cancelledPublished/activeRegistrationCount).
-- Phase 5 | AC-ERROR-8 | cross-team id stays 404; UI treats 404 as not-found. Human still to decide on 403.
+- Phase 5 | AC-ERROR-8 | cross-team id was 404; UI treated 404 as not-found. RESOLVED 2026-10-24: ruled 403; the pages render the existing NoAccess state on that 403 (tests added).
 - Phase 5 | reviewer-accepted | seriesGroups on the list only shows series with a loaded date (no list-series endpoint); a freshly created, still-materialising series has no list row until its first date loads. "Nothing changed" is inferred from version equality.
 - Phase 5 | reviewer-accepted | `apiFetch` now keeps `dstOptions`/`raisedFields` from error bodies; two extra notices `publish_incomplete`, `series_already_ended`; Number-of-courts defaults and some copy written where the deck was silent; copy-deck example "27 Sep 2026 is the 5th Sunday" is wrong (it is the 4th and last).
 - Phase 5 | process | 5A integration tests first ran after implementation (unit RED observed); no browser/360 px/axe walk performed; unit tests are node-env static markup (no DOM), so focus/Escape/timers are untested until Phase 6.
@@ -1043,7 +1043,7 @@ Phase 6 | decisions and deviations:
 - Phase 6 | e2e uses `docker compose pause worker` briefly to observe the waiting line, `E2E_DATABASE_URL` default is the compose dev DB.
 - Phase 6 | coverage: branch coverage per file is below 80 on series-view.ts (79.6), series.ts (76.7), materialise-notice.ts (75.0), shared series-name.ts (66.7); the gate is aggregate so it passes. Follow-up candidate.
 - Phase 6 | "showing first 100" line not added: SERIES_INSTANCE_LIMIT only bites after ~86 stacked past drafts.
-- Phase 6 | open for the human: AC-ERROR-8 404-vs-403 (recorded in ADR 0019); AC text drift (AC-ASYNC-3 email key, AC-HAPPY-10 partial-failure banner).
+- Phase 6 | AC-ERROR-8 404-vs-403 RESOLVED 2026-10-24 (403, ADR 0019 (e)). Still open: AC text drift (AC-ASYNC-3 email key, AC-HAPPY-10 partial-failure banner).
 - Phase 6 | stale notes: Phase 2 `session_courts_guard_closed` unsorted and CLI TRIGGERABLE notes are resolved in code.
 
 ### Resumption Notes

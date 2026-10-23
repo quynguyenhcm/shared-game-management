@@ -289,15 +289,12 @@ export function sessionLabel(
   return { label, tags };
 }
 
-/** One page-level notice above the sections, only while a banking draft waits and banking is missing. */
-export function showListBankingNotice(
-  sessions: readonly Pick<SessionResponse, 'status' | 'draftReason'>[],
-  isPayoutConfigured: boolean,
-): boolean {
-  return (
-    !isPayoutConfigured &&
-    sessions.some((session) => session.status === 'DRAFT' && session.draftReason === 'banking')
-  );
+/**
+ * One page-level notice above the sections, only while a banking draft waits and banking is missing. `bankingDrafts` is the
+ * API's team-wide count (`GET /sessions`), never a count of the rows one page loaded (AC-ENTRY-2).
+ */
+export function showListBankingNotice(bankingDrafts: number, isPayoutConfigured: boolean): boolean {
+  return !isPayoutConfigured && bankingDrafts > 0;
 }
 
 export interface SeriesRow {

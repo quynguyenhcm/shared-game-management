@@ -41,7 +41,7 @@ const ERRORS = {
 } as const;
 
 const SHAPE =
-  'TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a session of another team is 404 `not_found`. The actor is re-checked as an approved admin under a row lock inside every write (403 when demoted meanwhile). Every write carries `expectedVersion`: a stale one is 409 `session_stale` with the latest row in `error.current`, and nothing is written.';
+  'TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a session id that belongs to another team is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404 `not_found`. The actor is re-checked as an approved admin under a row lock inside every write (403 when demoted meanwhile). Every write carries `expectedVersion`: a stale one is 409 `session_stale` with the latest row in `error.current`, and nothing is written.';
 
 /**
  * `/teams/:teamId/sessions` (session-scheduling-engine, one-off sessions): the admin list, create with replay, read, edit,
@@ -65,7 +65,7 @@ export const sessionsRoutes: FastifyPluginAsync<SessionsRoutesOptions> = async (
       config: { policy },
       schema: {
         summary: "List a team's sessions (admin)",
-        description: `One section of the Sessions page per call: \`view=upcoming\` (PUBLISHED and not ended, soonest first), \`drafts\` (DRAFT with a future start, soonest first) or \`past\` (COMPLETED, CANCELLED, ended, and drafts whose start passed, most recent first), \`limit\` rows (default 25, at most 100) after the opaque \`cursor\`; \`nextCursor\` is null on the last page. Each row carries \`phase\` (from the API clock), \`draftReason\`, \`isInstanceOverridden\`, \`recurringRuleId\` and its courts; \`isPayoutConfigured\` lets the page show the banking notice. ${SHAPE}`,
+        description: `One section of the Sessions page per call: \`view=upcoming\` (PUBLISHED and not ended, soonest first), \`drafts\` (DRAFT with a future start, soonest first) or \`past\` (COMPLETED, CANCELLED, ended, and drafts whose start passed, most recent first), \`limit\` rows (default 25, at most 100) after the opaque \`cursor\`; \`nextCursor\` is null on the last page. Each row carries \`phase\` (from the API clock), \`draftReason\`, \`isInstanceOverridden\`, \`recurringRuleId\` and its courts; \`isPayoutConfigured\` and \`bankingDrafts\` (the team-wide count of series drafts a banking refusal left, whatever the view or page) let the page show the banking notice. ${SHAPE}`,
         operationId: 'listTeamSessions',
         params: TeamIdParams,
         querystring: ListSessionsQuery,

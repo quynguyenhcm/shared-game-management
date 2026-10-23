@@ -560,7 +560,12 @@ describe('apiClient sessions calls (session-scheduling-engine)', () => {
   }
 
   it('listSessions GETs one view with the cursor and limit as an encoded query', async () => {
-    const fetchMock = stubJson(200, { sessions: [], nextCursor: null, isPayoutConfigured: false });
+    const fetchMock = stubJson(200, {
+      sessions: [],
+      nextCursor: null,
+      isPayoutConfigured: false,
+      bankingDrafts: 0,
+    });
     const result = await apiClient.listSessions(
       TEAM_ID,
       { view: 'past', cursor: 'a b/c', limit: 25 },

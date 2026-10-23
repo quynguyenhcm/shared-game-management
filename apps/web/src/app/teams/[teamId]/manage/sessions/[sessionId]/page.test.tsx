@@ -311,7 +311,14 @@ describe('session page: guards (AC-ERROR-8)', () => {
     expect(html).not.toContain('Rosedale, Wed');
   });
 
-  it("404 (unknown id, or another team's session) and 422 are not found, with nothing revealed", async () => {
+  it("403 on the session alone (another team's id under this team the caller administers) renders NoAccess while the team and banking reads succeed (AC-ERROR-8)", async () => {
+    const html = await render({}, { session: fail(403, 'forbidden') });
+    expect(html).toContain('You don&#x27;t have access to manage this team.');
+    expect(html).not.toContain('<nav');
+    expect(html).not.toContain('Rosedale, Wed');
+  });
+
+  it('404 (an id that exists nowhere) and 422 are not found, with nothing revealed', async () => {
     await expect(render({}, { session: fail(404, 'not_found') })).rejects.toThrow('NOT_FOUND');
     await expect(render({}, { session: fail(422, 'validation_failed') })).rejects.toThrow(
       'NOT_FOUND',

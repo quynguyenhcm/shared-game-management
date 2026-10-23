@@ -25,6 +25,35 @@ export function findSession(
     .executeTakeFirst();
 }
 
+/**
+ * A plain existence read by id alone (no team filter, no lock): called only after a team-scoped read found nothing, to
+ * tell "belongs to another team" (403, AC-ERROR-8) from "does not exist" (404).
+ */
+export async function sessionExists(db: Database, sessionId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('game_sessions')
+    .select('id')
+    .where('id', '=', sessionId)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/**
+ * The team's series DRAFT dates a banking refusal left behind (a series date, not edited by an admin): the same rule as
+ * `draftReasonOf` = 'banking', counted across the whole team and not one page of it.
+ */
+export async function countBankingDrafts(db: Database, teamId: string): Promise<number> {
+  const row = await db
+    .selectFrom('game_sessions')
+    .select((eb) => eb.fn.countAll<string>().as('n'))
+    .where('team_id', '=', teamId)
+    .where('status', '=', 'DRAFT')
+    .where('recurring_rule_id', 'is not', null)
+    .where('is_instance_overridden', '=', false)
+    .executeTakeFirstOrThrow();
+  return Number(row.n);
+}
+
 export function findSessionByCreateKey(
   db: Database,
   teamId: string,

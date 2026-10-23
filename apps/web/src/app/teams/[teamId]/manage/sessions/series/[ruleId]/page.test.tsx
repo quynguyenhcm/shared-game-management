@@ -333,7 +333,16 @@ describe('series page: guards (AC-ERROR-8)', () => {
     expect(html).not.toContain('Wednesdays at Rosedale');
   });
 
-  it('404 (unknown or another team’s series) and 422 are not found; a 5xx throws and logs without values', async () => {
+  it('403 on the series alone (another team’s id under this team the caller administers) renders NoAccess while the team read succeeds (AC-ERROR-8)', async () => {
+    mocks.teamDetail.mockClear();
+    const html = await render({}, { series: fail(403, 'forbidden') });
+    expect(mocks.teamDetail).toHaveBeenCalled();
+    expect(html).toContain('You don&#x27;t have access to manage this team.');
+    expect(html).not.toContain('<nav');
+    expect(html).not.toContain('Wednesdays at Rosedale');
+  });
+
+  it('404 (an id that exists nowhere) and 422 are not found; a 5xx throws and logs without values', async () => {
     await expect(render({}, { series: fail(404, 'not_found') })).rejects.toThrow('NOT_FOUND');
     await expect(render({}, { series: fail(422, 'validation_failed') })).rejects.toThrow(
       'NOT_FOUND',

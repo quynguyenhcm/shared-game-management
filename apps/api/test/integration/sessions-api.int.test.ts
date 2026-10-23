@@ -301,21 +301,29 @@ describe('access control (AC-ERROR-8)', () => {
     expect(await row(sessionId)).toEqual(before);
   });
 
-  it("answers 404 for another team's session id on a team the caller does administer, and changes nothing", async () => {
+  it("answers 403 for another team's session id on a team the caller does administer (ruled 2026-10-24), 404 for an id that does not exist, and changes nothing", async () => {
     const c = await scene({ payout: true });
     const foreign = await insertSession(database.pool, c.otherTeamId);
     const before = await row(foreign);
-    for (const [method, suffix, payload] of [
+    const routes = [
       ['GET', '', undefined],
       ['PUT', '', editBody(createBody(), 1)],
       ['POST', '/publish', { expectedVersion: 1 }],
       ['POST', '/cancel', { expectedVersion: 1 }],
-    ] as const) {
+    ] as const;
+    for (const [method, suffix, payload] of routes) {
       const res = await call(method, `${base(c)}/${foreign}${suffix}`, c.admin, payload);
-      expect(res.statusCode, `${method} ${suffix}`).toBe(404);
-      expect(errorOf(res).code).toBe('not_found');
+      expect(res.statusCode, `${method} ${suffix}`).toBe(403);
+      // The same body as any other refusal: it names no team, session or detail of the other team's row.
+      expect(res.json<ApiError>()).toEqual({
+        error: { code: 'forbidden', message: 'You do not have permission to do that.' },
+      });
+      const missing = await call(method, `${base(c)}/${randomUUID()}${suffix}`, c.admin, payload);
+      expect(missing.statusCode, `missing ${method} ${suffix}`).toBe(404);
+      expect(errorOf(missing).code).toBe('not_found');
     }
     expect(await row(foreign)).toEqual(before);
+    expect(enqueued).toHaveLength(0);
   });
 
   it('re-checks the actor inside the write transaction: an admin demoted while the request waits gets 403', async () => {
@@ -1614,6 +1622,73 @@ describe('the admin list (spec "API")', () => {
     ).toBe(false);
     const bad = await call('GET', `${base(c)}?view=everything`, c.admin);
     expect(bad.statusCode).toBe(422);
+  });
+
+  it('reports the team-wide count of banking-refused drafts on every list view, even when that draft is past the first page (AC-ENTRY-2)', async () => {
+    const c = await scene({ payout: false });
+    const ruleId = await insertRule(database.pool, c.teamId);
+    // 29 one-off drafts all dated before the series draft: it is the 30th, past the default page of 25.
+    for (let day = 0; day < 29; day += 1) {
+      await insertSession(
+        database.pool,
+        c.teamId,
+        {},
+        { date: `2026-11-${String(day + 1).padStart(2, '0')}` },
+      );
+    }
+    const banking = await insertSession(
+      database.pool,
+      c.teamId,
+      {},
+      { date: '2026-12-20', recurringRuleId: ruleId },
+    );
+    // Not counted: an edited series draft, a published series date, another team's banking draft.
+    const edited = await insertSession(
+      database.pool,
+      c.teamId,
+      {},
+      { date: '2026-12-21', recurringRuleId: ruleId },
+    );
+    await database.pool.query(
+      `UPDATE game_sessions SET is_instance_overridden = true WHERE id = $1`,
+      [edited],
+    );
+    await insertSession(
+      database.pool,
+      c.teamId,
+      { flat: '0.00' },
+      { date: '2026-12-22', recurringRuleId: ruleId, status: 'PUBLISHED' },
+    );
+    const otherRule = await insertRule(database.pool, c.otherTeamId);
+    await insertSession(
+      database.pool,
+      c.otherTeamId,
+      {},
+      { date: '2026-12-20', recurringRuleId: otherRule },
+    );
+
+    const page = await call('GET', `${base(c)}?view=drafts`, c.admin);
+    expect(page.statusCode, page.body).toBe(200);
+    const firstPage = page.json<{
+      sessions: SessionResponse[];
+      nextCursor: string | null;
+      bankingDrafts: number;
+    }>();
+    expect(firstPage.sessions).toHaveLength(25);
+    expect(firstPage.sessions.map((s) => s.id)).not.toContain(banking);
+    expect(firstPage.nextCursor).not.toBeNull();
+    expect(firstPage.bankingDrafts).toBe(1);
+    for (const view of ['upcoming', 'past']) {
+      const other = await call('GET', `${base(c)}?view=${view}`, c.admin);
+      expect(other.json<{ bankingDrafts: number }>().bankingDrafts, view).toBe(1);
+    }
+  });
+
+  it('reports zero banking drafts when the team has none', async () => {
+    const c = await scene({ payout: false });
+    await insertSession(database.pool, c.teamId, {}, { date: '2026-11-04' });
+    const res = await call('GET', `${base(c)}?view=drafts`, c.admin);
+    expect(res.json<{ bankingDrafts: number }>().bankingDrafts).toBe(0);
   });
 
   it('answers 422 validation_failed on a malformed cursor: a bad id or a bad time, never a 500', async () => {

@@ -566,8 +566,17 @@ describe('responses and the error envelope', () => {
         sessions: [session],
         nextCursor: null,
         isPayoutConfigured: false,
+        bankingDrafts: 2,
       }).success,
     ).toBe(true);
+    // The team-wide banking draft count is part of the contract: a list without it is not a list response.
+    expect(
+      SessionListResponse.safeParse({
+        sessions: [session],
+        nextCursor: null,
+        isPayoutConfigured: false,
+      }).success,
+    ).toBe(false);
   });
 
   it('wraps one session for the detail and write responses, and the list query is strict and coerced', () => {

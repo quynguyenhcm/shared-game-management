@@ -217,11 +217,11 @@ describe('status labels (T-11, copy deck "Status labels" and "Draft labels")', (
     expect(view.tags).toEqual([]);
   });
 
-  it('the page-level banking notice shows only for a banking draft while the team is not set up', () => {
-    const drafts = [session({ status: 'DRAFT', draftReason: 'banking' }), session()];
-    expect(showListBankingNotice(drafts, false)).toBe(true);
-    expect(showListBankingNotice(drafts, true)).toBe(false);
-    expect(showListBankingNotice([session()], false)).toBe(false);
+  it('the page-level banking notice shows from the API count while banking is missing, whatever rows are loaded', () => {
+    expect(showListBankingNotice(1, false)).toBe(true);
+    expect(showListBankingNotice(30, false)).toBe(true);
+    expect(showListBankingNotice(1, true)).toBe(false);
+    expect(showListBankingNotice(0, false)).toBe(false);
   });
 });
 
@@ -280,6 +280,8 @@ describe('series on the list', () => {
     [{ isActive: true, materialising: false, recurUntil: null }, 'Active'],
     [{ isActive: true, materialising: true, recurUntil: null }, 'Adding sessions…'],
     [{ isActive: false, materialising: false, recurUntil: '2026-12-16' }, 'Ended 16 Dec 2026'],
+    // A series past its last date arrives from the API with isActive false (read-time rule): ended beats adding.
+    [{ isActive: false, materialising: true, recurUntil: '2026-10-14' }, 'Ended 14 Oct 2026'],
   ])('%j reads "%s"', (series, label) => {
     expect(seriesStatusLabel(series)).toBe(label);
   });

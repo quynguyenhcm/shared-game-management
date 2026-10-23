@@ -8,12 +8,12 @@
 - Duration: 4 calendar days. Plan, creative and all six build phases plus the final review landed on 2026-10-20; reflection and archive on 2026-10-24.
 - Roadmap Link: session-scheduling-engine (v1.0.0)
 - Branch: feature/session-scheduling-engine (fork point 1ee4520; pr_target and metadata_branch both `main`)
-- Status at archive: **Ready to merge WITH FIXES**. Two Important findings and one human decision are open. See "Known Issues / Open Items at Archive".
+- Status at archive: **Ready to merge WITH FIXES**. Two Important findings and one human decision were open at archive; all three were resolved on 2026-10-24 on PR #7 (see "Known Issues / Open Items at Archive").
 
 ## Executive Summary
 Team admins can now set up one-off and recurring multi-court sessions, cost them, change a single night without breaking its series, and publish them through the team-banking gate. The feature adds a new "Sessions" area at `/teams/[teamId]/manage/sessions`, a `sessions` API module, a pure shared recurrence core, a materialiser (daily sweep plus per-rule jobs), an auto-enrol follow-up queue, and an allocator port that registration-and-waitlist will fill in. ADR 0019 records the contracts honoured and offered.
 
-The engine is complete and heavily tested (1952 unit, 637 integration, 2 Playwright runs; aggregate coverage 96.3% statements / 90.0% branches). The build was not clean: three HALT/remediate cycles, a detached-HEAD incident, and soft TDD discipline. The final whole-branch review found 0 Critical, 2 Important and 8 Minor findings, and none of the Important ones are fixed in this archive. **This archive is written before they are fixed.**
+The engine is complete and heavily tested (1952 unit, 637 integration, 2 Playwright runs; aggregate coverage 96.3% statements / 90.0% branches). The build was not clean: three HALT/remediate cycles, a detached-HEAD incident, and soft TDD discipline. The final whole-branch review found 0 Critical, 2 Important and 8 Minor findings, and none of the Important ones are fixed in this archive. **This archive was written before they were fixed; both Important findings and the 403 ruling were resolved on 2026-10-24 (see Known Issues / Open Items).**
 
 ## System Overview
 ### Purpose
@@ -181,7 +181,7 @@ The task's 48 ACs were amended during build. Downstream features must not inheri
 - **AC-HAPPY-10**: the partial-failure banner is dropped. End series is one transaction (T-6), so a failed cancel rolls back the whole end.
 - **AC-ASYNC-3**: the email idempotency key is `payout-missing:<ruleId>:<windowStart>:<recipientId>`, so every admin is emailed.
 - **AC-VERIFY-6**: `session.recurrence.sweep_completed` carries no `teamId`, because the sweep is cross-team (human ruling, 2026-10-20). `session.lock_retry*` events do carry `teamId`.
-- **AC-ERROR-8**: implemented as 404 for another team's session id; still awaiting a human ruling (see Open Items).
+- **AC-ERROR-8**: human ruled 403 on 2026-10-24; another team's session or series id is 403 `forbidden`, an id that exists nowhere is 404 (ADR 0019 (e)).
 - **T-10 wording**: ADR 0019 adopts "wholly inside the gap" (code and ALG), not "any court time between 02:00 and 03:00".
 - **Minor contract drift**: `feesLocked` returns `'none'` where the spec says `null`; series list sort is ascending where the spec says newest-first.
 - **Human rulings**: Phase 5's 360 px manual walk was deferred to Phase 6 and discharged there.
@@ -209,14 +209,14 @@ Aggregate 96.3% statements, 90.0% branches. Four files are under 80% branch cove
 Not verified: screen reader, full Tab order, axe moderate/minor impacts, publish confirm panel. `/yay:uat` was not run. Codex review was unavailable for Phases 3-6 (`timeout` absent on macOS); the final review called Codex directly and it worked.
 
 ## Known Issues / Open Items at Archive
-**Verdict of the final whole-branch review (Opus, Codex usable): Ready to merge WITH FIXES. 0 Critical, 2 Important, 8 Minor.** None of the following is fixed in this archive.
+**Verdict of the final whole-branch review (Opus, Codex usable): Ready to merge WITH FIXES. 0 Critical, 2 Important, 8 Minor.** The three items below were open at archive and were fixed on 2026-10-24 on the PR branch (post-archive fixes, test-first).
 
-### Important (open, fix before merge)
-1. **A series past `recur_until` still shows Active and can be restarted by PUT.** Derive status server-side and refuse PUT with 409 `series_ended`. Same defect class as the Phase 5 HALT (UI state derived from loaded rows).
-2. **The list page's banking notice is computed from the loaded page only.** Serve it from a team-level server read so it does not depend on which 25 rows were loaded.
+### Important (RESOLVED 2026-10-24)
+1. **RESOLVED. A series past `recur_until` still showed Active and could be restarted by PUT.** One shared read-time rule (`isSeriesActive`, `packages/shared/src/sessions/series-status.ts`) now drives the series response and list (`isActive`, "active first" ordering) and the edit, End and publish-drafts guards (409 `series_ended`). A series is ended when its flag is off or its last date is before NZ today; on the last date itself it is still active. Nothing flips the stored flag; the sweep is unchanged.
+2. **RESOLVED. The list page's banking notice was computed from the loaded page only.** `GET /teams/:teamId/sessions` now returns `bankingDrafts`, the team-wide count of unedited series drafts, and the page shows the notice iff the count is above zero and banking is missing.
 
-### Open human decision
-3. **AC-ERROR-8: cross-team session id answers 404 or 403?** The API returns 404 `not_found` (routes do not probe for existence). The AC text lists "an id that belongs to another team" among 403 cases. A human must choose, then align the code or the AC.
+### Human decision (RESOLVED 2026-10-24)
+3. **RESOLVED. AC-ERROR-8: the human ruled 403.** Another team's session or series id answers 403 `forbidden` on session GET, PUT, publish, cancel and series GET, PUT, End, publish-drafts; an id that exists nowhere stays 404. See ADR 0019 (e).
 
 ### Minor and carried items
 - 12-factor: `webBaseUrl ?? 'http://localhost:3000'` and `recurrenceHorizonDays` defaulting to 28 in `buildApp`/`RegisterJobsOptions`. Make both required at the composition root.

@@ -74,6 +74,7 @@ import * as seriesRepo from './series-repo.ts';
 import {
   buildSeriesExtras,
   existingInstanceOf,
+  seriesIsActive,
   toSeriesListItem,
   toSeriesResponse,
   type RuleCourtRow,
@@ -194,6 +195,10 @@ const seriesRuleOf = (rule: LockedRule): SeriesRule => ({
   ...templateOf(rule),
 });
 
+/** An ended series: switched off, or past its last date in NZ at `now` (P-3, T-6; the shared read-time rule). */
+const isEnded = (rule: LockedRule, now: Date): boolean =>
+  !seriesIsActive(rule, instantToLocal(now).date);
+
 const patternOf = (rule: LockedRule) => ({
   frequency: rule.frequency,
   dayOfWeek: rule.day_of_week,
@@ -292,7 +297,17 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
         today: instantToLocal(now).date,
       }),
       horizonDays,
+      instantToLocal(now).date,
     );
+  }
+
+  /**
+   * Why a team-scoped read or lock found no series (AC-ERROR-8, human ruling 2026-10-24): a series of another team is 403
+   * `forbidden`, an id that exists nowhere is 404 `not_found`. A plain SELECT on the failure path only: no lock, so nothing
+   * is added to LOCK_ORDER wherever it runs (before the transaction, or inside it after the locks already held).
+   */
+  async function missingRule(reader: Database, ruleId: string): Promise<AppError> {
+    return new AppError((await seriesRepo.ruleExists(reader, ruleId)) ? 'forbidden' : 'not_found');
   }
 
   async function requireRule(
@@ -301,7 +316,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
     ruleId: string,
   ): Promise<LockedRule> {
     const rule = await seriesRepo.findRule(reader, teamId, ruleId);
-    if (rule === undefined) throw new AppError('not_found');
+    if (rule === undefined) throw await missingRule(reader, ruleId);
     return rule;
   }
 
@@ -334,8 +349,9 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
 
   return {
     async list(teamId) {
-      const rules = await seriesRepo.listRules(db, teamId);
-      return { series: rules.map(toSeriesListItem), horizonDays };
+      const today = instantToLocal(clock.now()).date;
+      const rules = await seriesRepo.listRules(db, teamId, today);
+      return { series: rules.map((rule) => toSeriesListItem(rule, today)), horizonDays };
     },
 
     async get(teamId, ruleId) {
@@ -403,7 +419,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
     update(teamId, ruleId, actorId, input, ctx) {
       return refusing(ctx.log, { action: 'update_series', actorId, teamId }, async () => {
         const r0 = await requireRule(db, teamId, ruleId);
-        if (!r0.is_active) throw new AppError('series_ended');
+        if (isEnded(r0, clock.now())) throw new AppError('series_ended');
 
         // Request-only validation first: nothing here needs a lock.
         const fees = computeFeeColumns(input, {
@@ -449,8 +465,9 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
           }
 
           const rule = await lockRule(trx, { ruleId, teamId });
-          if (rule === undefined) throw new AppError('not_found');
-          if (!rule.is_active) throw new AppError('series_ended');
+          if (rule === undefined) throw await missingRule(trx, ruleId);
+          // The clock is read after the rule lock (a wait across NZ midnight must judge "ended" at the time of the write).
+          if (isEnded(rule, clock.now())) throw new AppError('series_ended');
           await assertSessionAdmin(trx, teamId, actorId);
 
           // The pattern was checked against an unlocked read: check the locked rule too (an End may have shortened it).
@@ -608,7 +625,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
     end(teamId, ruleId, actorId, input, ctx) {
       return refusing(ctx.log, { action: 'end_series', actorId, teamId }, async () => {
         const r0 = await requireRule(db, teamId, ruleId);
-        if (!r0.is_active) throw new AppError('series_ended');
+        if (isEnded(r0, clock.now())) throw new AppError('series_ended');
         try {
           assertRecurrenceRule({ ...recurrenceRuleOf(r0), recurUntil: input.lastDate });
         } catch (error) {
@@ -624,9 +641,9 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
             async (trx) => {
               if (!(await lockTeamKeyShare(trx, teamId))) throw new AppError('forbidden');
               const rule = await lockRule(trx, { ruleId, teamId });
-              if (rule === undefined) throw new AppError('not_found');
+              if (rule === undefined) throw await missingRule(trx, ruleId);
               await assertSessionAdmin(trx, teamId, actorId);
-              if (!rule.is_active) throw new AppError('series_ended');
+              if (isEnded(rule, clock.now())) throw new AppError('series_ended');
               if (rule.version !== input.expectedVersion) {
                 throw await stale(trx, rule, {
                   actorId,
@@ -736,7 +753,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
               await assertSessionAdmin(trx, teamId, actorId);
               const rule = await requireRule(trx, teamId, ruleId);
               // An ended series publishes nothing more: say so instead of queueing a run that will skip it.
-              if (!rule.is_active) throw new AppError('series_ended');
+              if (isEnded(rule, clock.now())) throw new AppError('series_ended');
               // `stately`: null means a run for this rule is already queued, and it will read the latest rule.
               const jobId = await enqueueRun(trx, rule, 'manual');
               return { series: await viewOf(trx, rule), queued: jobId !== null };

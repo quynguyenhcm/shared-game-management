@@ -5,6 +5,7 @@
  */
 import {
   ZERO,
+  isSeriesActive,
   planSeriesReconciliation,
   seriesName,
   type LocalDate,
@@ -56,14 +57,23 @@ export function seriesNameOf(
   });
 }
 
+/**
+ * `isActive` of every series response is the READ-TIME rule (`isSeriesActive`): the stored flag AND a last date that has not
+ * passed, in NZ `today`. The stored `is_active` alone would show a series past its end date as Active (P-3, T-6).
+ */
+export const seriesIsActive = (
+  rule: Pick<LockedRule, 'is_active' | 'recur_until'>,
+  today: LocalDate,
+) => isSeriesActive({ isActive: rule.is_active, recurUntil: rule.recur_until }, today);
+
 /** One Series-section row of the Sessions page: the rule alone, no dates. */
-export function toSeriesListItem(rule: LockedRule): SeriesListItem {
+export function toSeriesListItem(rule: LockedRule, today: LocalDate): SeriesListItem {
   return {
     id: rule.id,
     name: seriesNameOf(rule),
     startsOn: rule.starts_on,
     recurUntil: rule.recur_until,
-    isActive: rule.is_active,
+    isActive: seriesIsActive(rule, today),
     version: rule.version,
     materialising: isMaterialising(rule),
   };
@@ -74,6 +84,7 @@ export function toSeriesResponse(
   courts: readonly RuleCourtRow[],
   extras: SeriesViewExtras,
   horizonDays: number,
+  today: LocalDate,
 ): SeriesResponse {
   return {
     id: rule.id,
@@ -84,7 +95,7 @@ export function toSeriesResponse(
     startsOn: rule.starts_on,
     monthlyWeek: rule.monthly_week,
     recurUntil: rule.recur_until,
-    isActive: rule.is_active,
+    isActive: seriesIsActive(rule, today),
     version: rule.version,
     materialising: isMaterialising(rule),
     horizonDays,

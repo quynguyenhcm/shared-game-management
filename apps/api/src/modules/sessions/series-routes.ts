@@ -35,7 +35,7 @@ const ERRORS = {
 } as const;
 
 const SHAPE =
-  'TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a series of another team is 404 `not_found`. The actor is re-checked as an approved admin under a row lock inside every write (403 when demoted meanwhile). Writes that change a series carry `expectedVersion`: a stale one is 409 `series_stale` with the latest series in `error.current`, and nothing is written.';
+  'TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a series id that belongs to another team is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404 `not_found`. The actor is re-checked as an approved admin under a row lock inside every write (403 when demoted meanwhile). Writes that change a series carry `expectedVersion`: a stale one is 409 `series_stale` with the latest series in `error.current`, and nothing is written.';
 
 /**
  * `/teams/:teamId/session-series` (session-scheduling-engine, recurring series): create with replay, read, edit with

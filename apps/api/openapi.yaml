@@ -12410,12 +12410,15 @@ paths:
         most 100) after the opaque `cursor`; `nextCursor` is null on the last
         page. Each row carries `phase` (from the API clock), `draftReason`,
         `isInstanceOverridden`, `recurringRuleId` and its courts;
-        `isPayoutConfigured` lets the page show the banking notice. TEAM_ADMIN
-        of this team only (`allowGlobalAdmin` is off); a session of another team
-        is 404 `not_found`. The actor is re-checked as an approved admin under a
-        row lock inside every write (403 when demoted meanwhile). Every write
-        carries `expectedVersion`: a stale one is 409 `session_stale` with the
-        latest row in `error.current`, and nothing is written."
+        `isPayoutConfigured` and `bankingDrafts` (the team-wide count of series
+        drafts a banking refusal left, whatever the view or page) let the page
+        show the banking notice. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off); a session id that belongs to another team
+        is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that exists
+        nowhere is 404 `not_found`. The actor is re-checked as an approved admin
+        under a row lock inside every write (403 when demoted meanwhile). Every
+        write carries `expectedVersion`: a stale one is 409 `session_stale` with
+        the latest row in `error.current`, and nothing is written."
       parameters:
         - schema:
             type: string
@@ -12657,10 +12660,15 @@ paths:
                       - "null"
                   isPayoutConfigured:
                     type: boolean
+                  bankingDrafts:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
                 required:
                   - sessions
                   - nextCursor
                   - isPayoutConfigured
+                  - bankingDrafts
                 additionalProperties: false
         "401":
           description: Default Response
@@ -14012,12 +14020,13 @@ paths:
         Pacific/Auckland wall-clock times: one that does not exist or happens
         twice on a DST day is 422 with `dstOptions`. The date must not be in the
         past. A blank `courtCost` or `extraExpenses` is $0.00 (a free session).
-        TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a session of
-        another team is 404 `not_found`. The actor is re-checked as an approved
-        admin under a row lock inside every write (403 when demoted meanwhile).
-        Every write carries `expectedVersion`: a stale one is 409
-        `session_stale` with the latest row in `error.current`, and nothing is
-        written."
+        TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a session id
+        that belongs to another team is 403 `forbidden` (AC-ERROR-8, ruled
+        2026-10-24) and an id that exists nowhere is 404 `not_found`. The actor
+        is re-checked as an approved admin under a row lock inside every write
+        (403 when demoted meanwhile). Every write carries `expectedVersion`: a
+        stale one is 409 `session_stale` with the latest row in `error.current`,
+        and nothing is written."
       requestBody:
         required: true
         content:
@@ -15915,11 +15924,12 @@ paths:
       description: "The editor's view: `version`, `deadlineIsDefault`,
         `activeRegistrationCount` and `feesLocked` ('raise_only_blocked' once a
         PUBLISHED session has a registered player). TEAM_ADMIN of this team only
-        (`allowGlobalAdmin` is off); a session of another team is 404
-        `not_found`. The actor is re-checked as an approved admin under a row
-        lock inside every write (403 when demoted meanwhile). Every write
-        carries `expectedVersion`: a stale one is 409 `session_stale` with the
-        latest row in `error.current`, and nothing is written."
+        (`allowGlobalAdmin` is off); a session id that belongs to another team
+        is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that exists
+        nowhere is 404 `not_found`. The actor is re-checked as an approved admin
+        under a row lock inside every write (403 when demoted meanwhile). Every
+        write carries `expectedVersion`: a stale one is 409 `session_stale` with
+        the latest row in `error.current`, and nothing is written."
       parameters:
         - schema:
             type: string
@@ -17493,11 +17503,12 @@ paths:
         the response carries `promoted` and `material` (a field players care
         about changed), and the session's `activeRegistrationCount`, so the
         admin can tell them. TEAM_ADMIN of this team only (`allowGlobalAdmin` is
-        off); a session of another team is 404 `not_found`. The actor is
-        re-checked as an approved admin under a row lock inside every write (403
-        when demoted meanwhile). Every write carries `expectedVersion`: a stale
-        one is 409 `session_stale` with the latest row in `error.current`, and
-        nothing is written."
+        off); a session id that belongs to another team is 403 `forbidden`
+        (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404
+        `not_found`. The actor is re-checked as an approved admin under a row
+        lock inside every write (403 when demoted meanwhile). Every write
+        carries `expectedVersion`: a stale one is 409 `session_stale` with the
+        latest row in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:
@@ -19198,11 +19209,12 @@ paths:
         Enroll are added once, in a follow-up job enqueued in this transaction.
         Publishing a PUBLISHED session is a 200 that writes and enqueues
         nothing. TEAM_ADMIN of this team only (`allowGlobalAdmin` is off); a
-        session of another team is 404 `not_found`. The actor is re-checked as
-        an approved admin under a row lock inside every write (403 when demoted
-        meanwhile). Every write carries `expectedVersion`: a stale one is 409
-        `session_stale` with the latest row in `error.current`, and nothing is
-        written."
+        session id that belongs to another team is 403 `forbidden` (AC-ERROR-8,
+        ruled 2026-10-24) and an id that exists nowhere is 404 `not_found`. The
+        actor is re-checked as an approved admin under a row lock inside every
+        write (403 when demoted meanwhile). Every write carries
+        `expectedVersion`: a stale one is 409 `session_stale` with the latest
+        row in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:
@@ -20792,11 +20804,12 @@ paths:
         A cancelled series date keeps its row, so the series does not recreate
         it. A started session is 409 `session_started`; a closed one is 409
         `session_not_editable`. TEAM_ADMIN of this team only (`allowGlobalAdmin`
-        is off); a session of another team is 404 `not_found`. The actor is
-        re-checked as an approved admin under a row lock inside every write (403
-        when demoted meanwhile). Every write carries `expectedVersion`: a stale
-        one is 409 `session_stale` with the latest row in `error.current`, and
-        nothing is written."
+        is off); a session id that belongs to another team is 403 `forbidden`
+        (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404
+        `not_found`. The actor is re-checked as an approved admin under a row
+        lock inside every write (403 when demoted meanwhile). Every write
+        carries `expectedVersion`: a stale one is 409 `session_stale` with the
+        latest row in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:
@@ -22384,11 +22397,13 @@ paths:
         once per render: a replay of a committed request answers 200 with the
         existing series and queues nothing. The series stays `materialising:
         true` until its first run completes. TEAM_ADMIN of this team only
-        (`allowGlobalAdmin` is off); a series of another team is 404
-        `not_found`. The actor is re-checked as an approved admin under a row
-        lock inside every write (403 when demoted meanwhile). Writes that change
-        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
-        the latest series in `error.current`, and nothing is written."
+        (`allowGlobalAdmin` is off); a series id that belongs to another team is
+        403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that exists
+        nowhere is 404 `not_found`. The actor is re-checked as an approved admin
+        under a row lock inside every write (403 when demoted meanwhile). Writes
+        that change a series carry `expectedVersion`: a stale one is 409
+        `series_stale` with the latest series in `error.current`, and nothing is
+        written."
       requestBody:
         required: true
         content:
@@ -24376,11 +24391,12 @@ paths:
         It is read from the series themselves, not from the sessions loaded on a
         page, so a series still being created, an ended one and one with no
         dates yet all appear. TEAM_ADMIN of this team only (`allowGlobalAdmin`
-        is off); a series of another team is 404 `not_found`. The actor is
-        re-checked as an approved admin under a row lock inside every write (403
-        when demoted meanwhile). Writes that change a series carry
-        `expectedVersion`: a stale one is 409 `series_stale` with the latest
-        series in `error.current`, and nothing is written."
+        is off); a series id that belongs to another team is 403 `forbidden`
+        (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404
+        `not_found`. The actor is re-checked as an approved admin under a row
+        lock inside every write (403 when demoted meanwhile). Writes that change
+        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
+        the latest series in `error.current`, and nothing is written."
       parameters:
         - schema:
             type: string
@@ -25785,11 +25801,13 @@ paths:
       summary: Read one series
       description: "The series defaults, its court template and `materialising` (true
         while the last run trails `version`). TEAM_ADMIN of this team only
-        (`allowGlobalAdmin` is off); a series of another team is 404
-        `not_found`. The actor is re-checked as an approved admin under a row
-        lock inside every write (403 when demoted meanwhile). Writes that change
-        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
-        the latest series in `error.current`, and nothing is written."
+        (`allowGlobalAdmin` is off); a series id that belongs to another team is
+        403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that exists
+        nowhere is 404 `not_found`. The actor is re-checked as an approved admin
+        under a row lock inside every write (403 when demoted meanwhile). Writes
+        that change a series carry `expectedVersion`: a stale one is 409
+        `series_stale` with the latest series in `error.current`, and nothing is
+        written."
       parameters:
         - schema:
             type: string
@@ -27411,11 +27429,13 @@ paths:
         publish gate first and is refused whole with 409
         `payout_not_configured`. A save that changes nothing is 200 and writes
         nothing. An ended series is 409 `series_ended`. TEAM_ADMIN of this team
-        only (`allowGlobalAdmin` is off); a series of another team is 404
-        `not_found`. The actor is re-checked as an approved admin under a row
-        lock inside every write (403 when demoted meanwhile). Writes that change
-        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
-        the latest series in `error.current`, and nothing is written."
+        only (`allowGlobalAdmin` is off); a series id that belongs to another
+        team is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that
+        exists nowhere is 404 `not_found`. The actor is re-checked as an
+        approved admin under a row lock inside every write (403 when demoted
+        meanwhile). Writes that change a series carry `expectedVersion`: a stale
+        one is 409 `series_stale` with the latest series in `error.current`, and
+        nothing is written."
       requestBody:
         required: true
         content:
@@ -29211,11 +29231,12 @@ paths:
         left as they are and nobody is emailed; `activeRegistrationCount` is how
         many players the admin should let know). Dates on or before `lastDate`
         are untouched. TEAM_ADMIN of this team only (`allowGlobalAdmin` is off);
-        a series of another team is 404 `not_found`. The actor is re-checked as
-        an approved admin under a row lock inside every write (403 when demoted
-        meanwhile). Writes that change a series carry `expectedVersion`: a stale
-        one is 409 `series_stale` with the latest series in `error.current`, and
-        nothing is written."
+        a series id that belongs to another team is 403 `forbidden` (AC-ERROR-8,
+        ruled 2026-10-24) and an id that exists nowhere is 404 `not_found`. The
+        actor is re-checked as an approved admin under a row lock inside every
+        write (403 when demoted meanwhile). Writes that change a series carry
+        `expectedVersion`: a stale one is 409 `series_stale` with the latest
+        series in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:
@@ -30888,11 +30909,12 @@ paths:
         `queued` is false when a run was already waiting (a double click leaves
         one). Edited drafts are never published by it. An ended series is 409
         `series_ended`. TEAM_ADMIN of this team only (`allowGlobalAdmin` is
-        off); a series of another team is 404 `not_found`. The actor is
-        re-checked as an approved admin under a row lock inside every write (403
-        when demoted meanwhile). Writes that change a series carry
-        `expectedVersion`: a stale one is 409 `series_stale` with the latest
-        series in `error.current`, and nothing is written."
+        off); a series id that belongs to another team is 403 `forbidden`
+        (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404
+        `not_found`. The actor is re-checked as an approved admin under a row
+        lock inside every write (403 when demoted meanwhile). Writes that change
+        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
+        the latest series in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:

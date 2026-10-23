@@ -3,7 +3,7 @@
  * also filters by `team_id` from the path, so another team's series is simply not found. Reads take a `Database` (the pool or a
  * transaction); the writes run inside the series use case's locked transaction.
  */
-import type { Insertable, Updateable } from 'kysely';
+import { sql, type Insertable, type Updateable } from 'kysely';
 import type { LocalDate } from '@sgm/shared';
 import type { Database } from '../../lib/db/kysely.ts';
 import type { RecurringSessionRules } from '../../lib/db/types.generated.ts';
@@ -25,13 +25,29 @@ export function findRule(
     .executeTakeFirst();
 }
 
-/** The team's series, active first, then oldest first (a stable order for the Sessions page's Series section). */
-export function listRules(db: Database, teamId: string): Promise<LockedRule[]> {
+/**
+ * A plain existence read by id alone (no team filter, no lock): called only after a team-scoped read or lock found nothing, to
+ * tell "belongs to another team" (403, AC-ERROR-8) from "does not exist" (404).
+ */
+export async function ruleExists(db: Database, ruleId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('recurring_session_rules')
+    .select('id')
+    .where('id', '=', ruleId)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/**
+ * The team's series, active first, then oldest first (a stable order for the Sessions page's Series section). "Active" is the
+ * read-time rule of `isSeriesActive`: the flag is on and the last date, if any, is not before NZ `today`.
+ */
+export function listRules(db: Database, teamId: string, today: LocalDate): Promise<LockedRule[]> {
   return db
     .selectFrom('recurring_session_rules')
     .selectAll()
     .where('team_id', '=', teamId)
-    .orderBy('is_active', 'desc')
+    .orderBy(sql`(is_active AND (recur_until IS NULL OR recur_until >= ${today}::date))`, 'desc')
     .orderBy('created_at', 'asc')
     .orderBy('id', 'asc')
     .execute();

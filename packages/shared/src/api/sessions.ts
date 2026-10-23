@@ -497,6 +497,11 @@ export const SessionListResponse = z.object({
   /** Keyset cursor for the next page, or null at the end. */
   nextCursor: z.string().nullable(),
   isPayoutConfigured: z.boolean(),
+  /**
+   * The team-wide count of series DRAFT dates the materialiser could not publish for banking (not edited by an admin),
+   * whatever page or view this response is: the page-level banking notice keys off it, never off the loaded rows.
+   */
+  bankingDrafts: count,
 });
 export type SessionListResponse = z.infer<typeof SessionListResponse>;
 
@@ -547,6 +552,7 @@ export const SeriesResponse = z.object({
   startsOn: z.string(),
   monthlyWeek: z.number().int().nullable(),
   recurUntil: z.string().nullable(),
+  /** False once the series is ended: switched off by End series, or past its last date (`isSeriesActive`, NZ today). */
   isActive: z.boolean(),
   version: z.number().int().min(1),
   /** True while the last per-rule run trails `version` ("We're adding the sessions…"). */
@@ -587,6 +593,7 @@ export const SeriesListItem = z.object({
   name: z.string(),
   startsOn: z.string(),
   recurUntil: z.string().nullable(),
+  /** False once the series is ended: switched off by End series, or past its last date (`isSeriesActive`, NZ today). */
   isActive: z.boolean(),
   version: z.number().int().min(1),
   /** True while the last per-rule run trails `version` ("Adding sessions…"). */

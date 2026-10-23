@@ -301,13 +301,23 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
     });
   }
 
+  /**
+   * Why a team-scoped read or lock found no session (AC-ERROR-8, human ruling 2026-10-24): a session that exists under another
+   * team is 403 `forbidden` (the same body as every other refusal, naming nothing of that row), an id that exists nowhere is
+   * 404 `not_found`. The check is a plain SELECT, never a lock, and runs only on the failure path, so it adds nothing to
+   * LOCK_ORDER wherever it is called (before the transaction, or inside it after the locks it already holds).
+   */
+  async function missingSession(reader: Database, sessionId: string): Promise<AppError> {
+    return new AppError((await repo.sessionExists(reader, sessionId)) ? 'forbidden' : 'not_found');
+  }
+
   async function requireRow(
     reader: Database,
     teamId: string,
     sessionId: string,
   ): Promise<SessionRow> {
     const row = await repo.findSession(reader, teamId, sessionId);
-    if (row === undefined) throw new AppError('not_found');
+    if (row === undefined) throw await missingSession(reader, sessionId);
     return row;
   }
 
@@ -334,7 +344,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
   return {
     async list(teamId, query) {
       const now = clock.now();
-      const [page, isPayoutConfigured] = await Promise.all([
+      const [page, isPayoutConfigured, bankingDrafts] = await Promise.all([
         repo.listSessionsPage(db, {
           teamId,
           view: query.view,
@@ -343,6 +353,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
           cursor: query.cursor,
         }),
         repo.readPayoutConfigured(db, teamId),
+        repo.countBankingDrafts(db, teamId),
       ]);
       const ids = page.rows.map((row) => row.id);
       const ruleIds = [
@@ -368,6 +379,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
         ),
         nextCursor: page.nextCursor,
         isPayoutConfigured,
+        bankingDrafts,
       };
     },
 
@@ -526,7 +538,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               }
               await assertSessionAdmin(trx, teamId, actorId);
               const locked = await lockSession(trx, { sessionId, teamId });
-              if (locked === undefined) throw new AppError('not_found');
+              if (locked === undefined) throw await missingSession(trx, sessionId);
               const staleContext = {
                 actorId,
                 expectedVersion: input.expectedVersion,
@@ -665,7 +677,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               }
               await assertSessionAdmin(trx, teamId, actorId);
               const locked = await lockSession(trx, { sessionId, teamId });
-              if (locked === undefined) throw new AppError('not_found');
+              if (locked === undefined) throw await missingSession(trx, sessionId);
               // A replayed publish of a PUBLISHED session is a harmless 200: nothing written, nothing enqueued.
               if (locked.status === 'PUBLISHED') {
                 return {
@@ -751,7 +763,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               if (!(await lockTeamKeyShare(trx, teamId))) throw new AppError('forbidden');
               await assertSessionAdmin(trx, teamId, actorId);
               const locked = await lockSession(trx, { sessionId, teamId });
-              if (locked === undefined) throw new AppError('not_found');
+              if (locked === undefined) throw await missingSession(trx, sessionId);
               const now = clock.now();
               const decision = decideSessionAction(
                 'cancel',

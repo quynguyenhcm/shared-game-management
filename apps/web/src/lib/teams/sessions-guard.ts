@@ -7,8 +7,8 @@ type Failure = Extract<ApiResult<unknown>, { ok: false }>;
 
 /**
  * The guard every Sessions page runs after its parallel load, the same order as the banking page: any 401
- * redirects to sign-in (returning to `here`), any 403 is the no-access page (the API answers a non-admin and an
- * unknown team alike, so nothing is revealed), a 404 or 422 is "not found" (an unknown id, another team's id or
+ * redirects to sign-in (returning to `here`), any 403 is the no-access page (the API answers a non-admin, an
+ * unknown team and another team's session or series id alike, so nothing is revealed), a 404 or 422 is "not found" (an unknown id or
  * a malformed one), and any other failure throws to the error page and logs the status and code only. `optional`
  * results (a read the page can do without) can still sign the user out or revoke access, but a 5xx from one is
  * not fatal.
