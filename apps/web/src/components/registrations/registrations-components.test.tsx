@@ -111,6 +111,9 @@ describe('RegisterForm: guests, no preselection, no focus jump (R11, AC-ERROR-4/
     sessionId: SESSION_ID,
     publicCapacity: 10,
     seatsLeft: 3,
+    pricing: 'FLAT' as const,
+    fees: readFixture().session.fees,
+    unitFee: readFixture().me.unitFee,
   };
 
   it('guest fieldsets follow the party group directly, with Sex, Skill level and Name, and nothing preselected', () => {
@@ -153,23 +156,57 @@ describe('RegisterForm: guests, no preselection, no focus jump (R11, AC-ERROR-4/
     expect(enabled).not.toContain('disabled');
   });
 
-  it('the button says Join waitlist, with the prediction, only when the server reports no seats left (session.seatsLeft)', () => {
+  it('the button says Join waitlist, with the prediction, when the party is bigger than session.seatsLeft (server stays authoritative)', () => {
     const full = renderToStaticMarkup(<RegisterForm {...props} seatsLeft={0} />);
     expect(full).toContain('>Join waitlist<');
     expect(text(full)).toContain(
       "This group goes on the waitlist. You're only charged if you get a place.",
     );
     expect(full).toContain('value="waitlist"');
+    // 2 seats left, party of 3 (me + 2 guests) does not fit: predicted waitlist
+    const bigParty = renderToStaticMarkup(
+      <RegisterForm {...props} seatsLeft={2} initialParty={2} />,
+    );
+    expect(bigParty).toContain('>Join waitlist<');
+    expect(bigParty).toContain('value="waitlist"');
+    // the same seats and a party of 2 fit
+    const fits = renderToStaticMarkup(<RegisterForm {...props} seatsLeft={2} initialParty={1} />);
+    expect(fits).toContain('>Register<');
+    expect(fits).not.toContain('This group goes on the waitlist');
     const open = renderToStaticMarkup(<RegisterForm {...props} />);
     expect(open).toContain('>Register<');
     expect(open).toContain('value="register"');
-    expect(open).not.toContain('This group goes on the waitlist');
   });
 
-  it('computes no total: no "Total" line and no fee arithmetic in the form', () => {
-    expect(text(renderToStaticMarkup(<RegisterForm {...props} initialParty={2} />))).not.toMatch(
-      /total/i,
+  it('shows the pre-submit total in its own role=status line from me.unitFee and session.fees (AC-HAPPY-2)', () => {
+    const solo = renderToStaticMarkup(<RegisterForm {...props} />);
+    expect(text(solo)).toContain('Total: $17.00 for 1 person.');
+    const html = renderToStaticMarkup(<RegisterForm {...props} initialParty={2} />);
+    expect(text(html)).toContain('Total: $51.00 for 3 people.');
+    expect(html).toMatch(/<p[^>]*role="status"[^>]*>Total: \$51\.00 for 3 people\.<\/p>/);
+  });
+
+  it('BY_SEX: estimate wording, and a partial total until each guest sex is chosen (session.fees)', () => {
+    const fees = {
+      ...props.fees,
+      flat: null,
+      male: '20.00',
+      female: '17.00',
+      other: '18.00',
+    } as unknown as typeof props.fees;
+    const bySex = { ...props, pricing: 'BY_SEX' as const, fees, unitFee: '20.00' as never };
+    const partial = renderToStaticMarkup(<RegisterForm {...bySex} initialParty={1} />);
+    expect(text(partial)).toContain(
+      "Total so far: $20.00. Choose each guest's sex to see the rest.",
     );
+    const complete = renderToStaticMarkup(
+      <RegisterForm
+        {...bySex}
+        initialParty={1}
+        initialGuests={[{ sex: 'FEMALE', skillLevel: '', displayName: '' }]}
+      />,
+    );
+    expect(text(complete)).toContain('Estimated total: $37.00 for 2 people.');
   });
 });
 

@@ -88,6 +88,7 @@ export function createRegistrationsBanHandler(deps: BanHandlerDeps): MemberBanne
       const ids = { teamId: event.teamId, userId: event.userId };
       // One clock reading for the whole run: selection and every per-session transaction act at this instant, so a
       // session that starts mid-run is still withdrawn (a later reading would refuse it as closed).
+      // The withdrawal stamps therefore carry the selection instant, which is harmless for a BANNED withdrawal.
       const selectionNow = deps.clock.now();
       const fixedClock: Clock = { now: () => selectionNow };
       const targets = await listTargets(deps.db, ids, selectionNow);

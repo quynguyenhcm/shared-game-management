@@ -38,6 +38,9 @@ export function RegistrationPanel({
             sessionId={session.id}
             publicCapacity={session.publicCapacity}
             seatsLeft={session.seatsLeft}
+            pricing={session.pricingStructure}
+            fees={session.fees}
+            unitFee={me.unitFee}
             deadlinePassed={view.deadlinePassed}
           />
         ) : null}
