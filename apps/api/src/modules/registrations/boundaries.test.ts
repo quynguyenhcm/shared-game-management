@@ -57,8 +57,14 @@ describe('who writes registrations', () => {
 });
 
 describe('money tables (AC-VERIFY-10)', () => {
-  const MONEY =
-    /\b(?:payments|payment_line_items|credit_transactions|player_credits|team_invoice_counters)\b/;
+  // A reference in code: a table name as a query-builder argument or after a SQL keyword. Prose such as the "overdue payments"
+  // in a user-facing message is not a reference.
+  const TABLES =
+    'payments|payment_line_items|credit_transactions|player_credits|team_invoice_counters';
+  const MONEY = new RegExp(
+    `(?:selectFrom|insertInto|updateTable|deleteFrom|innerJoin|leftJoin|rightJoin)\\(\\s*['"\`](?:${TABLES})\\b|\\b(?:FROM|JOIN|INTO|UPDATE)\\s+(?:${TABLES})\\b`,
+    'i',
+  );
 
   it('no source writes a money table', () => {
     for (const file of own) {
@@ -77,6 +83,15 @@ describe('money tables (AC-VERIFY-10)', () => {
       /\b(?:payment_line_items|credit_transactions|player_credits|team_invoice_counters)\b/,
     );
     expect(repo).toMatch(/selectFrom\(\s*['"]payments['"]\s*\)/);
+  });
+});
+
+describe('observability carry-forward (AC-VERIFY-6)', () => {
+  it('only allocator.ts emits the registration.created, withdrawn, promoted and refused events: the HTTP service must not log them again', () => {
+    const emitters = own.filter((file) =>
+      /['"`]registration\.(?:created|withdrawn|promoted|refused)['"`]/.test(read(file)),
+    );
+    expect(emitters.map((file) => path.basename(file))).toEqual(['allocator.ts']);
   });
 });
 
@@ -133,6 +148,9 @@ describe('the allocator never manages its caller transaction', () => {
 describe('imports', () => {
   const isPlatform = (specifier: string): boolean =>
     specifier === 'kysely' ||
+    // The HTTP layer (routes.ts, service.ts) is built on Fastify like every module's routes.
+    specifier === 'fastify' ||
+    specifier === 'fastify-type-provider-zod' ||
     specifier === '@sgm/shared' ||
     specifier.startsWith('node:') ||
     specifier.startsWith('../../lib/') ||

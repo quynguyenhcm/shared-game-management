@@ -21,15 +21,24 @@ const code = (name: string): string =>
     .replace(/^\s*\/\/.*$/gm, '');
 
 describe('createSessionAllocator', () => {
-  it('returns the no-op port until registration-and-waitlist wires its adapter', () => {
+  it('returns registration-and-waitlist adapter: named "registrations", enrolling, not the no-op (R19)', () => {
     const allocator = createSessionAllocator({
       db: {} as Database,
       jobs: { enqueue: () => Promise.resolve(null) },
       clock: createManualClock(),
       webBaseUrl: 'https://games.example.nz',
     });
-    expect(allocator).toBe(noopSessionAllocator);
-    expect(allocator.enrols).toBe(false);
+    expect(allocator).not.toBe(noopSessionAllocator);
+    expect(allocator.name).toBe('registrations');
+    expect(allocator.enrols).toBe(true);
+    expect(typeof allocator.promoteWaitlist).toBe('function');
+    expect(typeof allocator.autoEnrolInSession).toBe('function');
+  });
+
+  it('is the one composition point: the body builds the adapter over createAllocator from the injected jobs and web origin', () => {
+    expect(code('./session-allocator.ts')).toMatch(
+      /createRegistrationsSessionAllocator\(\s*createAllocator\(\{\s*jobs: deps\.jobs,\s*webBaseUrl: deps\.webBaseUrl\s*\}\)\s*,?\s*\)/,
+    );
   });
 });
 

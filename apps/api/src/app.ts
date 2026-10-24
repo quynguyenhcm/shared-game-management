@@ -32,6 +32,8 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import { registrationsRoutes } from './modules/registrations/routes.ts';
+import { createRegistrationsService } from './modules/registrations/service.ts';
 import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
 import { sessionsRoutes } from './modules/sessions/routes.ts';
 import { createSessionsService } from './modules/sessions/service.ts';
@@ -195,6 +197,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(skillLevelsRoutes, {
     prefix: '/teams',
     service: createSkillLevelsService({ db: deps.db, clock: deps.clock }),
+  });
+  // Before `sessionsRoutes`: the member routes under `/teams/:teamId/sessions/` (`upcoming`, `:sessionId/registration*`) are
+  // registration's. `upcoming` is a static segment and wins over SSE's `/:sessionId` either way; the order documents the intent.
+  await app.register(registrationsRoutes, {
+    prefix: '/teams',
+    service: createRegistrationsService({
+      db: deps.db,
+      clock: deps.clock,
+      jobs: deps.jobs,
+      webBaseUrl: deps.auth.webBaseUrl,
+    }),
   });
   await app.register(sessionsRoutes, {
     prefix: '/teams',

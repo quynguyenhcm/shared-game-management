@@ -57,6 +57,11 @@
  *
  * The "marker proof" (AC-INTEGRATION-1, AC-INTEGRATION-2): a published session whose allocator has `enrols: false` stays
  * pending; once an `enrols: true` double is injected and the sweep runs, it is enrolled exactly once and stamped.
+ *
+ * What registration-and-waitlist now provides (Phase 3, R19, R26): `createSessionAllocator` returns its adapter
+ * (`name: 'registrations'`, `enrols: true`), the D-85 widening (a) and `already_registered` for any existing row (b) were built
+ * in Phases 1-2, and the marker proof is repeated with the REAL adapter in `registrations-sse-integration.int.test.ts`
+ * (AC-INTEGRATION-6). This file keeps its recording double and stays green.
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
