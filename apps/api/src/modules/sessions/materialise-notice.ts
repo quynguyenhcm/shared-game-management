@@ -38,11 +38,12 @@ export async function claimPayoutNotice(
     .executeTakeFirst();
   if (claimed === undefined) return false;
 
+  // The team exists: the caller holds its KEY SHARE lock and the rule belongs to it, so a missing row is a bug, not a case.
   const team = await trx
     .selectFrom('teams')
     .select('name')
     .where('id', '=', input.teamId)
-    .executeTakeFirst();
+    .executeTakeFirstOrThrow();
   const admins = await trx
     .selectFrom('team_members as m')
     .innerJoin('users as u', 'u.id', 'm.user_id')
@@ -58,7 +59,7 @@ export async function claimPayoutNotice(
         to: admin.email,
         recipientId: admin.user_id,
         teamId: input.teamId,
-        teamName: team?.name ?? 'your team',
+        teamName: team.name,
         ruleId: input.ruleId,
         windowStart: input.windowStart,
         webBaseUrl: deps.webBaseUrl,

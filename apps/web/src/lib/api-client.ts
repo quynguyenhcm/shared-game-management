@@ -33,6 +33,7 @@ import {
   SeriesSaveResponse,
   SessionDetailResponse,
   SessionListResponse,
+  SessionEditResponse,
   SessionWriteResponse,
   TeamDetailResponse,
   type CreateSeriesRequest,
@@ -636,7 +637,7 @@ export const apiClient = {
       path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}`,
       method: 'PUT',
       body,
-      schema: SessionWriteResponse,
+      schema: SessionEditResponse,
     }),
 
   publishSession: (

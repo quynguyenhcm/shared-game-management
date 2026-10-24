@@ -25,6 +25,7 @@ import {
   type SessionDetailResponse,
   type SessionListResponse,
   type SessionResponse,
+  type SessionEditResponse,
   type SessionWriteResponse,
   type UpdateSessionRequest,
 } from '@sgm/shared';
@@ -93,7 +94,7 @@ export interface SessionsService {
     actorId: string,
     input: UpdateSessionRequest,
     ctx: SessionsContext,
-  ): Promise<SessionWriteResponse>;
+  ): Promise<SessionEditResponse>;
   publish(
     teamId: string,
     sessionId: string,
@@ -638,7 +639,12 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
             'session updated',
           );
         }
-        return { session: result.session, promoted: result.promoted, material: result.material };
+        return {
+          session: result.session,
+          promoted: result.promoted,
+          material: result.material,
+          changed: result.changed.length > 0,
+        };
       });
     },
 

@@ -384,7 +384,7 @@ describe('create a one-off draft (AC-HAPPY-1, AC-HAPPY-11)', () => {
       deadlineIsDefault: true,
       isInstanceOverridden: false,
       activeRegistrationCount: 0,
-      feesLocked: 'none',
+      feesLocked: null,
       startsAt: '2026-11-03T19:00:00.000Z',
       endsAt: '2026-11-03T21:00:00.000Z',
       cancellationDeadline: '2026-11-01T19:00:00.000Z',
@@ -749,9 +749,10 @@ describe('edit a draft (AC-ERROR-7)', () => {
       }),
     );
     expect(res.statusCode, res.body).toBe(200);
-    expect(res.json<{ material: boolean; promoted: number }>()).toMatchObject({
+    expect(res.json<{ material: boolean; promoted: number; changed: boolean }>()).toMatchObject({
       material: true,
       promoted: 0,
+      changed: true,
     });
     expect(sessionOf(res)).toMatchObject({ version: 2, location: 'Rosedale Annexe' });
     expect(await courtsOf(id)).toEqual([
@@ -800,13 +801,20 @@ describe('edit a draft (AC-ERROR-7)', () => {
     const before = await row(id);
     const same = await call('PUT', `${base(c)}/${id}`, c.admin, editBody(body, 1));
     expect(same.statusCode).toBe(200);
-    expect(same.json<{ material: boolean; promoted: number }>()).toMatchObject({
+    expect(same.json<{ material: boolean; promoted: number; changed: boolean }>()).toMatchObject({
       material: false,
       promoted: 0,
+      changed: false,
     });
     expect(sessionOf(same).version).toBe(1);
     // A stale expectedVersion with the same content is still a no-op, not a conflict.
-    await call('PUT', `${base(c)}/${id}`, c.admin, editBody(body, 1, { maxPlayers: 40 }));
+    const real = await call(
+      'PUT',
+      `${base(c)}/${id}`,
+      c.admin,
+      editBody(body, 1, { maxPlayers: 40 }),
+    );
+    expect(real.json<{ changed: boolean }>().changed).toBe(true);
     const back = await call(
       'PUT',
       `${base(c)}/${id}`,
@@ -814,6 +822,8 @@ describe('edit a draft (AC-ERROR-7)', () => {
       editBody(body, 1, { maxPlayers: 40 }),
     );
     expect(back.statusCode).toBe(200);
+    // The version moved on (2 > the form's 1), yet nothing was written: `changed` says so, not the version.
+    expect(back.json<{ changed: boolean }>().changed).toBe(false);
     expect(sessionOf(back).version).toBe(2);
     expect(await row(id)).toMatchObject({ version: 2, max_players: 40 });
     expect(iso(before.updated_at)).not.toBe(iso((await row(id)).updated_at));

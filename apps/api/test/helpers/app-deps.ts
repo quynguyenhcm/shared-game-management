@@ -58,6 +58,7 @@ export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): 
     }),
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
     sessionAllocator: noopSessionAllocator,
+    recurrenceHorizonDays: config.recurrence.horizonDays,
     ...overrides,
   };
 }

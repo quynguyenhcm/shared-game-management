@@ -402,7 +402,7 @@ function lockedSession(
 }
 
 describe('DetailsFieldset and PlacesFieldset', () => {
-  const state = initialSessionForm(lockedSession({ feesLocked: 'none' }));
+  const state = initialSessionForm(lockedSession({ feesLocked: null }));
 
   it('a one-off edits its date; a series date shows it as text with the cancel-and-recreate hint', () => {
     const input = renderToStaticMarkup(

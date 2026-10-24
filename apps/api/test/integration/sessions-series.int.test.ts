@@ -26,6 +26,7 @@ import {
 import { captureLogs } from '../helpers/log-capture.ts';
 import { createQueryRecorder, createRecordingDatabase } from '../helpers/query-recorder.ts';
 import { createRecordingAllocator, createSessionsScene } from '../helpers/sessions-scene.ts';
+import { raceUnderTeamLock } from '../helpers/lock-waiters.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 
 let database: TestDatabase;
@@ -595,7 +596,7 @@ describe('series list read for the Sessions page', () => {
     expect(after.series.map((s) => [s.id, s.materialising])).toEqual([[created.id, false]]);
   });
 
-  it('lists an ended series with its end date, and a series with no sessions at all, active ones first', async () => {
+  it('lists an ended series with its end date, and a series with no sessions at all, newest first', async () => {
     const c = await scene();
     const ended = await insertRule(database.pool, c.teamId, {
       isActive: false,
@@ -613,6 +614,28 @@ describe('series list read for the Sessions page', () => {
     expect(listed[0]).toMatchObject({ name: 'Saturdays at Test Hall', isActive: true });
     expect(listed[1]).toMatchObject({ isActive: false, recurUntil: '2026-09-16' });
     expect(await sessionsOf(empty)).toHaveLength(0);
+  });
+
+  it('lists the newest series first whether or not it is active (AC-ENTRY-2: "newest first")', async () => {
+    const c = await scene();
+    const oldActive = await insertRule(database.pool, c.teamId, { startsOn: '2026-10-07' });
+    const newEnded = await insertRule(database.pool, c.teamId, {
+      isActive: false,
+      dayOfWeek: 6,
+      startsOn: '2026-08-08',
+      recurUntil: '2026-09-12',
+    });
+    const newestActive = await insertRule(database.pool, c.teamId, {
+      dayOfWeek: 0,
+      startsOn: '2026-10-11',
+    });
+    const res = await call('GET', base(c), c.admin);
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json<SeriesListBody>().series.map((s) => s.id)).toEqual([
+      newestActive,
+      newEnded,
+      oldActive,
+    ]);
   });
 
   it('lists only this team, answers an empty list when there is none, and refuses anonymous, member and other-team admin', async () => {
@@ -780,6 +803,7 @@ describe('series edit propagation (AC-HAPPY-7)', () => {
       unchanged: 0,
       skipped: { edited: 1, started: 0, closed: 1, deadlinePassed: 1, feeLocked: 1 },
     });
+    expect(res.json<{ changed: boolean }>().changed).toBe(true);
     expect(saved.series.version).toBeGreaterThan(version);
     expect(saved.series.location).toBe('New Hall');
 
@@ -939,6 +963,7 @@ describe('series edit propagation (AC-HAPPY-7)', () => {
 
     const noop = await call('PUT', `${base(c)}/${ruleId}`, c.admin, editBody(body, version));
     expect(noop.statusCode, noop.body).toBe(200);
+    expect(noop.json<{ changed: boolean }>().changed).toBe(false);
     expect((await rule(ruleId)).version).toBe(version);
     expect(enqueued).toHaveLength(0);
     // Whatever the version: nothing to change is not stale.
@@ -949,6 +974,7 @@ describe('series edit propagation (AC-HAPPY-7)', () => {
       editBody(body, version + 7),
     );
     expect(noopStale.statusCode).toBe(200);
+    expect(noopStale.json<{ changed: boolean }>().changed).toBe(false);
 
     const stale = await call(
       'PUT',
@@ -961,6 +987,106 @@ describe('series edit propagation (AC-HAPPY-7)', () => {
     expect(errorOf(stale).current).toMatchObject({ id: ruleId, version });
     expect((await rule(ruleId)).default_max_players).toBe(24);
     expect(enqueued).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Re-checks under the locks: the unlocked read passed, then the series changed while the write queued behind the team lock
+// ---------------------------------------------------------------------------------------------
+
+describe('a series write re-checks the rule once it holds the locks (AC-ERROR-7, P-3, T-6)', () => {
+  /** A rule with a last date and no instances: it matches `createBody({ recurUntil })`, so a PUT passes every unlocked check. */
+  async function ruleWithLastDate(c: Scene): Promise<{ ruleId: string; body: Body }> {
+    const ruleId = await insertRule(database.pool, c.teamId, { recurUntil: '2026-12-30' });
+    return { ruleId, body: createBody({ recurUntil: '2026-12-30', location: 'Changed Hall' }) };
+  }
+  const endBody = { expectedVersion: 1, lastDate: '2026-11-04' };
+  const putUnderLock = (
+    c: Scene,
+    ruleId: string,
+    body: Body,
+    change: string,
+  ): Promise<LightMyRequestResponse[]> =>
+    raceUnderTeamLock(
+      database.pool,
+      c.teamId,
+      [() => call('PUT', `${base(c)}/${ruleId}`, c.admin, editBody(body, 1))],
+      { beforeRelease: (lock) => lock.query(change, [ruleId]).then(() => undefined) },
+    );
+  const endUnderLock = (
+    c: Scene,
+    ruleId: string,
+    change: string,
+  ): Promise<LightMyRequestResponse[]> =>
+    raceUnderTeamLock(
+      database.pool,
+      c.teamId,
+      [() => call('POST', `${base(c)}/${ruleId}/end`, c.admin, endBody)],
+      { beforeRelease: (lock) => lock.query(change, [ruleId]).then(() => undefined) },
+    );
+  const SWITCH_OFF = 'UPDATE recurring_session_rules SET is_active = false WHERE id = $1';
+  const DELETE_RULE = 'DELETE FROM recurring_session_rules WHERE id = $1';
+
+  it('End series refuses an old expectedVersion with 409 series_stale and the current series, ending nothing', async () => {
+    const c = await scene();
+    const { ruleId } = await ruleWithLastDate(c);
+    enqueued.length = 0;
+    const res = await call('POST', `${base(c)}/${ruleId}/end`, c.admin, {
+      expectedVersion: 7,
+      lastDate: '2026-11-04',
+    });
+    expect(res.statusCode, res.body).toBe(409);
+    expect(errorOf(res).code).toBe('series_stale');
+    expect(errorOf(res).current).toMatchObject({ id: ruleId, version: 1 });
+    expect((await rule(ruleId)).recur_until).toBe('2026-12-30');
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it('an edit that queued behind the team lock finds the series switched off meanwhile: 409 series_ended, nothing written', async () => {
+    const c = await scene();
+    const { ruleId, body } = await ruleWithLastDate(c);
+    const [res] = await putUnderLock(c, ruleId, body, SWITCH_OFF);
+    expect(res?.statusCode, res?.body).toBe(409);
+    expect(res && errorOf(res).code).toBe('series_ended');
+    expect((await rule(ruleId)).default_location).toBe('Test Hall');
+  });
+
+  it('an edit that queued behind the team lock finds the series deleted meanwhile: 404 not_found', async () => {
+    const c = await scene();
+    const { ruleId, body } = await ruleWithLastDate(c);
+    const [res] = await putUnderLock(c, ruleId, body, DELETE_RULE);
+    expect(res?.statusCode, res?.body).toBe(404);
+    expect(res && errorOf(res).code).toBe('not_found');
+  });
+
+  it('an edit that queued behind the team lock finds its last date shortened meanwhile: 422 on recurUntil, nothing written', async () => {
+    const c = await scene();
+    const { ruleId, body } = await ruleWithLastDate(c);
+    const [res] = await putUnderLock(
+      c,
+      ruleId,
+      body,
+      "UPDATE recurring_session_rules SET recur_until = '2027-03-31' WHERE id = $1",
+    );
+    expect(res?.statusCode, res?.body).toBe(422);
+    expect(Object.keys((res && errorOf(res).fieldErrors) ?? {})).toContain('recurUntil');
+    expect((await rule(ruleId)).default_location).toBe('Test Hall');
+  });
+
+  it('End series that queued behind the team lock finds the series switched off meanwhile: 409 series_ended', async () => {
+    const c = await scene();
+    const { ruleId } = await ruleWithLastDate(c);
+    const [res] = await endUnderLock(c, ruleId, SWITCH_OFF);
+    expect(res?.statusCode, res?.body).toBe(409);
+    expect(res && errorOf(res).code).toBe('series_ended');
+  });
+
+  it('End series that queued behind the team lock finds the series deleted meanwhile: 404 not_found', async () => {
+    const c = await scene();
+    const { ruleId } = await ruleWithLastDate(c);
+    const [res] = await endUnderLock(c, ruleId, DELETE_RULE);
+    expect(res?.statusCode, res?.body).toBe(404);
+    expect(res && errorOf(res).code).toBe('not_found');
   });
 });
 

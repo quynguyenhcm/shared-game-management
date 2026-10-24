@@ -959,7 +959,7 @@ Carry-forward notes for Phase 2+ (from TDD agents and review, not blockers):
 - Court-only edits do not bump `game_sessions.version` (D-72 exclusion of starts_at/ends_at); the service must bump `updated_at`/version explicitly when it edits courts.
 - `deadline_is_default` has no auto-flip for raw writers; the service must write the flag with any explicit deadline.
 - `advanceSessionTo` cannot yet walk PUBLISHED -> CANCELLED (LIFECYCLE_PATH); fix when a test needs it.
-- `session_courts_guard_closed` locks sessions in unsorted [OLD, NEW] order (unlikely deadlock); sort ids if touched.
+- `session_courts_guard_closed` locks sessions in unsorted [OLD, NEW] order (unlikely deadlock); sort ids if touched. RESOLVED in Phase 4: the migration `20261020000100000_session_scheduling.sql` now takes `DISTINCT ... ORDER BY s` (D-76).
 - Phase 2 `AppError`/handler must carry the extra fields of `SessionErrorResponse` (`dstOptions`, `raisedFields`, `current`).
 - D-85 DB trigger alone is not a full guard under READ COMMITTED; Phase 2 session lock plus Phase 4 T-17 cover it.
 - Binding T-10 wording ("any court time between 02:00 and 03:00") vs code/ALG ("wholly inside the gap"): code follows ALG; reconcile wording in ADR 0019.
@@ -977,7 +977,7 @@ Phase 2 | reviewer-accepted deviations:
 - Phase 2 | service.ts | An explicit deadline is parked on the default with an extra UPDATE when an edit could trip the non-deferrable `deadline <= starts_at` CHECK; version may bump more than once on such edits.
 - Phase 2 | content.ts | List rows carry endsAt and draftReason but no series name (rule table has no name column); revisit in Phase 3/5.
 - Phase 2 | service.ts | Edit of a PUBLISHED session into a passed start refused with 409 `session_started` (review fix).
-- Phase 2 | not delivered | CLI `jobs trigger session-auto-enrol` is not in TRIGGERABLE; non-blocking.
+- Phase 2 | not delivered | CLI `jobs trigger session-auto-enrol` is not in TRIGGERABLE; non-blocking. RESOLVED: `QUEUE_NAMES.sessionAutoEnrol` is in `TRIGGERABLE` in `apps/api/src/cli.ts`.
 - Phase 2 | suggestions deferred | split service.ts (823 lines) per use case; double log on stale refusal; `as never` casts in repo.ts need a comment; spot-check openapi.yaml diff (8.7k lines) in the PR.
 - Phase 2 | Phase 4 owes | T-17 registration-insert vs fee-edit race under the session lock; Phase 3 adds the `recurrence-rule` queue (bootstrap already accepts sessionAllocator).
 
@@ -987,7 +987,7 @@ Phase 2 | reviewer-accepted deviations (added at Phase 3 start):
 - Phase 2 | DONE_WITH_CONCERNS | build-orchestrator | the two blocking review fixes (PUBLISHED edit into the past -> 409; malformed cursor -> 422) were not re-reviewed and `build` was not re-run after them (tests/lint/typecheck were). Phase 3 verifier ran the full build: PASS.
 
 Phase 3 | reviewer-accepted deviations:
-- Phase 3 | emails.ts:49 | AC-ASYNC-3 key `payout-missing:<ruleId>:<windowStart>` became `...:<recipientId>` so every admin is emailed (shared key would dedupe all but the first); claim row stays one per rule per NZ Monday. Update AC text.
+- Phase 3 | emails.ts:49 | AC-ASYNC-3 key `payout-missing:<ruleId>:<windowStart>` became `...:<recipientId>` so every admin is emailed (shared key would dedupe all but the first); claim row stays one per rule per NZ Monday. Update AC text. RESOLVED: AC-ASYNC-3 now states the per-recipient key (amended at archive 2026-10-24).
 - Phase 3 | materialise.ts:171-181 | AC-HAPPY-12: a newly materialised instance's auto-enrol runs inline after commit (BIND T-2 wins), not as an enqueued job in the publish tx; retried drafts do enqueue. Failure is swallowed; sweep/boot re-offers via the D-80 marker.
 - Phase 3 | materialise-instance.ts | gate runs before the started-date clock check (one gate read for a started date, nothing created); a refused retry claims the weekly notice (can send the week's first email).
 - Phase 3 | materialise.ts | `materialised_version` stamped even when failures are all permanent (clears the waiting state); only transient failure leaves it pending (interpretation of D-82).
@@ -1014,10 +1014,10 @@ Phase 4 | reviewer-accepted deviations:
 Phase 5 | decisions (carry-forwards from Phase 3/4 resolved):
 - Phase 5 | series label | no schema column: shared `seriesName()` derives "Wednesdays at {location}" etc.; exposed as `seriesName` on SessionResponse and `name` on SeriesResponse (UJ copy deck).
 - Phase 5 | seriesChangeEffect | exposed API-side on series GET `instances` (will_update|edited|closed|has_registrations; past-deadline maps to closed; fee-locked to has_registrations), with `isPayoutConfigured`, `bankingDrafts`, `editedDrafts`. `nextDate` omitted (not cheap); web hard-codes a 28-day horizon line.
-- Phase 5 | AC-HAPPY-10 "partial failure" banner | not built: End series is one transaction (T-6), so the UI has no partial state. AC text should drop it.
+- Phase 5 | AC-HAPPY-10 "partial failure" banner | not built: End series is one transaction (T-6), so the UI has no partial state. RESOLVED: the AC text now says so (amended at archive 2026-10-24).
 - Phase 5 | cancelled/deletedDrafts on session.series.updated | not built: copy does not need them (series save never cancels or deletes; End response carries removedDrafts/cancelledPublished/activeRegistrationCount).
 - Phase 5 | AC-ERROR-8 | cross-team id was 404; UI treated 404 as not-found. RESOLVED 2026-10-24: ruled 403; the pages render the existing NoAccess state on that 403 (tests added).
-- Phase 5 | reviewer-accepted | seriesGroups on the list only shows series with a loaded date (no list-series endpoint); a freshly created, still-materialising series has no list row until its first date loads. "Nothing changed" is inferred from version equality.
+- Phase 5 | reviewer-accepted | seriesGroups on the list only shows series with a loaded date (no list-series endpoint); a freshly created, still-materialising series has no list row until its first date loads. "Nothing changed" is inferred from version equality. RESOLVED in Phase 5 remediation (series list endpoint); "nothing changed" now comes from the API's `changed` flag (2026-10-24).
 - Phase 5 | reviewer-accepted | `apiFetch` now keeps `dstOptions`/`raisedFields` from error bodies; two extra notices `publish_incomplete`, `series_already_ended`; Number-of-courts defaults and some copy written where the deck was silent; copy-deck example "27 Sep 2026 is the 5th Sunday" is wrong (it is the 4th and last).
 - Phase 5 | process | 5A integration tests first ran after implementation (unit RED observed); no browser/360 px/axe walk performed; unit tests are node-env static markup (no DOM), so focus/Escape/timers are untested until Phase 6.
 - Phase 5 | suggestions deferred | note in sessions-paths.ts that helpers take validated UUIDs only; test for series_stale redirect with existing query; "showing first 100" line if instances cap can bite.
@@ -1025,7 +1025,7 @@ Phase 5 | decisions (carry-forwards from Phase 3/4 resolved):
 - Phase 5 | HUMAN RULING 2026-10-20 | Phase 5 gate | manual 360 px walk deferred to Phase 6 Playwright (360 px viewport + no-horizontal-scroll assertion + axe) and later /yay:uat.
 - Phase 5 | reviewer-accepted | AC-HAPPY-10 | no partial-failure banner (End series is one tx, T-6); AC text should drop it.
 - Phase 5 | reviewer-accepted | session.series.updated | `cancelled`/`deletedDrafts` fields not built; copy does not use them.
-- Phase 5 | reviewer-accepted | seriesName() derived, no schema column; series GET extras (seriesChangeEffect, isPayoutConfigured, bankingDrafts, editedDrafts); 'Nothing changed' inferred from version equality.
+- Phase 5 | reviewer-accepted | seriesName() derived, no schema column; series GET extras (seriesChangeEffect, isPayoutConfigured, bankingDrafts, editedDrafts); 'Nothing changed' inferred from version equality. The version-equality inference is RESOLVED 2026-10-24 (`changed`).
 - Phase 5 | DONE_WITH_CONCERNS | 5A | API integration tests first run after implementation (no RED observed).
 - Phase 5 remediation | resolved | AC-ENTRY-2, AC-ASYNC-6, AC-HAPPY-15 | supersedes the earlier "seriesGroups only shows series with a loaded date" acceptance: `GET /teams/:teamId/session-series` (TEAM_ADMIN, tenant-scoped, active first) returns `{ series: [{ id, name, startsOn, recurUntil, isActive, version, materialising }], horizonDays }` and the Sessions list renders the Series section from it with `seriesStatusLabel()`; `seriesGroups()` is removed. The "{n} upcoming" text still counts only dates on the loaded pages, so it shows only when above zero. Cross-team and non-admin: 403 on the list (admin of another team has no role here); a foreign rule id on the per-series routes stays 404.
 - Phase 5 remediation | resolved | 12-factor | `horizonDays` (the API's `RECURRENCE_HORIZON_DAYS`, 7-91) is now on `SeriesResponse` and on the series list; the web constant `SERIES_HORIZON_DAYS` is deleted and `nextSeriesDate`/`horizonLine`/`SeriesForm` take it as a required argument. The new-series page reads it from the series list read (admin-guarded). `nextDate` not exposed (the web still derives it from the pattern and `horizonDays`). `buildApp` takes an optional `recurrenceHorizonDays` (default 28, wired from config in main.ts, same default the worker uses).
@@ -1033,7 +1033,7 @@ Phase 5 | decisions (carry-forwards from Phase 3/4 resolved):
 - Phase 5 remediation | process | RED observed for the 4 new API integration tests (404/undefined before implementation) and 13 web tests; the two small `series-view.test.ts` unit tests (`horizonDays`, `toSeriesListItem`) were written alongside the code. Code review: Anthropic reviewer used (codex backend unusable here, `timeout` missing on macOS).
 
 Phase 5 | reviewer-accepted deviations (added at Phase 6):
-- Phase 5 | reviewer-accepted | apps/api/src/app.ts:73,210 | `recurrenceHorizonDays` optional in AppDeps, defaulting to 28; main.ts passes config. A future entrypoint that forgets it gets 28 silently - tidy-up candidate.
+- Phase 5 | reviewer-accepted | apps/api/src/app.ts:73,210 | `recurrenceHorizonDays` optional in AppDeps, defaulting to 28; main.ts passes config. A future entrypoint that forgets it gets 28 silently - tidy-up candidate. RESOLVED 2026-10-24: required in `AppDeps`, fallback removed.
 - Phase 5 | reviewer-accepted | sessions list + new-series pages throw if listSeries fails (fail-fast).
 - Phase 5 | reviewer-accepted | series-repo.ts listRules unpaginated (per-team counts small).
 
@@ -1043,9 +1043,19 @@ Phase 6 | decisions and deviations:
 - Phase 6 | e2e uses `docker compose pause worker` briefly to observe the waiting line, `E2E_DATABASE_URL` default is the compose dev DB.
 - Phase 6 | coverage: branch coverage per file is below 80 on series-view.ts (79.6), series.ts (76.7), materialise-notice.ts (75.0), shared series-name.ts (66.7); the gate is aggregate so it passes. Follow-up candidate.
 - Phase 6 | "showing first 100" line not added: SERIES_INSTANCE_LIMIT only bites after ~86 stacked past drafts.
-- Phase 6 | AC-ERROR-8 404-vs-403 RESOLVED 2026-10-24 (403, ADR 0019 (e)). Still open: AC text drift (AC-ASYNC-3 email key, AC-HAPPY-10 partial-failure banner).
-- Phase 6 | stale notes: Phase 2 `session_courts_guard_closed` unsorted and CLI TRIGGERABLE notes are resolved in code.
+- Phase 6 | AC-ERROR-8 404-vs-403 RESOLVED 2026-10-24 (403, ADR 0019 (e)). AC text drift (AC-ASYNC-3 email key, AC-HAPPY-10 partial-failure banner, AC-VERIFY-6 sweep carve-out) RESOLVED: the AC text was amended at archive.
+- Phase 6 | stale notes: Phase 2 `session_courts_guard_closed` unsorted and CLI TRIGGERABLE notes are resolved in code (marked RESOLVED above).
+
+Post-archive Minor fixes (2026-10-24, final-review Minor findings, test-first):
+- Series list is newest first (`created_at desc, id desc`), as AC-ENTRY-2 and the UI doc say; the earlier active-first order was an extra not in the spec (an ended series sorts by age like any other).
+- `PUT` session and `PUT` series answer an explicit `changed: boolean` (true only when a row was written); the web banners use it, no longer version equality. A stale `expectedVersion` with a real change is still 409 (AC-ERROR-7); only the no-op path answers `changed: false`.
+- `feesLocked` is `'raise_only_blocked'` or `null` (the spec value); the `'none'` member is gone from the contract.
+- `AppDeps.recurrenceHorizonDays` is required (no 28 fallback in `buildApp`); `RegisterJobsOptions.recurrenceHorizonDays` still defaults to the materialiser constant (worker.ts passes config).
+- `series.ts` propagation moved to `series-propagate.ts` (lock order and transaction boundaries unchanged; `lock-order.test.ts` now also treats `propagateSeriesEdit(`/`propagateSeriesEnd(` as session-lock calls).
+- `as never` time casts replaced by `parseLocalTime` at the write boundary (the generated column type is the branded `LocalTime`).
+- Branch coverage of `series-view.ts`, `series.ts`, `materialise-notice.ts`, `series-name.ts` raised to 80%+; `materialise-notice.ts` lost a dead `?? 'your team'` fallback (the team row is locked and exists).
+- `apps/api/openapi.yaml` is marked `linguist-generated` in `.gitattributes`.
 
 ### Resumption Notes
 **Can Resume**: NO
-**Resume From**: none (BUILD_COMPLETE); run /yay:reflect session-scheduling-engine
+**Resume From**: none (COMPLETE and archived; PR #7)

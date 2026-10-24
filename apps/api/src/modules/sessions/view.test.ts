@@ -115,7 +115,7 @@ describe('toSessionResponse', () => {
       customPlayerRate: null,
       feeFlat: '11.00',
       version: 1,
-      feesLocked: 'none',
+      feesLocked: null,
       activeRegistrationCount: 0,
       seriesName: null,
     });
@@ -147,13 +147,13 @@ describe('toSessionResponse', () => {
       activeRegistrationCount: 0,
       seriesName: null,
     });
-    expect(none.feesLocked).toBe('none');
+    expect(none.feesLocked).toBeNull();
     const draftWithPlayers = toSessionResponse(row(), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 2,
       seriesName: null,
     });
-    expect(draftWithPlayers.feesLocked).toBe('none');
+    expect(draftWithPlayers.feesLocked).toBeNull();
     const empty = toSessionResponse(row({ starts_at: null, ends_at: null }), [], {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,

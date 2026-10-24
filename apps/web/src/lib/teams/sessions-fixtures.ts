@@ -52,7 +52,7 @@ export function sessionFixture(overrides: Overrides<SessionResponse> = {}): Sess
     seriesName: null,
     version: 3,
     activeRegistrationCount: 0,
-    feesLocked: 'none',
+    feesLocked: null,
     courts: [
       {
         id: '21111111-1111-4111-8111-111111111111',

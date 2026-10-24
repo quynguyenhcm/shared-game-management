@@ -4,7 +4,7 @@
  * run inside the service's locked transaction.
  */
 import { sql, type Insertable, type Updateable } from 'kysely';
-import type { ListSessionsQuery } from '@sgm/shared';
+import { parseLocalTime, type ListSessionsQuery } from '@sgm/shared';
 import type { Database } from '../../lib/db/kysely.ts';
 import type { GameSessions } from '../../lib/db/types.generated.ts';
 import { AppError } from '../../lib/http/errors.ts';
@@ -147,8 +147,8 @@ export async function insertCourts(
       courts.map((court) => ({
         session_id: sessionId,
         court_identifier: court.identifier,
-        start_time: court.startTime as never,
-        end_time: court.endTime as never,
+        start_time: parseLocalTime(court.startTime),
+        end_time: parseLocalTime(court.endTime),
       })),
     )
     .execute();
@@ -175,7 +175,7 @@ export async function syncCourts(
       continue;
     await db
       .updateTable('session_courts')
-      .set({ start_time: court.startTime as never, end_time: court.endTime as never })
+      .set({ start_time: parseLocalTime(court.startTime), end_time: parseLocalTime(court.endTime) })
       .where('id', '=', stored.id)
       .execute();
   }

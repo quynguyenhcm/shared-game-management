@@ -35,4 +35,25 @@ describe('seriesName', () => {
       }),
     ).toBe('Wednesdays at Wellington Sports Centre');
   });
+
+  // The name is derived for display only, so a row the DB CHECKs should never allow still gets a readable name.
+  describe('fallbacks for values the schema should never store', () => {
+    it('names an out-of-range weekday "Day" instead of "undefined"', () => {
+      expect(
+        seriesName({ frequency: 'WEEKLY', dayOfWeek: 9, monthlyWeek: null, location: 'Hall' }),
+      ).toBe('Days at Hall');
+      expect(
+        seriesName({ frequency: 'WEEKLY', dayOfWeek: -1, monthlyWeek: null, location: 'Hall' }),
+      ).toBe('Days at Hall');
+    });
+
+    it('reads a monthly series without a week as the First, and an unknown week (5) as the First', () => {
+      expect(
+        seriesName({ frequency: 'MONTHLY', dayOfWeek: 3, monthlyWeek: null, location: 'Hall' }),
+      ).toBe('First Wednesday of the month at Hall');
+      expect(
+        seriesName({ frequency: 'MONTHLY', dayOfWeek: 3, monthlyWeek: 5, location: 'Hall' }),
+      ).toBe('First Wednesday of the month at Hall');
+    });
+  });
 });

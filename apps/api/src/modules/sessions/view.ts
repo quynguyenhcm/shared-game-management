@@ -84,7 +84,7 @@ export function toSessionResponse(
     seriesName: options.seriesName,
     version: row.version,
     activeRegistrationCount: count,
-    feesLocked: row.status === 'PUBLISHED' && count > 0 ? 'raise_only_blocked' : 'none',
+    feesLocked: row.status === 'PUBLISHED' && count > 0 ? 'raise_only_blocked' : null,
     courts: sortCourts(
       courts.map((court) => ({
         id: court.id,

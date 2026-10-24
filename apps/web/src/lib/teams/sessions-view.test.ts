@@ -81,7 +81,7 @@ function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
     seriesName: null,
     version: 1,
     activeRegistrationCount: 0,
-    feesLocked: 'none',
+    feesLocked: null,
     courts: [],
     ...overrides,
   } as SessionResponse;

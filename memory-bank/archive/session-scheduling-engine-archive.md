@@ -183,7 +183,7 @@ The task's 48 ACs were amended during build. Downstream features must not inheri
 - **AC-VERIFY-6**: `session.recurrence.sweep_completed` carries no `teamId`, because the sweep is cross-team (human ruling, 2026-10-20). `session.lock_retry*` events do carry `teamId`.
 - **AC-ERROR-8**: human ruled 403 on 2026-10-24; another team's session or series id is 403 `forbidden`, an id that exists nowhere is 404 (ADR 0019 (e)).
 - **T-10 wording**: ADR 0019 adopts "wholly inside the gap" (code and ALG), not "any court time between 02:00 and 03:00".
-- **Minor contract drift**: `feesLocked` returns `'none'` where the spec says `null`; series list sort is ascending where the spec says newest-first.
+- **Minor contract drift** (fixed 2026-10-24): `feesLocked` returned `'none'` where the spec says `null`; the series list sorted ascending where the spec says newest first.
 - **Human rulings**: Phase 5's 360 px manual walk was deferred to Phase 6 and discharged there.
 
 ## Testing
@@ -200,7 +200,7 @@ Pure shared functions get unit tests with the platform-foundation vectors and DS
 Key integration suites: `sessions-schema`, `sessions-contracts` (C-SSE-1..5), `sessions-parity` (D-85 TS/SQL parity), query-order recorder gate test, `stately` trailing-run test, `boundaries.test.ts`, `session-allocator.test.ts`. Phase 4 added 38 race tests (characterization, not RED-first).
 
 ### Coverage
-Aggregate 96.3% statements, 90.0% branches. Four files are under 80% branch coverage while the aggregate gate passes:
+Aggregate 96.3% statements, 90.0% branches. Four files were under 80% branch coverage at archive (all four are at or above 80% after the 2026-10-24 pass: 98.1, 84.3, 100, 100):
 - `series-view.ts` 79.6
 - `series.ts` 76.7
 - `materialise-notice.ts` 75.0
@@ -218,14 +218,15 @@ Not verified: screen reader, full Tab order, axe moderate/minor impacts, publish
 ### Human decision (RESOLVED 2026-10-24)
 3. **RESOLVED. AC-ERROR-8: the human ruled 403.** Another team's session or series id answers 403 `forbidden` on session GET, PUT, publish, cancel and series GET, PUT, End, publish-drafts; an id that exists nowhere stays 404. See ADR 0019 (e).
 
-### Minor and carried items
-- 12-factor: `webBaseUrl ?? 'http://localhost:3000'` and `recurrenceHorizonDays` defaulting to 28 in `buildApp`/`RegisterJobsOptions`. Make both required at the composition root.
-- "Nothing changed" is inferred from version equality; expose an explicit server flag.
-- Fix the four under-80% branch-coverage files.
-- Split `service.ts` (823) and extract `propagate` from `series.ts` (716); comment the `as never` casts; the `openapi.yaml` diff is about 8.7k lines.
-- `waitForLockWaiters` latent flake: filter by locktype.
-- Misleading vitest comments; stale task-file notes.
-- Hand-off to registration-and-waitlist's build gate: widen `game_session_has_active_registrations` and `countActiveRegistrations` together (parity test fails if they drift).
+### Minor and carried items (2026-10-24 pass, test-first, on the PR branch)
+- **RESOLVED. 12-factor.** `AppDeps.recurrenceHorizonDays` is required (no 28 fallback in `buildApp`; `main.ts` and every test helper pass it). `webBaseUrl` was already required in `registerJobs`. NOT changed: `RegisterJobsOptions.recurrenceHorizonDays` is still optional with the materialiser default (`worker.ts` passes config); it is the only remaining fallback.
+- **RESOLVED. "Nothing changed" inferred from version equality.** The session `PUT` and series `PUT` answer an explicit `changed: boolean` (true only when a row was written; contract `SessionEditResponse`, `SeriesSaveResponse`); the web banners use it. A stale `expectedVersion` with a real change is still 409 (AC-ERROR-7); a stale no-op is 200 with `changed: false`.
+- **RESOLVED. Contract drift.** `feesLocked` is `'raise_only_blocked'` or `null` (spec), and the series list is newest first (`created_at desc, id desc`), as AC-ENTRY-2 says. The earlier "active first" order was not in the spec and is gone.
+- **RESOLVED. Four files under 80% branch coverage.** `series-view.ts` 98.1, `series.ts` 84.3, `materialise-notice.ts` 100, `series-name.ts` 100 (per file; the gate is still aggregate, `perFile` stays off). `series.ts` gained deterministic lock-time race tests (`raceUnderTeamLock`); `materialise-notice.ts` lost a dead `?? 'your team'` fallback.
+- **RESOLVED (partly). Size and casts.** The propagation logic moved to `series-propagate.ts` (`series.ts` 780 to 613 lines; lock order and transactions unchanged; the static lock-order guard now counts `propagateSeriesEdit(`/`propagateSeriesEnd(` as session locks). The `as never` casts in `repo.ts` and `series-repo.ts` became `parseLocalTime`. `apps/api/openapi.yaml` is marked `linguist-generated` in `.gitattributes` so GitHub collapses it. NOT done: splitting `service.ts` (823 lines).
+- **RESOLVED. Misleading vitest comments and stale task-file notes.** `vitest.config.ts` no longer cites AC-VERIFY-8 for the sessions list and says the thresholds are aggregate; the task file's stale Phase 2 notes and AC-text-drift notes are marked RESOLVED. The openapi `publishTeamSeriesDrafts` description already says 409 `series_ended`.
+- **NOT done. `waitForLockWaiters` latent flake** (filter by `locktype`): out of scope for this pass.
+- **Open. Hand-off to registration-and-waitlist's build gate:** widen `game_session_has_active_registrations` and `countActiveRegistrations` together (the parity test fails if they drift).
 
 ## Deployment
 ### Procedures

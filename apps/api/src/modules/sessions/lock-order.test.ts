@@ -34,8 +34,17 @@ const TEAMS_LOCK_CALLS = [
   'lockTeamRow(',
 ];
 const RULE_LOCK_CALLS = ['lockRule('];
-/** Calls that lock `game_sessions` rows `FOR UPDATE`. */
-const SESSION_LOCK_CALLS = ['lockSession(', 'lockRuleInstances(', 'lockedInstances('];
+/**
+ * Calls that lock `game_sessions` rows `FOR UPDATE`. `propagateSeriesEdit(` and `propagateSeriesEnd(` (series-propagate.ts)
+ * lock every target instance in `(date, id)` order, so a transaction callback that calls them has taken its session locks there.
+ */
+const SESSION_LOCK_CALLS = [
+  'lockSession(',
+  'lockRuleInstances(',
+  'lockedInstances(',
+  'propagateSeriesEdit(',
+  'propagateSeriesEnd(',
+];
 
 const lastIndexOfAny = (text: string, needles: readonly string[]): number =>
   Math.max(...needles.map((needle) => text.lastIndexOf(needle)));

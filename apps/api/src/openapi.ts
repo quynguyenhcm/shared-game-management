@@ -50,6 +50,7 @@ async function withInertApp<T>(read: (app: FastifyInstance) => T): Promise<T> {
     loginThrottle: createLoginThrottle({ db, keys, config: config.auth }),
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
     sessionAllocator: noopSessionAllocator,
+    recurrenceHorizonDays: config.recurrence.horizonDays,
   });
   try {
     return read(app);

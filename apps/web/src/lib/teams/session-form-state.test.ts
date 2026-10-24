@@ -395,7 +395,7 @@ describe('locked pricing (T-7: fees can only go down once players have registere
   });
 
   it('an unlocked session has no fee limit', () => {
-    const state = initialSessionForm(publishedSession({ feesLocked: 'none' }));
+    const state = initialSessionForm(publishedSession({ feesLocked: null }));
     const next = sessionFormReducer(state, { type: 'set_fee', field: 'feeMale', value: '40.00' });
     expect(lockedFeeErrors(next)).toEqual({});
   });
@@ -403,7 +403,7 @@ describe('locked pricing (T-7: fees can only go down once players have registere
 
 describe('seeding the form from the API', () => {
   it('maps courts, defaults (the most common times), places, costing and pricing', () => {
-    const state = initialSessionForm(publishedSession({ feesLocked: 'none' }));
+    const state = initialSessionForm(publishedSession({ feesLocked: null }));
     expect(state.details).toEqual({
       location: 'Rosedale',
       address: '1 Court Rd',

@@ -49,8 +49,9 @@ export default defineConfig({
         'apps/api/src/modules/team-banking/**/*.ts',
         // skill-levels-and-auto-enroll (AC-VERIFY-8): the skill-levels module.
         'apps/api/src/modules/skill-levels/**/*.ts',
-        // session-scheduling-engine (AC-VERIFY-8): the sessions module, its recurrence and auto-enrol jobs, the
-        // allocator composition root and the shared session rules.
+        // session-scheduling-engine (task success criterion "at least 80% coverage"; AC-VERIFY-8 is the accessibility
+        // AC): the sessions module, its recurrence and auto-enrol jobs, the allocator composition root and the shared
+        // session rules.
         'apps/api/src/modules/sessions/**/*.ts',
         'apps/api/src/jobs/{recurrence-materialisation,recurrence-rule,session-auto-enrol}.ts',
         'apps/api/src/session-allocator.ts',
@@ -59,7 +60,8 @@ export default defineConfig({
         'apps/web/src/lib/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.int.test.ts'],
-      // Thresholds apply to every file matched by `include` (platform library modules and the auth code above).
+      // Thresholds are AGGREGATE over every file matched by `include` (not per file: `perFile` is off), so one file can sit
+      // below 80% while the gate passes. Keep an eye on per-file branch numbers in the report.
       thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
     },
   },

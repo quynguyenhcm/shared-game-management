@@ -401,7 +401,8 @@ const nullableMoney = moneyStringSchema.nullable();
 const count = z.number().int().min(0);
 
 export const SessionPhase = z.enum(['upcoming', 'started', 'ended']);
-export const FeesLocked = z.enum(['none', 'raise_only_blocked']);
+/** `'raise_only_blocked'` once a PUBLISHED session has an active registration (T-7), otherwise `null` (the spec value). */
+export const FeesLocked = z.enum(['raise_only_blocked']).nullable();
 /** Why a DRAFT is a draft: a refused banking gate (series), an admin edit of a series date, or the admin's own draft. */
 export const DraftReason = z.enum(['banking', 'edited', 'admin']);
 export type DraftReason = z.infer<typeof DraftReason>;
@@ -491,6 +492,13 @@ export const SessionWriteResponse = z.object({
   material: z.boolean(),
 });
 export type SessionWriteResponse = z.infer<typeof SessionWriteResponse>;
+
+/**
+ * A session edit (PUT). `changed` is true only when a row was actually written; a save that would change nothing is a 200
+ * with the current row (SA-6), whatever `expectedVersion` said, so callers must not infer "nothing changed" from the version.
+ */
+export const SessionEditResponse = SessionWriteResponse.extend({ changed: z.boolean() });
+export type SessionEditResponse = z.infer<typeof SessionEditResponse>;
 
 export const SessionListResponse = z.object({
   sessions: z.array(SessionResponse),
@@ -601,7 +609,7 @@ export const SeriesListItem = z.object({
 });
 export type SeriesListItem = z.infer<typeof SeriesListItem>;
 
-/** The team's series, active ones first; `horizonDays` is the materialisation horizon (see `SeriesResponse`). */
+/** The team's series, newest first; `horizonDays` is the materialisation horizon (see `SeriesResponse`). */
 export const SeriesListResponse = z.object({
   series: z.array(SeriesListItem),
   horizonDays: z.number().int().min(7).max(91),
@@ -629,7 +637,12 @@ export const SeriesSaveOutcome = z.object({
   }),
 });
 
-export const SeriesSaveResponse = z.object({ series: SeriesResponse, outcome: SeriesSaveOutcome });
+/** `changed` is true only when the rule was actually written (see `SessionEditResponse`). */
+export const SeriesSaveResponse = z.object({
+  series: SeriesResponse,
+  outcome: SeriesSaveOutcome,
+  changed: z.boolean(),
+});
 export type SeriesSaveResponse = z.infer<typeof SeriesSaveResponse>;
 
 export const EndSeriesResponse = z.object({

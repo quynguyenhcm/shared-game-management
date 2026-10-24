@@ -105,6 +105,7 @@ const write = (overrides = {}, extra: Record<string, unknown> = {}) => ({
   session: sessionFixture(overrides),
   promoted: 0,
   material: false,
+  changed: true,
   ...extra,
 });
 
@@ -307,10 +308,24 @@ describe('saveSessionAction: Save draft and Save changes', () => {
     expect(call.body).not.toHaveProperty('createKey');
   });
 
-  it('a save that changed nothing (version unchanged) says so, without claiming a save', async () => {
-    stubFetch([200, write({ version: 3 })]);
+  it('a save the API says changed nothing says so, without claiming a save', async () => {
+    stubFetch([200, write({ version: 3 }, { changed: false })]);
     await expect(redirectOf(saveSessionAction({}, form(EDIT_FORM)))).resolves.toBe(
       `${SESSION_URL}?notice=nothing_changed:replace`,
+    );
+  });
+
+  it('a stale form that changed nothing (the API row is on a newer version) still says nothing changed', async () => {
+    stubFetch([200, write({ version: 4 }, { changed: false })]);
+    await expect(redirectOf(saveSessionAction({}, form(EDIT_FORM)))).resolves.toBe(
+      `${SESSION_URL}?notice=nothing_changed:replace`,
+    );
+  });
+
+  it('trusts `changed: true` even when the version did not move', async () => {
+    stubFetch([200, write({ version: 3 }, { changed: true })]);
+    await expect(redirectOf(saveSessionAction({}, form(EDIT_FORM)))).resolves.toBe(
+      `${SESSION_URL}?notice=draft_saved:replace`,
     );
   });
 
@@ -641,7 +656,8 @@ describe('createSeriesAction (AC-HAPPY-5)', () => {
 
 describe('saveSeriesAction (AC-HAPPY-7)', () => {
   const edit = { ...SERIES_FORM, ruleId: RULE_ID, expectedVersion: '2' };
-  const saved = (version: number, outcome = {}) => ({
+  const saved = (version: number, outcome = {}, changed = true) => ({
+    changed,
     series: seriesFixture({ version, instances: [instanceFixture()] }),
     outcome: {
       updated: 4,
@@ -674,16 +690,29 @@ describe('saveSeriesAction (AC-HAPPY-7)', () => {
     );
   });
 
-  it('an unchanged version is "Nothing to change."', async () => {
-    stubFetch([
-      200,
-      saved(2, {
-        updated: 0,
-        skipped: { edited: 0, started: 0, closed: 0, deadlinePassed: 0, feeLocked: 0 },
-      }),
-    ]);
+  const noChange = {
+    updated: 0,
+    skipped: { edited: 0, started: 0, closed: 0, deadlinePassed: 0, feeLocked: 0 },
+  };
+
+  it('`changed: false` is "Nothing to change."', async () => {
+    stubFetch([200, saved(2, noChange, false)]);
     await expect(redirectOf(saveSeriesAction({}, form(edit)))).resolves.toBe(
       `${SERIES_URL}?notice=series_nothing_changed:replace`,
+    );
+  });
+
+  it('a stale form that changed nothing (the series is on a newer version) is still "Nothing to change."', async () => {
+    stubFetch([200, saved(5, noChange, false)]);
+    await expect(redirectOf(saveSeriesAction({}, form(edit)))).resolves.toBe(
+      `${SERIES_URL}?notice=series_nothing_changed:replace`,
+    );
+  });
+
+  it('trusts `changed: true` even when the version did not move', async () => {
+    stubFetch([200, saved(2, { updated: 1 }, true)]);
+    await expect(redirectOf(saveSeriesAction({}, form(edit)))).resolves.toBe(
+      `${SERIES_URL}?notice=series_saved&count=1&edited=1:replace`,
     );
   });
 

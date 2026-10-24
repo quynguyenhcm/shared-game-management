@@ -12594,10 +12594,11 @@ paths:
                           minimum: 0
                           maximum: 9007199254740991
                         feesLocked:
-                          type: string
-                          enum:
-                            - none
-                            - raise_only_blocked
+                          anyOf:
+                            - type: string
+                              enum:
+                                - raise_only_blocked
+                            - type: "null"
                         courts:
                           type: array
                           items:
@@ -13149,10 +13150,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -13704,10 +13706,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -14299,10 +14302,11 @@ paths:
                         minimum: 0
                         maximum: 9007199254740991
                       feesLocked:
-                        type: string
-                        enum:
-                          - none
-                          - raise_only_blocked
+                        anyOf:
+                          - type: string
+                            enum:
+                              - raise_only_blocked
+                          - type: "null"
                       courts:
                         type: array
                         items:
@@ -14508,10 +14512,11 @@ paths:
                         minimum: 0
                         maximum: 9007199254740991
                       feesLocked:
-                        type: string
-                        enum:
-                          - none
-                          - raise_only_blocked
+                        anyOf:
+                          - type: string
+                            enum:
+                              - raise_only_blocked
+                          - type: "null"
                       courts:
                         type: array
                         items:
@@ -15058,10 +15063,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -15613,10 +15619,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -16086,10 +16093,11 @@ paths:
                         minimum: 0
                         maximum: 9007199254740991
                       feesLocked:
-                        type: string
-                        enum:
-                          - none
-                          - raise_only_blocked
+                        anyOf:
+                          - type: string
+                            enum:
+                              - raise_only_blocked
+                          - type: "null"
                       courts:
                         type: array
                         items:
@@ -16628,10 +16636,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -17183,10 +17192,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -17493,22 +17503,25 @@ paths:
       description: "Replaces the editable content of a DRAFT or a not-started
         PUBLISHED session (a series date too: a real change marks it edited, its
         date can never move). A save that changes nothing is 200 and writes
-        nothing. A started session is 409 `session_started`; a COMPLETED or
-        CANCELLED one is 409 `session_not_editable`. Once a PUBLISHED session
-        has an active registration, fees can only go down: a raise, a
-        pricing-model change or free-to-paid is 409 `session_fee_locked` with
-        `raisedFields`. Turning a PUBLISHED session from free to paid goes
-        through the publish gate first (409 `payout_not_configured`). Raising
-        public capacity calls the seat allocator once in the same transaction;
-        the response carries `promoted` and `material` (a field players care
-        about changed), and the session's `activeRegistrationCount`, so the
-        admin can tell them. TEAM_ADMIN of this team only (`allowGlobalAdmin` is
-        off); a session id that belongs to another team is 403 `forbidden`
-        (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404
-        `not_found`. The actor is re-checked as an approved admin under a row
-        lock inside every write (403 when demoted meanwhile). Every write
-        carries `expectedVersion`: a stale one is 409 `session_stale` with the
-        latest row in `error.current`, and nothing is written."
+        nothing, whatever `expectedVersion` says; `changed` is false then and
+        true only when a row was written (a stale `expectedVersion` with a real
+        change is still 409 `session_stale`). A started session is 409
+        `session_started`; a COMPLETED or CANCELLED one is 409
+        `session_not_editable`. Once a PUBLISHED session has an active
+        registration, fees can only go down: a raise, a pricing-model change or
+        free-to-paid is 409 `session_fee_locked` with `raisedFields`. Turning a
+        PUBLISHED session from free to paid goes through the publish gate first
+        (409 `payout_not_configured`). Raising public capacity calls the seat
+        allocator once in the same transaction; the response carries `promoted`
+        and `material` (a field players care about changed), and the session's
+        `activeRegistrationCount`, so the admin can tell them. TEAM_ADMIN of
+        this team only (`allowGlobalAdmin` is off); a session id that belongs to
+        another team is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id
+        that exists nowhere is 404 `not_found`. The actor is re-checked as an
+        approved admin under a row lock inside every write (403 when demoted
+        meanwhile). Every write carries `expectedVersion`: a stale one is 409
+        `session_stale` with the latest row in `error.current`, and nothing is
+        written."
       requestBody:
         required: true
         content:
@@ -17788,10 +17801,11 @@ paths:
                         minimum: 0
                         maximum: 9007199254740991
                       feesLocked:
-                        type: string
-                        enum:
-                          - none
-                          - raise_only_blocked
+                        anyOf:
+                          - type: string
+                            enum:
+                              - raise_only_blocked
+                          - type: "null"
                       courts:
                         type: array
                         items:
@@ -17854,10 +17868,13 @@ paths:
                     maximum: 9007199254740991
                   material:
                     type: boolean
+                  changed:
+                    type: boolean
                 required:
                   - session
                   - promoted
                   - material
+                  - changed
                 additionalProperties: false
         "401":
           description: Default Response
@@ -18338,10 +18355,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -18893,10 +18911,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -19385,10 +19404,11 @@ paths:
                         minimum: 0
                         maximum: 9007199254740991
                       feesLocked:
-                        type: string
-                        enum:
-                          - none
-                          - raise_only_blocked
+                        anyOf:
+                          - type: string
+                            enum:
+                              - raise_only_blocked
+                          - type: "null"
                       courts:
                         type: array
                         items:
@@ -19935,10 +19955,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -20490,10 +20511,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -20980,10 +21002,11 @@ paths:
                         minimum: 0
                         maximum: 9007199254740991
                       feesLocked:
-                        type: string
-                        enum:
-                          - none
-                          - raise_only_blocked
+                        anyOf:
+                          - type: string
+                            enum:
+                              - raise_only_blocked
+                          - type: "null"
                       courts:
                         type: array
                         items:
@@ -21527,10 +21550,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -22082,10 +22106,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -23523,10 +23548,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -24078,10 +24104,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -24936,10 +24963,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -25491,10 +25519,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -26553,10 +26582,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -27108,10 +27138,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -27428,14 +27459,16 @@ paths:
         free-to-paid change that would reach a PUBLISHED date goes through the
         publish gate first and is refused whole with 409
         `payout_not_configured`. A save that changes nothing is 200 and writes
-        nothing. An ended series is 409 `series_ended`. TEAM_ADMIN of this team
-        only (`allowGlobalAdmin` is off); a series id that belongs to another
-        team is 403 `forbidden` (AC-ERROR-8, ruled 2026-10-24) and an id that
-        exists nowhere is 404 `not_found`. The actor is re-checked as an
-        approved admin under a row lock inside every write (403 when demoted
-        meanwhile). Writes that change a series carry `expectedVersion`: a stale
-        one is 409 `series_stale` with the latest series in `error.current`, and
-        nothing is written."
+        nothing, whatever `expectedVersion` says: `changed` is false then and
+        true only when the rule was written (a stale `expectedVersion` with a
+        real change is still 409 `series_stale`). An ended series is 409
+        `series_ended`. TEAM_ADMIN of this team only (`allowGlobalAdmin` is
+        off); a series id that belongs to another team is 403 `forbidden`
+        (AC-ERROR-8, ruled 2026-10-24) and an id that exists nowhere is 404
+        `not_found`. The actor is re-checked as an approved admin under a row
+        lock inside every write (403 when demoted meanwhile). Writes that change
+        a series carry `expectedVersion`: a stale one is 409 `series_stale` with
+        the latest series in `error.current`, and nothing is written."
       requestBody:
         required: true
         content:
@@ -27878,9 +27911,12 @@ paths:
                       - unchanged
                       - skipped
                     additionalProperties: false
+                  changed:
+                    type: boolean
                 required:
                   - series
                   - outcome
+                  - changed
                 additionalProperties: false
         "401":
           description: Default Response
@@ -28361,10 +28397,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -28916,10 +28953,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -30041,10 +30079,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -30596,10 +30635,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -31671,10 +31711,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:
@@ -32226,10 +32267,11 @@ paths:
                                 minimum: 0
                                 maximum: 9007199254740991
                               feesLocked:
-                                type: string
-                                enum:
-                                  - none
-                                  - raise_only_blocked
+                                anyOf:
+                                  - type: string
+                                    enum:
+                                      - raise_only_blocked
+                                  - type: "null"
                               courts:
                                 type: array
                                 items:

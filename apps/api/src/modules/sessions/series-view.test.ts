@@ -115,6 +115,23 @@ describe('toSeriesResponse', () => {
   });
 });
 
+describe('a rule with no costing', () => {
+  it('reads a missing court cost and extra expenses as $0.00 and suggests no rate', () => {
+    const response = toSeriesResponse(
+      ruleRow({ default_total_court_cost: null, default_extra_expenses: null }),
+      [],
+      NO_EXTRAS,
+      28,
+      TODAY,
+    );
+    expect(response).toMatchObject({
+      courtCost: '0.00',
+      extraExpenses: '0.00',
+      calculatedRatePerPlayer: '0.00',
+    });
+  });
+});
+
 describe('the materialisation horizon and the list row', () => {
   it('reports the configured horizon on the series response', () => {
     expect(toSeriesResponse(ruleRow(), [], NO_EXTRAS, 56, TODAY).horizonDays).toBe(56);
@@ -206,6 +223,19 @@ describe('existingInstanceOf', () => {
       { courtIdentifier: 'Court 1', startTime: '19:00', endTime: '21:00' },
     ]);
     expect(instance.startsAt.toISOString()).toBe('2026-10-21T06:00:00.000Z');
+  });
+
+  it('reads missing costing columns as zero and keeps a court that ends at midnight as 24:00', () => {
+    const instance = existingInstanceOf(
+      sessionRow({ total_court_cost: null, calculated_rate_per_player: null }),
+      [{ id: 'c1', court_identifier: 'Court 1', start_time: '22:00:00', end_time: '24:00:00' }],
+      0,
+    );
+    expect(instance.courtCost).toBe(parseMoney('0.00'));
+    expect(instance.calculatedRatePerPlayer).toBe(parseMoney('0.00'));
+    expect(instance.courts).toEqual([
+      { courtIdentifier: 'Court 1', startTime: '22:00', endTime: '24:00' },
+    ]);
   });
 
   it('treats a session with no court yet as not started, so it is reconciled rather than skipped', () => {
@@ -321,5 +351,18 @@ describe('buildSeriesExtras', () => {
       ['p', 'closed'],
       ['s', 'closed'],
     ]);
+  });
+
+  it('orders two dates that fall on the same day by id, and reports no times for a session without courts', () => {
+    const extras = build([
+      row('b', { date: '2026-10-28', status: 'DRAFT', starts_at: null, ends_at: null }),
+      row('a', {
+        date: '2026-10-28',
+        status: 'DRAFT',
+        starts_at: new Date('2026-10-28T06:00:00Z'),
+      }),
+    ]);
+    expect(extras.instances.map((i) => i.id)).toEqual(['a', 'b']);
+    expect(extras.instances[1]).toMatchObject({ startsAt: null, endsAt: null });
   });
 });

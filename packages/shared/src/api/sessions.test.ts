@@ -4,6 +4,8 @@ import {
   CancelSessionResponse,
   SeriesDetailResponse,
   SeriesListResponse,
+  SeriesSaveResponse,
+  SessionEditResponse,
   CreateSeriesRequest,
   CreateSessionRequest,
   EndSeriesRequest,
@@ -458,7 +460,7 @@ describe('responses and the error envelope', () => {
     seriesName: null,
     version: 3,
     activeRegistrationCount: 0,
-    feesLocked: 'none',
+    feesLocked: null,
     courts: [{ id: UUID, identifier: 'Court 1', startTime: '19:00', endTime: '21:00' }],
   };
 
@@ -467,6 +469,14 @@ describe('responses and the error envelope', () => {
     expect(SessionResponse.safeParse({ ...session, feeFlat: 11 }).success).toBe(false);
     expect(SessionResponse.safeParse({ ...session, courtCost: '120' }).success).toBe(false);
     expect(SessionResponse.safeParse({ ...session, feesLocked: 'maybe' }).success).toBe(false);
+  });
+
+  it("feesLocked is 'raise_only_blocked' or null (spec), never 'none'", () => {
+    expect(SessionResponse.safeParse({ ...session, feesLocked: null }).success).toBe(true);
+    expect(
+      SessionResponse.safeParse({ ...session, feesLocked: 'raise_only_blocked' }).success,
+    ).toBe(true);
+    expect(SessionResponse.safeParse({ ...session, feesLocked: 'none' }).success).toBe(false);
   });
 
   it('carries the series name as a string or null, and nothing else', () => {
@@ -527,6 +537,15 @@ describe('responses and the error envelope', () => {
       instances: [instance],
     };
     expect(SeriesDetailResponse.safeParse({ series }).success).toBe(true);
+    const outcome = {
+      updated: 0,
+      unchanged: 0,
+      skipped: { edited: 0, started: 0, closed: 0, deadlinePassed: 0, feeLocked: 0 },
+    };
+    // A series save says explicitly whether anything was written (never inferred from the version).
+    expect(SeriesSaveResponse.safeParse({ series, outcome, changed: false }).success).toBe(true);
+    expect(SeriesSaveResponse.safeParse({ series, outcome, changed: true }).success).toBe(true);
+    expect(SeriesSaveResponse.safeParse({ series, outcome }).success).toBe(false);
     for (const effect of ['will_update', 'edited', 'closed', 'has_registrations']) {
       const ok = { ...series, instances: [{ ...instance, seriesChangeEffect: effect }] };
       expect(SeriesDetailResponse.safeParse({ series: ok }).success).toBe(true);
@@ -587,6 +606,10 @@ describe('responses and the error envelope', () => {
     expect(SessionWriteResponse.safeParse({ session, promoted: -1, material: true }).success).toBe(
       false,
     );
+    // A session edit (PUT) also says explicitly whether anything was written.
+    const edit = { session, promoted: 0, material: false };
+    expect(SessionEditResponse.safeParse({ ...edit, changed: false }).success).toBe(true);
+    expect(SessionEditResponse.safeParse(edit).success).toBe(false);
     expect(SessionResponse.safeParse({ ...session, draftReason: 'bank' }).success).toBe(false);
     expect(SessionIdParams.safeParse({ teamId: UUID, sessionId: 'nope' }).success).toBe(false);
 

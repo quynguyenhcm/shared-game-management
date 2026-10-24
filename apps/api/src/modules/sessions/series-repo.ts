@@ -3,8 +3,8 @@
  * also filters by `team_id` from the path, so another team's series is simply not found. Reads take a `Database` (the pool or a
  * transaction); the writes run inside the series use case's locked transaction.
  */
-import { sql, type Insertable, type Updateable } from 'kysely';
-import type { LocalDate } from '@sgm/shared';
+import type { Insertable, Updateable } from 'kysely';
+import { parseLocalTime, type LocalDate } from '@sgm/shared';
 import type { Database } from '../../lib/db/kysely.ts';
 import type { RecurringSessionRules } from '../../lib/db/types.generated.ts';
 import type { StoredCourt } from './content.ts';
@@ -38,18 +38,14 @@ export async function ruleExists(db: Database, ruleId: string): Promise<boolean>
   return row !== undefined;
 }
 
-/**
- * The team's series, active first, then oldest first (a stable order for the Sessions page's Series section). "Active" is the
- * read-time rule of `isSeriesActive`: the flag is on and the last date, if any, is not before NZ `today`.
- */
-export function listRules(db: Database, teamId: string, today: LocalDate): Promise<LockedRule[]> {
+/** The team's series, newest first (AC-ENTRY-2), `id` breaking a created-at tie so the order is stable. */
+export function listRules(db: Database, teamId: string): Promise<LockedRule[]> {
   return db
     .selectFrom('recurring_session_rules')
     .selectAll()
     .where('team_id', '=', teamId)
-    .orderBy(sql`(is_active AND (recur_until IS NULL OR recur_until >= ${today}::date))`, 'desc')
-    .orderBy('created_at', 'asc')
-    .orderBy('id', 'asc')
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
     .execute();
 }
 
@@ -103,8 +99,8 @@ export async function insertRuleCourts(
         rule_id: ruleId,
         position: index + 1,
         court_identifier: court.identifier,
-        start_time: court.startTime as never,
-        end_time: court.endTime as never,
+        start_time: parseLocalTime(court.startTime),
+        end_time: parseLocalTime(court.endTime),
       })),
     )
     .execute();

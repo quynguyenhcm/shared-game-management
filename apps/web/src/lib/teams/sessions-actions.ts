@@ -331,7 +331,8 @@ export async function saveSessionAction(
     );
     return publishOutcome('publish_session', published, { target, created: false });
   }
-  const outcome = savedNotice(session, parsed.body.expectedVersion, formData, {
+  const outcome = savedNotice(session, formData, {
+    changed: saved.data.changed,
     material,
     promoted,
   });
@@ -347,12 +348,12 @@ interface SavedNotice {
 /** The banner after a plain save: nothing changed, changes to a published session, a first edit of a series date, or a draft. */
 function savedNotice(
   session: SessionResponse,
-  expectedVersion: number,
   formData: FormData,
-  write: { material: boolean; promoted: number },
+  write: { changed: boolean; material: boolean; promoted: number },
 ): SavedNotice {
-  // A save that changes nothing is a 200 that writes nothing, so the version did not move.
-  if (session.version === expectedVersion) return { code: 'nothing_changed', counts: {} };
+  // The API says whether it wrote anything; a stale form that changed nothing gets a newer version back, so the version
+  // cannot tell (SA-6).
+  if (!write.changed) return { code: 'nothing_changed', counts: {} };
   const firstEdit =
     session.recurringRuleId !== null &&
     formField(formData, 'overridden') === 'false' &&
@@ -436,7 +437,7 @@ export async function saveSeriesAction(
   const saved = await apiClient.updateSeries(teamId, ruleId, parsed.body, options);
   if (!saved.ok) return formFailure('save_series', saved, { here, page: target, kind: 'series' });
 
-  if (saved.data.series.version === parsed.body.expectedVersion) {
+  if (!saved.data.changed) {
     return notice(target, 'series_nothing_changed');
   }
   const { updated, skipped } = saved.data.outcome;
