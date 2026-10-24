@@ -218,6 +218,7 @@ All options share three things. Liability exists only for a **LATE** withdrawal 
   //   if S == 0: withdrawer becomes an open liability (feeDue = true)
   //   else: withdrawer released (feeDue = false); release(open, S - withdrawer.partySize)
   // any other step: release(open, Σ size(promotions) + (newcomer confirmed ? newcomer.partySize : 0))
+  //   a fee-due re-registrant that confirms nets off its prior party size first (floor 0)
   ```
 - **Time Complexity**: Best O(1) (no confirmations or no open liabilities); Average O(1)–O(2); Worst O(L), where L is the number of open liabilities in the session (single digits).
 - **Space Complexity**: O(L) for the ordered liability list read under the lock; one boolean column.
@@ -359,7 +360,7 @@ The transaction is dominated by SQL round trips, not the decision. The chosen pa
 | (d) | Registration after the deadline | **Allowed** until `starts_at`. A registration after the deadline that later withdraws is LATE by the clock. The panel warns before submit (AC-ERROR-2 copy) |
 | (e) | After start | **Closed.** At `now >= starts_at`, register and withdraw are refused with `session_not_open`. The ban handler skips started sessions (ADR 0015). `promoteWaitlist` promotes nobody. Liabilities freeze. The open check runs **before** classification |
 | (f) | Marker | **Column** `withdrawal_fee_due boolean NOT NULL DEFAULT false` on `registrations` (meaning "currently due"), with `withdrawal_kind` and `withdrawn_at`. Its DB rules are below |
-| (g) | Re-registration of a fee-due withdrawal (new, found during this analysis) | **Allowed only into a CONFIRMED place for a party at least as large as the liable party.** Otherwise it is refused with 409 `late_withdrawal_fee_due`. Without this rule, a liable player can escape the fee in three clicks: re-register with a party too large to fit (waitlisted, flag reset), then leave the waitlist for free. A smaller re-registration would also drop guests' fees after the deadline. A re-registration that is CONFIRMED clears the flag (the row is CONFIRMED and billed), and that confirmation spends its seat budget on other open liabilities |
+| (g) | Re-registration of a fee-due withdrawal (new, found during this analysis) | **Allowed only into a CONFIRMED place for a party at least as large as the liable party.** Otherwise it is refused with 409 `late_withdrawal_fee_due`. Without this rule, a liable player can escape the fee in three clicks: re-register with a party too large to fit (waitlisted, flag reset), then leave the waitlist for free. A smaller re-registration would also drop guests' fees after the deadline. A re-registration that is CONFIRMED clears the flag (the row is CONFIRMED and billed), and that confirmation spends its seat budget on other open liabilities only after netting off the re-registrant's own prior party size (its own fee is cleared by taking that seat back; extra seats and simultaneous promotions still count) |
 | (h) | Ban withdrawal, early withdrawal, leaving the waitlist | Never liable (`feeDue = false`). A ban step's promotions do release other open liabilities |
 | (i) | Session CANCELLED | Out of scope (session-scheduling-engine). Recommended for the hand-off: `listBillableRegistrations` returns `[]` for a session whose status is not `PUBLISHED` or `COMPLETED`, so a cancelled game is never billed by mistake |
 
@@ -440,6 +441,7 @@ function decideAllocation({ publicCapacity, confirmedParties, waitlist, openLiab
             return refused('late_withdrawal_fee_due')
         promotions = promoted − {tail}
         budget     = Σ size(promoted)                 // includes the newcomer when confirmed
+        if newcomerConfirmed: budget = max(0, budget - (request.liablePriorPartySize ?? 0))  // own fee cleared by retaking its seat
         released   = release(openLiabilities, budget) // the re-registering row is not in openLiabilities (caller excludes it)
         newcomer   = newcomerConfirmed ? CONFIRMED : WAITLISTED at maxPos + 1
         taken     += budget
