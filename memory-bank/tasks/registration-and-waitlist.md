@@ -1031,6 +1031,7 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 
 **Build Status**: BUILD_COMPLETE (Phase 6 of 6)
 **Auto-Build Mode**: YES
+**Final Review Backend**: anthropic (codex unavailable: workspace out of credits). Verdict: ready to merge with fixes. 0 Critical, 1 Important (auto-enrol after the cancellation deadline creates a liability nobody chose and contradictory email copy; needs a human policy ruling), 8 Minor. C3 still awaits human acknowledgement.
 **Current Phase**: all phases built; next /yay:reflect registration-and-waitlist
 **Current Step**: Phase 6 built and committed (2026-10-25). Next: /yay:reflect registration-and-waitlist.
 **Step Started**: 2026-10-16
