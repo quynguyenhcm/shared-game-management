@@ -705,7 +705,7 @@ Adjust this plan if needed.
 - re-run `apps/api/test/integration/sessions-contracts.int.test.ts` and `sessions-parity.int.test.ts` on the branch (both green on `main`);
 - re-confirm that ADR 0018, D-62..D-69 and no migration newer than `20261020000100000` are on `main` (R25);
 - O1-O4 are RESOLVED (human ruling 2026-10-24; R20, R24, R27).
-- [ ] **Phase 1: Schema and shared contracts**: the lifecycle migration (D-62 onwards, including R15/R17 columns), regenerated types, zod contracts, error codes (incl. `auto_enroll_changed` refusal reason), `insertPublishedSession` (payout-configured team, R18). (R20, R25, R26) The same migration `CREATE OR REPLACE`s `game_session_has_active_registrations`, and `countActiveRegistrations` in `apps/api/src/modules/sessions/repo.ts` widens in the same phase as the fee-lock twin. The new display count `countRegisteredPlayers` is added, and every SSE call site is switched per the R20 table (O1 ruling). The D-85 cases in `sessions-parity`, `sessions-schema` and `sessions-contracts` are updated deliberately, the factory fixes cover SSE's suites, and every `sessions-*` integration suite is re-run. ACs: AC-VERIFY-2, AC-VERIFY-7, AC-VERIFY-11 (schema half), AC-VERIFY-12.
+- [x] **Phase 1: Schema and shared contracts**: the lifecycle migration (D-62 onwards, including R15/R17 columns), regenerated types, zod contracts, error codes (incl. `auto_enroll_changed` refusal reason), `insertPublishedSession` (payout-configured team, R18). (R20, R25, R26) The same migration `CREATE OR REPLACE`s `game_session_has_active_registrations`, and `countActiveRegistrations` in `apps/api/src/modules/sessions/repo.ts` widens in the same phase as the fee-lock twin. The new display count `countRegisteredPlayers` is added, and every SSE call site is switched per the R20 table (O1 ruling). The D-85 cases in `sessions-parity`, `sessions-schema` and `sessions-contracts` are updated deliberately, the factory fixes cover SSE's suites, and every `sessions-*` integration suite is re-run. ACs: AC-VERIFY-2, AC-VERIFY-7, AC-VERIFY-11 (schema half), AC-VERIFY-12.
 - [ ] **Phase 2: Allocator core and billing hand-off** (follows the algorithm and architecture creative docs): `decideAllocation`, `registerInSession`, `autoEnrolInSession` (R16 opt-out re-check, R17 source), `promoteWaitlist`, the R15 pricing snapshot on every transition into CONFIRMED, withdrawal classification and liability, debt gate, `listBillableRegistrations`, ADR 0018. (R19, R21, R22) The port adapter `createRegistrationsSessionAllocator` (`modules/registrations/session-allocator-adapter.ts`), tested directly and through SSE's `runSessionAutoEnrol` and capacity edit with the adapter injected; `already_registered` for an existing row in any status; port calls inside SSE's transactions. ADR 0018 cites ADR 0019. ACs: AC-HAPPY-1 to 9 (domain side), AC-ERROR-4, AC-VERIFY-3, 4, 5, 10, AC-INTEGRATION-1, 3 and 5, AC-VERIFY-11, AC-HAPPY-11 (domain side), AC-INTEGRATION-6 (domain half).
 - [ ] **Phase 3: Registration API and promotion emails**: routes, service, policies, team-scoped lookups, refusals, promotion emails and the R17 auto-enrol email in the placing transaction, `registration.*` logs, OpenAPI with 401/403. (R19, R23, R24) The body of `createSessionAllocator` now returns the adapter, once both emails exist. `session-allocator.test.ts` is updated, and the real-adapter marker proof and capacity-edit cases run through SSE's routes and sweep. `GET /teams/:teamId/sessions/upcoming` resolves ahead of SSE's `/:sessionId` route. Another team's session id stays 404 (O2 ruling). ACs: AC-ERROR-1 to 3 and 5 to 8, AC-ASYNC-1, AC-VERIFY-1 and 6, AC-HAPPY-11 (email), AC-INTEGRATION-6.
 - [ ] **Phase 4: Real ban handler and reconciliation sweep** (follows creative Q4): the handler, worker wiring, the `registration-ban-reconcile` queue and slot (`45 5 * * *`, O4 human ruling 2026-10-24), the team-management contract test with the real handler. ACs: AC-HAPPY-10 (API side), AC-ERROR-9, AC-ASYNC-2 and 3, AC-INTEGRATION-2.
@@ -1029,11 +1029,11 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: CREATIVE → BUILD
-**Current Step**: Creative complete and reconciled (R1-R13); plan amended 2026-10-20 (R14-R18) and 2026-10-24 (R19-R27, after session-scheduling-engine merged). Build gate: re-run the SSE contract and parity suites, and re-confirm numbering. O1-O4 are resolved (human ruling 2026-10-24).
+**Build Status**: PHASE_COMPLETE (Phase 1 of 6)
+**Current Phase**: Phase 2 next (Allocator core and billing hand-off)
+**Current Step**: Phase 1 built and committed (2026-10-24). Next: /yay:build registration-and-waitlist for Phase 2.
 **Step Started**: 2026-10-16
-**Can Resume**: NO
+**Can Resume**: YES
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
 
 ### Active Sub-Agents
@@ -1061,3 +1061,8 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
     - O2: registration keeps 404.
     - O3: accept and document, with no session-version check.
     - O4: the reconcile sweep moves to `45 5 * * *`.
+- Phase 1 BUILD COMPLETE (2026-10-24): migration 20261024000100000_registration_lifecycle.sql (D-62..D-69), O1 count split (countActiveRegistrations fee-lock / countRegisteredPlayers display), shared contracts + 7 error codes, insertPublishedSession, fee-lock copy fix. Unit 2014, integration 674, build/lint/typecheck green. Review (codex + anthropic audit): 2 MAJOR + 5 MINOR fixed, re-verified.
+
+### Guard & Recovery Log
+- Phase 1: commit guard result recorded at commit (see git log).
+- Phase 2 notes: allocator must null promoted_at when re-queuing WITHDRAWN to WAITLISTED; capacity trigger uses FOR UPDATE NOWAIT so tests must hold the session lock first; snapshot columns authoritative only for CONFIRMED and fee-due rows; source may change only on WITHDRAWN to active.

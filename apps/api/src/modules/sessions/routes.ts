@@ -107,7 +107,7 @@ export const sessionsRoutes: FastifyPluginAsync<SessionsRoutesOptions> = async (
       config: { policy },
       schema: {
         summary: 'Read one session (admin)',
-        description: `The editor's view: \`version\`, \`deadlineIsDefault\`, \`activeRegistrationCount\` and \`feesLocked\` ('raise_only_blocked' once a PUBLISHED session has a registered player). ${SHAPE}`,
+        description: `The editor's view: \`version\`, \`deadlineIsDefault\`, \`activeRegistrationCount\` and \`feesLocked\` ('raise_only_blocked' once a PUBLISHED session has a registered player or a late withdrawal whose fee is still owed; \`activeRegistrationCount\` counts the confirmed and waitlisted players only). ${SHAPE}`,
         operationId: 'getTeamSession',
         params: SessionIdParams,
         response: { 200: SessionDetailResponse, ...ERRORS },
@@ -122,7 +122,7 @@ export const sessionsRoutes: FastifyPluginAsync<SessionsRoutesOptions> = async (
       config: { policy },
       schema: {
         summary: 'Edit a session',
-        description: `Replaces the editable content of a DRAFT or a not-started PUBLISHED session (a series date too: a real change marks it edited, its date can never move). A save that changes nothing is 200 and writes nothing, whatever \`expectedVersion\` says; \`changed\` is false then and true only when a row was written (a stale \`expectedVersion\` with a real change is still 409 \`session_stale\`). A started session is 409 \`session_started\`; a COMPLETED or CANCELLED one is 409 \`session_not_editable\`. Once a PUBLISHED session has an active registration, fees can only go down: a raise, a pricing-model change or free-to-paid is 409 \`session_fee_locked\` with \`raisedFields\`. Turning a PUBLISHED session from free to paid goes through the publish gate first (409 \`payout_not_configured\`). Raising public capacity calls the seat allocator once in the same transaction; the response carries \`promoted\` and \`material\` (a field players care about changed), and the session's \`activeRegistrationCount\`, so the admin can tell them. ${SHAPE}`,
+        description: `Replaces the editable content of a DRAFT or a not-started PUBLISHED session (a series date too: a real change marks it edited, its date can never move). A save that changes nothing is 200 and writes nothing, whatever \`expectedVersion\` says; \`changed\` is false then and true only when a row was written (a stale \`expectedVersion\` with a real change is still 409 \`session_stale\`). A started session is 409 \`session_started\`; a COMPLETED or CANCELLED one is 409 \`session_not_editable\`. Once a PUBLISHED session has an active registration, or a late withdrawal whose fee is still owed, fees can only go down: a raise, a pricing-model change or free-to-paid is 409 \`session_fee_locked\` with \`raisedFields\`. Turning a PUBLISHED session from free to paid goes through the publish gate first (409 \`payout_not_configured\`). Raising public capacity calls the seat allocator once in the same transaction; the response carries \`promoted\` and \`material\` (a field players care about changed), and the session's \`activeRegistrationCount\`, so the admin can tell them. ${SHAPE}`,
         operationId: 'updateTeamSession',
         params: SessionIdParams,
         body: UpdateSessionRequest,

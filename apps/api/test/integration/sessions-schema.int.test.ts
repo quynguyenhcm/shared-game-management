@@ -116,9 +116,12 @@ describe('migration round trip, trigger order and ledger (AC-VERIFY-1)', () => {
         latest.some((line) => line.startsWith('column recurring_session_rules.starts_on')),
       ).toBe(true);
 
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 1 });
-      expect(reverted).toHaveLength(1);
-      expect(reverted[0]).toContain('session_scheduling');
+      // The registration lifecycle migration (D-62..D-69) sits on top and owns the widened D-85 function; SSE's migration
+      // is the second one back.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      expect(reverted).toHaveLength(2);
+      expect(reverted[0]).toContain('registration_lifecycle');
+      expect(reverted[1]).toContain('session_scheduling');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'recurring_rule_courts',
@@ -963,6 +966,7 @@ describe('fee-raise lock (D-85; AC-ERROR-10)', () => {
   async function publishedWith(
     status: 'CONFIRMED' | 'WAITLISTED' | 'WITHDRAWN' | null,
     fees: Parameters<typeof insertSession>[2] = {},
+    options: { feeDue?: boolean } = {},
   ): Promise<string> {
     const id = await insertSession(db.pool, paidTeamId, fees, { status: 'PUBLISHED' });
     if (status !== null) {
@@ -972,12 +976,13 @@ describe('fee-raise lock (D-85; AC-ERROR-10)', () => {
         userId: await insertUser(db.pool),
         status,
         queuePosition: status === 'WAITLISTED' ? 1 : null,
+        withdrawalFeeDue: options.feeDue ?? false,
       });
     }
     return id;
   }
 
-  it('counts CONFIRMED and WAITLISTED registrations as active, not WITHDRAWN or none', async () => {
+  it('counts CONFIRMED, WAITLISTED and a WITHDRAWN row with a fee still owed as active, not a released one, WITHDRAWN or none (R20)', async () => {
     const active = async (id: string): Promise<boolean> => {
       const { rows } = await db.pool.query<{ active: boolean }>(
         `SELECT game_session_has_active_registrations($1) AS active`,
@@ -988,6 +993,7 @@ describe('fee-raise lock (D-85; AC-ERROR-10)', () => {
     expect(await active(await publishedWith('CONFIRMED'))).toBe(true);
     expect(await active(await publishedWith('WAITLISTED'))).toBe(true);
     expect(await active(await publishedWith('WITHDRAWN'))).toBe(false);
+    expect(await active(await publishedWith('WITHDRAWN', {}, { feeDue: true }))).toBe(true);
     expect(await active(await publishedWith(null))).toBe(false);
   });
 
@@ -1034,6 +1040,18 @@ describe('fee-raise lock (D-85; AC-ERROR-10)', () => {
       const open = await publishedWith(status);
       await db.pool.query(`UPDATE game_sessions SET fee_flat = '20.00' WHERE id = $1`, [open]);
     }
+    // A late withdrawal whose fee is still owed locks the fees (AC-VERIFY-12); once the fee is released the raise is fine.
+    const owing = await publishedWith('WITHDRAWN', {}, { feeDue: true });
+    await expectPgError(
+      db.pool.query(`UPDATE game_sessions SET fee_flat = '20.00' WHERE id = $1`, [owing]),
+      '23514',
+      'game_sessions_fee_raise_locked',
+    );
+    await db.pool.query(
+      `UPDATE registrations SET withdrawal_fee_due = false WHERE session_id = $1`,
+      [owing],
+    );
+    await db.pool.query(`UPDATE game_sessions SET fee_flat = '20.00' WHERE id = $1`, [owing]);
     // A DRAFT is never locked.
     const draft = await insertSession(db.pool, paidTeamId);
     await db.pool.query(`UPDATE game_sessions SET fee_flat = '30.00' WHERE id = $1`, [draft]);

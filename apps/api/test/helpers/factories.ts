@@ -296,6 +296,13 @@ export interface SessionOptions {
   readonly calculatedRate?: string | null;
   readonly customRate?: string | null;
   readonly maxPlayers?: number;
+  /** `reserved_seats` (0..max_players); default 0. */
+  readonly reservedSeats?: number;
+  /** `cancellation_deadline`; default 2026-10-05T06:00:00Z. */
+  readonly cancellationDeadline?: Date | string;
+  /** The single court's local times (default 19:00 to 21:00); `24:00` is a midnight end. */
+  readonly courtStart?: string;
+  readonly courtEnd?: string;
   readonly createKey?: string | null;
 }
 
@@ -321,15 +328,15 @@ export async function insertSession(
     `INSERT INTO game_sessions (team_id, recurring_rule_id, location, address, date, cancellation_deadline,
                                 max_players, pricing_structure, fee_flat, fee_male, fee_female, fee_other,
                                 fee_beginner, fee_intermediate, fee_advanced, calculated_rate_per_player,
-                                custom_player_rate, create_key)
+                                custom_player_rate, create_key, reserved_seats, deadline_is_default)
      VALUES ($1, $2, 'Test Hall', '1 Test Street, Auckland', $3, $4, $13, $5, $6, $7, $8, $9, $10, $11, $12,
-             $14, $15, $16)
+             $14, $15, $16, $17, $18)
      RETURNING id`,
     [
       teamId,
       options.recurringRuleId ?? null,
       options.date ?? '2026-10-07',
-      '2026-10-05T06:00:00Z',
+      options.cancellationDeadline ?? '2026-10-05T06:00:00Z',
       pricing,
       fees.flat === undefined ? flatDefault : fees.flat,
       fees.male ?? null,
@@ -342,17 +349,102 @@ export async function insertSession(
       options.calculatedRate ?? null,
       options.customRate ?? null,
       options.createKey ?? null,
+      options.reservedSeats ?? 0,
+      // An explicit deadline must survive the court trigger that recomputes a defaulted one.
+      options.cancellationDeadline === undefined,
     ],
   );
   if (options.withCourt ?? true) {
     await db.query(
       `INSERT INTO session_courts (session_id, court_identifier, start_time, end_time)
-       VALUES ($1, 'Court 1', '19:00', '21:00')`,
-      [id],
+       VALUES ($1, 'Court 1', $2, $3)`,
+      [id, options.courtStart ?? '19:00', options.courtEnd ?? '21:00'],
     );
   }
   if (status !== 'DRAFT') await advanceSessionTo(db, id, status);
   return id;
+}
+
+export interface PublishedSessionOptions extends SessionFees {
+  /** The clock the session is placed relative to; its date and court times are derived from it (no fixed date). */
+  readonly now: Date;
+  /** Hours from `now` to the start. Default 72. */
+  readonly startsInHours?: number;
+  readonly maxPlayers?: number;
+  readonly reservedSeats?: number;
+  /** Default: the start minus 48 hours. */
+  readonly cancellationDeadline?: Date;
+  readonly recurringRuleId?: string | null;
+  readonly calculatedRate?: string | null;
+  readonly customRate?: string | null;
+}
+
+const NZ_PARTS = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Pacific/Auckland',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+function nzLocal(instant: Date): { date: string; minutes: number } {
+  const part = Object.fromEntries(NZ_PARTS.formatToParts(instant).map((p) => [p.type, p.value]));
+  return {
+    date: `${part.year}-${part.month}-${part.day}`,
+    minutes: Number(part.hour) * 60 + Number(part.minute),
+  };
+}
+
+function clock(minutes: number): string {
+  if (minutes >= 24 * 60) return '24:00';
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/**
+ * A PUBLISHED session starting `startsInHours` (default 72) after `now`, built on `insertSession({ status: 'PUBLISHED' })`
+ * (C-SSE-1-complete fees, one court). The date and court times come from `now` in Pacific/Auckland, so nothing is pinned
+ * to a calendar date and a real-clock worker still sees a future session; the deadline defaults to the start minus 48 h.
+ * `teamId` omitted creates a payout-configured team (R18), so the publish gate would pass.
+ */
+export async function insertPublishedSession(
+  db: Queryable,
+  teamId: string | undefined,
+  options: PublishedSessionOptions,
+): Promise<{ sessionId: string; teamId: string }> {
+  const team = teamId ?? (await insertTeam(db, { payoutConfigured: true }));
+  const startsAt = new Date(options.now.getTime() + (options.startsInHours ?? 72) * 3_600_000);
+  const local = nzLocal(startsAt);
+  const start = local.minutes;
+  const sessionId = await insertSession(
+    db,
+    team,
+    {
+      pricing: options.pricing,
+      flat: options.flat,
+      male: options.male,
+      female: options.female,
+      other: options.other,
+      beginner: options.beginner,
+      intermediate: options.intermediate,
+      advanced: options.advanced,
+    },
+    {
+      status: 'PUBLISHED',
+      date: local.date,
+      courtStart: clock(start),
+      courtEnd: clock(start + 120),
+      cancellationDeadline:
+        options.cancellationDeadline ?? new Date(startsAt.getTime() - 48 * 3_600_000),
+      maxPlayers: options.maxPlayers,
+      reservedSeats: options.reservedSeats,
+      recurringRuleId: options.recurringRuleId,
+      calculatedRate: options.calculatedRate,
+      customRate: options.customRate,
+    },
+  );
+  return { sessionId, teamId: team };
 }
 
 export interface RuleOptions extends SessionFees {
@@ -455,21 +547,80 @@ export interface RegistrationInput {
   readonly status?: 'CONFIRMED' | 'WAITLISTED' | 'WITHDRAWN';
   readonly queuePosition?: number | null;
   readonly guestCount?: number;
+  /** `WAITLISTED -> CONFIRMED` promotions stamp this (D-64); a row inserted CONFIRMED has none. */
+  readonly promotedAt?: Date | null;
+  /** WITHDRAWN rows only; default now. */
+  readonly withdrawnAt?: Date | null;
+  /** WITHDRAWN rows only; default EARLY (LATE when `withdrawalFeeDue`). */
+  readonly withdrawalKind?: 'EARLY' | 'LATE' | 'BANNED' | null;
+  readonly withdrawalFeeDue?: boolean;
+  readonly source?: 'MEMBER' | 'AUTO_ENROL';
+  /** The R15 snapshot. Default for CONFIRMED and fee-due rows: the user's sex and the member's level (BEGINNER if none). */
+  readonly registrantSex?: Sex | null;
+  readonly registrantSkillLevel?: Skill | null;
 }
 
+/**
+ * A registration row consistent with the lifecycle CHECKs (D-63): CONFIRMED and fee-due rows carry the R15 snapshot read
+ * from `users.sex` and `team_members.skill_level`, and WITHDRAWN rows carry the stamps. Every default can be overridden.
+ */
 export function insertRegistration(db: Queryable, input: RegistrationInput): Promise<string> {
+  const status = input.status ?? 'CONFIRMED';
+  const feeDue = input.withdrawalFeeDue ?? false;
+  const withdrawn = status === 'WITHDRAWN';
   return insertId(
     db,
-    `INSERT INTO registrations (session_id, team_id, user_id, status, queue_position, guest_count)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    `INSERT INTO registrations (session_id, team_id, user_id, status, queue_position, guest_count, promoted_at,
+                                withdrawn_at, withdrawal_kind, withdrawal_fee_due, source, registrant_sex,
+                                registrant_skill_level)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+             coalesce($12::user_sex, CASE WHEN $13 THEN (SELECT sex FROM users WHERE id = $3) END),
+             coalesce($14::skill_tier, CASE WHEN $13 THEN coalesce(
+               (SELECT skill_level FROM team_members WHERE team_id = $2 AND user_id = $3), 'BEGINNER') END))
+     RETURNING id`,
     [
       input.sessionId,
       input.teamId,
       input.userId,
-      input.status ?? 'CONFIRMED',
+      status,
       input.queuePosition ?? null,
       input.guestCount ?? 0,
+      input.promotedAt ?? null,
+      input.withdrawnAt === undefined ? (withdrawn ? new Date() : null) : input.withdrawnAt,
+      input.withdrawalKind === undefined
+        ? withdrawn
+          ? feeDue
+            ? 'LATE'
+            : 'EARLY'
+          : null
+        : input.withdrawalKind,
+      feeDue,
+      input.source ?? 'MEMBER',
+      input.registrantSex ?? null,
+      status === 'CONFIRMED' || feeDue,
+      input.registrantSkillLevel ?? null,
     ],
+  );
+}
+
+/** Sets Auto Enroll on a member the way `selectAutoEnrollees` reads it (R16/AC-INTEGRATION-5 raw-SQL setters). */
+export async function setAutoEnroll(
+  db: Queryable,
+  input: {
+    teamId: string;
+    userId: string;
+    enabled: boolean;
+    until?: string | null;
+    assignedAt?: Date | null;
+  },
+): Promise<void> {
+  await db.query(
+    `UPDATE team_members
+        SET is_auto_enroll = $3,
+            auto_enroll_until = CASE WHEN $3 THEN $4::date END,
+            auto_enroll_assigned_at = CASE WHEN $3 THEN coalesce($5::timestamptz, now()) END
+      WHERE team_id = $1 AND user_id = $2`,
+    [input.teamId, input.userId, input.enabled, input.until ?? null, input.assignedAt ?? null],
   );
 }
 

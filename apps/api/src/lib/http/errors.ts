@@ -124,7 +124,32 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
   },
   session_fee_locked: {
     status: 409,
-    message: 'Players have registered, so fees can only be lowered.',
+    message:
+      'Fees can only be lowered: a player has registered or still owes a late-withdrawal fee.',
+  },
+  overdue_payments: {
+    status: 403,
+    message: 'You have overdue payments. Pay them before registering for more sessions.',
+  },
+  session_not_open: {
+    status: 409,
+    message: "This session isn't open for registration.",
+  },
+  already_registered: { status: 409, message: "You're already registered for this session." },
+  not_registered: { status: 409, message: "You're not registered for this session." },
+  party_exceeds_capacity: {
+    status: 422,
+    message: "Your group is bigger than this session's places, so it can never fit.",
+  },
+  late_withdrawal_fee_due: {
+    status: 409,
+    message:
+      "You owe the late-withdrawal fee for this session. You can register again only if there's a place for your whole group right now.",
+  },
+  cancellation_terms_changed: {
+    status: 409,
+    message:
+      'The cancellation deadline has passed since you opened this. Review the late-withdrawal terms and confirm again.',
   },
 };
 

@@ -254,15 +254,17 @@ async function withRegistration(
   sessionId: string,
   status: 'CONFIRMED' | 'WAITLISTED' | 'WITHDRAWN',
   queuePosition: number | null = null,
-): Promise<void> {
+  withdrawalFeeDue = false,
+): Promise<string> {
   const userId = await insertUser(database.pool, 'FEMALE');
   await insertTeamMember(database.pool, { teamId: c.teamId, userId });
-  await insertRegistration(database.pool, {
+  return insertRegistration(database.pool, {
     sessionId,
     teamId: c.teamId,
     userId,
     status,
     queuePosition,
+    withdrawalFeeDue,
   });
 }
 
@@ -636,19 +638,73 @@ describe('cancelling changes no registration and calls no allocator (assumed out
 // ---------------------------------------------------------------------------------------------
 
 describe('the D-85 predicate is the contract registration re-checks', () => {
-  it('is the function and trigger named in the header, counting exactly CONFIRMED and WAITLISTED today', async () => {
+  it('is the function and trigger named in the header, counting CONFIRMED, WAITLISTED and a fee-due WITHDRAWN (R20)', async () => {
     const { rows } = await database.pool.query<{ def: string }>(
       `SELECT pg_get_functiondef('game_session_has_active_registrations(uuid)'::regprocedure) AS def`,
     );
     const def = rows[0]?.def ?? '';
     expect(def).toMatch(/STABLE/);
     expect(def.replaceAll(/\s+/g, ' ')).toContain(
-      "r.session_id = p_session_id AND r.status IN ('CONFIRMED', 'WAITLISTED')",
+      "r.session_id = p_session_id AND (r.status IN ('CONFIRMED', 'WAITLISTED') OR (r.status = 'WITHDRAWN' AND r.withdrawal_fee_due))",
     );
     const trigger = await database.pool.query(
       `SELECT 1 FROM pg_trigger WHERE tgname = 'game_sessions_fee_raise_locked' AND NOT tgisinternal`,
     );
     expect(trigger.rowCount).toBe(1);
+  });
+});
+
+describe('a late withdrawal whose fee is still owed locks the fees but is not a registered player (AC-VERIFY-12)', () => {
+  it('shows activeRegistrationCount 0 with feesLocked raise_only_blocked, refuses a raise 409, answers the cancel with 0, and unlocks on release', async () => {
+    const c = await scene();
+    const s = await publishedSession(c);
+    const registrationId = await withRegistration(c, s.id, 'WITHDRAWN', null, true);
+
+    const read = await call('GET', `${base(c)}/${s.id}`, c.admin);
+    expect(read.statusCode, read.body).toBe(200);
+    expect(sessionOf(read)).toMatchObject({
+      activeRegistrationCount: 0,
+      feesLocked: 'raise_only_blocked',
+    });
+    const listed = await call('GET', `${base(c)}?view=upcoming`, c.admin);
+    expect(listed.statusCode, listed.body).toBe(200);
+    expect(
+      listed.json<{ sessions: SessionResponse[] }>().sessions.find((x) => x.id === s.id),
+    ).toMatchObject({ activeRegistrationCount: 0, feesLocked: 'raise_only_blocked' });
+
+    const raise = await call(
+      'PUT',
+      `${base(c)}/${s.id}`,
+      c.admin,
+      editBody(s.body, s.version, { courtCost: '720.00' }),
+    );
+    expect(raise.statusCode, raise.body).toBe(409);
+    expect(raise.json<{ error: { code: string } }>().error.code).toBe('session_fee_locked');
+
+    // The fee is released (R2): nothing is locked any more, and the raise goes through.
+    await database.pool.query(`UPDATE registrations SET withdrawal_fee_due = false WHERE id = $1`, [
+      registrationId,
+    ]);
+    const released = await call('GET', `${base(c)}/${s.id}`, c.admin);
+    expect(sessionOf(released)).toMatchObject({ activeRegistrationCount: 0, feesLocked: null });
+    const raised = await call(
+      'PUT',
+      `${base(c)}/${s.id}`,
+      c.admin,
+      editBody(s.body, s.version, { courtCost: '720.00' }),
+    );
+    expect(raised.statusCode, raised.body).toBe(200);
+  });
+
+  it('cancelling such a session reports the display count: only a confirmed or waitlisted player is let known', async () => {
+    const c = await scene();
+    const s = await publishedSession(c);
+    await withRegistration(c, s.id, 'WITHDRAWN', null, true);
+    const cancelled = await call('POST', `${base(c)}/${s.id}/cancel`, c.admin, {
+      expectedVersion: s.version,
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    expect(cancelled.json<{ activeRegistrationCount: number }>().activeRegistrationCount).toBe(0);
   });
 });
 

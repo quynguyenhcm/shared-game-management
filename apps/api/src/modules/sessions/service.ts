@@ -285,9 +285,10 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
 
   /** The admin view of `row`, read through `reader` (the pool, or the writer's own transaction). */
   async function viewOf(reader: Database, row: SessionRow, now: Date): Promise<SessionResponse> {
-    const [courts, counts, names] = await Promise.all([
+    const [courts, feeLockCounts, registeredCounts, names] = await Promise.all([
       repo.listCourts(reader, row.id),
       repo.countActiveRegistrations(reader, [row.id]),
+      repo.countRegisteredPlayers(reader, [row.id]),
       repo.listRuleNames(
         reader,
         row.team_id,
@@ -296,7 +297,8 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
     ]);
     return toSessionResponse(row, courts, {
       now,
-      activeRegistrationCount: counts.get(row.id) ?? 0,
+      activeRegistrationCount: registeredCounts.get(row.id) ?? 0,
+      feeLockCount: feeLockCounts.get(row.id) ?? 0,
       seriesName:
         row.recurring_rule_id === null ? null : (names.get(row.recurring_rule_id) ?? null),
     });
@@ -364,16 +366,18 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
           ),
         ),
       ];
-      const [courts, counts, names] = await Promise.all([
+      const [courts, feeLockCounts, registeredCounts, names] = await Promise.all([
         repo.listCourtsFor(db, ids),
         repo.countActiveRegistrations(db, ids),
+        repo.countRegisteredPlayers(db, ids),
         repo.listRuleNames(db, teamId, ruleIds),
       ]);
       return {
         sessions: page.rows.map((row) =>
           toSessionResponse(row, courts.get(row.id) ?? [], {
             now,
-            activeRegistrationCount: counts.get(row.id) ?? 0,
+            activeRegistrationCount: registeredCounts.get(row.id) ?? 0,
+            feeLockCount: feeLockCounts.get(row.id) ?? 0,
             seriesName:
               row.recurring_rule_id === null ? null : (names.get(row.recurring_rule_id) ?? null),
           }),
@@ -580,9 +584,9 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
 
               // T-7: once a PUBLISHED session has an active registration, fees can only go down (session lock held).
               if (locked.status === 'PUBLISHED') {
-                const registered =
+                const feeLocked =
                   (await repo.countActiveRegistrations(trx, [sessionId])).get(sessionId) ?? 0;
-                if (registered > 0) {
+                if (feeLocked > 0) {
                   const raised = feeRaised(sessionFeesOf(before.fees), sessionFeesOf(after.fees));
                   if (raised.length > 0) {
                     throw new AppError('session_fee_locked', { raisedFields: raised });
@@ -793,7 +797,7 @@ export function createSessionsService(deps: SessionsServiceDeps): SessionsServic
               });
               if (!cancelled) throw new AppError('session_state_conflict');
               const count =
-                (await repo.countActiveRegistrations(trx, [sessionId])).get(sessionId) ?? 0;
+                (await repo.countRegisteredPlayers(trx, [sessionId])).get(sessionId) ?? 0;
               const fresh = await requireRow(trx, teamId, sessionId);
               return {
                 session: await viewOf(trx, fresh, now),

@@ -55,7 +55,8 @@ interface HandlerCall {
 /** The seam test's stand-in for the real handler: selects registrations by CURRENT state, withdraws, never remembers. */
 const withdrawActiveRegistrations: Behaviour = async (event) => {
   const { rows } = await database.pool.query<{ id: string }>(
-    `UPDATE registrations SET status = 'WITHDRAWN', queue_position = NULL, updated_at = now()
+    `UPDATE registrations SET status = 'WITHDRAWN', queue_position = NULL, updated_at = now(),
+                              withdrawn_at = now(), withdrawal_kind = 'BANNED'
       WHERE team_id = $1 AND user_id = $2 AND status IN ('CONFIRMED', 'WAITLISTED')
       RETURNING id`,
     [event.teamId, event.userId],
@@ -457,10 +458,10 @@ describe('assertApprovedMember serialises with a concurrent ban (AC-ASYNC-3, AC-
 
     const registering = h.db.transaction().execute(async (trx) => {
       await assertApprovedMember(trx, s.teamId, s.member.id);
-      await sql`INSERT INTO registrations (id, session_id, team_id, user_id, status)
-                VALUES (${registrationId}, ${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED')`.execute(
-        trx,
-      );
+      await sql`INSERT INTO registrations (id, session_id, team_id, user_id, status, registrant_sex,
+                                           registrant_skill_level)
+                VALUES (${registrationId}, ${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED',
+                        'MALE', 'BEGINNER')`.execute(trx);
       gateAcquired();
       await mayFinish;
     });
@@ -498,8 +499,10 @@ describe('assertApprovedMember serialises with a concurrent ban (AC-ASYNC-3, AC-
 
     const registering = h.db.transaction().execute(async (trx) => {
       await assertApprovedMember(trx, s.teamId, s.member.id);
-      await sql`INSERT INTO registrations (session_id, team_id, user_id, status)
-                VALUES (${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED')`.execute(trx);
+      await sql`INSERT INTO registrations (session_id, team_id, user_id, status, registrant_sex,
+                                           registrant_skill_level)
+                VALUES (${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED', 'MALE',
+                        'BEGINNER')`.execute(trx);
     });
     // Attach the assertion before the ban commits so the rejection is never unhandled.
     const refused = expect(registering).rejects.toMatchObject({ code: 'forbidden' });

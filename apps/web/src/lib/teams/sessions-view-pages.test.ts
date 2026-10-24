@@ -25,7 +25,10 @@ describe('sessionErrorBanner (the in-place page error of a Sessions form)', () =
       'offline',
       'Something went wrong on our side. Your details are still here. Try again in a minute.',
     ],
-    ['session_fee_locked', 'Players have registered, so fees can only be lowered.'],
+    [
+      'session_fee_locked',
+      'Fees can only be lowered: a player has registered or still owes a late-withdrawal fee.',
+    ],
     ['publish_incomplete', 'Your other changes are saved as a draft.'],
   ])('%s reads "%s" as an error banner', (code, headline) => {
     const banner = sessionErrorBanner(code, { bankingHref: HREF });

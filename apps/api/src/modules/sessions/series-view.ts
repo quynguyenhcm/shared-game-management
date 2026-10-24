@@ -188,7 +188,10 @@ export interface SeriesExtrasInput {
   /** The rule's sessions from today forward plus any DRAFT, soonest first, already capped. */
   readonly rows: readonly SessionRow[];
   readonly courtsByRow: ReadonlyMap<string, readonly CourtRow[]>;
+  /** The fee-lock count (D-85, widened): feeds the reconciliation's `fee_locked` skip and `has_registrations`. */
   readonly counts: ReadonlyMap<string, number>;
+  /** The display count (CONFIRMED and WAITLISTED players): feeds `activeRegistrationCount`. */
+  readonly registeredCounts: ReadonlyMap<string, number>;
   readonly draftCounts: { readonly banking: number; readonly edited: number };
   readonly isPayoutConfigured: boolean;
   readonly now: Date;
@@ -266,7 +269,7 @@ export function buildSeriesExtras(input: SeriesExtrasInput): SeriesViewExtras {
         phase: phaseOf(row.starts_at, row.ends_at, input.now),
         draftReason: draftReasonOf(row),
         isInstanceOverridden: row.is_instance_overridden,
-        activeRegistrationCount: count,
+        activeRegistrationCount: input.registeredCounts.get(row.id) ?? 0,
         version: row.version,
         seriesChangeEffect: effectOf(row, count),
       };

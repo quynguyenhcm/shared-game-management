@@ -96,6 +96,7 @@ describe('toSessionResponse', () => {
     const response = toSessionResponse(row(), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      feeLockCount: 0,
       seriesName: null,
     });
     expect(SessionResponse.safeParse(response).success).toBe(true);
@@ -129,6 +130,7 @@ describe('toSessionResponse', () => {
     const response = toSessionResponse(row(), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      feeLockCount: 0,
       seriesName: 'Wednesdays at Hall',
     });
     expect(response.seriesName).toBe('Wednesdays at Hall');
@@ -138,6 +140,7 @@ describe('toSessionResponse', () => {
     const published = toSessionResponse(row({ status: 'PUBLISHED' }), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 2,
+      feeLockCount: 2,
       seriesName: null,
     });
     expect(published.feesLocked).toBe('raise_only_blocked');
@@ -145,20 +148,43 @@ describe('toSessionResponse', () => {
     const none = toSessionResponse(row({ status: 'PUBLISHED' }), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      feeLockCount: 0,
       seriesName: null,
     });
     expect(none.feesLocked).toBeNull();
     const draftWithPlayers = toSessionResponse(row(), courts, {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 2,
+      feeLockCount: 2,
       seriesName: null,
     });
     expect(draftWithPlayers.feesLocked).toBeNull();
     const empty = toSessionResponse(row({ starts_at: null, ends_at: null }), [], {
       now: at('2026-10-06T00:00:00Z'),
       activeRegistrationCount: 0,
+      feeLockCount: 0,
       seriesName: null,
     });
     expect(empty).toMatchObject({ startsAt: null, endsAt: null, phase: 'upcoming', courts: [] });
+  });
+
+  it('keeps the display count and the fee lock apart: a late fee still owed locks fees without being a registered player', () => {
+    const owing = toSessionResponse(row({ status: 'PUBLISHED' }), courts, {
+      now: at('2026-10-06T00:00:00Z'),
+      activeRegistrationCount: 0,
+      feeLockCount: 1,
+      seriesName: null,
+    });
+    expect(owing).toMatchObject({
+      activeRegistrationCount: 0,
+      feesLocked: 'raise_only_blocked',
+    });
+    const registeredOnly = toSessionResponse(row({ status: 'PUBLISHED' }), courts, {
+      now: at('2026-10-06T00:00:00Z'),
+      activeRegistrationCount: 3,
+      feeLockCount: 0,
+      seriesName: null,
+    });
+    expect(registeredOnly).toMatchObject({ activeRegistrationCount: 3, feesLocked: null });
   });
 });

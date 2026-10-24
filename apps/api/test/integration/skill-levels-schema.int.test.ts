@@ -316,11 +316,12 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
         latest.some((line) => line.startsWith('column team_members.skill_level_changed_at')),
       ).toBe(true);
 
-      // Newest first: the session scheduling schema sits on top of this feature's migration.
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
-      expect(reverted).toHaveLength(2);
-      expect(reverted[0]).toContain('session_scheduling');
-      expect(reverted[1]).toContain('skill_levels_and_auto_enroll');
+      // Newest first: the registration lifecycle and the session scheduling schema sit on top of this feature's migration.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 3 });
+      expect(reverted).toHaveLength(3);
+      expect(reverted[0]).toContain('registration_lifecycle');
+      expect(reverted[1]).toContain('session_scheduling');
+      expect(reverted[2]).toContain('skill_levels_and_auto_enroll');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'skill_level_changed_at',
@@ -350,7 +351,7 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
     const empty = await createTestDatabase({ empty: true });
     try {
       await migrateToLatest({ databaseUrl: empty.url });
-      await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      await rollbackMigrations({ databaseUrl: empty.url, count: 3 });
       const teamId = await insertTeam(empty.pool);
       const [userId, actorId] = [await insertUser(empty.pool), await insertUser(empty.pool)];
       await insertTeamMember(empty.pool, { teamId, userId, actorId });
@@ -377,7 +378,7 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
         ],
       ];
       // A failed migration leaves the schema one step behind, so roll back once and keep trying from there.
-      await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      await rollbackMigrations({ databaseUrl: empty.url, count: 3 });
       for (const [assignment, message] of broken) {
         await empty.pool.query(
           `UPDATE team_members SET skill_level_override_by = NULL, skill_level_override_at = NULL,
@@ -395,7 +396,7 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
     const empty = await createTestDatabase({ empty: true });
     try {
       await migrateToLatest({ databaseUrl: empty.url });
-      await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      await rollbackMigrations({ databaseUrl: empty.url, count: 3 });
       const teamId = await insertTeam(empty.pool);
       const userId = await insertUser(empty.pool);
       await empty.pool.query(

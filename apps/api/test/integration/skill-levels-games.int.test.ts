@@ -43,6 +43,7 @@ import {
 import { assertApprovedMember } from '../../src/modules/teams/membership.ts';
 import {
   insertAuthSession,
+  insertGuest,
   insertRegistration,
   insertSession,
   insertTeam,
@@ -51,7 +52,7 @@ import {
 } from '../helpers/factories.ts';
 import { bearer, buildAuthTestApp } from '../helpers/auth-app.ts';
 import { countLockWaiters } from '../helpers/lock-waiters.ts';
-import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
+import { createTestDatabase, inTransaction, type TestDatabase } from '../helpers/test-db.ts';
 
 let database: TestDatabase;
 let kysely: Kysely<DB>;
@@ -218,35 +219,20 @@ describe('countQualifyingGames: the qualifying-game table (AC-VERIFY-3, C-GAME-1
     const gameTeam = row.owner === 'other-team' ? otherTeamId : teamId;
     const gameUser = row.owner === 'other-member' ? otherUserId : userId;
     const session = await seedSession(gameTeam, row.session ?? 'COMPLETED');
-    await insertRegistration(database.pool, {
-      sessionId: session.id,
-      teamId: gameTeam,
-      userId: gameUser,
-      status: row.registration ?? 'CONFIRMED',
-      queuePosition: row.registration === 'WAITLISTED' ? 1 : null,
-      guestCount: 0,
-    });
-    if (row.guests !== undefined) {
-      // guest rows are checked at COMMIT, so a party is modelled by guest_count + guest rows in one transaction.
-      await database.pool.query('BEGIN');
-      try {
-        await database.pool.query(
-          'UPDATE registrations SET guest_count = $2 WHERE session_id = $1',
-          [session.id, row.guests],
-        );
-        for (let position = 1; position <= row.guests; position += 1) {
-          await database.pool.query(
-            `INSERT INTO registration_guests (registration_id, position, sex, skill_level)
-             SELECT id, $2, 'FEMALE', 'BEGINNER' FROM registrations WHERE session_id = $1`,
-            [session.id, position],
-          );
-        }
-        await database.pool.query('COMMIT');
-      } catch (error) {
-        await database.pool.query('ROLLBACK');
-        throw error;
+    // guest rows are checked at COMMIT, so a party is modelled by guest_count + guest rows in one transaction.
+    await inTransaction(database.pool, async (client) => {
+      const registrationId = await insertRegistration(client, {
+        sessionId: session.id,
+        teamId: gameTeam,
+        userId: gameUser,
+        status: row.registration ?? 'CONFIRMED',
+        queuePosition: row.registration === 'WAITLISTED' ? 1 : null,
+        guestCount: row.guests ?? 0,
+      });
+      for (let position = 1; position <= (row.guests ?? 0); position += 1) {
+        await insertGuest(client, registrationId, position);
       }
-    }
+    });
     if (row.baselineAfterEnd !== undefined) {
       await setBaseline(teamId, userId, new Date(session.endsAt.getTime() + row.baselineAfterEnd));
     }

@@ -421,9 +421,10 @@ export function changeNoticeLine(count: number): string | null {
   return `${registeredAre(count)}. We don't email them about changes, so let them know if you change the date, times, place, cancellation deadline or fees.`;
 }
 
-export const FEES_LOCKED_MESSAGE = 'Players have registered, so fees can only be lowered.';
+export const FEES_LOCKED_MESSAGE =
+  'Fees can only be lowered: a player has registered or still owes a late-withdrawal fee.';
 export const FEE_OVER_LIMIT_MESSAGE =
-  'This is higher than the current fee. Fees can only be lowered once players have registered.';
+  'This is higher than the current fee. Fees can only be lowered once a player has registered or still owes a late-withdrawal fee.';
 export const CAPACITY_HINT = "Lowering this won't remove anyone who's already in.";
 export const FIXED_DATE_HINT = 'To move this night, cancel it and create a one-off session.';
 

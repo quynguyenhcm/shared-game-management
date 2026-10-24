@@ -45,8 +45,14 @@ export async function register(
 ): Promise<void> {
   if (sessionIds.length === 0) return;
   await db.query(
-    `INSERT INTO registrations (session_id, team_id, user_id, status, queue_position, guest_count)
-     SELECT unnest($1::uuid[]), $2, $3, $4, NULL, 0`,
+    `INSERT INTO registrations (session_id, team_id, user_id, status, queue_position, guest_count, withdrawn_at,
+                                withdrawal_kind, registrant_sex, registrant_skill_level)
+     SELECT unnest($1::uuid[]), $2, $3, $4::registration_status, NULL, 0,
+            CASE WHEN $4::registration_status = 'WITHDRAWN' THEN now() END,
+            CASE WHEN $4::registration_status = 'WITHDRAWN' THEN 'EARLY'::withdrawal_kind END,
+            CASE WHEN $4::registration_status = 'CONFIRMED' THEN (SELECT sex FROM users WHERE id = $3) END,
+            CASE WHEN $4::registration_status = 'CONFIRMED' THEN coalesce(
+              (SELECT skill_level FROM team_members WHERE team_id = $2 AND user_id = $3), 'BEGINNER') END`,
     [sessionIds, teamId, userId, status],
   );
 }

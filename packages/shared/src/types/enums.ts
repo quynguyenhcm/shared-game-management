@@ -43,6 +43,14 @@ export type SessionStatus = (typeof SessionStatus)[number];
 export const RegistrationStatus = ['CONFIRMED', 'WAITLISTED', 'WITHDRAWN'] as const;
 export type RegistrationStatus = (typeof RegistrationStatus)[number];
 
+/** How a withdrawn registration ended: before the deadline, after it, or because the member was banned. */
+export const WithdrawalKind = ['EARLY', 'LATE', 'BANNED'] as const;
+export type WithdrawalKind = (typeof WithdrawalKind)[number];
+
+/** How a registration row was created: by the member, or by the team's Auto Enroll. */
+export const RegistrationSource = ['MEMBER', 'AUTO_ENROL'] as const;
+export type RegistrationSource = (typeof RegistrationSource)[number];
+
 export const PaymentStatus = ['PENDING', 'PAID', 'FAILED', 'OVERDUE'] as const;
 export type PaymentStatus = (typeof PaymentStatus)[number];
 
@@ -88,6 +96,8 @@ export const DB_ENUMS = {
   pricing_type: PricingType,
   session_status: SessionStatus,
   registration_status: RegistrationStatus,
+  withdrawal_kind: WithdrawalKind,
+  registration_source: RegistrationSource,
   payment_status: PaymentStatus,
   billing_type: BillingType,
   recurrence_frequency: RecurrenceFrequency,
