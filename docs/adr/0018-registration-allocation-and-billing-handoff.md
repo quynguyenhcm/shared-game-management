@@ -1,6 +1,6 @@
 # ADR 0018: Registration allocation, waitlist promotion, the billing hand-off and the cross-feature contracts
 
-- Status: Proposed (accepted when Phase 2 merges; the Phase 3 composition swap is recorded in section 9; the Phase 4 ban handler and sweep are recorded in section 11)
+- Status: Proposed until merge (all six phases are built; the Phase 3 composition swap is recorded in section 9 and the Phase 4 ban handler and sweep in section 11). It becomes Accepted when the feature merges. C3 (section 11 / Consequences) is still pending human acknowledgement and is not marked acknowledged here
 - Task: registration-and-waitlist
 - Source: [Allocation algorithm, Q1 and Q3 and "ADR 0016 Draft Content"](../../memory-bank/creative/registration-and-waitlist-allocation-algorithm.md) (ALG); [Allocator architecture, Q2, Q4, Q6](../../memory-bank/creative/registration-and-waitlist-allocator-architecture.md) (ARCH); task file requirements R1 to R27 (the 2026-10-20 amendment R14 to R18, the 2026-10-24 amendment R19 to R27 and the rulings O1 to O4). Migration `20261024000100000_registration_lifecycle.sql` (ledger D-62 to D-69).
 - Numbering: this ADR is 0018 and its ledger rows are D-62 to D-69, as reserved by ADR 0019 (session-scheduling-engine), which took 0019 and D-70 onwards. The creative documents were written when this ADR was still called "ADR 0016" (and, for a while, 0017); every such reference means this ADR. ADR 0016 is team-banking's and ADR 0017 is skill-levels', both merged. If more ledger rows are ever needed they continue at D-86, never inside D-70 to D-85.
@@ -129,7 +129,7 @@ The port is SSE's (`allocator-port.ts`), the adapter is this feature's, and `cre
 
 **Schedule.** The sweep is registered as the queue and slot `registration-ban-reconcile` at `45 5 * * *` Pacific/Auckland. It moved from 05:30 by ruling O4, because `skill-progression` already holds 05:30 as the last daily slot before this feature, and 05:45 falls after the 02:00 to 02:59 DST window. `enqueueBootSweeps` in `jobs/bootstrap.ts`, which `worker.ts` calls, enqueues the sweep once at every worker boot, so a stuck ban is repaired at the first boot after a deploy. The sweep can also be run on demand with `pnpm run jobs:trigger registration-ban-reconcile`.
 
-**Other facts.** The handler never emails the banned member and never writes `team_members`. The worker pool is 5 connections, up from 2, because a ban handler can hold a connection through a 5 s lock wait.
+**Other facts.** The handler never emails the banned member and never writes `team_members`. The worker pool is 5 connections, up from 2, because a ban handler can hold a connection through a 5 s lock wait. The 5 is a hardcoded literal in `apps/api/src/worker.ts` (`createPool({ max: 5 })`), not a config key; exposing it as an environment variable (for example `WORKER_DATABASE_POOL_MAX`) is a follow-up.
 
 ### 12. Rollback order
 

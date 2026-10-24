@@ -18,6 +18,9 @@ describe('coverage gate (AC-VERIFY-9)', () => {
     // registration-and-waitlist (AC-VERIFY-9): the registrations module and the shared fee estimate are measured too.
     expect(config).toContain("'apps/api/src/modules/registrations/**/*.ts'");
     expect(config).toContain("'packages/shared/src/registrations/**/*.ts'");
+    expect(config).toContain("'apps/api/src/jobs/ban-reconcile.ts'");
+    // The thresholds are aggregate over the measured set, not per file (`perFile` stays off).
+    expect(config).not.toMatch(/perFile:\s*true/);
     expect(config).toMatch(
       /thresholds: \{ lines: 80, functions: 80, branches: 80, statements: 80 \}/,
     );

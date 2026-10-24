@@ -79,13 +79,14 @@
   - **Unit tests**: `**/*.test.ts` (no DB, no network, Node environment)
   - **Integration tests**: `**/*.int.test.ts` against real PostgreSQL 17 (forks pool, SKIP LOCKED job polling)
   - **Coverage provider**: v8, threshold 80% for money/time/invoice/auth shared code, the api platform libraries, `apps/api/src/modules/auth/**` and `apps/web/src/lib/**`; measured over unit and integration tests together (`pnpm run test:coverage`)
-  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`, `teams.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
+  - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`, `teams.spec.ts`, `skill-levels.spec.ts`, `team-banking.spec.ts`, `sessions.spec.ts`, `registrations.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
   - **Team journeys** (`teams.spec.ts`): run against a production `next start` build, with the worker running so the `member-banned` queue is drained. Not part of `pnpm run ci`
   - **Banking journeys** (`apps/web/e2e/team-banking.spec.ts`, 7 journeys per project, 14/14 passing): desktop and 360 x 740 with axe. Like the team journeys, it is not part of `pnpm run ci`. It runs natively against a temporary database with the API, the worker and a production `next start` (`AUTH_FAKE_OAUTH=true`); seeding (a published paid session, a failed payout, an unreadable saved name) needs the stack's database URL in `E2E_DATABASE_URL`, and those journeys are skipped without it. Recipe:
     1. Create and migrate a temporary database (`pnpm run db:migrate` with `DATABASE_URL` pointing at it, a generated `ENCRYPTION_KEYS`, and `ENCRYPTION_ACTIVE_KEY_ID`).
     2. Start the API (`tsx src/main.ts`), the worker (`tsx src/worker.ts`) and `next build && next start -p 3000`, with `AUTH_FAKE_OAUTH=true`, `WEB_BASE_URL=http://localhost:3000`, `API_INTERNAL_URL=http://localhost:4000`, a 32+ character `API_INTERNAL_SHARED_SECRET` and `WEB_TRUSTED_PROXY_HOPS=0`.
     3. Run `E2E_DATABASE_URL=<that database> pnpm run test:e2e apps/web/e2e/team-banking.spec.ts`.
     4. Re-run it after any change to the banking or GST page.
+  - **Registration journeys** (`apps/web/e2e/registrations.spec.ts`, 4 journeys per project, 8/8 passing against the rebuilt Compose stack): the full entry-to-success flow on desktop and 360 x 740 with axe, no horizontal scroll and 44 px targets. The team, members and published sessions are created through the session-scheduling-engine admin API (`E2E_API_URL`, default `http://localhost:4000`; bearer tokens, no seed script). The worker must be running (promotion emails and the ban handler are worker jobs) and Mailpit reachable. The debt journey writes three OVERDUE `payments` rows to `E2E_DATABASE_URL` (default the Compose database) because no money row can be created through the app yet. Rebuild the stack from the checkout under test first (`AUTH_FAKE_OAUTH=true docker compose up -d --build --wait`), because the Compose images are not rebuilt automatically.
 - **Linting & Formatting**: ESLint 9.39.5 + TypeScript support, Prettier 3.9.9
   - **Type checking**: `tsc --noEmit` strict mode (no `any`, explicit return types)
   - **Code quality**: `no-console` error in `apps/api/src` (except `cli.ts`); bans on unsafe money operations (parseFloat, toFixed); host-TZ independence rules in `packages/shared/src/time/`
@@ -141,7 +142,7 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 |-------|----------|---------|-----------|-------------|
 | **Unit** | co-located with source, `src/**/*.test.ts` | One test file per module; shallow describe blocks | vitest 5 | Node, no DB, no network |
 | **Integration** | `apps/api/test/integration/**/*.int.test.ts` | Feature or service-level scenarios | vitest 5 | Node, real PostgreSQL 17, fork pool |
-| **E2E** | `apps/web/e2e/**/*.spec.ts` | Smoke tests (health check, homepage load) | Playwright 1.63.0 | Browser, full stack running |
+| **E2E** | `apps/web/e2e/**/*.spec.ts` | Smoke tests plus one journey file per feature (auth, teams, skill levels, banking, sessions, registrations) | Playwright 1.63.0 | Browser, full stack running |
 
 ### Unit Testing Specifics
 - **Naming**: `*.test.ts` (not `.spec.ts`); vitest discovers them automatically
@@ -183,6 +184,9 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `apps/api/src/modules/registrations/**` | 80% | Allocator, pure decision, repo, billing hand-off, port adapter (added by registration-and-waitlist, ADR 0018) |
 | `packages/shared/src/registrations/**` | 80% | Shared registration rules (added by registration-and-waitlist) |
 | `packages/shared/src/nz/**` | 80% | NZ bank-account, IRD and GST validators |
+| `apps/api/src/jobs/ban-reconcile.ts` | 80% | Registration ban reconciliation sweep (added by registration-and-waitlist) |
+
+The gate is **aggregate** over all listed files, not per file. `vitest.config.ts` `coverage.include` is the source of truth for the measured set; `systemPatterns.md` "Test Scope Preferences" lists it in words.
 | Other modules, generated types | Not required | Coverage gate applies only to listed modules |
 
 Coverage is checked via `vitest run --coverage` (`pnpm run test:coverage`, both projects) with the v8 provider; thresholds are `lines: 80, functions: 80, branches: 80, statements: 80`. Unit tests alone cover about 76% of the listed files because the DB-backed auth services are exercised by the integration project.
@@ -209,6 +213,12 @@ The `.github/workflows/ci.yml` runs:
 Total time: ~5 min (varies with cache and Postgres startup). Each step must exit 0 for the job to pass.
 
 ## Recent Technology Changes
+
+### 2026-10-25 - Registration E2E, coverage and docs (registration-and-waitlist, Phase 6)
+- **What Changed**: no new libraries. `apps/web/e2e/registrations.spec.ts` (Playwright, desktop and 360 x 740, axe, no horizontal scroll, 44 px targets). The 80% aggregate coverage gate (already in `vitest.config.ts`) is re-confirmed over the registrations paths. Docs: Test Scope Preferences in `systemPatterns.md` now lists the real measured set.
+- **Watch items**: (1) the HTTP race tests in `registrations-http-races.int.test.ts` depend on the 2 s `lock_timeout` of `HTTP_POLICY`; on a very slow CI runner they could surface as `lock_retry`, so they are a flake watch item (ADR 0018 Consequences notes the same). (2) The worker database pool `max: 5` is a hardcoded literal in `apps/api/src/worker.ts`, not a config key; a `WORKER_DATABASE_POOL_MAX` key is a follow-up, not part of this feature (ADR 0018 section 11 explains why 5). (3) `memory-bank/ux-patterns.md` does not exist; run `/yay:ux-ingest` after this feature merges so `/yay:uat` has its component rules.
+- **Reason**: AC-INTEGRATION-4 (the journey in a real browser), AC-VERIFY-8 (accessibility on both viewports) and AC-VERIFY-9 (the coverage gate).
+- **Migration Notes**: none.
 
 ### 2026-10-25 - Registration allocator and billing hand-off (registration-and-waitlist, Phase 2)
 - **What Changed**: no new libraries or infrastructure. New module `apps/api/src/modules/registrations/` (pure allocation decision, allocator, repo, billing hand-off, port adapter) and `packages/shared/src/registrations/`. The vitest coverage gate now also covers both paths. The adapter is built but not yet wired: `createSessionAllocator` still returns the no-op.
