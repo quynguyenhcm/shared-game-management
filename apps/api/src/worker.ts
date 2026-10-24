@@ -8,6 +8,7 @@ import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
 import { createNotifier } from './lib/notifications/notifier.ts';
+import { createRegistrationsBanHandler } from './modules/registrations/ban-handler.ts';
 import { createSessionAllocator } from './session-allocator.ts';
 import { systemClock } from './lib/clock.ts';
 
@@ -15,8 +16,9 @@ import { systemClock } from './lib/clock.ts';
 const config = loadConfigOrExit();
 const logger = createLogger(loggerOptionsFromConfig(config, 'worker'));
 
-// Small pool: only the health probe uses it; pg-boss keeps its own connections.
-const pool = createPool({ connectionString: config.databaseUrl, max: 2, logger });
+// Small pool: the health probe and the job handlers' own queries (pg-boss keeps its own connections). The ban handler can hold
+// a connection through a 5 s lock wait, so the pool is 5 and the health probe cannot starve (registration Q4, guideline 9).
+const pool = createPool({ connectionString: config.databaseUrl, max: 5, logger });
 const notifier = createNotifier(config);
 const runner = createJobRunner({
   databaseUrl: config.databaseUrl,
@@ -78,11 +80,18 @@ try {
       clock: systemClock,
       webBaseUrl: config.auth.webBaseUrl,
     }),
+    // ADR 0015: the real ban handler replaces the no-op, over the worker's runner so promotion emails commit with the withdrawal.
+    memberBannedHandler: createRegistrationsBanHandler({
+      db,
+      jobs: runner,
+      clock: systemClock,
+      webBaseUrl: config.auth.webBaseUrl,
+    }),
     recurrenceHorizonDays: config.recurrence.horizonDays,
     webBaseUrl: config.auth.webBaseUrl,
     expireSecondsOverride: config.jobs.expireSecondsOverride,
   });
-  // Reconcile at every boot: series dates and pending auto-enrol (the sweep also runs at 03:00).
+  // Reconcile at every boot: series dates, pending auto-enrol (the sweep also runs at 03:00) and unhandled bans (05:45).
   await enqueueBootSweeps(runner, logger);
 } catch (error) {
   logger.fatal({ err: error }, 'worker failed to start');

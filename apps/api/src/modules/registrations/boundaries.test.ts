@@ -6,7 +6,8 @@
  * - No source here writes a money table; the OVERDUE debt count is the one read of `payments`.
  * - The allocator never opens a transaction, never sets a lock timeout, never retries, never takes an advisory lock or a
  *   `teams` lock, never updates `game_sessions`, and reads no clock of its own (one `now` per operation).
- * - Imports stay inside the platform, `teams/membership.ts` and `jobs/send-email.ts`; from the sessions module only the port.
+ * - Imports stay inside the platform, `teams/membership.ts`, `teams/ban-hook.ts` (the member-banned payload and enqueue helper, used
+ *   by the ban handler and the reconciliation sweep) and `jobs/send-email.ts`; from the sessions module only the port.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -145,6 +146,38 @@ describe('the allocator never manages its caller transaction', () => {
   });
 });
 
+describe('the ban handler and the reconciliation sweep (ADR 0015; AC-ASYNC-2, AC-ASYNC-3)', () => {
+  const files = ['ban-handler.ts', 'reconcile.ts'];
+
+  it('exist', () => {
+    expect(own.map((file) => path.basename(file))).toEqual(expect.arrayContaining(files));
+  });
+
+  it('never write a table, never read ban_reason and never email the banned member', () => {
+    for (const name of files) {
+      const source = read(named(name));
+      expect(source, name).not.toMatch(/\b(?:insertInto|updateTable|deleteFrom)\(/);
+      expect(source, name).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+\w/i);
+      expect(source, name).not.toMatch(/ban_reason|banReason/);
+      expect(source, name).not.toMatch(/enqueueEmail|send-email|sendEmail/);
+    }
+  });
+
+  it('the handler withdraws only through the allocator, one transaction per session, under the job policy', () => {
+    const handler = read(named('ban-handler.ts'));
+    expect(handler).toMatch(/withdrawFromSession/);
+    expect(handler).toMatch(/cause:\s*'ban'/);
+    expect(handler).toMatch(/JOB_POLICY/);
+    expect(handler).not.toMatch(/withdrawRegistration|promoteRegistrations|\.transaction\(\)/);
+  });
+
+  it('the sweep reuses the team module helper so the payload and the singleton key live in one place', () => {
+    const sweep = read(named('reconcile.ts'));
+    expect(sweep).toMatch(/enqueueMemberBanned/);
+    expect(sweep).not.toMatch(/memberBannedSingletonKey|member-banned:/);
+  });
+});
+
 describe('imports', () => {
   const isPlatform = (specifier: string): boolean =>
     specifier === 'kysely' ||
@@ -159,6 +192,7 @@ describe('imports', () => {
     '../teams/membership.ts',
     '../../jobs/send-email.ts',
     '../sessions/allocator-port.ts',
+    '../teams/ban-hook.ts',
   ]);
 
   it.each(own.map((file) => [path.basename(file), file] as const))(

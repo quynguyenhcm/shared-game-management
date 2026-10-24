@@ -7,12 +7,12 @@
  * retry was logged, no 5xx and no SQLSTATE 23505 reached a client or a log line, and every recorded transaction respected the
  * canonical lock order. The pool is larger than the number of parallel requests (learned rule: testing-integration-db-isolation).
  */
+import { randomUUID } from 'node:crypto';
 import type { LightMyRequestResponse } from 'fastify';
 import type pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createManualClock } from '../../src/lib/clock.ts';
-import { createAllocator } from '../../src/modules/registrations/allocator.ts';
-import { HTTP_POLICY, runAllocatorTransaction } from '../../src/modules/registrations/tx.ts';
+import { createRegistrationsBanHandler } from '../../src/modules/registrations/ban-handler.ts';
 import { START_TIME, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import { insertGuest, insertPublishedSession, insertRegistration } from '../helpers/factories.ts';
 import { waitForLockWaiters } from '../helpers/lock-waiters.ts';
@@ -259,21 +259,33 @@ describe('seat allocation under real concurrency over HTTP (AC-INTEGRATION-1)', 
     const next = await httpMember(h, s.teamId, { email: 'only-once@example.test' });
     await seed(s, x.userId, 1, { status: 'CONFIRMED' });
     await seed(s, next.userId, 1, { status: 'WAITLISTED', queuePosition: 1 });
-    // Phase 4's ban handler does not exist yet: the ban path is the allocator's `withdrawFromSession` with cause 'ban', run
-    // through the same transaction entry point the handler will use.
-    const allocator = createAllocator({ jobs, webBaseUrl: 'https://games.example.nz' });
-    const clock = createManualClock(START_TIME);
+    // The ban side is the REAL ban handler (Phase 4) over the gated database, so the lock-order recorder sees its statements.
+    // `x` stays APPROVED: the race is about the registration row, and a withdrawal that reached the route just before the
+    // ban committed is exactly the interleaving the handler's re-check under the lock has to absorb.
+    const handler = createRegistrationsBanHandler({
+      db: gate.db,
+      jobs,
+      clock: createManualClock(START_TIME),
+      webBaseUrl: 'https://games.example.nz',
+    });
     const ban = (): Promise<{ ok: boolean }> =>
-      runAllocatorTransaction(
-        gate.db,
-        HTTP_POLICY,
-        { clock, teamId: s.teamId, path: 'ban', log: h.logs.logger },
-        ({ trx, now }) =>
-          allocator.withdrawFromSession(
-            { trx, now, log: h.logs.logger },
-            { teamId: s.teamId, sessionId: s.sessionId, userId: x.userId, cause: 'ban' },
-          ),
-      );
+      handler
+        .handle(
+          {
+            teamId: s.teamId,
+            userId: x.userId,
+            membershipId: randomUUID(),
+            bannedBy: randomUUID(),
+            bannedAt: new Date(START_TIME),
+          },
+          {
+            logger: h.logs.logger,
+            signal: new AbortController().signal,
+            jobId: 'race-d',
+            attempt: 1,
+          },
+        )
+        .then((outcome) => ({ ok: outcome.affected === 1 }));
     const [player, banned] = await raceUnderSessionLock<LightMyRequestResponse | { ok: boolean }>(
       s.sessionId,
       [() => withdrawAs(h, x, s.teamId, s.sessionId), ban],

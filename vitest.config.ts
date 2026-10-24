@@ -58,6 +58,7 @@ export default defineConfig({
         'packages/shared/src/sessions/**/*.ts',
         // registration-and-waitlist (AC-VERIFY-9): the registrations module (allocator, repo, hand-off) and the shared fee rule.
         'apps/api/src/modules/registrations/**/*.ts',
+        'apps/api/src/jobs/ban-reconcile.ts',
         'packages/shared/src/registrations/**/*.ts',
         'packages/shared/src/nz/**/*.ts',
         'apps/web/src/lib/**/*.ts',

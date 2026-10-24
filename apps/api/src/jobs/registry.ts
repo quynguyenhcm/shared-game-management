@@ -25,6 +25,7 @@ export const QUEUE_NAMES = {
   skillProgression: 'skill-progression',
   sessionAutoEnrol: 'session-auto-enrol',
   recurrenceRule: 'recurrence-rule',
+  registrationBanReconcile: 'registration-ban-reconcile',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -62,6 +63,9 @@ export const QUEUES: readonly QueueDefinition[] = [
   // `stately` allows one queued and one active job per key, so an edit that commits during a run queues exactly one trailing
   // run that reads the latest rule. Idempotence comes from `uq_game_sessions_rule_date` and guarded UPDATEs, never from this policy.
   { ...DEFAULTS, name: QUEUE_NAMES.recurrenceRule, policy: 'stately' },
+  // Daily ban reconciliation (registration-and-waitlist, architecture Q4, O4): one run at a time. The sweep only enqueues
+  // `member-banned` jobs (singleton per membership), so overlap would at worst enqueue nothing twice.
+  { ...DEFAULTS, name: QUEUE_NAMES.registrationBanReconcile, policy: 'exclusive' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

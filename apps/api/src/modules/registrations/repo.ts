@@ -7,7 +7,7 @@
  *
  * The only table outside the registration family this file touches is `payments`, read-only, for the OVERDUE debt count.
  */
-import type { Selectable, Transaction } from 'kysely';
+import { sql, type Kysely, type Selectable, type Transaction } from 'kysely';
 import type { LocalDate, SkillTier, UserSex } from '@sgm/shared';
 import type { DB, GameSessions } from '../../lib/db/types.generated.ts';
 
@@ -518,4 +518,101 @@ export async function releaseOwedFees(
   if (Number(result.numUpdatedRows) !== input.ids.length) {
     throw new RegistrationInvariantError('released a late fee that was not owed');
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The ban handler's selection and the reconciliation sweep's scan (architecture Q4). Both read current state with no lock and
+// both are served by `idx_registrations_active_member` (D-51); the withdrawal itself re-checks everything under the lock.
+// ---------------------------------------------------------------------------------------------
+
+export interface BanTarget {
+  readonly sessionId: string;
+  readonly startsAt: Date;
+}
+
+/**
+ * The member's active registrations in the team's future PUBLISHED sessions, in `(starts_at, id)` order. A started, cancelled,
+ * completed or draft session is never selected (P-2): the ban leaves those rows as they are.
+ */
+export async function listBanTargets(
+  db: Kysely<DB>,
+  input: { readonly teamId: string; readonly userId: string },
+  now: Date,
+): Promise<readonly BanTarget[]> {
+  const rows = await db
+    .selectFrom('registrations as r')
+    .innerJoin('game_sessions as s', 's.id', 'r.session_id')
+    .select(['s.id as session_id', 's.starts_at as starts_at'])
+    .where('r.team_id', '=', input.teamId)
+    .where('r.user_id', '=', input.userId)
+    .where('r.status', 'in', ['CONFIRMED', 'WAITLISTED'])
+    .where('s.team_id', '=', input.teamId)
+    .where('s.status', '=', 'PUBLISHED')
+    .where('s.starts_at', '>', now)
+    .orderBy('s.starts_at')
+    .orderBy('s.id')
+    .execute();
+  // `starts_at > now` already excludes a NULL; the guard only narrows the generated column type.
+  return rows.flatMap((row) =>
+    row.starts_at === null ? [] : [{ sessionId: row.session_id, startsAt: row.starts_at }],
+  );
+}
+
+export interface BannedCandidate {
+  readonly membershipId: string;
+  readonly teamId: string;
+  readonly userId: string;
+  readonly bannedBy: string | null;
+  readonly bannedAt: Date;
+}
+
+/**
+ * BANNED memberships that still hold an active registration in a future PUBLISHED session of their own team, oldest ban first,
+ * after the keyset `after` (`banned_at, id`). Handled members drop out of the set, so a page boundary is stable.
+ */
+export async function listBannedWithActive(
+  db: Kysely<DB>,
+  input: {
+    readonly now: Date;
+    readonly limit: number;
+    readonly after?: { readonly bannedAt: Date; readonly membershipId: string } | undefined;
+  },
+): Promise<readonly BannedCandidate[]> {
+  let query = db
+    .selectFrom('team_members as tm')
+    .select(['tm.id', 'tm.team_id', 'tm.user_id', 'tm.banned_by', 'tm.banned_at'])
+    .where('tm.status', '=', 'BANNED')
+    .where((eb) =>
+      eb.exists(
+        eb
+          .selectFrom('registrations as r')
+          .innerJoin('game_sessions as s', 's.id', 'r.session_id')
+          .select(sql<number>`1`.as('one'))
+          .whereRef('r.team_id', '=', 'tm.team_id')
+          .whereRef('r.user_id', '=', 'tm.user_id')
+          .where('r.status', 'in', ['CONFIRMED', 'WAITLISTED'])
+          .whereRef('s.team_id', '=', 'tm.team_id')
+          .where('s.status', '=', 'PUBLISHED')
+          .where('s.starts_at', '>', input.now),
+      ),
+    );
+  if (input.after !== undefined) {
+    const { bannedAt, membershipId } = input.after;
+    query = query.where(sql<boolean>`(tm.banned_at, tm.id) > (${bannedAt}, ${membershipId})`);
+  }
+  const rows = await query.orderBy('tm.banned_at').orderBy('tm.id').limit(input.limit).execute();
+  // A BANNED row always carries `banned_at` (D-41); the guard only narrows the column's nullable type.
+  return rows.flatMap((row) =>
+    row.banned_at === null
+      ? []
+      : [
+          {
+            membershipId: row.id,
+            teamId: row.team_id,
+            userId: row.user_id,
+            bannedBy: row.banned_by,
+            bannedAt: row.banned_at,
+          },
+        ],
+  );
 }

@@ -8,6 +8,7 @@ import type { SessionAllocatorPort } from '../modules/sessions/allocator-port.ts
 import { DEFAULT_RECURRENCE_HORIZON_DAYS } from '../modules/sessions/materialise.ts';
 import { noopMemberBannedHandler, type MemberBannedHandler } from '../modules/teams/ban-hook.ts';
 import { createAuthCleanupHandler } from './auth-cleanup.ts';
+import { createBanReconcileHandler } from './ban-reconcile.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { createMemberBannedJobHandler } from './member-banned.ts';
 import { createRecurrenceMaterialisationHandler } from './recurrence-materialisation.ts';
@@ -34,8 +35,9 @@ export interface RegisterJobsOptions {
   /** Time source for handlers that judge staleness; defaults to the system clock. */
   readonly clock?: Clock;
   /**
-   * What a ban triggers (ADR 0015). Defaults to the no-op until registration-and-waitlist supplies its handler;
-   * this option is the only place the port is injected.
+   * What a ban triggers (ADR 0015). `worker.ts` passes `createRegistrationsBanHandler`; the no-op default exists for tests
+   * and for an entrypoint that forgets it (`worker.test.ts` proves the worker does not). This option is the only place the
+   * port is injected.
    */
   readonly memberBannedHandler?: MemberBannedHandler;
   /**
@@ -77,6 +79,12 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
     [QUEUE_NAMES.memberBanned]: createMemberBannedJobHandler({
       db: options.db,
       hook: options.memberBannedHandler ?? noopMemberBannedHandler,
+    }),
+    // The real sweep replaces the schedule placeholder (registration-and-waitlist AC-ASYNC-3).
+    [QUEUE_NAMES.registrationBanReconcile]: createBanReconcileHandler({
+      db: options.db,
+      jobs: runner,
+      clock: options.clock ?? systemClock,
     }),
     [QUEUE_NAMES.skillProgression]: createSkillProgressionHandler({
       db: options.db,
@@ -125,10 +133,13 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
 }
 
 /**
- * Queues the sweeps that reconcile state at every worker boot (SA-1, SA-5): the series materialiser (also re-offers every
- * pending auto-enrol) runs once right after the queues are up, so a deploy that wires a real allocator enrols the sessions that
- * were waiting, and a worker that was down at 03:00 catches up. The queue is `exclusive`, so this is a no-op when a sweep is
- * already queued or active. A failure to enqueue is logged and never stops the worker: the 03:00 schedule is still registered.
+ * Queues the sweeps that reconcile state at every worker boot (SA-1, SA-5; registration-and-waitlist Q4):
+ *  - the series materialiser (also re-offers every pending auto-enrol) runs once right after the queues are up, so a deploy
+ *    that wires a real allocator enrols the sessions that were waiting, and a worker that was down at 03:00 catches up;
+ *  - the ban reconciliation re-enqueues `member-banned` for banned members who still hold active registrations, so the deploy
+ *    window of the old no-op handler closes at the first boot instead of at 05:45.
+ * Both queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
+ * never stops the worker (the cron slots are still registered), and one failing sweep never prevents the other.
  */
 export async function enqueueBootSweeps(
   runner: Pick<JobRunner, 'enqueue'>,
@@ -144,6 +155,18 @@ export async function enqueueBootSweeps(
     logger.warn(
       { event: 'session.recurrence.boot_sweep_failed', err: error },
       'boot sweep could not be queued',
+    );
+  }
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.registrationBanReconcile, { source: 'boot' });
+    logger.info(
+      { event: 'registration.ban_reconcile.boot_sweep', enqueued: jobId !== null },
+      jobId === null ? 'ban reconciliation already queued' : 'ban reconciliation queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'registration.ban_reconcile.boot_sweep_failed', err: error },
+      'ban reconciliation could not be queued',
     );
   }
 }

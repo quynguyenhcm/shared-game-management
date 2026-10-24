@@ -30,7 +30,7 @@ const runner = createJobRunner({
 const preview = runner.previewSchedule.bind(runner);
 
 describe('schedule slots', () => {
-  it('registers the binding slots (plus auth-cleanup at 05:00 and skill-progression at 05:30) in Pacific/Auckland', () => {
+  it('registers the binding slots (plus auth-cleanup at 05:00, skill-progression at 05:30 and registration-ban-reconcile at 05:45) in Pacific/Auckland', () => {
     expect(SCHEDULE_TZ).toBe('Pacific/Auckland');
     expect(SCHEDULES.map(({ name, cron, tz }) => ({ name, cron, tz }))).toEqual([
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
@@ -38,6 +38,7 @@ describe('schedule slots', () => {
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
+      { name: 'registration-ban-reconcile', cron: '45 5 * * *', tz: 'Pacific/Auckland' },
     ]);
   });
 
@@ -92,6 +93,20 @@ describe('schedule slots', () => {
     ]);
   });
 
+  it('fires registration-ban-reconcile at 05:45 local on both sides of each DST change, never in the 02:00 hour, as the last daily slot (O4)', () => {
+    const slot = SCHEDULES.find((candidate) => candidate.name === 'registration-ban-reconcile');
+    expect(slot).toBeDefined();
+    expect(slot?.intervalSweep).toBeUndefined();
+    const next = (from: string): string | undefined =>
+      preview('45 5 * * *', { tz: SCHEDULE_TZ, from: new Date(from), count: 1 })[0]?.toISOString();
+    expect(next('2026-09-25T17:45:01Z')).toBe('2026-09-26T16:45:00.000Z');
+    expect(next('2027-04-02T16:45:01Z')).toBe('2027-04-03T17:45:00.000Z');
+    expect(findDstHourFirings(slot as ScheduleSlot, preview)).toEqual([]);
+    // Every other daily slot fires earlier in the local morning.
+    const daily = SCHEDULES.filter((candidate) => !candidate.intervalSweep);
+    expect(daily.at(-1)?.name).toBe('registration-ban-reconcile');
+  });
+
   it('registerSchedules runs the guard first, then schedules every slot with its tz', async () => {
     const calls: unknown[][] = [];
     const fakeRunner = {
@@ -108,6 +123,7 @@ describe('schedule slots', () => {
       ['daily-overdue', '0 4 * * *'],
       ['auth-cleanup', '0 5 * * *'],
       ['skill-progression', '30 5 * * *'],
+      ['registration-ban-reconcile', '45 5 * * *'],
     ]);
     expect(calls.every((call) => (call[3] as { tz: string }).tz === 'Pacific/Auckland')).toBe(true);
     calls.length = 0;
