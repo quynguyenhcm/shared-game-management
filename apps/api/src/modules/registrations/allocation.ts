@@ -201,6 +201,11 @@ export function decideAllocation(input: AllocationInput): AllocationDecision {
     const promoted = scanned.filter((entry) => entry !== tail);
     const seatsConfirmed = sum(scanned);
     taken += seatsConfirmed;
+    // A liable re-registrant clears its own fee by taking over its prior seats, so those seats cannot also release
+    // another owed fee; extra seats and simultaneous promotions still count.
+    const budget = confirmedNewcomer
+      ? Math.max(0, seatsConfirmed - (request.liablePriorPartySize ?? 0))
+      : seatsConfirmed;
     return done({
       newcomer: confirmedNewcomer
         ? { registrationId: request.registrationId, status: 'CONFIRMED' }
@@ -211,7 +216,7 @@ export function decideAllocation(input: AllocationInput): AllocationDecision {
           },
       withdrawn: null,
       promotions: asPromotions(promoted),
-      released: open ? release(input.openLiabilities, seatsConfirmed) : [],
+      released: open ? release(input.openLiabilities, budget) : [],
     });
   }
 

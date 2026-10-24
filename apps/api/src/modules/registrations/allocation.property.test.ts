@@ -176,6 +176,7 @@ interface Stats {
   released: number;
   refused: number;
   cuts: number;
+  liableReRegistrations: number;
 }
 
 /** What a first-fit scan must do for `step`, computed from the model BEFORE the decision (the reference implementation). */
@@ -278,6 +279,23 @@ function runSequence(seed: number, steps: number, stats: Stats): void {
         fail('I8 newcomer placement');
     }
 
+    // I14 a liable re-registrant's own seats are not also spent releasing another fee: nothing is released unless seats
+    // refilled net of its own prior party size are positive, and only the last release may overshoot that net.
+    if (step.kind === 'register') {
+      const own = model.rows.get(step.id);
+      if (own?.status === 'WITHDRAWN' && own.owed && decision.newcomer?.status === 'CONFIRMED') {
+        const refilled =
+          step.size + decision.promotions.reduce((total, one) => total + one.partySize, 0);
+        const net = Math.max(0, refilled - own.size);
+        const sizes = decision.releasedLiabilities.map((id) => (model.rows.get(id) as Row).size);
+        if (net === 0 && sizes.length > 0) fail('I14 released a fee with no net refilled seat');
+        const beforeLast = sizes.slice(0, -1).reduce((total, size) => total + size, 0);
+        if (sizes.length > 0 && beforeLast >= net)
+          fail(`I14 released ${sizes.join('+')} against ${net} net refilled seats`);
+        stats.liableReRegistrations += 1;
+      }
+    }
+
     apply(model, step, decision);
     const takenAfter = taken(model);
     const queueAfter = waitlist(model);
@@ -339,6 +357,7 @@ describe('decideAllocation properties (AC-VERIFY-4, invariants I1-I13)', () => {
     released: 0,
     refused: 0,
     cuts: 0,
+    liableReRegistrations: 0,
   });
 
   it('holds on 400 random sequences of up to 60 steps, and the generator reaches every rule', () => {
@@ -356,5 +375,6 @@ describe('decideAllocation properties (AC-VERIFY-4, invariants I1-I13)', () => {
     expect(stats.released).toBeGreaterThan(0);
     expect(stats.refused).toBeGreaterThan(0);
     expect(stats.cuts).toBeGreaterThan(0);
+    expect(stats.liableReRegistrations).toBeGreaterThan(0);
   });
 });

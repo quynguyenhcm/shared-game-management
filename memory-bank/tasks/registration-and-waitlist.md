@@ -1068,6 +1068,7 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 ### Guard & Recovery Log
 - Phase 1: commit guard result recorded at commit (see git log).
 - Phase 2: guard result recorded at commit (see git log); no FAIL.
+- Phase 2 remediation 1 (2026-10-25): phase reviewer HALT (Misunderstood, money-affecting): register branch spent one `seatsConfirmed` budget twice when a fee-due WITHDRAWN row re-registered (own fee cleared plus another owed fee released, under-billing). Fixed test-first (RED seen: unit, property seed 59): the release budget is now `seatsConfirmed - liablePriorPartySize` (floor 0) for a CONFIRMED newcomer. autoEnrol reuses the register path with no liable row (unaffected); rebalance has no newcomer; withdraw already netted. Added unit cases, property invariant I14, integration proof that the other fee stays billable.
 - Phase 2 notes: allocator must null promoted_at when re-queuing WITHDRAWN to WAITLISTED; capacity trigger uses FOR UPDATE NOWAIT so tests must hold the session lock first; snapshot columns authoritative only for CONFIRMED and fee-due rows; source may change only on WITHDRAWN to active.
 
 ### Deviations
@@ -1081,3 +1082,9 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 - Phase 2 | deferred | autoEnrolInSession reloads state per member (~6 queries each); recorded in ADR 0018. waitlistRank counts hidden banned rows (cosmetic).
 - Phase 2 | carry-forward done | SSE UI copy deck (session-scheduling-engine-uiux.md) and sessions-view.ts series lines aligned to the fee-lock wording, test-first.
 - Phase 2 | note | AC-INTEGRATION-1 races run through runAllocatorTransaction; Phase 3 must repeat them through buildAuthTestApp HTTP. ADR 0018 status is Proposed until merge.
+- Phase 2 | reviewer buckets (remediation 1) | bucket 1 (fixed or documented above): listBillableRegistrations signature/FOR SHARE/before_start; banned waitlisted eligible:false; emails and expectLate built early; ADR 0018 Proposed; FEES_LOCKED carry-forward.
+- Phase 2 | reviewer buckets (remediation 1) | bucket 2 (later phases): AC-INTEGRATION-1 must be repeated over HTTP in Phase 3; the systemPatterns Test Scope Preferences list is stale, fix it at reflect.
+- Phase 2 | reviewer buckets (remediation 1) | bucket 3: the ban/promotion residual (ADR 0018 C3) is an accepted correctness gap that awaits human acknowledgement.
+- Phase 3 notes: do not re-log registration.* events (the allocator already emits them); repeat the AC-INTEGRATION-1 races over HTTP.
+- Phase 4 notes: call listBillableRegistrations(trx, sessionId, now) only at or after starts_at, inside a transaction.
+- Phase 2 | reviewer-required | register branch released other owed fees with the seat a fee-due re-registrant took over (R2/R3 double waiver); budget now nets `liablePriorPartySize`.

@@ -196,6 +196,57 @@ describe('decideAllocation: decisions in detail', () => {
   });
 });
 
+describe('decideAllocation: a liable re-registrant does not also release other fees (R2, R3)', () => {
+  const reRegister = (overrides: Partial<AllocationInput> & { partySize?: 1 | 2 | 3 }) =>
+    applied({
+      publicCapacity: 2,
+      confirmedParties: [],
+      waitlist: [],
+      openLiabilities: [party('a', 1)],
+      request: {
+        kind: 'register',
+        registrationId: 'b',
+        partySize: overrides.partySize ?? 1,
+        liablePriorPartySize: 1,
+      },
+      ...overrides,
+    });
+
+  it('keeps the other fee owed when the re-registrant takes exactly the freed seats', () => {
+    const decision = reRegister({ publicCapacity: 1 });
+    expect(decision.newcomer).toEqual({ registrationId: 'b', status: 'CONFIRMED' });
+    expect(decision.releasedLiabilities).toEqual([]);
+  });
+
+  it('releases the other fee when the re-registrant brings one more seat than it owed', () => {
+    const decision = reRegister({ partySize: 2 });
+    expect(decision.releasedLiabilities).toEqual(['a']);
+  });
+
+  it('releases the other fee when a waitlisted party is promoted in the same step', () => {
+    const decision = applied({
+      publicCapacity: 2,
+      confirmedParties: [],
+      waitlist: [queued('w', 1, 1)],
+      openLiabilities: [party('a', 1)],
+      request: { kind: 'register', registrationId: 'b', partySize: 1, liablePriorPartySize: 1 },
+    });
+    expect(decision.promotions.map((one) => one.registrationId)).toEqual(['w']);
+    expect(decision.releasedLiabilities).toEqual(['a']);
+  });
+
+  it('is unchanged for a newcomer that owes nothing', () => {
+    const decision = applied({
+      publicCapacity: 1,
+      confirmedParties: [],
+      waitlist: [],
+      openLiabilities: [party('a', 1)],
+      request: { kind: 'register', registrationId: 'n', partySize: 1, liablePriorPartySize: null },
+    });
+    expect(decision.releasedLiabilities).toEqual(['a']);
+  });
+});
+
 describe('decideAllocation: malformed input is a programming error', () => {
   const base: AllocationInput = {
     publicCapacity: 2,

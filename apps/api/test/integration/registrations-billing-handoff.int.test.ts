@@ -229,6 +229,23 @@ describe('listBillableRegistrations (AC-INTEGRATION-3)', () => {
     for (const guest of late?.guests ?? []) expect(guest.guestId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it('R2/R3: a fee-due B re-registering into the seat it freed leaves A still billable (the refilled seat clears one fee, not two)', async () => {
+    const s = await scene(2);
+    const a = await insertMember(database.pool, s.teamId);
+    const b = await insertMember(database.pool, s.teamId);
+    await register(s, a);
+    clock.advance(1_000);
+    await register(s, b);
+    clock.set(new Date(s.deadline.getTime() + 60_000));
+    await withdraw(s, a); // LATE, nobody behind: owes
+    clock.advance(1_000);
+    await withdraw(s, b); // LATE, nobody behind: owes
+    await register(s, b); // B re-registers into the freed seats: its own fee clears
+    const billable = (await bill(s)).map((row) => [row.userId, row.reason]);
+    expect(billable).toContainEqual([a, 'LATE_WITHDRAWAL']);
+    expect(billable).toContainEqual([b, 'CONFIRMED']);
+  });
+
   it('AC-VERIFY-11: returns the snapshot taken at confirmation, not the member level or sex at charge time', async () => {
     const s = await scene(4);
     const priya = await insertMember(database.pool, s.teamId, {
