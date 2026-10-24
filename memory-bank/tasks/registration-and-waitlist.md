@@ -33,7 +33,7 @@ Registration, FIFO waitlist, debt control and cancellation rules (PRODDUCT-OVERV
 - Ship the reconciliation sweep that re-enqueues `member-banned` for BANNED members who still hold active registrations (covers bans the no-op handled and permanently failed jobs).
 - Restore cancellation wording in the ban confirmation once the real handler ships.
 
-**Build gate**: `/yay:build` is held until session-scheduling-engine is merged (decision 2026-10-14: plan and creative now, build later).
+**Build gate**: `/yay:build` is held until session-scheduling-engine is merged (decision 2026-10-14: plan and creative now, build later). **Update 2026-10-24:** session-scheduling-engine merged to `main` (PR #7, merge cc324a3; ADR 0019). The gate is now the re-check list under § Phases, amended by R19-R27.
 
 ## Specification
 
@@ -57,6 +57,8 @@ Registration, FIFO waitlist, debt control and cancellation rules (PRODDUCT-OVERV
 3. A player-facing session page that can host the registration panel. Assumed route: `/teams/[teamId]/sessions/[sessionId]`, reached from a team's list of upcoming sessions (and later from the player-dashboard "Currently Opening" tab). If session-scheduling-engine ships no player page, this feature ships that minimal page itself (LOW confidence).
 4. Capacity edits on a PUBLISHED session (raising `max_players` or lowering `reserved_seats`) call this feature's exported `promoteWaitlist(trx, sessionId, now)` in the same transaction, under the D-14 lock. Lowering capacity never demotes a CONFIRMED registration.
 5. The auto-enrol step of recurrence materialisation (workflows §4, skill-levels-and-auto-enroll) registers members through this feature's exported allocator (`autoEnrolInSession` with `{ userId, assignedAt }` entries, re-checked under the member lock, R16), in auto-enrol assignment order, calling the gate first.
+
+*Checked 2026-10-24 against `main` (ADR 0019, `apps/api/test/integration/sessions-contracts.int.test.ts` header points 1.1-1.5).* All five hold, with these corrections: item 3, SSE ships no player page, so this feature owns it unconditionally (R8, R23); item 4, the call is `promoteWaitlist(ctx, { teamId, sessionId })` through the `SessionAllocatorPort`, also from series propagation (R19, R22); item 5, auto-enrol runs in SSE's follow-up transaction on every published session, one-offs included (ADR 0019 §6, P-1; R22, R27).
 
 ### Invocation Method
 - **Location**: Web app (Next.js App Router).
@@ -118,7 +120,7 @@ Billing computes the fee at charge time from the session's fee columns and the s
 **Priority**: MUST
 **Given** callers who are anonymous, a non-member, PENDING, REJECTED or BANNED in T, an admin of another team, and a GLOBAL_ADMIN who is not a member
 **When** they call any registration route of T or open the session page
-**Then** the anonymous caller gets 401 (the page redirects to `/login?returnTo=...`). Every other caller gets 403 `forbidden` before body validation (never a 422), and the page shows "You need to be a member of this team to register." with no form. A `:sessionId` of another team, a DRAFT session's id or an unknown id under T returns 404 `not_found` with an identical body
+**Then** the anonymous caller gets 401 (the page redirects to `/login?returnTo=...`). Every other caller gets 403 `forbidden` before body validation (never a 422), and the page shows "You need to be a member of this team to register." with no form. A `:sessionId` of another team, a DRAFT session's id or an unknown id under T returns 404 `not_found` with an identical body (2026-10-24: ADR 0019 (e) answers 403 for another team's id on SSE's admin routes. Registration's member routes keep 404, by human ruling 2026-10-24 (O2, R24), and ADR 0018 records why)
 
 #### AC-ENTRY-3: A registered player finds how to withdraw or leave the waitlist
 **Priority**: MUST
@@ -200,7 +202,7 @@ Billing computes the fee at charge time from the session's fee columns and the s
 **Priority**: MUST
 **Given** sessions of T that are `COMPLETED`, `CANCELLED`, or `PUBLISHED` with `now >= starts_at` (injected clock)
 **When** a member registers, or withdraws an active registration
-**Then** the API returns 409 `session_not_open` ("Registration for this session is closed."), nothing changes, and the page shows "Registration is closed." with no form or withdraw button. A DRAFT session is 404 (AC-ENTRY-2). Registering after the cancellation deadline but before `starts_at` is allowed, and the panel then shows "The free cancellation deadline has passed. If you withdraw later you may be charged." above the button
+**Then** the API returns 409 `session_not_open` ("Registration for this session is closed."), nothing changes, and the page shows "Registration is closed." with no form or withdraw button. A DRAFT session is 404 (AC-ENTRY-2). For a CANCELLED session the page shows the journey doc A10 copy "This session has been cancelled." even when the caller's row is still CONFIRMED or WAITLISTED: SSE's cancel leaves registrations untouched and emails no player (ADR 0019 C-SSE-4, user ruling P-2), so this page is the player's only signal (R27). Registering after the cancellation deadline but before `starts_at` is allowed, and the panel then shows "The free cancellation deadline has passed. If you withdraw later you may be charged." above the button
 
 #### AC-ERROR-3: Double submits and second tabs never make a second registration
 **Priority**: MUST
@@ -248,7 +250,7 @@ Billing computes the fee at charge time from the session's fee columns and the s
 
 #### AC-ASYNC-1: Every promotion emails the promoted player, committed with the promotion (P5)
 **Priority**: MUST
-**Given** any promotion (from a withdrawal, a ban withdrawal, or `promoteWaitlist` called by a capacity change)
+**Given** any promotion (from a withdrawal, a ban withdrawal, or `promoteWaitlist` called by a capacity change: SSE's session `PUT` or series propagation, through the port, ADR 0019 C-SSE-3, R19)
 **When** the promoting transaction commits
 **Then** a `send-email` job for each promoted registrant exists, enqueued with `enqueueEmail(runner, message, { trx })` in that transaction. A rolled-back promotion leaves no job. The `idempotencyKey` is `registration-promoted:<registrationId>:<promoted_at epoch ms>`, so a replay sends once per promotion. The subject is "You're in: {Team name}, {Wed 7 Oct}" and the body includes the time, location, address, a link to the session page, the fee per person and either "Free cancellation until {deadline}." or "The free cancellation deadline has passed. If you can't play, withdraw on the session page: you won't be charged if someone from the waitlist takes your place, otherwise the fee applies." Nobody is emailed about their own register or withdraw (the page tells them), and a banned member is never emailed
 
@@ -261,7 +263,7 @@ Billing computes the fee at charge time from the session's fee columns and the s
 #### AC-ASYNC-3: A daily reconciliation sweep closes the no-op window and failed jobs
 **Priority**: MUST
 **Given** a BANNED membership whose registrations are still active in future PUBLISHED sessions of its team (because the ban ran the no-op handler before this feature deployed, or its job failed permanently), and another BANNED membership with nothing active
-**When** the `registration-ban-reconcile` slot fires (cron `30 5 * * *`, `Pacific/Auckland`, outside the 02:00-02:59 DST window and after `auth-cleanup` at 05:00; queue `exclusive`) or an operator runs `pnpm run jobs:trigger registration-ban-reconcile`
+**When** the `registration-ban-reconcile` slot fires (cron `45 5 * * *`, `Pacific/Auckland`, outside the 02:00-02:59 DST window, after `auth-cleanup` at 05:00 and `skill-progression` at 05:30, O4 human ruling 2026-10-24; queue `exclusive`) or an operator runs `pnpm run jobs:trigger registration-ban-reconcile`
 **Then** it enqueues exactly one `member-banned` job for the first membership, with the payload rebuilt from the `team_members` row (`teamId`, `userId`, `membershipId`, `bannedBy = banned_by`, `bannedAt = banned_at`) and `singletonKey member-banned:<membershipId>` (a job already queued is not duplicated), and none for the second. It logs `registration.ban_reconcile.completed` with `enqueued` and `scanned` counts and no PII. Once that job runs, a second sweep enqueues nothing
 
 #### AC-ASYNC-4: A waitlisted player sees their promotion without doing anything
@@ -276,13 +278,13 @@ Billing computes the fee at charge time from the session's fee columns and the s
 **Priority**: MUST
 **Given** the fully built Fastify app
 **When** a test enumerates `listRoutePolicies(app)` for the registration routes
-**Then** `GET /teams/:teamId/sessions/:sessionId/registration`, `POST /teams/:teamId/sessions/:sessionId/registrations` and `POST /teams/:teamId/sessions/:sessionId/registrations/me/withdraw` are `teamRole('MEMBER')` with `allowGlobalAdmin: false`. The roster route, if built, is `teamRole('TEAM_ADMIN')`. No registration route is `public` or `optionalSession`, and `:sessionId` is always resolved together with `:teamId` (never by session id alone)
+**Then** `GET /teams/:teamId/sessions/:sessionId/registration`, `POST /teams/:teamId/sessions/:sessionId/registrations` and `POST /teams/:teamId/sessions/:sessionId/registrations/me/withdraw` are `teamRole('MEMBER')` with `allowGlobalAdmin: false`. The roster route, if built, is `teamRole('TEAM_ADMIN')`. No registration route is `public` or `optionalSession`, and `:sessionId` is always resolved together with `:teamId` (never by session id alone). `GET /teams/:teamId/sessions/upcoming` (R8) is `teamRole('MEMBER')`, and a MEMBER request to it reaches registration's handler, not SSE's `TEAM_ADMIN` route `GET /teams/:teamId/sessions/:sessionId` (R23)
 
 #### AC-VERIFY-2: Registration invariants are enforced by the database, reversibly and ledgered
 **Priority**: MUST
 **Given** one new migration `db/migrations/<utc-timestamp>_registration_lifecycle.sql`
 **When** `pnpm run test:integration` runs
-**Then** the migrate, `rollback --all`, migrate round trip is identical, `db/schema-deviations.md` has D-62 onwards (each with a Source) for every new object, `types.generated.ts` matches codegen, and the enum-parity test covers the new `withdrawal_kind` enum (mirrored in `packages/shared/src/types/enums.ts`). Raw SQL proves each rule:
+**Then** the migrate, `rollback --all`, migrate round trip is identical (the down migration restores SSE's original body of `game_session_has_active_registrations`, never drops it, R20), `db/schema-deviations.md` has D-62 onwards (D-62..D-69 only; D-70..D-85 are SSE's, R25), each with a Source, for every new object, `types.generated.ts` matches codegen, and the enum-parity test covers the new `withdrawal_kind` enum (mirrored in `packages/shared/src/types/enums.ts`). Raw SQL proves each rule:
 - `withdrawn_at` and `withdrawal_kind` are set iff `status = 'WITHDRAWN'` (23514).
 - `withdrawal_fee_due` implies `status = 'WITHDRAWN' AND withdrawal_kind = 'LATE'` (23514).
 - `promoted_at` is NULL while WAITLISTED (23514).
@@ -301,7 +303,9 @@ Billing computes the fee at charge time from the session's fee columns and the s
 4. the `registrations` reads and writes;
 5. `registration_guests`.
 
-Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLISTED rows by ascending `queue_position`. No path takes locks out of this order, uses `SERIALIZABLE` or an advisory lock, or renumbers positions. The transaction reads the clock once (`clock.now()`) and passes that value down (learned rule: testing-injected-clock)
+Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLISTED rows by ascending `queue_position`. No path takes locks out of this order, uses `SERIALIZABLE` or an advisory lock, or renumbers positions. The transaction reads the clock once (`clock.now()`) and passes that value down (learned rule: testing-injected-clock).
+
+Amended 2026-10-24 (R22): the order above is a slice of ADR 0019's `LOCK_ORDER` (`apps/api/src/modules/sessions/locks.ts:25`, `teams → recurring_session_rules → team_members → game_sessions → registrations → registration_guests → payments`), and registration code never locks `recurring_session_rules`. Registration code takes no advisory lock; the auto-enrol entry runs inside SSE's `runSessionAutoEnrol` transaction, whose first statement is SSE's advisory lock (`SESSION_AUTO_ENROL_LOCK_NAMESPACE`, `locks.ts:39`). Port calls (`promoteWaitlist`, `autoEnrolInSession`) use `ctx.now`, read by the caller after its own locks, and never read the clock themselves. A `promoteWaitlist` call may run in a transaction that already holds several session locks (series propagation, `series-propagate.ts:167`), and the trace must show it takes no new session lock out of `(date, id)` order
 
 #### AC-VERIFY-4: Seat accounting is exact and the waitlist invariant always holds
 **Priority**: MUST
@@ -393,7 +397,7 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
 
 #### AC-INTEGRATION-4: The full journey works in a real browser on both viewports
 **Priority**: SHOULD
-**Given** the Compose stack with `AUTH_FAKE_OAUTH=true`, the worker running, Mailpit, and a PUBLISHED session seeded through the session-scheduling-engine admin flow (or by a seed script until it exists) with public capacity 2 (`apps/web/e2e/registrations.spec.ts`)
+**Given** the Compose stack with `AUTH_FAKE_OAUTH=true`, the worker running, Mailpit, and a PUBLISHED session with public capacity 2 created through session-scheduling-engine's admin API (`POST /teams/:teamId/sessions` then `.../publish`; it exists on `main` since 2026-10-24, so no seed script) (`apps/web/e2e/registrations.spec.ts`)
 **When** the journey runs:
 1. player A registers with 1 guest;
 2. player B registers alone and is waitlisted (#1);
@@ -422,6 +426,7 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
 - Each of the three members is skipped with reason `auto_enroll_changed` and no `registrations` row. Valid members in the same call are placed in order.
 - When the waiting save turns Auto Enroll off and commits first, that member is skipped.
 - The canonical lock order (ADR 0016 team-banking: `teams` → `team_members` → `game_sessions` → `registrations`) holds. Nothing takes `teams FOR UPDATE`.
+- (R21, ADR 0019 §8, ALG R-b) A member who already has a `registrations` row for the session in any status, WITHDRAWN included (EARLY, LATE with or without `withdrawal_fee_due`, BANNED), is skipped with `already_registered`. The row is unchanged: no re-activation, no `source` change, no email.
 
 #### AC-HAPPY-11: An auto-enrolled player sees it was automatic and is emailed (ADR 0017 later obligation)
 **Priority**: MUST
@@ -434,6 +439,40 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
 - A member re-registering through the panel sets `source = 'MEMBER'`.
 - The email and the label never appear for a `MEMBER` row.
 - Logs carry `source`, never the email address.
+
+**Added 2026-10-24 (plan amendment, R19-R27; session-scheduling-engine merged, ADR 0019)**
+
+#### AC-VERIFY-12: The D-85 fee-lock predicate and its TypeScript twin are widened together, and the admin's "registered" count is split off (ADR 0019 §8, BIND T-17, O1 ruling)
+**Priority**: MUST
+**Given** the lifecycle migration, `countActiveRegistrations` (the fee-lock twin, `apps/api/src/modules/sessions/repo.ts:98`) and the new display count `countRegisteredPlayers` (R20)
+**When** `pnpm run test:integration` runs, including `sessions-parity.int.test.ts`, `sessions-schema.int.test.ts` and `sessions-contracts.int.test.ts`
+**Then**:
+- `game_session_has_active_registrations(uuid)` is replaced by `CREATE OR REPLACE` in this feature's migration and is true for a CONFIRMED or WAITLISTED row, or a WITHDRAWN row with `withdrawal_fee_due`. It is false for a WITHDRAWN row without it, and for none.
+- `countActiveRegistrations` (fee lock) counts the same rows. The parity test's hand-written table (`sessions-parity.int.test.ts:24`) gains the WITHDRAWN-with-fee-due case, and the TS count and the SQL predicate agree on every case.
+- `game_sessions_fee_raise_locked` (23514) refuses a fee raise on a PUBLISHED session whose only registration is a fee-due withdrawal, and allows it once the fee is released (R2).
+- `rollback --all` restores SSE's original function body (CONFIRMED and WAITLISTED), so SSE's migration still owns the function.
+- (O1 resolved, human ruling 2026-10-24.) `countRegisteredPlayers` counts only CONFIRMED and WAITLISTED rows, and drives SSE's `activeRegistrationCount`: the admin's "{n} players are registered", the edit banner, and the cancel and end-series counts. The fee-lock count drives only `feesLocked`, the 409 `session_fee_locked` and the series `fee_locked` skip. Each SSE call site is classified in R20.
+- A late withdrawer who still owes the fee is in the fee-lock count and not in the display count. On a PUBLISHED session whose only row is a LATE withdrawal with `withdrawal_fee_due`:
+  - `countActiveRegistrations` = 1 and the SQL predicate is true;
+  - `countRegisteredPlayers` = 0;
+  - the admin `GET /teams/:teamId/sessions/:sessionId` returns `activeRegistrationCount 0` and `feesLocked 'raise_only_blocked'`;
+  - a fee raise through `PUT` is 409 `session_fee_locked`;
+  - a cancel answers `activeRegistrationCount 0`.
+  - After the fee is released (R2), the lock lifts.
+
+#### AC-INTEGRATION-6: The registrations adapter fills session-scheduling-engine's allocator port end to end
+**Priority**: MUST
+**Given** `createSessionAllocator` (`apps/api/src/session-allocator.ts:26`) returning registration's adapter (`name: 'registrations'`, `enrols: true`), a real cloned Postgres and a real pg-boss worker
+**When**:
+1. a PUBLISHED session that was pending under the no-op (`auto_enrol_required` true, `auto_enrolled_at` NULL) is offered by SSE's `recurrence-materialisation` sweep;
+2. an admin raises public capacity on a full PUBLISHED session with a waitlist through SSE's `PUT /teams/:teamId/sessions/:sessionId`;
+3. the same raise arrives through a series edit that propagates to that instance.
+
+**Then**:
+- (1) The session is enrolled once in `selectAutoEnrollees` order through the real allocator, rows get `source 'AUTO_ENROL'`, the AC-HAPPY-11 emails are enqueued in that transaction, and `auto_enrolled_at` is stamped in the same transaction. A second sweep enrols nobody. This is the real-adapter counterpart of SSE's marker proof (`sessions-contracts.int.test.ts:731`, which uses a recording double).
+- (2) and (3) `promoteWaitlist` promotes first-fit inside SSE's edit transaction, releases owed fees (R2), and enqueues the AC-ASYNC-1 emails on that transaction. SSE's response `promoted` equals the number of returned `PromotedSeat`s.
+- A rolled-back edit leaves no promotion, release or email.
+- `session-allocator.test.ts` asserts the adapter's `name` and `enrols` (it no longer expects `noopSessionAllocator`). `sessions-contracts.int.test.ts` stays green with its contract points 1.1-1.5, C-SSE-1..5, the port signature and the D-85 items re-checked (R26).
 
 ### Scope Boundaries
 - **In scope**:
@@ -461,7 +500,7 @@ Enqueue uses `coalesce(max(queue_position), 0) + 1` and promotion scans WAITLIST
   - GLOBAL_ADMIN acting on registrations.
   - Unban and its effect on registrations (BANNED is terminal in v1).
 - **Dependencies**:
-  - session-scheduling-engine (NOT built; build gate): the five assumed outputs listed above.
+  - session-scheduling-engine (merged 2026-10-24, PR #7; ADR 0019): the five assumed outputs listed above, as corrected there, and the hand-offs in R19-R27.
   - team-management (merged): gate, ban port, job, ADR 0015, contract test, `InlineConfirm`, labels.
   - auth-and-user-roles (merged): guards, `requireUser`, `proxy.ts`, error shape.
   - platform-foundation (merged): schema D-10 to D-14 and D-19 to D-21, pg-boss, `send-email`, `Clock`, money and time primitives, test harness.
@@ -503,7 +542,7 @@ Yes. Questions for `/yay:creative`, in order of risk:
    Agree the result with wallet-and-akahu-billing's future plan and record it in an ADR.
 4. **Ban handler and reconciliation sweep (MEDIUM, architecture).** Settle these:
    - **Handler structure:** query by current state; one transaction per session; error classification (which errors are permanent); behaviour when the session moves to COMPLETED or CANCELLED between selection and lock (re-check under the lock and skip).
-   - **Sweep design:** cadence and time (`30 5 * * *` assumed); one job per membership vs. per (membership, session); the query and its index needs (`registrations (team_id, user_id, status)`?); logging.
+   - **Sweep design:** cadence and time (`30 5 * * *` assumed; now `45 5 * * *`, O4 human ruling 2026-10-24); one job per membership vs. per (membership, session); the query and its index needs (`registrations (team_id, user_id, status)`?); logging.
    - **Ordering and copy:** how the sweep and live bans interact under the `exclusive` singleton; the final wording of the restored ban confirmation, and whether the success message also changes.
 5. **Invocation surface pending session-scheduling-engine (LOW, UI/UX and user journey).** Decide:
    - **The page:** where the session page lives and who owns it (`/teams/[teamId]/sessions/[sessionId]` assumed); whether this feature adds an "Upcoming sessions" list to the team page until session-scheduling-engine or player-dashboard do; how the panel slots into the scheduling engine's page.
@@ -661,12 +700,17 @@ Provisional (pending creative): the defaults above. The creative architecture an
 - the free ADR/D numbers on `main` (R14).
 
 Adjust this plan if needed.
-- [ ] **Phase 1: Schema and shared contracts**: the lifecycle migration (D-62 onwards, including R15/R17 columns), regenerated types, zod contracts, error codes (incl. `auto_enroll_changed` refusal reason), `insertPublishedSession` (payout-configured team, R18). ACs: AC-VERIFY-2, AC-VERIFY-7, AC-VERIFY-11 (schema half).
-- [ ] **Phase 2: Allocator core and billing hand-off** (follows the algorithm and architecture creative docs): `decideAllocation`, `registerInSession`, `autoEnrolInSession` (R16 opt-out re-check, R17 source), `promoteWaitlist`, the R15 pricing snapshot on every transition into CONFIRMED, withdrawal classification and liability, debt gate, `listBillableRegistrations`, ADR 0018. ACs: AC-HAPPY-1 to 9 (domain side), AC-ERROR-4, AC-VERIFY-3, 4, 5, 10, AC-INTEGRATION-1, 3 and 5, AC-VERIFY-11, AC-HAPPY-11 (domain side).
-- [ ] **Phase 3: Registration API and promotion emails**: routes, service, policies, team-scoped lookups, refusals, promotion emails and the R17 auto-enrol email in the placing transaction, `registration.*` logs, OpenAPI with 401/403. ACs: AC-ERROR-1 to 3 and 5 to 8, AC-ASYNC-1, AC-VERIFY-1 and 6, AC-HAPPY-11 (email).
-- [ ] **Phase 4: Real ban handler and reconciliation sweep** (follows creative Q4): the handler, worker wiring, the `registration-ban-reconcile` queue and slot, the team-management contract test with the real handler. ACs: AC-HAPPY-10 (API side), AC-ERROR-9, AC-ASYNC-2 and 3, AC-INTEGRATION-2.
-- [ ] **Phase 5: Web registration panel** (follows the UI/UX and journey creative docs): session page or panel slot, register form with guests, waitlist and withdraw states, debt block, proxy, api-client, Server Actions, restored ban confirmation, the R17 "Added automatically (Auto Enroll)" label and the R15 fee line naming the level. ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 10, AC-ERROR-5 and 8, AC-ASYNC-4, AC-HAPPY-11 (label).
-- [ ] **Phase 6: E2E, accessibility and docs**: Playwright journeys with axe on both viewports, coverage gate, `systemPatterns.md`/`techContext.md` updates. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-8 and 9, AC-INTEGRATION-4.
+
+*Gate status 2026-10-24:* session-scheduling-engine is merged (PR #7, cc324a3). The re-check is done in R19-R27. Before Phase 1 also:
+- re-run `apps/api/test/integration/sessions-contracts.int.test.ts` and `sessions-parity.int.test.ts` on the branch (both green on `main`);
+- re-confirm that ADR 0018, D-62..D-69 and no migration newer than `20261020000100000` are on `main` (R25);
+- O1-O4 are RESOLVED (human ruling 2026-10-24; R20, R24, R27).
+- [ ] **Phase 1: Schema and shared contracts**: the lifecycle migration (D-62 onwards, including R15/R17 columns), regenerated types, zod contracts, error codes (incl. `auto_enroll_changed` refusal reason), `insertPublishedSession` (payout-configured team, R18). (R20, R25, R26) The same migration `CREATE OR REPLACE`s `game_session_has_active_registrations`, and `countActiveRegistrations` in `apps/api/src/modules/sessions/repo.ts` widens in the same phase as the fee-lock twin. The new display count `countRegisteredPlayers` is added, and every SSE call site is switched per the R20 table (O1 ruling). The D-85 cases in `sessions-parity`, `sessions-schema` and `sessions-contracts` are updated deliberately, the factory fixes cover SSE's suites, and every `sessions-*` integration suite is re-run. ACs: AC-VERIFY-2, AC-VERIFY-7, AC-VERIFY-11 (schema half), AC-VERIFY-12.
+- [ ] **Phase 2: Allocator core and billing hand-off** (follows the algorithm and architecture creative docs): `decideAllocation`, `registerInSession`, `autoEnrolInSession` (R16 opt-out re-check, R17 source), `promoteWaitlist`, the R15 pricing snapshot on every transition into CONFIRMED, withdrawal classification and liability, debt gate, `listBillableRegistrations`, ADR 0018. (R19, R21, R22) The port adapter `createRegistrationsSessionAllocator` (`modules/registrations/session-allocator-adapter.ts`), tested directly and through SSE's `runSessionAutoEnrol` and capacity edit with the adapter injected; `already_registered` for an existing row in any status; port calls inside SSE's transactions. ADR 0018 cites ADR 0019. ACs: AC-HAPPY-1 to 9 (domain side), AC-ERROR-4, AC-VERIFY-3, 4, 5, 10, AC-INTEGRATION-1, 3 and 5, AC-VERIFY-11, AC-HAPPY-11 (domain side), AC-INTEGRATION-6 (domain half).
+- [ ] **Phase 3: Registration API and promotion emails**: routes, service, policies, team-scoped lookups, refusals, promotion emails and the R17 auto-enrol email in the placing transaction, `registration.*` logs, OpenAPI with 401/403. (R19, R23, R24) The body of `createSessionAllocator` now returns the adapter, once both emails exist. `session-allocator.test.ts` is updated, and the real-adapter marker proof and capacity-edit cases run through SSE's routes and sweep. `GET /teams/:teamId/sessions/upcoming` resolves ahead of SSE's `/:sessionId` route. Another team's session id stays 404 (O2 ruling). ACs: AC-ERROR-1 to 3 and 5 to 8, AC-ASYNC-1, AC-VERIFY-1 and 6, AC-HAPPY-11 (email), AC-INTEGRATION-6.
+- [ ] **Phase 4: Real ban handler and reconciliation sweep** (follows creative Q4): the handler, worker wiring, the `registration-ban-reconcile` queue and slot (`45 5 * * *`, O4 human ruling 2026-10-24), the team-management contract test with the real handler. ACs: AC-HAPPY-10 (API side), AC-ERROR-9, AC-ASYNC-2 and 3, AC-INTEGRATION-2.
+- [ ] **Phase 5: Web registration panel** (follows the UI/UX and journey creative docs): session page or panel slot, register form with guests, waitlist and withdraw states, debt block, proxy, api-client, Server Actions, restored ban confirmation, the R17 "Added automatically (Auto Enroll)" label and the R15 fee line naming the level. (R23, R27) The player page at `apps/web/src/app/teams/[teamId]/sessions/[sessionId]/page.tsx`, which flips SSE's page-absence check (`sessions-contracts.int.test.ts:448-455`) to assert this page. The player summary component is named apart from SSE's admin `SessionSummary` (`components/teams/session-summary.tsx`). The cancelled-session copy (P-2). ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 10, AC-ERROR-2 and 5 and 8, AC-ASYNC-4, AC-HAPPY-11 (label).
+- [ ] **Phase 6: E2E, accessibility and docs**: Playwright journeys with axe on both viewports, coverage gate, `systemPatterns.md`/`techContext.md` updates. (R27) The e2e session is created and published through SSE's admin API, with no seed script. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-8 and 9, AC-INTEGRATION-4.
 
 ## Creative Phases
 
@@ -713,7 +757,7 @@ Where this section and a creative doc or an AC disagree, this section wins. Buil
 - Worker pool goes from 2 to 5.
 - This replaces the spec's `promoteWaitlist(trx, sessionId, now)` signature.
 
-**R6 · Ban handler and sweep (Q4).** Architecture doc option 4A: one job per membership, one transaction per session through `withdrawFromSession({ cause: 'ban' })`, continue past a failed session, transient vs permanent classification as listed there. Sweep at `30 5 * * *` Pacific/Auckland, once at worker start, and on demand, capped at 1000 memberships. Ban-triggered promotions release owed fees (R2).
+**R6 · Ban handler and sweep (Q4).** Architecture doc option 4A: one job per membership, one transaction per session through `withdrawFromSession({ cause: 'ban' })`, continue past a failed session, transient vs permanent classification as listed there. Sweep at `45 5 * * *` Pacific/Auckland (moved from `30 5 * * *` by R27/O4, human ruling 2026-10-24), once at worker start, and on demand, capped at 1000 memberships. Ban-triggered promotions release owed fees (R2).
 
 **R7 · Cross-feature contracts (Q6).** Architecture doc option 6A: consumer obligations C-SSE-1..5, C-SAE-1..2, C-BIL-1..3, C-ALL-1 go into ADR 0018 and are re-checked at the build gate. C-BIL is extended: billing reads the hand-off at or after `starts_at`, when the fee flag is final; the list is empty for a CANCELLED or unpublished session. Guest rows carry `guestId` and `position`.
 
@@ -802,13 +846,192 @@ This amendment follows the rebase onto `main` (team-banking-and-gst merged; ADR 
 - Phase 5: the R17 label and the R15 fee-line level.
 - Phase 6: e2e unchanged; auto-enrol has no UI entry, so it is covered by integration tests.
 
+### Plan Amendment 2026-10-24 (binding; session-scheduling-engine merged, ADR 0019)
+
+This amendment follows the rebase onto `main` after session-scheduling-engine (SSE) merged (PR #7, merge cc324a3). SSE's ADR 0019 §8 "Contracts offered" and its hand-offs to this feature's build gate are binding here. Each item was checked against the code on `main`. Where this section and R1-R18 or a creative doc disagree, this section wins. The open decisions **O1-O4** were RESOLVED by human ruling on 2026-10-24, and each ruling is recorded where its item was raised. **Status: APPROVED (2026-10-24).**
+
+**R19 · The allocator port and its single composition point (ADR 0019 §8; ARCH H10).**
+- **Port.** SSE owns `SessionAllocatorPort` (`apps/api/src/modules/sessions/allocator-port.ts:50-80`); this feature owns the adapter.
+  - `name: string`, `enrols: boolean`.
+  - `promoteWaitlist(ctx, { teamId, sessionId }): Promise<readonly PromotedSeat[]>`, where `PromotedSeat` is `{ registrationId, userId, promotedAt }` (`:44-48`).
+  - `autoEnrolInSession(ctx, { teamId, sessionId, entries }): Promise<readonly { userId, outcome }[]>`, where `entries` is `readonly { userId, assignedAt: Date, membershipId? }[]` (`:23-29`).
+  - The outcome is `{ ok: true, status: 'CONFIRMED' | 'WAITLISTED' }` or `{ ok: false, reason }`. The reason is one of `overdue_payments | forbidden | already_registered | auto_enroll_changed | not_found | session_not_open | party_exceeds_capacity` (`:31-42`).
+  - `ctx` is `{ trx: Transaction<DB>, now: Date, log }` (`:15-20`), and the adapter asserts `trx.isTransaction`.
+- **Superseded signature.** This replaces the spec's `promoteWaitlist(trx, sessionId, now)` (Assumed output 4; already superseded in R5).
+- **`decideAllocation` stays as planned.** R5's `createAllocator({ jobs, webBaseUrl })` signatures match the port structurally. The adapter is a thin wrapper.
+- **Wiring.** Change only the body of `createSessionAllocator` (`apps/api/src/session-allocator.ts:26-29`). It returns `createRegistrationsSessionAllocator(createAllocator({ jobs, webBaseUrl }))`, with `name: 'registrations'` and `enrols: true`.
+  - The deps are `{ db, jobs, clock, webBaseUrl }` (`:18-24`). `jobs` is the API producer in `main.ts:44` and the worker runner in `worker.ts:75`, so promotion and auto-enrol emails go on the caller's `trx` either way.
+  - `AppDeps.sessionAllocator` (`apps/api/src/app.ts:71`) and `RegisterJobsOptions.sessionAllocator` (`apps/api/src/jobs/bootstrap.ts:45`) are already required. No environment variable selects the adapter.
+  - The adapter may import only `allocator-port.ts` from `modules/sessions` (`boundaries.test.ts`).
+- **`enrols` semantics.** `true` means the adapter really registers members.
+  - SSE stamps the D-80 marker `game_sessions.auto_enrolled_at` only when `enrols` is true. It stamps in the same transaction as the placements (`apps/api/src/modules/sessions/auto-enrol.ts:149-155`).
+  - Under the no-op it logs `session.auto_enrol.port_noop` and leaves the session pending (`auto-enrol.ts:95-105`).
+- **Consequence of wiring the real adapter.** SSE's sweep (03:00 Pacific/Auckland and every worker boot) starts enrolling and stamping every pending PUBLISHED, not-started session.
+  - SSE proves this only with a recording double (`apps/api/test/integration/sessions-contracts.int.test.ts:695-790`, "the marker proof").
+  - This feature proves it with the real adapter in AC-INTEGRATION-6 (1).
+- **Phasing.** The adapter is built and tested in Phase 2, with SSE's code paths using an injected adapter. The `createSessionAllocator` body swap waits for Phase 3, when both the promotion and the auto-enrol emails exist, so the branch never enrols anyone without emailing. `session-allocator.test.ts:24-33` currently expects `noopSessionAllocator` and is updated in that phase.
+
+**R20 · Widen the D-85 predicate and its TypeScript twin together for the fee lock only, and split off a display count (ADR 0019 §8 and (b); ALG R-a; BIND T-17; O1 human ruling 2026-10-24).**
+- **SQL.** The lifecycle migration replaces SSE's function (`db/migrations/20261020000100000_session_scheduling.sql:481-484`, today `status IN ('CONFIRMED','WAITLISTED')`) with `CREATE OR REPLACE FUNCTION game_session_has_active_registrations(p_session_id uuid)`. The new body also counts `status = 'WITHDRAWN' AND withdrawal_fee_due`, keeping `LANGUAGE sql STABLE`.
+  - The down migration `CREATE OR REPLACE`s SSE's original body back. It must not `DROP` the function: SSE's trigger `game_sessions_fee_raise_locked` depends on it (`:505`), and SSE's own down migration drops it (`:519`).
+  - The partial index `(session_id, withdrawn_at) WHERE withdrawal_fee_due` (R2) serves the new branch.
+- **Two functions in `apps/api/src/modules/sessions/repo.ts`.** Both are reads, so `boundaries.test.ts` ("never writes registrations") still passes.
+  - **Fee lock: `countActiveRegistrations(db, sessionIds)`** (`repo.ts:98-113`). It keeps its name and stays the TS twin of the SQL function, widened to the same rows: CONFIRMED, WAITLISTED, or WITHDRAWN with `withdrawal_fee_due`. The parity test keeps importing it. Its doc comment says it is the fee-lock count, not a "registered players" count.
+  - **Display: new `countRegisteredPlayers(db, sessionIds)`.** It returns `Map<sessionId, number>`, counts only `status IN ('CONFIRMED','WAITLISTED')` (one per registration, as today), and has no SQL twin. It feeds the admin's "{n} players are registered" copy.
+- **SSE call sites: one classification each, all changed in Phase 1**, in the same commit as the widening. At no commit does a fee-due withdrawal appear in the admin's "registered" count.
+
+  | Call site | What it feeds | Count after the split |
+  |---|---|---|
+  | `service.ts:584` | the 409 `session_fee_locked` check under the session lock | fee lock |
+  | `series-propagate.ts:81` | `existingInstanceOf(...)` → `reconcile.ts:146` `fee_locked` skip of a series fee raise | fee lock |
+  | `view.ts:87` | `feesLocked` | fee lock: `toSessionResponse` gains a second option (for example `feeLockCount`); `activeRegistrationCount` keeps the display count |
+  | `service.ts:290` (`viewOf`) | `activeRegistrationCount` and `feesLocked` | both: reads both counts |
+  | `service.ts:369` (list) | `activeRegistrationCount` and `feesLocked` per row | both: reads both counts |
+  | `series.ts:208` (series page) | per-row `activeRegistrationCount` (display) and the series-change preview (`series-view.ts:234-243`, `fee_locked` → `has_registrations`) | both: reads both counts |
+  | `service.ts:796` | the cancel response's `activeRegistrationCount` (P-2: "let them know") | display |
+  | `series-propagate.ts:236` | the end-series cancel count (P-2) | display |
+
+  - The response field name `activeRegistrationCount` and the web copy in `apps/web/src/lib/teams/sessions-view.ts:414-424` are unchanged, since the field now carries the display count.
+  - The OpenAPI descriptions that say the lock starts "once a PUBLISHED session has a registered player" (`routes.ts:110`, `:125`) gain "or a late withdrawal whose fee is still owed". `apps/api/openapi.yaml` is regenerated.
+  - SSE's `view.test.ts` covers the new option.
+  - **Known copy edge, not changed here:** a session whose only liable row is a fee-due withdrawal shows "No one has registered yet." beside `FEES_LOCKED_MESSAGE` ("Players have registered, so fees can only be lowered."). A copy change would be SSE's.
+- **SSE tests: update them deliberately in Phase 1, not as collateral.**
+  - `sessions-parity.int.test.ts:24-28`: the hand-written table splits WITHDRAWN into with and without `withdrawal_fee_due`; parity between `countActiveRegistrations` and the SQL function is kept. New case (AC-VERIFY-12): a session whose only row is a LATE withdrawal with `withdrawal_fee_due` is counted 1 by `countActiveRegistrations` and by the SQL predicate, and 0 by `countRegisteredPlayers`. When the fee is released (R2), all three are 0.
+  - `sessions-schema.int.test.ts:980-991` and `:1033-1036`: the SQL predicate and the 23514 trigger now treat a fee-due withdrawal as active, and a released one as not.
+  - `sessions-contracts.int.test.ts:638-655`: asserts the new function body text.
+  - `sessions-contracts.int.test.ts:591` (C-SSE-4 cancel): its count stays a CONFIRMED + WAITLISTED count.
+- **O1 RESOLVED (human ruling 2026-10-24): option (b), split.**
+  - The widened predicate drives only the fee lock: the SQL function, `countActiveRegistrations`, and `feesLocked`.
+  - `countRegisteredPlayers` drives every "{n} players are registered" display: the edit and fee-lock banners, cancel, end series, and the list and series rows.
+  - Seat counting with guests, option (c), is not adopted.
+  - ADR 0018 records the split and cites ADR 0019 §8.
+
+**R21 · `already_registered` for an existing row in any status on the auto-enrol path (ADR 0019 §8; ALG R-b).** `autoEnrolInSession` returns `{ ok: false, reason: 'already_registered' }` for a member who already has a `registrations` row for the session, whatever its status: CONFIRMED, WAITLISTED, or WITHDRAWN of any kind, with or without `withdrawal_fee_due`.
+- The row is never re-activated or relabelled. A retried durable job, or a sweep after a member withdrew, therefore never puts them back.
+- This is checked under the session lock, after the member gates (R16), and before `decideAllocation`.
+- It is a skip, and it does not apply to the member's own panel register. R3 still governs re-registration there.
+- R3's `late_withdrawal_fee_due` never arises on this path, so it is not added to the port's reasons.
+- Covered by AC-INTEGRATION-5's new bullet.
+
+**R22 · Running inside SSE's transactions (ADR 0019 §2, §6, C-SSE-3, C-SSE-5, C-SAE-1/2 as amended).**
+- **Lock order.** The canonical order is `LOCK_ORDER` (`apps/api/src/modules/sessions/locks.ts:25`): `teams → recurring_session_rules → team_members → game_sessions → registrations → registration_guests → payments`.
+  - `registrations` comes after `game_sessions`. This feature never locks `recurring_session_rules`, and never takes a `teams` lock after a session lock (R18).
+- **Port calls do not open a transaction.** They run in the caller's transaction:
+  - SSE's `HTTP_POLICY`: 2 s `lock_timeout`, 3 attempts (`tx.ts:21`).
+  - SSE's `JOB_POLICY`: 5 s, 3 attempts (`tx.ts:27`).
+  - So they must not `SET LOCAL lock_timeout` or retry. They must be safe to re-run when SSE retries the whole transaction.
+  - They use `ctx.now`, which SSE reads after its locks, and `ctx.log`. R5's own policy and single clock read apply only to this module's own transactions (register, withdraw, ban).
+- **Auto-enrol.** It runs in SSE's follow-up transaction (`runSessionAutoEnrol`, `auto-enrol.ts:88-158`).
+  - The first statement is SSE's advisory lock: `pg_advisory_xact_lock(SESSION_AUTO_ENROL_LOCK_NAMESPACE = 0x5345_4153, hashtext(sessionId))`, `locks.ts:39` and `:121`. Only SSE takes it, and this feature must never reuse the namespace.
+  - Then come the member gates (`team_members FOR SHARE`, R16 re-check) and then the D-14 session lock.
+  - SSE never calls the allocator with empty `entries`.
+  - This supersedes the "inside the materialisation transaction" wording of C-SAE-1 in the architecture doc (line 590), which ADR 0018 records with a citation to ADR 0019 §6.
+- **`promoteWaitlist`.** SSE calls it after `lockSession` and the capacity `UPDATE`, only when public capacity rose on a PUBLISHED, not-started session:
+  - from the session `PUT` (`service.ts:608`);
+  - per instance during series propagation (`series-propagate.ts:167`), in a transaction that already holds the rule lock and the instances' session locks in `(date, id)` order.
+  - It re-takes the D-14 lock re-entrantly, may run several times in one transaction, and enqueues promotion emails on `ctx.trx`.
+  - The R4 deferred capacity trigger (`FOR UPDATE NOWAIT`) finds those locks already held by the same transaction.
+- AC-VERIFY-3 is amended accordingly.
+
+**R23 · Page, route and component ownership (ADR 0019 §8 "Route namespace", "Slot contract acknowledgement").**
+- **Pages.** SSE built admin pages only, under `/teams/[teamId]/manage/sessions`, and adds nothing to the player page.
+  - The player page `/teams/[teamId]/sessions/[sessionId]` and the "Upcoming sessions" section stay this feature's (R8, journey slot contract).
+  - SSE's check that no `apps/web/src/app/teams/[teamId]/sessions` directory exists (`sessions-contracts.int.test.ts:448-455`) fails by design when Phase 5 adds the page. Phase 5 rewrites it to assert the page is registration's and that the admin pages stay under `/manage/sessions`.
+- **Routes.** Reserved for this feature: `GET /teams/:teamId/sessions/upcoming` and `/teams/:teamId/sessions/:sessionId/registration*` (`apps/api/src/modules/sessions/routes.ts:50`).
+  - SSE's `GET /teams/:teamId/sessions/:sessionId` is `TEAM_ADMIN`. A test proves that a MEMBER's `GET .../sessions/upcoming` reaches registration's handler, since the static segment must win over SSE's parametric route (AC-VERIFY-1).
+- **Components.** There is nothing to reuse as a component.
+  - SSE's `SessionSummary` (`apps/web/src/components/teams/session-summary.tsx:47`) is an admin view over `SessionResponse` from a `TEAM_ADMIN` route. The player summary from the journey's slot contract fetches from `GET .../registration` and gets a distinct name (for example `components/registrations/player-session-summary.tsx`).
+  - `sessionPath()` in `apps/web/src/lib/teams/sessions-paths.ts:12` is the admin path. The player path gets its own helper, for example `playerSessionPath` in `lib/registrations`.
+  - SSE's pure formatters in `apps/web/src/lib/teams/sessions-view.ts` (`formatDay`, `formatClock`, `formatMoneyText`) may be reused for consistent dates and money.
+
+**R24 · API conventions now on `main`: only those that apply to this feature's routes.**
+- **O2 RESOLVED (human ruling 2026-10-24): another team's session id stays 404 on registration's routes.**
+  - ADR 0019 (e) (human ruling 2026-10-24) answers 403 `forbidden` for an id that exists under another team, and 404 for an id that exists nowhere. The distinction comes from a lock-free `SELECT id` on the failure path only (`sessionExists`, `repo.ts:32`; `service.ts:312`), and the ruling covers SSE's admin routes.
+  - This feature's AC-ENTRY-2 says 404 with an identical body for another team's id, a DRAFT id and an unknown id.
+  - **Ruling:** option (a). AC-ENTRY-2 is unchanged: another team's id, a DRAFT id and an unknown id all answer 404 `not_found` with an identical body. Registration's service never calls `sessionExists` or any lookup by id alone.
+  - **ADR 0018 records why this differs from ADR 0019 (e).** These routes are member-facing. A 403 would tell a member that a session id exists in a team they cannot see. The 404 rule was approved with this spec. SSE's 403 applies only to its `TEAM_ADMIN` routes.
+  - A test in `registrations-api.int.test.ts` asserts the identical 404 body for all three cases.
+- **Not adopted.** These are not adopted, because they don't fit this feature's routes:
+  - `feesLocked: 'raise_only_blocked' | null`: an admin edit-form concern; registration only reads fees.
+  - Explicit `changed` flags on write responses: register and withdraw are not idempotent saves; a repeat is a 409 `already_registered` or `not_registered`, AC-ERROR-3 and AC-ERROR-6.
+  - The `expectedVersion` stale refusal: no registration route edits a versioned row. R9's `expectLate` is this feature's stale-terms guard.
+- **O3 RESOLVED (human ruling 2026-10-24): accept and document; no `expectedSessionVersion` check.** Before the first registration, an admin may still raise fees or change times, so a player can register on terms that differ from the page they saw.
+  - The register body stays as specified, with no session-version field and no 409 `session_changed`.
+  - **ADR 0018 records the trade-off.** The window is only the first registrant(s) racing an admin edit, because once anyone is registered (or owes a late fee) D-85 stops fee raises (`game_sessions_fee_raise_locked`, 409 `session_fee_locked`). The fee line is an estimate. A deadline that moves while the withdraw confirmation is open is already covered by R9's `expectLate`.
+
+**R25 · Numbering and migration order (re-check of R14).**
+- **ADR.** On `main`, ADR 0018 is free, ADR 0019 is SSE's, and ADR 0017 is skill-levels'.
+- **Ledger.** `db/schema-deviations.md` has D-01..D-61 and D-70..D-85, with D-84 reserved and not built. D-62..D-69 are free.
+  - This feature's rows stay within D-62..D-69: R5's D-62..D-66 plus the R2 index, and R15/R17's columns and enums grouped into those rows.
+  - If more rows are needed, continue at D-86, never in D-70..D-85.
+  - The D-85 widening is recorded as a new D-6x row with the object key `function:game_session_has_active_registrations`. It cites ADR 0019 §8 and BIND T-17, and does not edit SSE's D-85 row.
+- **Migration.** The newest migration on `main` is `20261020000100000_session_scheduling.sql`. The lifecycle migration's UTC timestamp is the build date, for example `20261024000100000_registration_lifecycle.sql`, and must sort after it.
+
+**R26 · Fixtures and the SSE suites this feature's schema touches.**
+- **`insertRegistration`** (`apps/api/test/helpers/factories.ts:460`) inserts CONFIRMED and WITHDRAWN rows with no `registrant_sex` / `registrant_skill_level` snapshot (R15 CHECK) and no withdrawal stamps (R12). SSE's suites insert such rows:
+  - `sessions-schema`, `sessions-contracts` (C-SSE-4 with a WITHDRAWN row, `:591`), `sessions-parity`.
+  - Phase 1 extends the factory to fill the snapshot for CONFIRMED, and the stamps and `withdrawal_kind` for WITHDRAWN, with defaults.
+  - Phase 1 re-runs every `sessions-*` integration suite and `boundaries.test.ts`.
+- **`insertPublishedSession`.** `insertSession` (`factories.ts:307`) now takes `{ status: 'PUBLISHED' }` and fills C-SSE-1-complete fees and a court. `insertPublishedSession` is built on it, with `now`-derived dates (R12, A14) and a payout-configured team (R18), rather than as a second raw insert.
+- **The contract file.** `sessions-contracts.int.test.ts` is SSE's hand-off. Its header lists:
+  - 1.1-1.5, the assumed outputs: Phases 1-2 (fees and instants), 2-3 (open rule, capacity raise, auto-enrol) and 5 (page);
+  - C-SSE-1..5: Phase 2;
+  - the port: Phase 2-3, R19;
+  - D-85 a/b/c: Phase 1 R20, Phase 2 R21, Phase 3 R19;
+  - the marker proof: Phase 3, AC-INTEGRATION-6.
+  - It stays green except for the two checks R20 and R23 update deliberately.
+  - The header test (`:659`) pins the header text, so the header is edited only to record what registration now provides.
+
+**R27 · SSE rulings and lifecycle facts that change this feature's behaviour (ADR 0019 §1, §6; SSE archive "Requirements as built", P-1 to P-3).**
+- **P-1: Auto Enroll applies to every session, one-off or series** (`auto_enrol_required` defaults to true, D-80).
+  - Auto-enrol and its emails (AC-HAPPY-11) therefore fire for one-off sessions too.
+  - On the first worker boot after the adapter ships, the boot sweep enrols every PUBLISHED, not-started session that was left pending since SSE merged. ADR 0019 §6 accepts this as the bounded exception to ADR 0017 point 7.
+  - It sends one AC-HAPPY-11 email per placed member per session in that one run. Operators should expect that burst at deploy.
+- **P-2: cancel and change send players no email.** SSE leaves every registration exactly as it was on cancel (C-SSE-4). A CANCELLED session can therefore hold CONFIRMED and WAITLISTED rows indefinitely.
+  - The panel shows the journey A10 cancelled state ahead of "You're in." (AC-ERROR-2).
+  - The ban handler and the sweep select PUBLISHED sessions only, so they never touch these rows.
+  - `listBillableRegistrations` stays empty for a CANCELLED session (R7).
+  - The "Upcoming sessions" list excludes it.
+- **P-3: a series' pattern is fixed.** No effect on this feature.
+- **Session lifecycle.**
+  - `COMPLETED` is reachable only through billing (D-75).
+  - Edits and cancels are refused after `starts_at` (409 `session_started`), which matches registration closing at `starts_at`.
+  - A capacity cut never demotes anyone, so the over-capacity state handled by architecture A1/A5 is real on `main` (`CAPACITY_HINT`, `sessions-view.ts:427`).
+- **Rollback order.** Once this feature ships, rolling SSE back requires rolling this feature back first. This feature widens D-85 and replaces the allocator body (SSE archive, Rollback). ADR 0018 states this.
+- **O4 RESOLVED (human ruling 2026-10-24): `registration-ban-reconcile` moves to `45 5 * * *` Pacific/Auckland.** `skill-progression` already runs at `30 5 * * *`, commented as "the last daily slot" (`apps/api/src/jobs/schedules.ts:35-36`).
+  - 05:45 is after the 02:00-02:59 DST window and after every other daily slot.
+  - AC-ASYNC-3, R6 and creative question 4 are updated.
+  - Phase 4 adds the slot to `schedules.ts` with a comment that it is now the last daily slot, and updates `skill-progression`'s comment.
+  - `schedules.test.ts` gains `['registration-ban-reconcile', '45 5 * * *']` and the DST-hour check.
+
+**New source files / extends from this amendment:**
+- New: `apps/api/src/modules/registrations/session-allocator-adapter.ts` (+ `.test.ts`): `createRegistrationsSessionAllocator`.
+- Extend:
+  - `apps/api/src/session-allocator.ts` (body only) and `apps/api/src/session-allocator.test.ts`;
+  - `apps/api/src/modules/sessions/repo.ts`: widen `countActiveRegistrations` (fee lock) and add `countRegisteredPlayers` (display), O1;
+  - the SSE call sites in `service.ts`, `series.ts`, `series-propagate.ts` and `view.ts` (+ `view.test.ts`), per the R20 table;
+  - the descriptions in `routes.ts:110` and `:125`, then regenerate `apps/api/openapi.yaml`;
+  - `apps/api/test/integration/sessions-{parity,schema,contracts}.int.test.ts`: the D-85 cases, the fee-lock vs display case and the page check only;
+  - `apps/api/test/helpers/factories.ts`: `insertRegistration` defaults;
+  - `apps/api/src/jobs/schedules.ts` and `schedules.test.ts`: the 05:45 slot (O4).
+- The web copy in `apps/web/src/lib/teams/sessions-view.ts` is unchanged.
+- The lifecycle migration gains the `CREATE OR REPLACE` of `game_session_has_active_registrations` and its down-migration restore.
+
+**Phase mapping:**
+- Phase 1: R20 (SQL and TS widening, the display-count split with every SSE call site switched, the D-85 and fee-lock vs display test updates), R25, and R26's fixtures and suite re-run.
+- Phase 4: the `registration-ban-reconcile` slot at `45 5 * * *` (O4).
+- Phase 2: R19's adapter, R21, R22, and AC-INTEGRATION-6's domain half.
+- Phase 3: R19's composition swap and test, R23's route precedence, the O2 404 test, and AC-INTEGRATION-6.
+- Phase 5: R23's page, the tripwire rewrite, the component naming, and R27's cancelled copy.
+- Phase 6: the e2e session via SSE's admin API.
+
 ---
 
 ## Execution State
 
 **Build Status**: IDLE
 **Current Phase**: CREATIVE → BUILD
-**Current Step**: Creative complete and reconciled (R1-R13); plan amended 2026-10-20 (R14-R18). Build gated on session-scheduling-engine being merged (re-check ADR 0016, ADR 0017 and free numbers at the gate).
+**Current Step**: Creative complete and reconciled (R1-R13); plan amended 2026-10-20 (R14-R18) and 2026-10-24 (R19-R27, after session-scheduling-engine merged). Build gate: re-run the SSE contract and parity suites, and re-confirm numbering. O1-O4 are resolved (human ruling 2026-10-24).
 **Step Started**: 2026-10-16
 **Can Resume**: NO
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
@@ -830,3 +1053,11 @@ This amendment follows the rebase onto `main` (team-banking-and-gst merged; ADR 
 - Step 4.5: Codex design critique - COMPLETE (needs-attention, 4 findings)
 - Creative Reconciliation: COMPLETE (2026-10-16); user decided fee release on refill and confirmed-only re-registration
 - Plan amendment: COMPLETE (2026-10-20). Rebased onto `main` (team-banking-and-gst merged). R14-R18 add numbering (ADR 0018, D-62+), the registrant sex/skill snapshot (C-PRICE-1), the auto-enrol opt-out re-check (C-SKL-1), the auto-enrol source/label/email, and the team-banking ADR 0016 rules. New ACs: AC-VERIFY-11, AC-INTEGRATION-5, AC-HAPPY-11. Taxonomy lint CLEAN (43 ACs). The user approved the amendment, keeping the existing spec and creative docs, with no stacked PR on #6.
+- Plan amendment: APPROVED (2026-10-24). Rebased onto `main` after session-scheduling-engine merged (PR #7, cc324a3; ADR 0019).
+  - R19-R27 cover the allocator port and composition, the D-85 SQL/TS widening, `already_registered` in any status, running inside SSE's transactions, page and route ownership, API conventions, numbering, fixtures and SSE suites, and SSE's rulings P-1 to P-3.
+  - New ACs: AC-VERIFY-12 and AC-INTEGRATION-6.
+  - O1-O4 RESOLVED (human ruling 2026-10-24):
+    - O1: split into a fee-lock count `countActiveRegistrations` and a display count `countRegisteredPlayers`.
+    - O2: registration keeps 404.
+    - O3: accept and document, with no session-version check.
+    - O4: the reconcile sweep moves to `45 5 * * *`.
