@@ -117,9 +117,9 @@ export function deadlineLine(deadline: string | null, passed: boolean): string |
 const guestsFor = (guestCount: number): string => `you and ${plural(guestCount, 'guest')}`;
 
 /**
- * The fee line. `unitFee` and `estimatedTotal` are the server's (`me.unitFee`, `me.estimatedTotal`); `level` is the pricing
- * snapshot level of the caller's registration (`me.registration.registrantSkillLevel`, R15), named only on a skill-level
- * session. The read model carries no level for a caller who has never registered, so the level is named once there is one.
+ * The fee line. `unitFee` and `estimatedTotal` are the server's (`me.unitFee`, `me.estimatedTotal`); `level` is the tier the
+ * server priced the caller at (`me.feeLevel`, R15: the snapshot for a confirmed row, otherwise the current level), already
+ * null off a skill-level session. It is named for a never-registered, waitlisted and confirmed caller alike.
  */
 export function feeLine(input: {
   pricing: Pricing;

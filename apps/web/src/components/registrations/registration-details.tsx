@@ -6,7 +6,7 @@ import type { PanelView } from '../../lib/registrations/view.ts';
  * The three summary lines (UI/UX "SessionSummary" of the panel, renamed so it is never confused with the admin `SessionSummary`):
  * places, fee and cancellation deadline. Places are `session.seatsLeft`, `publicCapacity` and `waitlistLength`; the fee is
  * `me.unitFee` or, with an active registration, `me.estimatedTotal`, plus every `session.fees` entry on a BY_SEX or
- * BY_SKILL_LEVEL session (the level named is the registration's `registrantSkillLevel`, R15). Nothing is derived.
+ * BY_SKILL_LEVEL session (the level named is `me.feeLevel`, R15). Nothing is derived.
  */
 export function RegistrationDetails({
   view,
@@ -25,7 +25,7 @@ export function RegistrationDetails({
     guestCount: registration?.guestCount ?? 0,
     registered: active,
     waitlisted: registration?.status === 'WAITLISTED',
-    level: registration?.registrantSkillLevel ?? null,
+    level: me.feeLevel,
   });
   const list = feeListLines(session.pricingStructure, session.fees);
   const deadline = deadlineLine(session.cancellationDeadline, view.deadlinePassed);

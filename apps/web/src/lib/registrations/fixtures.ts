@@ -80,6 +80,7 @@ export function readFixture(overrides: ReadOverrides = {}): RegistrationReadResp
       registration: null,
       unitFee: '17.00',
       estimatedTotal: '17.00',
+      feeLevel: null,
       overdueCount: 0,
       ...overrides.me,
     },

@@ -159,6 +159,8 @@ export const RegistrationReadResponse = z.object({
     registration: MyRegistration.nullable(),
     unitFee: nullableMoney,
     estimatedTotal: nullableMoney,
+    /** The skill tier the fee is priced at (R15); null unless the session is BY_SKILL_LEVEL or the caller's level is unknown. */
+    feeLevel: z.enum(SkillTier).nullable(),
     overdueCount: count,
   }),
   canRegister: z.boolean(),

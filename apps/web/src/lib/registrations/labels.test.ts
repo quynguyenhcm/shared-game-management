@@ -56,7 +56,7 @@ describe('dates are shown in Pacific/Auckland from the server instant', () => {
   });
 });
 
-describe('feeLine renders me.unitFee / me.estimatedTotal and names the level from me.registration (R15)', () => {
+describe('feeLine renders me.unitFee / me.estimatedTotal and names the level from me.feeLevel (R15)', () => {
   const base = {
     pricing: 'FLAT' as const,
     unitFee: '17.00',

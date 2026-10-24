@@ -268,15 +268,39 @@ describe('registered (AC-ENTRY-3, AC-HAPPY-1/2)', () => {
     );
   });
 
-  it('R15: a skill-level session names the level from me.registration.registrantSkillLevel', () => {
+  it('R15: a confirmed caller on a skill-level session names me.feeLevel (the snapshot)', () => {
     const data = active(confirmed({ registrantSkillLevel: 'INTERMEDIATE' }), {
       session: { pricingStructure: 'BY_SKILL_LEVEL' },
       me: {
         registration: confirmed({ registrantSkillLevel: 'INTERMEDIATE' }),
         estimatedTotal: '20.00',
+        feeLevel: 'INTERMEDIATE',
       },
     });
     expect(text(panel(data))).toContain('Your fee (Intermediate): $20.00, charged after the game.');
+  });
+
+  it('R15: a never-registered caller on a skill-level session sees the fee line naming me.feeLevel', () => {
+    const data = readFixture({
+      session: { pricingStructure: 'BY_SKILL_LEVEL' },
+      me: { unitFee: '20.00', estimatedTotal: '20.00', feeLevel: 'INTERMEDIATE' },
+    });
+    expect(text(panel(data))).toContain('Your fee (Intermediate): $20.00, charged after the game.');
+  });
+
+  it('R15: a waitlisted caller names me.feeLevel too, and a flat session names none', () => {
+    const waiting = active(waitlisted({ registrantSkillLevel: 'ADVANCED' }), {
+      session: { pricingStructure: 'BY_SKILL_LEVEL' },
+      me: {
+        registration: waitlisted({ registrantSkillLevel: null }),
+        estimatedTotal: '20.00',
+        feeLevel: 'ADVANCED',
+      },
+    });
+    expect(text(panel(waiting))).toContain('Your fee (Advanced): $20.00');
+    expect(text(panel(readFixture({ me: { feeLevel: 'ADVANCED' } })))).toContain(
+      'Fee: $17.00 per person',
+    );
   });
 
   it('BY_SEX / BY_SKILL_LEVEL list session.fees', () => {

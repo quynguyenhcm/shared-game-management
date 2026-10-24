@@ -285,6 +285,8 @@ export async function readRegistrationModel(
       registration: own?.response ?? null,
       unitFee: moneyOrNull(priced),
       estimatedTotal: moneyOrNull(total),
+      feeLevel:
+        session.pricing_structure === 'BY_SKILL_LEVEL' ? (person?.skillLevel ?? null) : null,
       overdueCount,
     },
     canRegister: access.canRegister,

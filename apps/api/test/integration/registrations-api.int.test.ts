@@ -263,6 +263,35 @@ describe('POST .../registrations', () => {
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
+  it('R15: me.feeLevel names the current level on a skill-level session, for a never-registered and a waitlisted caller; null otherwise', async () => {
+    const skill = await insertPublishedSession(database.pool, undefined, {
+      now: h.clock.now(),
+      maxPlayers: 1,
+      pricing: 'BY_SKILL_LEVEL',
+      beginner: '15.00',
+      intermediate: '17.00',
+      advanced: '20.00',
+    });
+    const never = await httpMember(h, skill.teamId, { skill: 'INTERMEDIATE' });
+    expect(readModelOf(await readAs(h, never, skill.teamId, skill.sessionId)).me).toMatchObject({
+      feeLevel: 'INTERMEDIATE',
+      unitFee: '17.00',
+    });
+    const taker = await httpMember(h, skill.teamId);
+    expect((await registerAs(h, taker, skill.teamId, skill.sessionId)).statusCode).toBe(201);
+    const waiting = await httpMember(h, skill.teamId, { skill: 'ADVANCED' });
+    const joined = await registerAs(h, waiting, skill.teamId, skill.sessionId);
+    expect(registeredOf(joined).status).toBe('WAITLISTED');
+    expect(readModelOf(await readAs(h, waiting, skill.teamId, skill.sessionId)).me).toMatchObject({
+      feeLevel: 'ADVANCED',
+    });
+    const flat = await scene();
+    const member = await httpMember(h, flat.teamId, { skill: 'ADVANCED' });
+    expect(
+      readModelOf(await readAs(h, member, flat.teamId, flat.sessionId)).me.feeLevel,
+    ).toBeNull();
+  });
+
   it('puts a full session onto the waitlist with rank 1, 2, and the rank follows the queue when someone ahead leaves', async () => {
     const s = await scene({ maxPlayers: 1 });
     const holder = await httpMember(h, s.teamId);

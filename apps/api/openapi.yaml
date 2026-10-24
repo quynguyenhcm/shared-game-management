@@ -13751,6 +13751,14 @@ paths:
                         anyOf:
                           - {}
                           - type: "null"
+                      feeLevel:
+                        anyOf:
+                          - type: string
+                            enum:
+                              - BEGINNER
+                              - INTERMEDIATE
+                              - ADVANCED
+                          - type: "null"
                       overdueCount:
                         type: integer
                         minimum: 0
@@ -13759,6 +13767,7 @@ paths:
                       - registration
                       - unitFee
                       - estimatedTotal
+                      - feeLevel
                       - overdueCount
                     additionalProperties: false
                   canRegister:

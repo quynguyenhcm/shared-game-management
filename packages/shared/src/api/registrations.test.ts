@@ -137,11 +137,22 @@ describe('response schemas', () => {
   it('parses the registration read model with money as strings and instants as ISO strings', () => {
     const body = {
       session,
-      me: { registration, unitFee: '12.00', estimatedTotal: '24.00', overdueCount: 0 },
+      me: {
+        registration,
+        unitFee: '12.00',
+        estimatedTotal: '24.00',
+        feeLevel: 'INTERMEDIATE',
+        overdueCount: 0,
+      },
       canRegister: false,
       blockedReason: 'already_registered',
     };
     expect(RegistrationReadResponse.parse(body).me.estimatedTotal).toBe('24.00');
+    expect(RegistrationReadResponse.parse(body).me.feeLevel).toBe('INTERMEDIATE');
+    expect(
+      RegistrationReadResponse.safeParse({ ...body, me: { ...body.me, feeLevel: 'EXPERT' } })
+        .success,
+    ).toBe(false);
     expect(
       RegistrationReadResponse.safeParse({ ...body, me: { ...body.me, estimatedTotal: 24 } })
         .success,
@@ -180,7 +191,13 @@ describe('response schemas', () => {
     (blockedReason) => {
       const body = {
         session,
-        me: { registration: null, unitFee: null, estimatedTotal: null, overdueCount: 0 },
+        me: {
+          registration: null,
+          unitFee: null,
+          estimatedTotal: null,
+          feeLevel: null,
+          overdueCount: 0,
+        },
         canRegister: false,
         blockedReason,
       };
@@ -197,7 +214,13 @@ describe('response schemas', () => {
   ])('accepts %s as a read-model blockedReason', (blockedReason) => {
     const body = {
       session,
-      me: { registration: null, unitFee: null, estimatedTotal: null, overdueCount: 0 },
+      me: {
+        registration: null,
+        unitFee: null,
+        estimatedTotal: null,
+        feeLevel: null,
+        overdueCount: 0,
+      },
       canRegister: false,
       blockedReason,
     };
