@@ -2,13 +2,13 @@
 slug: registration-and-waitlist
 legacy_id:
 feature: registration-and-waitlist
-status: CREATIVE_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # registration-and-waitlist: Registration and Waitlist
 
 **Complexity**: Level 4 (inherited from registration-and-waitlist)
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: registration-and-waitlist
 **Branch**: feature/registration-and-waitlist
 **Worktree**: N/A (main checkout)
@@ -710,7 +710,7 @@ Adjust this plan if needed.
 - [x] **Phase 3: Registration API and promotion emails**: routes, service, policies, team-scoped lookups, refusals, promotion emails and the R17 auto-enrol email in the placing transaction, `registration.*` logs, OpenAPI with 401/403. (R19, R23, R24) The body of `createSessionAllocator` now returns the adapter, once both emails exist. `session-allocator.test.ts` is updated, and the real-adapter marker proof and capacity-edit cases run through SSE's routes and sweep. `GET /teams/:teamId/sessions/upcoming` resolves ahead of SSE's `/:sessionId` route. Another team's session id stays 404 (O2 ruling). ACs: AC-ERROR-1 to 3 and 5 to 8, AC-ASYNC-1, AC-VERIFY-1 and 6, AC-HAPPY-11 (email), AC-INTEGRATION-6.
 - [x] **Phase 4: Real ban handler and reconciliation sweep** (follows creative Q4): the handler, worker wiring, the `registration-ban-reconcile` queue and slot (`45 5 * * *`, O4 human ruling 2026-10-24), the team-management contract test with the real handler. ACs: AC-HAPPY-10 (API side), AC-ERROR-9, AC-ASYNC-2 and 3, AC-INTEGRATION-2.
 - [x] **Phase 5: Web registration panel** (follows the UI/UX and journey creative docs): session page or panel slot, register form with guests, waitlist and withdraw states, debt block, proxy, api-client, Server Actions, restored ban confirmation, the R17 "Added automatically (Auto Enroll)" label and the R15 fee line naming the level. (R23, R27) The player page at `apps/web/src/app/teams/[teamId]/sessions/[sessionId]/page.tsx`, which flips SSE's page-absence check (`sessions-contracts.int.test.ts:448-455`) to assert this page. The player summary component is named apart from SSE's admin `SessionSummary` (`components/teams/session-summary.tsx`). The cancelled-session copy (P-2). ACs: AC-ENTRY-1 to 3, web side of AC-HAPPY-1 to 10, AC-ERROR-2 and 5 and 8, AC-ASYNC-4, AC-HAPPY-11 (label).
-- [ ] **Phase 6: E2E, accessibility and docs**: Playwright journeys with axe on both viewports, coverage gate, `systemPatterns.md`/`techContext.md` updates. (R27) The e2e session is created and published through SSE's admin API, with no seed script. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-8 and 9, AC-INTEGRATION-4.
+- [x] **Phase 6: E2E, accessibility and docs**: Playwright journeys with axe on both viewports, coverage gate, `systemPatterns.md`/`techContext.md` updates. (R27) The e2e session is created and published through SSE's admin API, with no seed script. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-8 and 9, AC-INTEGRATION-4.
 
 ## Creative Phases
 
@@ -1029,10 +1029,10 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 
 ## Execution State
 
-**Build Status**: PHASE_COMPLETE (Phase 5 of 6)
+**Build Status**: BUILD_COMPLETE (Phase 6 of 6)
 **Auto-Build Mode**: YES
-**Current Phase**: Phase 6 next
-**Current Step**: Phase 5 built and committed (2026-10-25). Next: /yay:build registration-and-waitlist for Phase 6.
+**Current Phase**: all phases built; next /yay:reflect registration-and-waitlist
+**Current Step**: Phase 6 built and committed (2026-10-25). Next: /yay:reflect registration-and-waitlist.
 **Step Started**: 2026-10-16
 **Can Resume**: YES
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
@@ -1067,6 +1067,7 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 - Phase 3 BUILD COMPLETE (2026-10-25): registrations service/routes/read-model/access/errors, routes registered before SSE's (static `upcoming` wins), `createSessionAllocator` now returns the real adapter, OpenAPI regenerated with 401/403. AC-INTEGRATION-1 (a)-(d) repeated over HTTP; AC-INTEGRATION-6 proven through SSE's sweep, capacity PUT and series edit with the real adapter. Review: Anthropic APPROVED (5 MINOR) + Codex (1 P2: debtor on unknown/DRAFT/foreign session got 403 not 404, fixed test-first).
 - Phase 4 BUILD COMPLETE (2026-10-25): real `MemberBannedHandler` (`modules/registrations/ban-handler.ts`, name 'registrations', one session per transaction under JOB_POLICY, continue on error, transient-first classification), sweep (`modules/registrations/reconcile.ts` + `jobs/ban-reconcile.ts`), queue and slot `registration-ban-reconcile` at `45 5 * * *` (O4), boot enqueue in `enqueueBootSweeps`, worker wiring and pool 2 to 5, repo reads `listBanTargets` / `listBannedWithActive`. `teams-ban-seam.int.test.ts` now runs the real handler (AC-INTEGRATION-2); AC-INTEGRATION-1 race (d) repeated over HTTP through the real handler path. ADR 0018 sections 10, 11 and Consequences updated (Phase 3 gate bucket 2 items i to iii, C3 sweep analysis).
 - Phase 5 BUILD COMPLETE (2026-10-25): player session page + stacked RegistrationPanel, PlayerSessionSummary, Upcoming sessions section, Server Actions/api-client/proxy, ConfirmDisclosure extraction, restored ban confirmation copy, R17 label, SSE tripwire flipped; ban-handler fixed-clock carry-forward.
+- Phase 6 BUILD COMPLETE (2026-10-25): `apps/web/e2e/registrations.spec.ts` (4 journeys x desktop and 360x740: register with a guest, waitlist a party of three, promotion on early withdrawal with Mailpit email, ban withdrawn within 30 s; late withdrawal wording; debt block; cancelled session), axe + no-horizontal-scroll + 44 px targets at every state; sessions created and published through SSE's admin API; docs (systemPatterns Test Scope Preferences, techContext, ADR 0018 status). 8/8 e2e passing.
 
 ### Guard & Recovery Log
 - Phase 5 remediation 1 (2026-10-25): phase reviewer HALT (MISSING R15: fee estimate names the level only from the registration snapshot). Fixed test-first (RED seen: shared schema, integration read model, web component) with additive `me.feeLevel`. Guard result recorded at commit.
@@ -1120,3 +1121,9 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 - Phase 5 | accepted minor | test-only props initialParty/defaultOpen/initialGuests on production components; promotedLate and withdrawPrompt waitlistLength branch compare server fields (consider API field promotedAfterDeadline).
 - Phase 5 | reviewer bucket 1 (accepted) | the pre-submit estimated Total line is shown because AC-HAPPY-2 requires it; `memory-bank/ux-patterns.md` is absent (creative UI/UX doc used); the four item-4 departures stay as recorded above; the ban-handler fixed clock (`{ now: () => selectionNow }`) is the creative normative shape.
 - Phase 5 | reviewer bucket 2 (deferred) | Playwright E2E and axe checks belong to Phase 6; run `/yay:ux-ingest` after the feature to create `ux-patterns.md`. AC-VERIFY-5 wording reworded to name the NZ formatter (`formatDayShort` + `formatClock`, Pacific/Auckland) instead of `formatNzDateTime`.
+- Phase 6 | guard | commit guard PASS at 4373d36 (prod=0 test=2); later commits' results are in git log.
+- Phase 6 | RED seen | the first e2e run failed against a deliberately missing heading ("Registration panel"), then against real selector ambiguities (strict-mode on two matches) before passing; the 4 journeys x 2 projects pass against the Compose stack rebuilt from this branch.
+- Phase 6 | builder choice | AC-INTEGRATION-4 uses capacity 3 (A + 1 guest, then B as a party of three waitlisted #1, promoted whole) instead of capacity 2 with B alone; it covers every listed step including the ban within 30 s. "B alone waitlisted" is exercised by unit/integration tests, not e2e. The only SQL write in e2e is three OVERDUE payments rows (no money row can be created through the app yet).
+- Phase 6 | carry-forward done | Test Scope Preferences coverage list fixed; HTTP race tests' dependence on the 2 s lock_timeout recorded as a CI flake watch item (techContext, ADR 0018 Consequences); worker pool `max: 5` is a hardcoded literal in worker.ts, config key is a follow-up (techContext, ADR 0018 section 11); run `/yay:ux-ingest` after this feature (ux-patterns.md absent); ADR 0018 Status set to "Proposed until merge".
+- Phase 6 | open for human | C3 (a ban can commit concurrently with a promotion, ADR 0018 Consequences) remains PENDING HUMAN ACKNOWLEDGEMENT before merge; not marked acknowledged.
+- Phase 6 | reviewer | Anthropic APPROVED (non-blocking items fixed: strict-mode `.first()`, dialog collection asserted per person, techContext table layout and stale coverage bullet). Codex: no actionable findings.

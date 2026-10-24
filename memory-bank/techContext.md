@@ -78,7 +78,7 @@
 - **Testing**: vitest 5.0.2
   - **Unit tests**: `**/*.test.ts` (no DB, no network, Node environment)
   - **Integration tests**: `**/*.int.test.ts` against real PostgreSQL 17 (forks pool, SKIP LOCKED job polling)
-  - **Coverage provider**: v8, threshold 80% for money/time/invoice/auth shared code, the api platform libraries, `apps/api/src/modules/auth/**` and `apps/web/src/lib/**`; measured over unit and integration tests together (`pnpm run test:coverage`)
+  - **Coverage provider**: v8, aggregate threshold 80% over the files listed in `vitest.config.ts` `coverage.include` (see Coverage & Quality Gates); measured over unit and integration tests together (`pnpm run test:coverage`)
   - **E2E tests**: Playwright 1.63.0 (`apps/web/e2e/smoke.spec.ts`, `auth.spec.ts`, `teams.spec.ts`, `skill-levels.spec.ts`, `team-banking.spec.ts`, `sessions.spec.ts`, `registrations.spec.ts`) on a desktop and a 360 x 740 project, `@axe-core/playwright` for accessibility scans; needs the Compose stack with `AUTH_FAKE_OAUTH=true` and Chromium (`playwright install chromium`)
   - **Team journeys** (`teams.spec.ts`): run against a production `next start` build, with the worker running so the `member-banned` queue is drained. Not part of `pnpm run ci`
   - **Banking journeys** (`apps/web/e2e/team-banking.spec.ts`, 7 journeys per project, 14/14 passing): desktop and 360 x 740 with axe. Like the team journeys, it is not part of `pnpm run ci`. It runs natively against a temporary database with the API, the worker and a production `next start` (`AUTH_FAKE_OAUTH=true`); seeding (a published paid session, a failed payout, an unreadable saved name) needs the stack's database URL in `E2E_DATABASE_URL`, and those journeys are skipped without it. Recipe:
@@ -185,9 +185,9 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `packages/shared/src/registrations/**` | 80% | Shared registration rules (added by registration-and-waitlist) |
 | `packages/shared/src/nz/**` | 80% | NZ bank-account, IRD and GST validators |
 | `apps/api/src/jobs/ban-reconcile.ts` | 80% | Registration ban reconciliation sweep (added by registration-and-waitlist) |
+| Other modules, generated types | Not required | Coverage gate applies only to listed modules |
 
 The gate is **aggregate** over all listed files, not per file. `vitest.config.ts` `coverage.include` is the source of truth for the measured set; `systemPatterns.md` "Test Scope Preferences" lists it in words.
-| Other modules, generated types | Not required | Coverage gate applies only to listed modules |
 
 Coverage is checked via `vitest run --coverage` (`pnpm run test:coverage`, both projects) with the v8 provider; thresholds are `lines: 80, functions: 80, branches: 80, statements: 80`. Unit tests alone cover about 76% of the listed files because the DB-backed auth services are exercised by the integration project.
 

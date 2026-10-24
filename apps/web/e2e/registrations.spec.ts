@@ -149,6 +149,7 @@ interface Scene {
   readonly teamName: string;
 }
 
+/** A fresh team with its own admin; nothing is shared between journeys, so each one can run in any order. */
 async function newScene(): Promise<Scene> {
   const admin = await newPerson('admin');
   const teamName = `E2E Registrations ${unique('t')}`;
@@ -276,6 +277,7 @@ async function makeOverdue(userId: string): Promise<number> {
   });
 }
 
+/** Reads the registration row's status directly, so the ban step can assert the handler's effect without the UI. */
 async function registrationStatus(sessionId: string, userId: string): Promise<string | null> {
   return withDb(async (db) => {
     const result = await db.query(
@@ -288,6 +290,7 @@ async function registrationStatus(sessionId: string, userId: string): Promise<st
 
 // ---- Mailpit ----------------------------------------------------------------------------------
 
+/** Polls Mailpit until a message to `to` whose subject starts with `subjectStart` has arrived (worker-sent email). */
 async function waitForEmail(to: string, subjectStart: string): Promise<void> {
   await expect
     .poll(
@@ -309,6 +312,14 @@ async function waitForEmail(to: string, subjectStart: string): Promise<void> {
 
 // ---- The browser ------------------------------------------------------------------------------
 
+const openedDialogs = new WeakMap<Page, string[]>();
+
+/** Closes a person's context after asserting that no native dialog opened. */
+async function closePerson(page: Page): Promise<void> {
+  expect(openedDialogs.get(page) ?? [], 'native browser dialogs').toEqual([]);
+  await page.context().close();
+}
+
 /** A fresh browser context (one person) with the viewport and touch settings of the running project. */
 async function personPage(browser: Browser): Promise<Page> {
   const { baseURL, viewport, isMobile, hasTouch, deviceScaleFactor, userAgent } =
@@ -324,14 +335,17 @@ async function personPage(browser: Browser): Promise<Page> {
   const page = await context.newPage();
   page.setDefaultTimeout(30_000);
   page.setDefaultNavigationTimeout(30_000);
-  // No native browser dialog may ever open: confirmations are inline.
+  // No native browser dialog may ever open: confirmations are inline. Collected here, asserted in `closePerson`.
+  const dialogs: string[] = [];
+  openedDialogs.set(page, dialogs);
   page.on('dialog', (dialog) => {
+    dialogs.push(`${dialog.type()}: ${dialog.message()}`);
     void dialog.dismiss();
-    throw new Error(`native ${dialog.type()} dialog opened: ${dialog.message()}`);
   });
   return page;
 }
 
+/** Signs in through the real `/login` form; every player goes through it, never a cookie or token injection. */
 async function signIn(page: Page, person: Person): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email').fill(person.email);
@@ -456,7 +470,7 @@ test.describe('player registration', () => {
 
     // ===== 4. The promoted player sees "You're in." and gets the email
     await b.reload();
-    await expect(statusRegion(b).getByText("You're in.")).toBeVisible();
+    await expect(statusRegion(b).getByText("You're in.").first()).toBeVisible();
     await expect(statusRegion(b).getByText(/You were moved off the waitlist on/)).toBeVisible();
     await expect(panel(b).getByText('Full · 0 on the waitlist')).toBeVisible();
     await scan(b, 'session page, promoted');
@@ -486,8 +500,8 @@ test.describe('player registration', () => {
     await expect(b.getByText('You need to be a member of this team to register.')).toBeVisible();
     await scan(b, 'session page, banned player');
 
-    await a.context().close();
-    await b.context().close();
+    await closePerson(a);
+    await closePerson(b);
   });
 
   test('withdrawing after the deadline spells out the late terms (AC-ERROR-2, R9)', async ({
@@ -533,7 +547,7 @@ test.describe('player registration', () => {
         .first(),
     ).toBeVisible();
     await scan(page, 'session page, withdrawn late');
-    await page.context().close();
+    await closePerson(page);
   });
 
   test('three overdue payments block registration with the reason in words (AC-ERROR-1)', async ({
@@ -578,7 +592,7 @@ test.describe('player registration', () => {
       0,
     );
     await scan(page, 'session page, debt block');
-    await page.context().close();
+    await closePerson(page);
   });
 
   test('a cancelled session is closed to registration (AC-ERROR-2)', async ({ browser }) => {
@@ -602,6 +616,6 @@ test.describe('player registration', () => {
       0,
     );
     await scan(page, 'session page, cancelled');
-    await page.context().close();
+    await closePerson(page);
   });
 });
