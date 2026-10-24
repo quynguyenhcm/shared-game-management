@@ -394,6 +394,27 @@ describe('POST .../registrations', () => {
     expect(readModelOf(await readAs(h, lenient, s.teamId, s.sessionId)).me.overdueCount).toBe(2);
   });
 
+  it('AC-ERROR-1 / O2: a debtor registering to an unknown, DRAFT or other-team session gets the same 404 as a member without debt, never 403', async () => {
+    const s = await scene();
+    const foreign = await scene();
+    const draft = await insertSession(database.pool, s.teamId, {}, { status: 'DRAFT' });
+    const debtor = await httpMember(h, s.teamId);
+    for (let i = 0; i < 3; i += 1) await owes(debtor.userId, 'OVERDUE');
+    const clean = await httpMember(h, s.teamId);
+    for (const sessionId of [foreign.sessionId, draft, randomUUID()]) {
+      const asDebtor = await registerAs(h, debtor, s.teamId, sessionId);
+      const asClean = await registerAs(h, clean, s.teamId, sessionId);
+      expect(asClean.statusCode, sessionId).toBe(404);
+      expect(asDebtor.statusCode, sessionId).toBe(404);
+      expect(errorOf(asDebtor).code).toBe('not_found');
+      expect(asDebtor.body).toBe(asClean.body);
+    }
+    // No regression: on a visible open session the debt gate still answers 403.
+    const blocked = await registerAs(h, debtor, s.teamId, s.sessionId);
+    expect(blocked.statusCode).toBe(403);
+    expect(errorOf(blocked).code).toBe('overdue_payments');
+  });
+
   it('AC-ERROR-1: debt never blocks a withdrawal', async () => {
     const s = await scene();
     const debtor = await httpMember(h, s.teamId);

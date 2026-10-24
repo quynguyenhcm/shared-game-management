@@ -5,6 +5,11 @@
  * already has an active registration, three or more payments are overdue, the session has no public place at all. A fee-due
  * withdrawn caller can still try: whether the whole group fits right now is the allocator's answer (`late_withdrawal_fee_due`),
  * not something the page can know without reading the whole queue.
+ *
+ * Precedence across the two surfaces: an unknown, DRAFT or other-team session is a 404 before any of this (O2, the service
+ * resolves visibility first). For a visible but closed session the read model says `session_not_open` first, while a debtor's
+ * POST gets the allocator's 403 `overdue_payments` (its member gate precedes the session check). That asymmetry is
+ * deliberate: the session is visible, so the debt answer leaks nothing, and the member must clear the debt either way.
  */
 import type { RegistrationBlockedReason } from '@sgm/shared';
 import { DEBT_LIMIT } from './allocator.ts';

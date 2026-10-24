@@ -10,6 +10,9 @@
  * The allocator already emits `registration.created`, `.withdrawn`, `.promoted` and `.refused` through the `log` it is given
  * (`request.log`, which carries the trace ids). This service therefore logs NONE of them again; a test counts each event once.
  *
+ * Single emission holds only while nothing after the allocator call takes locks (a lock conflict retries the whole
+ * transaction, and the allocator's events would then be logged twice): the reads here are lock-free.
+ *
  * `:sessionId` is always resolved together with `:teamId`: another team's session, a DRAFT and an unknown id all end as the same
  * 404 `not_found` (O2, AC-ENTRY-2). Nothing here looks a session up by its id alone.
  */
@@ -39,6 +42,7 @@ import {
   readUpcoming,
   readVisibleSession,
 } from './read-model.ts';
+import { readSessionHeader } from './repo.ts';
 import { HTTP_POLICY, runAllocatorTransaction } from './tx.ts';
 
 /** The request logger the service passes on to the allocator. */
@@ -110,6 +114,11 @@ export function createRegistrationsService(deps: RegistrationsServiceDeps): Regi
         HTTP_POLICY,
         { clock, teamId, path: 'register', log: ctx.log },
         async ({ trx, now }) => {
+          // O2: resolve the session (team-scoped, lock-free) BEFORE the allocator, whose member gate refuses a debtor first.
+          // Unknown, DRAFT and other-team ids must answer the same 404 whatever the caller owes. The allocator re-reads
+          // the session under its own lock, so this check only decides visibility.
+          const header = await readSessionHeader(trx, { teamId, sessionId });
+          if (header === undefined || header.status === 'DRAFT') throw new AppError('not_found');
           const outcome = await allocator.registerInSession(
             { trx, now, log: ctx.log },
             { teamId, sessionId, userId, guests },
@@ -154,6 +163,8 @@ export function createRegistrationsService(deps: RegistrationsServiceDeps): Regi
         },
         // Never who: the answer says only whether the waitlist took the place.
         replacedBy: outcome.promoted.length > 0 ? 'waitlist' : 'nobody',
+        // Best-effort: billing decides the charge. When the fee is due but cannot be estimated (no snapshot or no fees
+        // for the session's pricing), `owed` is null and the estimate reads "0.00", not "unknown" (shared contract: a string).
         feeEstimate: result.owed ?? toMoneyString(ZERO),
       };
     },
