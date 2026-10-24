@@ -6,7 +6,7 @@
  */
 import { expect } from 'vitest';
 import type { SkillTier } from '@sgm/shared';
-import { insertSession, insertTeamMember, insertUser } from './factories.ts';
+import { advanceSessionsTo, insertSession, insertTeamMember, insertUser } from './factories.ts';
 import type { Queryable } from './test-db.ts';
 
 type SessionStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED';
@@ -31,12 +31,7 @@ export async function makeSessions(
       await insertSession(db, teamId, { flat: '0.00' }, { date: addDays(startDate, index) }),
     );
   }
-  if (status !== 'DRAFT' && ids.length > 0) {
-    await db.query('UPDATE game_sessions SET status = $2 WHERE id = ANY($1::uuid[])', [
-      ids,
-      status,
-    ]);
-  }
+  await advanceSessionsTo(db, ids, status);
   return ids;
 }
 

@@ -39,6 +39,7 @@ import {
 import { captureLogs } from '../helpers/log-capture.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 const config = loadConfig();
 const NEW_PASSWORD = 'tui-and-kereru-914';
@@ -89,6 +90,8 @@ beforeAll(async () => {
   await producer.start();
   await worker.start();
   await registerJobs({
+    sessionAllocator: noopSessionAllocator,
+    webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier: delegating,
     crypto: testCrypto(),

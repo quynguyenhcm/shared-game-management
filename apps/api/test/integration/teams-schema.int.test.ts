@@ -467,14 +467,15 @@ describe('ledger and reversibility (AC-VERIFY-2)', () => {
         true,
       );
 
-      // Newest first: the skill-level invariants, the banking change keys, then the banking invariants sit on
-      // top of the membership invariants.
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 4 });
-      expect(reverted).toHaveLength(4);
-      expect(reverted[0]).toContain('skill_levels_and_auto_enroll');
-      expect(reverted[1]).toContain('team_banking_change_keys');
-      expect(reverted[2]).toContain('team_banking_and_gst_invariants');
-      expect(reverted[3]).toContain('team_membership_invariants');
+      // Newest first: the session scheduling schema, the skill-level invariants, the banking change keys, then the
+      // banking invariants sit on top of the membership invariants.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 5 });
+      expect(reverted).toHaveLength(5);
+      expect(reverted[0]).toContain('session_scheduling');
+      expect(reverted[1]).toContain('skill_levels_and_auto_enroll');
+      expect(reverted[2]).toContain('team_banking_change_keys');
+      expect(reverted[3]).toContain('team_banking_and_gst_invariants');
+      expect(reverted[4]).toContain('team_membership_invariants');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'team_members_admin_approved',

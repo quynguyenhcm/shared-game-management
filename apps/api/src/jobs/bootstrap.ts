@@ -3,13 +3,19 @@ import type { FieldCrypto } from '../lib/crypto/crypto.ts';
 import type { Database } from '../lib/db/kysely.ts';
 import type { JobHandler, JobRunner, QueueDefinition } from '../lib/jobs/jobs.ts';
 import type { Notifier } from '../lib/notifications/notifier.ts';
+import type { Logger } from '../lib/logger/logger.ts';
+import type { SessionAllocatorPort } from '../modules/sessions/allocator-port.ts';
+import { DEFAULT_RECURRENCE_HORIZON_DAYS } from '../modules/sessions/materialise.ts';
 import { noopMemberBannedHandler, type MemberBannedHandler } from '../modules/teams/ban-hook.ts';
 import { createAuthCleanupHandler } from './auth-cleanup.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { createMemberBannedJobHandler } from './member-banned.ts';
+import { createRecurrenceMaterialisationHandler } from './recurrence-materialisation.ts';
+import { createRecurrenceRuleHandler } from './recurrence-rule.ts';
 import { QUEUES, QUEUE_NAMES, withExpireOverride } from './registry.ts';
 import { SCHEDULES, placeholderHandler, registerSchedules } from './schedules.ts';
 import { createSendEmailHandler } from './send-email.ts';
+import { createSessionAutoEnrolHandler } from './session-auto-enrol.ts';
 import { createSkillProgressionHandler } from './skill-progression.ts';
 
 export interface ExtraQueue {
@@ -32,6 +38,15 @@ export interface RegisterJobsOptions {
    * this option is the only place the port is injected.
    */
   readonly memberBannedHandler?: MemberBannedHandler;
+  /**
+   * Seat allocator seam for the sessions jobs (architecture SA-4). REQUIRED: `worker.ts` builds it with
+   * `createSessionAllocator`, so an entrypoint that forgets it does not compile.
+   */
+  readonly sessionAllocator: SessionAllocatorPort;
+  /** `RECURRENCE_HORIZON_DAYS` (7-91): how far ahead the series materialiser creates sessions. Defaults to 28. */
+  readonly recurrenceHorizonDays?: number;
+  /** `config.auth.webBaseUrl`: origin for the links in the series banking notice. REQUIRED (12-factor: no localhost fallback). */
+  readonly webBaseUrl: string;
   /** Defaults to the registry; tests pass tuned copies. */
   readonly queues?: readonly QueueDefinition[];
   /** Test-only expiry override applied to every queue (JOBS_EXPIRE_SECONDS_OVERRIDE). */
@@ -43,6 +58,10 @@ export interface RegisterJobsOptions {
 /** Creates the queues (idempotent), attaches every handler and registers the cron schedules. */
 export async function registerJobs(options: RegisterJobsOptions): Promise<void> {
   const { runner } = options;
+  // Fail fast, before any queue is defined: the banking-notice links need the real origin.
+  if (typeof options.webBaseUrl !== 'string' || options.webBaseUrl.length === 0) {
+    throw new Error('registerJobs: webBaseUrl is required (set WEB_BASE_URL)');
+  }
   const handlers: Record<string, JobHandler> = {
     // Placeholders first: a slot that has a real handler below overrides its placeholder.
     ...Object.fromEntries(SCHEDULES.map((slot) => [slot.name, placeholderHandler(slot.name)])),
@@ -62,6 +81,25 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
     [QUEUE_NAMES.skillProgression]: createSkillProgressionHandler({
       db: options.db,
       clock: options.clock ?? systemClock,
+    }),
+    [QUEUE_NAMES.sessionAutoEnrol]: createSessionAutoEnrolHandler({
+      db: options.db,
+      clock: options.clock ?? systemClock,
+      allocator: options.sessionAllocator,
+    }),
+    // The real sweep replaces the schedule placeholder; it fans out to the per-rule and per-session queues.
+    [QUEUE_NAMES.recurrenceMaterialisation]: createRecurrenceMaterialisationHandler({
+      db: options.db,
+      clock: options.clock ?? systemClock,
+      jobs: runner,
+    }),
+    [QUEUE_NAMES.recurrenceRule]: createRecurrenceRuleHandler({
+      db: options.db,
+      clock: options.clock ?? systemClock,
+      allocator: options.sessionAllocator,
+      jobs: runner,
+      horizonDays: options.recurrenceHorizonDays ?? DEFAULT_RECURRENCE_HORIZON_DAYS,
+      webBaseUrl: options.webBaseUrl,
     }),
   };
 
@@ -84,4 +122,28 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
     await runner.work(definition.name, handler);
   }
   await registerSchedules(runner);
+}
+
+/**
+ * Queues the sweeps that reconcile state at every worker boot (SA-1, SA-5): the series materialiser (also re-offers every
+ * pending auto-enrol) runs once right after the queues are up, so a deploy that wires a real allocator enrols the sessions that
+ * were waiting, and a worker that was down at 03:00 catches up. The queue is `exclusive`, so this is a no-op when a sweep is
+ * already queued or active. A failure to enqueue is logged and never stops the worker: the 03:00 schedule is still registered.
+ */
+export async function enqueueBootSweeps(
+  runner: Pick<JobRunner, 'enqueue'>,
+  logger: Pick<Logger, 'info' | 'warn'>,
+): Promise<void> {
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.recurrenceMaterialisation, { source: 'boot' });
+    logger.info(
+      { event: 'session.recurrence.boot_sweep', enqueued: jobId !== null },
+      jobId === null ? 'boot sweep already queued' : 'boot sweep queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'session.recurrence.boot_sweep_failed', err: error },
+      'boot sweep could not be queued',
+    );
+  }
 }

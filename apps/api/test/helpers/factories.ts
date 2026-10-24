@@ -223,20 +223,107 @@ export interface SessionFees {
   readonly advanced?: string | null;
 }
 
-/** A DRAFT session on 2026-10-07 with one court 19:00–21:00 (FLAT $17.00 unless fees say otherwise). */
+export type SessionStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED';
+
+/** The legal lifecycle paths of the DB matrix (D-75): DRAFT → PUBLISHED → COMPLETED, and → CANCELLED from DRAFT or PUBLISHED. */
+const LIFECYCLE_PATH: Readonly<Record<SessionStatus, readonly SessionStatus[]>> = {
+  DRAFT: [],
+  PUBLISHED: ['PUBLISHED'],
+  COMPLETED: ['PUBLISHED', 'COMPLETED'],
+  CANCELLED: ['CANCELLED'],
+};
+
+/**
+ * Moves a session to `target` along the legal lifecycle path, one UPDATE per step (never a raw
+ * DRAFT → COMPLETED jump, which the DB matrix refuses). A no-op when already there.
+ */
+export async function advanceSessionTo(
+  db: Queryable,
+  sessionId: string,
+  target: SessionStatus,
+): Promise<void> {
+  const { rows } = await db.query<{ status: SessionStatus }>(
+    `SELECT status FROM game_sessions WHERE id = $1`,
+    [sessionId],
+  );
+  const current = rows[0]?.status;
+  if (current === undefined) throw new Error(`advanceSessionTo: session ${sessionId} not found`);
+  if (current === target) return;
+  const path = LIFECYCLE_PATH[target];
+  const at = path.indexOf(current);
+  // CANCELLED is one legal step from DRAFT or PUBLISHED (neither is on its own path); everything else continues
+  // along the target's path from where the session is.
+  const remaining =
+    target === 'CANCELLED'
+      ? current === 'DRAFT' || current === 'PUBLISHED'
+        ? path
+        : []
+      : current === 'DRAFT'
+        ? path
+        : at >= 0
+          ? path.slice(at + 1)
+          : [];
+  if (remaining.length === 0) {
+    throw new Error(`advanceSessionTo: ${current} → ${target} is not a legal path`);
+  }
+  for (const step of remaining) {
+    await db.query(`UPDATE game_sessions SET status = $2 WHERE id = $1`, [sessionId, step]);
+  }
+}
+
+/** `advanceSessionTo` for many DRAFT sessions at once: one UPDATE per step of the legal path, not per session. */
+export async function advanceSessionsTo(
+  db: Queryable,
+  sessionIds: readonly string[],
+  target: SessionStatus,
+): Promise<void> {
+  if (target === 'DRAFT' || sessionIds.length === 0) return;
+  for (const step of LIFECYCLE_PATH[target]) {
+    await db.query(`UPDATE game_sessions SET status = $2 WHERE id = ANY($1::uuid[])`, [
+      sessionIds,
+      step,
+    ]);
+  }
+}
+
+export interface SessionOptions {
+  readonly date?: string;
+  readonly recurringRuleId?: string | null;
+  readonly withCourt?: boolean;
+  /** Reached through `advanceSessionTo` (courts first), never inserted directly. Default DRAFT. */
+  readonly status?: SessionStatus;
+  /** `calculated_rate_per_player` (FLAT). With no `fees.flat`, `fee_flat` follows custom ?? calculated. */
+  readonly calculatedRate?: string | null;
+  readonly customRate?: string | null;
+  readonly maxPlayers?: number;
+  readonly createKey?: string | null;
+}
+
+/**
+ * A session on 2026-10-07 with one court 19:00–21:00 (FLAT $17.00 unless fees say otherwise). DRAFT unless
+ * `options.status` says otherwise. A session that ends up PUBLISHED or COMPLETED (C-SSE-1) gets complete fees
+ * for its structure: BY_SKILL_LEVEL defaults every skill fee to $17.00 and a FLAT `fee_flat` is the final rate.
+ */
 export async function insertSession(
   db: Queryable,
   teamId: string,
   fees: SessionFees = {},
-  options: { date?: string; recurringRuleId?: string | null; withCourt?: boolean } = {},
+  options: SessionOptions = {},
 ): Promise<string> {
   const pricing = fees.pricing ?? 'FLAT';
+  const status = options.status ?? 'DRAFT';
+  const live = status === 'PUBLISHED' || status === 'COMPLETED';
+  const skillDefault = live && pricing === 'BY_SKILL_LEVEL' ? '17.00' : null;
+  const finalRate = options.customRate ?? options.calculatedRate ?? null;
+  const flatDefault = pricing === 'FLAT' ? (finalRate ?? '17.00') : null;
   const id = await insertId(
     db,
     `INSERT INTO game_sessions (team_id, recurring_rule_id, location, address, date, cancellation_deadline,
                                 max_players, pricing_structure, fee_flat, fee_male, fee_female, fee_other,
-                                fee_beginner, fee_intermediate, fee_advanced)
-     VALUES ($1, $2, 'Test Hall', '1 Test Street, Auckland', $3, $4, 12, $5, $6, $7, $8, $9, $10, $11, $12)
+                                fee_beginner, fee_intermediate, fee_advanced, calculated_rate_per_player,
+                                custom_player_rate, create_key)
+     VALUES ($1, $2, 'Test Hall', '1 Test Street, Auckland', $3, $4, $13, $5, $6, $7, $8, $9, $10, $11, $12,
+             $14, $15, $16)
      RETURNING id`,
     [
       teamId,
@@ -244,13 +331,17 @@ export async function insertSession(
       options.date ?? '2026-10-07',
       '2026-10-05T06:00:00Z',
       pricing,
-      fees.flat === undefined ? (pricing === 'FLAT' ? '17.00' : null) : fees.flat,
+      fees.flat === undefined ? flatDefault : fees.flat,
       fees.male ?? null,
       fees.female ?? null,
       fees.other ?? null,
-      fees.beginner ?? null,
-      fees.intermediate ?? null,
-      fees.advanced ?? null,
+      fees.beginner === undefined ? skillDefault : fees.beginner,
+      fees.intermediate === undefined ? skillDefault : fees.intermediate,
+      fees.advanced === undefined ? skillDefault : fees.advanced,
+      options.maxPlayers ?? 12,
+      options.calculatedRate ?? null,
+      options.customRate ?? null,
+      options.createKey ?? null,
     ],
   );
   if (options.withCourt ?? true) {
@@ -260,7 +351,101 @@ export async function insertSession(
       [id],
     );
   }
+  if (status !== 'DRAFT') await advanceSessionTo(db, id, status);
   return id;
+}
+
+export interface RuleOptions extends SessionFees {
+  readonly frequency?: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY';
+  /** 0 = Sunday … 6 = Saturday; must be the weekday of `startsOn`. Default 3 (Wednesday). */
+  readonly dayOfWeek?: number;
+  /** The series' first date and anchor. Default 2026-10-07 (a Wednesday). */
+  readonly startsOn?: string;
+  /** 1..4 or -1 (last); required for MONTHLY. */
+  readonly monthlyWeek?: number | null;
+  readonly recurUntil?: string | null;
+  readonly isActive?: boolean;
+  readonly createKey?: string | null;
+  /** Template courts; default one court 19:00–21:00. An empty list inserts the rule with no template. */
+  readonly courts?: readonly { identifier: string; start: string; end: string }[];
+}
+
+/**
+ * A recurring rule with its court template, written in ONE statement so the deferred "an active rule has a
+ * court" constraint is satisfied at commit even on an autocommit pool. FLAT $17.00 unless fees say otherwise.
+ */
+export async function insertRule(
+  db: Queryable,
+  teamId: string,
+  options: RuleOptions = {},
+): Promise<string> {
+  const pricing = options.pricing ?? 'FLAT';
+  const courts = options.courts ?? [{ identifier: 'Court 1', start: '19:00', end: '21:00' }];
+  const skillDefault = pricing === 'BY_SKILL_LEVEL' ? '17.00' : null;
+  const { rows } = await db.query<{ id: string }>(
+    `WITH rule AS (
+       INSERT INTO recurring_session_rules (team_id, frequency, day_of_week, starts_on, monthly_week, recur_until,
+                                            is_active, default_location, default_address, default_max_players,
+                                            default_start_time, default_end_time, pricing_structure, fee_flat,
+                                            fee_male, fee_female, fee_other, fee_beginner, fee_intermediate,
+                                            fee_advanced, create_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Test Hall', '1 Test Street, Auckland', 12, '19:00', '21:00', $8,
+               $9, $10, $11, $12, $13, $14, $15, $16)
+       RETURNING id),
+     template AS (
+       INSERT INTO recurring_rule_courts (rule_id, position, court_identifier, start_time, end_time)
+       SELECT rule.id, c.ord, c.identifier, c.start_time::time, c.end_time::time
+         FROM rule,
+              unnest($17::text[], $18::text[], $19::text[]) WITH ORDINALITY AS c(identifier, start_time, end_time, ord)
+       RETURNING 1)
+     SELECT id FROM rule`,
+    [
+      teamId,
+      options.frequency ?? 'WEEKLY',
+      options.dayOfWeek ?? 3,
+      options.startsOn ?? '2026-10-07',
+      options.monthlyWeek ?? null,
+      options.recurUntil ?? null,
+      options.isActive ?? true,
+      pricing,
+      options.flat === undefined ? (pricing === 'FLAT' ? '17.00' : null) : options.flat,
+      options.male ?? null,
+      options.female ?? null,
+      options.other ?? null,
+      options.beginner === undefined ? skillDefault : options.beginner,
+      options.intermediate === undefined ? skillDefault : options.intermediate,
+      options.advanced === undefined ? skillDefault : options.advanced,
+      options.createKey ?? null,
+      courts.map((court) => court.identifier),
+      courts.map((court) => court.start),
+      courts.map((court) => court.end),
+    ],
+  );
+  const id = rows[0]?.id;
+  if (id === undefined) throw new Error('insertRule returned no id');
+  return id;
+}
+
+/** One more template court on an existing rule (the next free position unless given). */
+export function insertRuleCourt(
+  db: Queryable,
+  ruleId: string,
+  court: { identifier: string; start?: string; end?: string; position?: number },
+): Promise<string> {
+  return insertId(
+    db,
+    `INSERT INTO recurring_rule_courts (rule_id, position, court_identifier, start_time, end_time)
+     VALUES ($1, coalesce($2::smallint, (SELECT coalesce(max(position), 0) + 1 FROM recurring_rule_courts WHERE rule_id = $1)),
+             $3, $4, $5)
+     RETURNING id`,
+    [
+      ruleId,
+      court.position ?? null,
+      court.identifier,
+      court.start ?? '19:00',
+      court.end ?? '21:00',
+    ],
+  );
 }
 
 export interface RegistrationInput {

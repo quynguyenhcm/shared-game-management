@@ -12,6 +12,7 @@ import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import { createJobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from '../../src/lib/logger/logger.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 
 export const CRASH_QUEUE = 'it-crash';
@@ -32,6 +33,8 @@ await registerJobs({
   notifier: createInMemoryNotifier(),
   crypto: createCrypto(keyProviderFromConfig(config)),
   db: createKysely(pool),
+  sessionAllocator: noopSessionAllocator,
+  webBaseUrl: 'https://app.example.test',
   expireSecondsOverride: config.jobs.expireSecondsOverride,
   extraQueues: [
     {

@@ -5,9 +5,9 @@ paths: ["memory-bank/"]
 topics: ["review", "phase review", "observability", "documentation", "plan", "invariants", "cross-phase", "cross-feature", "creative", "critique", "idempotency", "replay", "reconciliation", "siblings", "concurrency"]
 priority: medium
 auto_generated: true
-derived_from: [platform-foundation, auth-and-user-roles, team-management, team-banking-and-gst, skill-levels-and-auto-enroll]
-evidence_count: 5
-last_validated: 2026-10-17
+derived_from: [platform-foundation, auth-and-user-roles, team-management, team-banking-and-gst, skill-levels-and-auto-enroll, session-scheduling-engine]
+evidence_count: 6
+last_validated: 2026-10-24
 ---
 
 # Reconcile plan and doc claims against the built tree
@@ -23,3 +23,4 @@ last_validated: 2026-10-17
 - After a review finding about replay, idempotency, locking or claim semantics, list every return path of the handler (changed, no-op, refused, replay) and require a test that asserts the invariant on each, not only on the path the finding named. In team-banking-and-gst a replay fix covered saves that changed something; a save that changed nothing never claimed its key, five phase reviews passed it, and only the final whole-branch review caught it.
 - When a coordinator suggests a fix in a review hand-off, test it against the finding's own scenario before building it. In team-banking-and-gst a suggested "last change key" column could not have detected the replay it was meant to stop; the build agent correctly used a bounded key list.
 - A learned rule is not a check until a reviewer enumerates it. When a phase adds or changes a write on a resource, list every sibling write on the same page or resource and compare their guards (idempotency or stale check), lock order and where each reads the clock; record each difference as fixed or deliberately accepted. In skill-levels-and-auto-enroll the sibling-guard rule already existed, yet five phase reviews passed an unguarded Auto Enroll PUT beside a guarded override PUT, and only the final whole-branch review caught it and a clock-before-lock read.
+- Each UI acceptance criterion that lists, counts, labels or warns about items must name its authoritative server read: the endpoint or response field. Reviewers reject a section, count or banner derived from the rows already loaded on the current page. In session-scheduling-engine, the Series list section was built from the loaded session rows, which made AC-ENTRY-2, AC-ASYNC-6 and AC-HAPPY-15 unsatisfiable (Phase 5 HALT). The final review then found two more instances: the status of a series past its end date, and the list's banking notice.

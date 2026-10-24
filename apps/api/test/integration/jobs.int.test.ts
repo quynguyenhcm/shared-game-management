@@ -19,6 +19,7 @@ import { freePort, spawnNode } from '../helpers/spawn-node.ts';
 import { testCrypto } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { sleep, waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 const config = loadConfig();
 
@@ -61,6 +62,8 @@ beforeAll(async () => {
   await producer.start();
   // The production wiring, with a short retry policy on send-email so AC-ERROR-6 runs in seconds.
   await registerJobs({
+    sessionAllocator: noopSessionAllocator,
+    webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier,
     crypto: testCrypto(),
@@ -379,7 +382,7 @@ describe('schedules (AC-ASYNC-2)', () => {
     expect(next('2027-04-02T15:00:01Z')).toBe('2027-04-03T16:00:00.000Z');
   });
 
-  it('lists all five slots, and every placeholder plus heartbeat can be triggered manually and observed', async () => {
+  it('lists all five slots, and the recurrence sweep, every placeholder and heartbeat can be triggered manually and observed', async () => {
     const schedules = await worker.listSchedules();
     expect(
       schedules
@@ -392,7 +395,21 @@ describe('schedules (AC-ASYNC-2)', () => {
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
       { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
     ]);
-    for (const slot of ['recurrence-materialisation', 'post-game-billing', 'daily-overdue']) {
+    // The recurrence slot has its real sweep (session-scheduling-engine); the billing slots are still placeholders.
+    const sweepId = await worker.trigger('recurrence-materialisation', {
+      source: 'integration-test',
+    });
+    expect(sweepId, 'recurrence-materialisation').toEqual(expect.any(String));
+    await waitForState('recurrence-materialisation', sweepId as string, 'completed');
+    expect(
+      workerLogs
+        .lines()
+        .find(
+          (line) => line.event === 'session.recurrence.sweep_completed' && line.jobId === sweepId,
+        ),
+      'recurrence-materialisation',
+    ).toMatchObject({ rulesScanned: expect.any(Number) as number });
+    for (const slot of ['post-game-billing', 'daily-overdue']) {
       const id = await worker.trigger(slot, { source: 'integration-test' });
       expect(id, slot).toEqual(expect.any(String));
       await waitForState(slot, id as string, 'completed');

@@ -28,10 +28,16 @@ export interface PaidSessionCase {
   readonly fees: Fees;
   readonly expectedPaid: boolean;
   /**
-   * True when the row also satisfies `game_sessions` CHECKs (BY_SEX needs all three sex fees), so the
-   * integration test can publish a real session with it.
+   * True when the row also satisfies `game_sessions` CHECKs (BY_SEX needs all three sex fees, and no
+   * amount is negative: D-79), so the integration test can insert a real DRAFT session with it.
    */
   readonly insertable: boolean;
+  /**
+   * True when a real session with this row may become PUBLISHED: insertable AND complete for C-SSE-1 (D-77),
+   * which needs `fee_flat` for FLAT and all three skill fees for BY_SKILL_LEVEL (BY_SEX is complete by its
+   * insert CHECK). An insertable row that is not publishable is refused on publish with D-77, not by the gate.
+   */
+  readonly publishable: boolean;
 }
 
 const NO_FEES: Fees = {
@@ -60,8 +66,18 @@ const SINGLE_VALUES: readonly { value: string | null; positive: boolean }[] = [
   { value: '99999999.99', positive: true },
 ];
 
+/** Hand-written C-SSE-1: the fees a live session of this structure must have (D-77). */
+function isComplete(row: Omit<PaidSessionCase, 'publishable'>): boolean {
+  const required: Readonly<Record<PricingStructure, readonly FeeKey[]>> = {
+    FLAT: ['feeFlat'],
+    BY_SEX: ['feeMale', 'feeFemale', 'feeOther'],
+    BY_SKILL_LEVEL: ['feeBeginner', 'feeIntermediate', 'feeAdvanced'],
+  };
+  return required[row.pricingStructure].every((key) => row.fees[key] !== null);
+}
+
 function build(): PaidSessionCase[] {
-  const cases: PaidSessionCase[] = [];
+  const cases: Omit<PaidSessionCase, 'publishable'>[] = [];
 
   // M1: one fee column set, the rest NULL: 3 structures x 7 columns x 5 values = 105 rows.
   for (const pricingStructure of STRUCTURES) {
@@ -72,8 +88,9 @@ function build(): PaidSessionCase[] {
           pricingStructure,
           fees: { ...NO_FEES, [key]: value },
           expectedPaid: positive && APPLIES[pricingStructure].includes(key),
-          // BY_SEX rows need all three sex fees non-NULL to be insertable: only never true for M1.
-          insertable: pricingStructure !== 'BY_SEX',
+          // BY_SEX rows need all three sex fees non-NULL to be insertable: never true for M1. A negative
+          // amount is refused by game_sessions_amounts_non_negative (D-79).
+          insertable: pricingStructure !== 'BY_SEX' && value !== '-0.01',
         });
       }
     }
@@ -168,18 +185,18 @@ function build(): PaidSessionCase[] {
       pricingStructure: 'BY_SKILL_LEVEL',
       fees: { ...NO_FEES, feeBeginner: '-5.00', feeIntermediate: '0.00', feeAdvanced: '0.01' },
       expectedPaid: true,
-      insertable: true,
+      insertable: false,
     },
     {
       name: 'M6 BY_SKILL_LEVEL -5.00, 0.00, 0.00',
       pricingStructure: 'BY_SKILL_LEVEL',
       fees: { ...NO_FEES, feeBeginner: '-5.00', feeIntermediate: '0.00', feeAdvanced: '0.00' },
       expectedPaid: false,
-      insertable: true,
+      insertable: false,
     },
   );
 
-  return cases;
+  return cases.map((row) => ({ ...row, publishable: row.insertable && isComplete(row) }));
 }
 
 export const PAID_SESSION_MATRIX: readonly PaidSessionCase[] = build();

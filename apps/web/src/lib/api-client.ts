@@ -2,7 +2,10 @@ import { context, propagation } from '@opentelemetry/api';
 import {
   AuthSuccessResponse,
   BankingResponse,
+  CancelSessionResponse,
   CreateTeamResponse,
+  DstOptionsEntry,
+  EndSeriesResponse,
   ErrorResponse,
   FindTeamsResponse,
   ForgotPasswordResponse,
@@ -22,9 +25,24 @@ import {
   OAuthCompleteResponse,
   OAuthPendingResponse,
   ProvidersResponse,
+  PublishDraftsResponse,
   RemoveBankingResponse,
   ResetPasswordResponse,
+  SeriesDetailResponse,
+  SeriesListResponse,
+  SeriesSaveResponse,
+  SessionDetailResponse,
+  SessionListResponse,
+  SessionEditResponse,
+  SessionWriteResponse,
   TeamDetailResponse,
+  type CreateSeriesRequest,
+  type CreateSessionRequest,
+  type EndSeriesRequest,
+  type UpdateSeriesRequest,
+  type UpdateSessionRequest,
+  type ListSessionsQuery,
+  type SessionCommandRequest,
   type BanMemberRequest,
   type CreateTeamRequest,
   type FindTeamsQuery,
@@ -43,9 +61,16 @@ import {
   type SetAutoEnrollRequest,
   type SetSkillLevelRequest,
 } from '@sgm/shared';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { deriveClientAddress } from './auth/client-address.ts';
 import { loadWebConfig } from './config.ts';
+
+/** The wire (input) form of a sessions body: money as strings, never the parsed `Money` the schema outputs. */
+export type CreateSessionBody = z.input<typeof CreateSessionRequest>;
+export type UpdateSessionBody = z.input<typeof UpdateSessionRequest>;
+export type CreateSeriesBody = z.input<typeof CreateSeriesRequest>;
+export type UpdateSeriesBody = z.input<typeof UpdateSeriesRequest>;
+export type EndSeriesBody = z.input<typeof EndSeriesRequest>;
 
 const REQUEST_TIMEOUT_MS = 2000;
 const AUTH_TIMEOUT_MS = 5000;
@@ -105,6 +130,10 @@ export type ApiResult<T> =
       status: number;
       error: ErrorResponse['error'];
       retryAfterSeconds?: number;
+      /** Session routes only (422): the wall-clock times that do not exist or happen twice, with what can be stored. */
+      dstOptions?: DstOptionsEntry[];
+      /** Session routes only (409 `session_fee_locked`): the snake_case fee columns the edit would have raised. */
+      raisedFields?: string[];
     };
 
 export interface ApiCallOptions {
@@ -121,6 +150,24 @@ interface ApiRequest<T> extends ApiCallOptions {
   schema?: z.ZodType<T>;
   /** Extra request headers (an allowlisted few, set by `apiClient` only; never copied from the browser). */
   extraHeaders?: Record<string, string>;
+}
+
+/**
+ * What only session routes add to an error body: `dstOptions` and `raisedFields`. Each is read on its own with
+ * the shared schema, so a malformed extra is dropped and can never hide the error code.
+ */
+function sessionErrorExtras(raw: unknown): {
+  dstOptions?: DstOptionsEntry[];
+  raisedFields?: string[];
+} {
+  const error = (raw as { error?: Record<string, unknown> } | null)?.error;
+  if (error === null || typeof error !== 'object') return {};
+  const dst = DstOptionsEntry.array().safeParse(error.dstOptions);
+  const raised = z.array(z.string()).safeParse(error.raisedFields);
+  return {
+    ...(dst.success ? { dstOptions: dst.data } : {}),
+    ...(raised.success ? { raisedFields: raised.data } : {}),
+  };
 }
 
 /** The lower-case path spelling of an OAuth provider (`/auth/oauth/:provider/*`). */
@@ -176,7 +223,8 @@ export async function apiFetch<T>(request: ApiRequest<T>): Promise<ApiResult<T>>
     }
 
     const retryAfter = Number(response.headers.get('retry-after'));
-    const body = ErrorResponse.safeParse(await response.json().catch(() => null));
+    const raw: unknown = await response.json().catch(() => null);
+    const body = ErrorResponse.safeParse(raw);
     const error = body.success
       ? body.data.error
       : {
@@ -189,6 +237,7 @@ export async function apiFetch<T>(request: ApiRequest<T>): Promise<ApiResult<T>>
       status: response.status,
       error,
       ...(Number.isFinite(retryAfter) && retryAfter > 0 ? { retryAfterSeconds: retryAfter } : {}),
+      ...sessionErrorExtras(raw),
     };
   } catch {
     return failure(0, 'service_unavailable', 'The API could not be reached.');
@@ -536,5 +585,147 @@ export const apiClient = {
       method: 'PUT',
       body,
       schema: GstResponse,
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Sessions and series (session-scheduling-engine; `TEAM_ADMIN` routes, never cached). The ids are
+  // encoded, so a hostile id can never change the path.
+  // -------------------------------------------------------------------------------------------
+
+  /** One list section per call: `view`, keyset `cursor` and `limit` (the API defaults to 25). */
+  listSessions: (
+    teamId: string,
+    query: Pick<ListSessionsQuery, 'view'> & { cursor?: string | undefined; limit?: number },
+    options: ApiCallOptions = {},
+  ) => {
+    const params = new URLSearchParams({ view: query.view });
+    if (query.limit !== undefined) params.set('limit', String(query.limit));
+    if (query.cursor) params.set('cursor', query.cursor);
+    return apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions?${params.toString()}`,
+      method: 'GET',
+      schema: SessionListResponse,
+    });
+  },
+
+  createSession: (teamId: string, body: CreateSessionBody, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions`,
+      method: 'POST',
+      body,
+      schema: SessionWriteResponse,
+    }),
+
+  getSession: (teamId: string, sessionId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}`,
+      method: 'GET',
+      schema: SessionDetailResponse,
+    }),
+
+  updateSession: (
+    teamId: string,
+    sessionId: string,
+    body: UpdateSessionBody,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}`,
+      method: 'PUT',
+      body,
+      schema: SessionEditResponse,
+    }),
+
+  publishSession: (
+    teamId: string,
+    sessionId: string,
+    body: SessionCommandRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}/publish`,
+      method: 'POST',
+      body,
+      schema: SessionWriteResponse,
+    }),
+
+  cancelSession: (
+    teamId: string,
+    sessionId: string,
+    body: SessionCommandRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}/cancel`,
+      method: 'POST',
+      body,
+      schema: CancelSessionResponse,
+    }),
+
+  createSeries: (teamId: string, body: CreateSeriesBody, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series`,
+      method: 'POST',
+      body,
+      schema: SeriesDetailResponse,
+    }),
+
+  listSeries: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series`,
+      method: 'GET',
+      schema: SeriesListResponse,
+    }),
+
+  getSeries: (teamId: string, ruleId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series/${encodeURIComponent(ruleId)}`,
+      method: 'GET',
+      schema: SeriesDetailResponse,
+    }),
+
+  updateSeries: (
+    teamId: string,
+    ruleId: string,
+    body: UpdateSeriesBody,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series/${encodeURIComponent(ruleId)}`,
+      method: 'PUT',
+      body,
+      schema: SeriesSaveResponse,
+    }),
+
+  endSeries: (teamId: string, ruleId: string, body: EndSeriesBody, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series/${encodeURIComponent(ruleId)}/end`,
+      method: 'POST',
+      body,
+      schema: EndSeriesResponse,
+    }),
+
+  /**
+   * "Publish drafts now" answers 202. The body is an empty JSON object, as the OpenAPI contract says: a POST with no
+   * body arrives at the API as `null` and fails its body schema (found by the sessions browser journey).
+   */
+  publishSeriesDrafts: (teamId: string, ruleId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/session-series/${encodeURIComponent(ruleId)}/publish-drafts`,
+      method: 'POST',
+      body: {},
+      schema: PublishDraftsResponse,
     }),
 };

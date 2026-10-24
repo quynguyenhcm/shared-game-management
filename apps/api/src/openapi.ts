@@ -9,6 +9,7 @@ import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { createPool } from './lib/db/pool.ts';
 import { createLogger } from './lib/logger/logger.ts';
+import { noopSessionAllocator } from './modules/sessions/allocator-port.ts';
 import { buildOAuthProviders } from './modules/auth/providers/registry.ts';
 import { createPasswordHasher } from './modules/auth/password.ts';
 import { createLoginThrottle } from './modules/auth/throttle.ts';
@@ -48,6 +49,8 @@ async function withInertApp<T>(read: (app: FastifyInstance) => T): Promise<T> {
     passwordHasher: createPasswordHasher({ memoryKiB: 19_456, passes: 2 }),
     loginThrottle: createLoginThrottle({ db, keys, config: config.auth }),
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
+    sessionAllocator: noopSessionAllocator,
+    recurrenceHorizonDays: config.recurrence.horizonDays,
   });
   try {
     return read(app);

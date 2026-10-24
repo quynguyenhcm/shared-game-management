@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   parseMemberBannedTrigger,
+  parseRecurrenceRuleTrigger,
+  parseSessionAutoEnrolTrigger,
   parseSetRoleArgs,
   resetRefusal,
   rollbackRefusal,
@@ -128,6 +130,47 @@ describe('jobs trigger member-banned payload (AC-ERROR-12 operator re-run)', () 
       'error',
     );
     expect(parseMemberBannedTrigger(JSON.stringify({ teamId: ids.teamId }))).toHaveProperty(
+      'error',
+    );
+  });
+});
+
+describe('jobs trigger recurrence-rule and session-auto-enrol payloads (session-scheduling-engine)', () => {
+  const rule = {
+    ruleId: '0f0e0d0c-0b0a-4908-8706-050403020100',
+    teamId: '1f1e1d1c-1b1a-4918-8716-151413121110',
+    trigger: 'manual',
+  };
+  const session = {
+    sessionId: '2f2e2d2c-2b2a-4928-8726-252423222120',
+    teamId: rule.teamId,
+    trigger: 'manual',
+  };
+
+  it('accepts a strict payload and keys it like the job the feature enqueues itself', () => {
+    expect(parseRecurrenceRuleTrigger(JSON.stringify(rule))).toEqual({
+      payload: rule,
+      singletonKey: `recurrence-rule:${rule.ruleId}`,
+    });
+    expect(parseSessionAutoEnrolTrigger(JSON.stringify(session))).toEqual({
+      payload: session,
+      singletonKey: `session-auto-enrol:${session.sessionId}`,
+    });
+  });
+
+  it('rejects missing, malformed, extra-field and wrong-trigger payloads without echoing them', () => {
+    for (const parse of [parseRecurrenceRuleTrigger, parseSessionAutoEnrolTrigger]) {
+      expect(parse(undefined)).toHaveProperty('error');
+      expect(parse('{nope')).toHaveProperty('error');
+      expect(parse('[]')).toHaveProperty('error');
+    }
+    expect(
+      parseRecurrenceRuleTrigger(JSON.stringify({ ...rule, email: 'x@y.test' })),
+    ).toHaveProperty('error');
+    const wrong = parseRecurrenceRuleTrigger(JSON.stringify({ ...rule, trigger: 'secret-value' }));
+    expect(wrong).toHaveProperty('error');
+    expect(JSON.stringify(wrong)).not.toContain('secret-value');
+    expect(parseSessionAutoEnrolTrigger(JSON.stringify({ teamId: session.teamId }))).toHaveProperty(
       'error',
     );
   });

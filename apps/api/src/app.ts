@@ -32,6 +32,10 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
+import { sessionsRoutes } from './modules/sessions/routes.ts';
+import { createSessionsService } from './modules/sessions/service.ts';
+import { createSeriesService } from './modules/sessions/series.ts';
 import { skillLevelsRoutes } from './modules/skill-levels/routes.ts';
 import { createSkillLevelsService } from './modules/skill-levels/service.ts';
 import { teamBankingRoutes } from './modules/team-banking/routes.ts';
@@ -60,6 +64,16 @@ export interface AppDeps extends HealthDeps {
   readonly loginThrottle: LoginThrottle;
   /** Enabled Google/Facebook adapters (`buildOAuthProviders`), or both fakes in `AUTH_FAKE_OAUTH` mode. */
   readonly oauthProviders: OAuthProviderRegistry;
+  /**
+   * Seat allocator seam for the sessions module (architecture SA-4). REQUIRED: `main.ts` builds it with
+   * `createSessionAllocator`, so an entrypoint that forgets it does not compile.
+   */
+  readonly sessionAllocator: SessionAllocatorPort;
+  /**
+   * `RECURRENCE_HORIZON_DAYS` (7-91), reported on series reads. REQUIRED: `main.ts` passes `config.recurrence.horizonDays`,
+   * so an entrypoint that forgets it does not compile (no silent default).
+   */
+  readonly recurrenceHorizonDays: number;
   /** Test seam: extra plugins registered after the auth module (guard fixture routes). They need a policy too. */
   readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
@@ -181,6 +195,22 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(skillLevelsRoutes, {
     prefix: '/teams',
     service: createSkillLevelsService({ db: deps.db, clock: deps.clock }),
+  });
+  await app.register(sessionsRoutes, {
+    prefix: '/teams',
+    service: createSessionsService({
+      db: deps.db,
+      clock: deps.clock,
+      jobs: deps.jobs,
+      allocator: deps.sessionAllocator,
+    }),
+    series: createSeriesService({
+      db: deps.db,
+      clock: deps.clock,
+      jobs: deps.jobs,
+      allocator: deps.sessionAllocator,
+      horizonDays: deps.recurrenceHorizonDays,
+    }),
   });
   for (const plugin of deps.extraPlugins ?? []) await app.register(plugin);
   await app.ready();

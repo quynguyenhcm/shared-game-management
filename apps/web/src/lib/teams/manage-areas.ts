@@ -1,7 +1,7 @@
 /**
  * The team-admin area registry (UI/UX Q2, Option 3). Each area page renders `ManageAreaNav` itself after
- * its guard passes (so the no-access page never shows area links); a later feature (sessions) appends one
- * entry here and `manage-areas.test.ts` checks that its page renders the nav.
+ * its guard passes (so the no-access page never shows area links); a feature appends one entry here and
+ * `manage-areas.test.ts` checks that its page renders the nav.
  */
 export interface ManageArea {
   id: string;
@@ -13,6 +13,7 @@ export interface ManageArea {
 export const MANAGE_AREAS: readonly ManageArea[] = [
   { id: 'people', label: 'People', segment: '' },
   { id: 'banking', label: 'Banking and GST', segment: 'banking' },
+  { id: 'sessions', label: 'Sessions', segment: 'sessions' },
 ];
 
 export interface ManageAreaLink {

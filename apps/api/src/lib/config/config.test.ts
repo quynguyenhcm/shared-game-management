@@ -244,6 +244,22 @@ describe('job runner tuning', () => {
   });
 });
 
+describe('recurrence horizon (session-scheduling-engine T-4)', () => {
+  it('defaults to 28 days and accepts 7 to 91', () => {
+    expect(loadConfig(validEnv()).recurrence).toEqual({ horizonDays: 28 });
+    expect(loadConfig(validEnv({ RECURRENCE_HORIZON_DAYS: '7' })).recurrence.horizonDays).toBe(7);
+    expect(loadConfig(validEnv({ RECURRENCE_HORIZON_DAYS: '91' })).recurrence.horizonDays).toBe(91);
+  });
+
+  it('rejects a horizon outside 7 to 91 days by variable name', () => {
+    for (const bad of ['6', '92', 'soon', '28.5']) {
+      expect(issuesFor(validEnv({ RECURRENCE_HORIZON_DAYS: bad })).join('\n')).toContain(
+        'RECURRENCE_HORIZON_DAYS',
+      );
+    }
+  });
+});
+
 describe('auth configuration (AC-VERIFY-7)', () => {
   const AUTH_VARIABLES = [
     'WEB_BASE_URL',

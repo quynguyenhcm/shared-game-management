@@ -11,6 +11,7 @@ import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 import { buildOAuthProviders } from '../../src/modules/auth/providers/registry.ts';
 import { createPasswordHasher } from '../../src/modules/auth/password.ts';
 import { createLoginThrottle } from '../../src/modules/auth/throttle.ts';
@@ -56,6 +57,8 @@ export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): 
       config: config.auth,
     }),
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
+    sessionAllocator: noopSessionAllocator,
+    recurrenceHorizonDays: config.recurrence.horizonDays,
     ...overrides,
   };
 }

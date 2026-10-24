@@ -95,11 +95,15 @@ export interface CreditTransactions {
 
 export interface GameSessions {
   address: string;
+  auto_enrol_required: Generated<boolean>;
+  auto_enrolled_at: Timestamp | null;
   calculated_rate_per_player: MoneyString | null;
   cancellation_deadline: Timestamp;
+  create_key: string | null;
   created_at: Generated<Timestamp>;
   custom_player_rate: MoneyString | null;
   date: LocalDate;
+  deadline_is_default: Generated<boolean>;
   ends_at: ColumnType<Date | null, never, never>;
   extra_expenses: Generated<MoneyString | null>;
   fee_advanced: MoneyString | null;
@@ -120,6 +124,8 @@ export interface GameSessions {
   status: Generated<SessionStatus>;
   team_id: string;
   total_court_cost: Generated<MoneyString | null>;
+  updated_at: Generated<Timestamp>;
+  version: ColumnType<number, never, never>;
 }
 
 export interface OauthPendingSignups {
@@ -195,6 +201,12 @@ export interface Payments {
   user_id: string;
 }
 
+export interface PayoutNoticeClaims {
+  claimed_at: Generated<Timestamp>;
+  rule_id: string;
+  window_start: LocalDate;
+}
+
 export interface PlayerCredits {
   balance: Generated<MoneyString>;
   id: Generated<string>;
@@ -203,7 +215,18 @@ export interface PlayerCredits {
   user_id: string;
 }
 
+export interface RecurringRuleCourts {
+  court_identifier: string;
+  created_at: Generated<Timestamp>;
+  end_time: LocalTime;
+  id: Generated<string>;
+  position: number;
+  rule_id: string;
+  start_time: LocalTime;
+}
+
 export interface RecurringSessionRules {
+  create_key: string | null;
   created_at: Generated<Timestamp>;
   day_of_week: number;
   default_address: string;
@@ -226,9 +249,15 @@ export interface RecurringSessionRules {
   frequency: Generated<RecurrenceFrequency>;
   id: Generated<string>;
   is_active: Generated<boolean>;
+  materialised_at: Timestamp | null;
+  materialised_version: number | null;
+  monthly_week: number | null;
   pricing_structure: Generated<PricingType>;
   recur_until: LocalDate | null;
+  starts_on: LocalDate;
   team_id: string;
+  updated_at: Generated<Timestamp>;
+  version: ColumnType<number, never, never>;
 }
 
 export interface RegistrationGuests {
@@ -334,7 +363,9 @@ export interface DB {
   password_reset_tokens: PasswordResetTokens;
   payment_line_items: PaymentLineItems;
   payments: Payments;
+  payout_notice_claims: PayoutNoticeClaims;
   player_credits: PlayerCredits;
+  recurring_rule_courts: RecurringRuleCourts;
   recurring_session_rules: RecurringSessionRules;
   registration_guests: RegistrationGuests;
   registrations: Registrations;

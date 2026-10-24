@@ -38,6 +38,7 @@ import { captureLogs } from '../helpers/log-capture.ts';
 import { freePort, spawnNode } from '../helpers/spawn-node.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 type Behaviour = (
   event: MemberBannedEvent,
@@ -94,6 +95,8 @@ beforeAll(async () => {
   await worker.start();
   await producer.start();
   await registerJobs({
+    sessionAllocator: noopSessionAllocator,
+    webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier: createInMemoryNotifier(),
     crypto: testCrypto(),

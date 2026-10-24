@@ -1,6 +1,8 @@
 // Console output is allowed here (see eslint.config.mjs): the CLI talks to a terminal, not the logger.
 import {
   parseMemberBannedTrigger,
+  parseRecurrenceRuleTrigger,
+  parseSessionAutoEnrolTrigger,
   parseSetRoleArgs,
   resetRefusal,
   rollbackRefusal,
@@ -30,6 +32,8 @@ function usage(): string {
     '  db reset [--force]                (refused in production or on a non-local host)',
     '  jobs trigger <slot|heartbeat> [json]   (manually enqueue a slot, e.g. skill-progression, or the heartbeat job)',
     "  jobs trigger member-banned '<json>'    (re-run a ban's side effect; payload as in ADR 0015)",
+    "  jobs trigger recurrence-rule '<json>'   (re-run one series' materialisation: ruleId, teamId, trigger)",
+    "  jobs trigger session-auto-enrol '<json>' (re-offer one session's auto-enrol: sessionId, teamId, trigger)",
     '  jobs schedules                         (list registered cron schedules)',
     '  users set-role <email> <GLOBAL_ADMIN|PLAYER>   (grant or revoke the global admin role)',
   ].join('\n');
@@ -76,6 +80,8 @@ async function runDb(subcommand: string, flags: readonly string[], config: Confi
 const TRIGGERABLE: readonly string[] = [
   QUEUE_NAMES.heartbeat,
   QUEUE_NAMES.memberBanned,
+  QUEUE_NAMES.recurrenceRule,
+  QUEUE_NAMES.sessionAutoEnrol,
   ...SCHEDULES.map((slot) => slot.name),
 ];
 
@@ -116,6 +122,23 @@ async function runJobs(subcommand: string, args: readonly string[], config: Conf
       console.log(
         jobId === null
           ? `${name}: a job is already queued or active for this membership; nothing enqueued`
+          : `enqueued ${name} job ${jobId}`,
+      );
+      return;
+    }
+    if (name === QUEUE_NAMES.recurrenceRule || name === QUEUE_NAMES.sessionAutoEnrol) {
+      // Validated with the handler's own strict schema and keyed like the job the feature itself enqueues.
+      const trigger =
+        name === QUEUE_NAMES.recurrenceRule
+          ? parseRecurrenceRuleTrigger(rawPayload)
+          : parseSessionAutoEnrolTrigger(rawPayload);
+      if ('error' in trigger) fail(trigger.error);
+      const jobId = await runner.enqueue(name, trigger.payload, {
+        singletonKey: trigger.singletonKey,
+      });
+      console.log(
+        jobId === null
+          ? `${name}: a job is already queued for this target; nothing enqueued`
           : `enqueued ${name} job ${jobId}`,
       );
       return;

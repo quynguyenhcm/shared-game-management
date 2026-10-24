@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { registerJobs } from './jobs/bootstrap.ts';
+import { enqueueBootSweeps, registerJobs } from './jobs/bootstrap.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
@@ -8,6 +8,8 @@ import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
 import { createNotifier } from './lib/notifications/notifier.ts';
+import { createSessionAllocator } from './session-allocator.ts';
+import { systemClock } from './lib/clock.ts';
 
 // Boot order (AC-ERROR-1): config validation first; nothing binds a port or takes jobs before it passes.
 const config = loadConfigOrExit();
@@ -63,14 +65,25 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 
 try {
   await runner.start();
+  const db = createKysely(pool);
   await registerJobs({
     runner,
     notifier,
     // Opens the sealed reset emails; the keyring is validated here at boot, as in the API.
     crypto: createCrypto(keyProviderFromConfig(config)),
-    db: createKysely(pool),
+    db,
+    sessionAllocator: createSessionAllocator({
+      db,
+      jobs: runner,
+      clock: systemClock,
+      webBaseUrl: config.auth.webBaseUrl,
+    }),
+    recurrenceHorizonDays: config.recurrence.horizonDays,
+    webBaseUrl: config.auth.webBaseUrl,
     expireSecondsOverride: config.jobs.expireSecondsOverride,
   });
+  // Reconcile at every boot: series dates and pending auto-enrol (the sweep also runs at 03:00).
+  await enqueueBootSweeps(runner, logger);
 } catch (error) {
   logger.fatal({ err: error }, 'worker failed to start');
   process.exit(1);

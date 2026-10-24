@@ -49,10 +49,21 @@ export function FlashNotice() {
   );
 }
 
-/** Auth pages render their own notice and error from the codes; this strips them after mount. */
-export function StripAuthParams() {
+/**
+ * Auth pages render their own notice and error from the codes; this strips them after mount. A page whose
+ * notice carries display-only extras (the Sessions counts) names them in `also` so they leave the address bar
+ * with the code.
+ */
+export function StripAuthParams({ also = [] }: { also?: readonly string[] }) {
+  const extra = also.join(',');
   useEffect(() => {
-    removeParams(['notice', 'error', 'provider', 'removed']);
-  }, []);
+    removeParams([
+      'notice',
+      'error',
+      'provider',
+      'removed',
+      ...(extra === '' ? [] : extra.split(',')),
+    ]);
+  }, [extra]);
   return null;
 }

@@ -229,10 +229,12 @@ describe('PUT .../skill-level: override (AC-HAPPY-1..3, AC-INTEGRATION-3)', () =
       [s.teamId, s.priya.id, promotedAt],
     );
     // A game completed after the promotion counts toward nothing at ADVANCED, and must not count after the override.
-    const session = await insertSession(database.pool, s.teamId, { flat: '0.00' });
-    await database.pool.query(`UPDATE game_sessions SET status = 'COMPLETED' WHERE id = $1`, [
-      session,
-    ]);
+    const session = await insertSession(
+      database.pool,
+      s.teamId,
+      { flat: '0.00' },
+      { status: 'COMPLETED' },
+    );
     await insertRegistration(database.pool, {
       sessionId: session,
       teamId: s.teamId,
@@ -707,10 +709,12 @@ describe('races under the team lock (AC-ERROR-4, AC-ERROR-5)', () => {
 describe('GET /teams/:teamId/members additive fields (AC-HAPPY-11, AC-VERIFY-7)', () => {
   async function games(s: Scene, userId: string, n: number): Promise<void> {
     for (let i = 0; i < n; i += 1) {
-      const session = await insertSession(database.pool, s.teamId, { flat: '0.00' });
-      await database.pool.query(`UPDATE game_sessions SET status = 'COMPLETED' WHERE id = $1`, [
-        session,
-      ]);
+      const session = await insertSession(
+        database.pool,
+        s.teamId,
+        { flat: '0.00' },
+        { status: 'COMPLETED' },
+      );
       await insertRegistration(database.pool, { sessionId: session, teamId: s.teamId, userId });
     }
   }

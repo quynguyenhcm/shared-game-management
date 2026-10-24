@@ -23,6 +23,8 @@ export const QUEUE_NAMES = {
   authCleanup: 'auth-cleanup',
   memberBanned: 'member-banned',
   skillProgression: 'skill-progression',
+  sessionAutoEnrol: 'session-auto-enrol',
+  recurrenceRule: 'recurrence-rule',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -51,6 +53,15 @@ export const QUEUES: readonly QueueDefinition[] = [
   // Daily skill progression sweep (skill-levels-and-auto-enroll): one run at a time. The member-row lock and the
   // guarded UPDATE, not this policy, are what make a redelivery or an overlapping run safe.
   { ...DEFAULTS, name: QUEUE_NAMES.skillProgression, policy: 'exclusive' },
+  // The auto-enrol follow-up of one session (session-scheduling-engine, binding P-1, T-2, T-19): one job per session
+  // (`singletonKey = session-auto-enrol:<sessionId>`), enqueued in the publish transaction. The D-80 marker, stamped under
+  // the per-session advisory lock, is the durable once-only guard, not this policy.
+  { ...DEFAULTS, name: QUEUE_NAMES.sessionAutoEnrol, policy: 'exclusive' },
+  // One series' materialisation run (session-scheduling-engine SA-1, T-3): `singletonKey = recurrence-rule:<ruleId>`, enqueued
+  // by the nightly sweep, the boot sweep and (in their own transactions) series create, edit, end and "Publish drafts now".
+  // `stately` allows one queued and one active job per key, so an edit that commits during a run queues exactly one trailing
+  // run that reads the latest rule. Idempotence comes from `uq_game_sessions_rule_date` and guarded UPDATEs, never from this policy.
+  { ...DEFAULTS, name: QUEUE_NAMES.recurrenceRule, policy: 'stately' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

@@ -104,6 +104,16 @@ Domain write + enqueue (one transaction) -> pgboss.job -> worker handler -> Noti
 - **Trade-offs**: the paid rule has three encodings (SQL `game_session_is_paid`, TypeScript `isPaidSession`, and the parity fixture `apps/api/test/fixtures/paid-session-matrix.ts`); any change must update all three together. A removal can briefly block foreign-key inserts for the team. Publishes never wait on banking saves or moderation.
 - **Guiding Principles check**: P1 (constraints and triggers hold the rule; TS only shapes errors), P2 (`Money` only), P4 (envelopes, plaintext never logged) and P5 (change email in the same transaction) all hold. No contradiction.
 
+### Sessions, recurrence and the allocator seam (session-scheduling-engine)
+- **Implementation**: `apps/api/src/modules/sessions/` (routes, service, series, materialise and materialise-instance, auto-enrol, locks, tx, allocator-port). Jobs: `apps/api/src/jobs/recurrence-materialisation.ts` (sweep), `recurrence-rule.ts`, `session-auto-enrol.ts`. Shared rules: `packages/shared/src/sessions/`. Composition root: `apps/api/src/session-allocator.ts`. Decision record: `docs/adr/0019-session-scheduling-engine.md`.
+- **Lock order**: `teams` (KEY SHARE only), then `recurring_session_rules` (NO KEY UPDATE), then `team_members`, then `game_sessions`, then `registrations`, then `registration_guests` and `payments` (`LOCK_ORDER` in `locks.ts`). The series edit locks a rule's instances in `(date, id)` order under the rule lock. The auto-enrol advisory lock is taken first in its own transaction and sits outside this order.
+- **Trigger order**: `game_sessions` BEFORE triggers fire in name order: `derive_instants`, `fee_raise_locked`, `fill_default_deadline`, `guard_update`, `paid_requires_payout`, `version_bump`. The order is asserted from `pg_trigger` in `sessions-schema.int.test.ts`.
+- **Allocator seam**: `SessionAllocatorPort` (`allocator-port.ts`) is owned here. Registration-and-waitlist implements it. Until then `createSessionAllocator` returns `noopSessionAllocator`, which has `enrols: false`. `buildApp` and `registerJobs` require the port, and no session-side code writes `registrations`.
+- **Auto-enrol obligation**: a durable marker (`game_sessions.auto_enrolled_at`, D-80) is stamped only by a real allocator. The follow-up transaction runs after the session commits, never under its lock, so a pending session is reconciled by the sweep.
+- **Trade-offs**: the rules have a SQL trigger, TypeScript and a parity test for each (matrix, deadline, D-85 predicate); a change must update all of them. The series sweep fans out to per-rule and per-session jobs, so one bad rule cannot block another.
+- **Pre-merge migration amendments**: while a feature branch is unmerged, its own migration may be amended in place (Phase 4 did this to sort the ids in `session_courts_guard_closed`, D-76). Record it as a merge constraint in the ADR and the task ledger, and tell developers to run `pnpm db:reset`. Once the migration is on `main`, fix it with a forward migration only.
+- **Config at the composition root**: values derived from config (`webBaseUrl`, the recurrence horizon) are passed explicitly from `main.ts` and `worker.ts`, with no `?? <literal>` fallback in `buildApp` or the job bootstrap. The web app reads such values from the API response that owns them (`horizonDays` on the series reads) and never keeps its own copy. `AppDeps.recurrenceHorizonDays` is still optional with a default of 28, and making it required is a follow-up.
+
 ## Integration Patterns
 
 ### Email
@@ -180,6 +190,12 @@ To populate this section, run `/yay:c4`. The command builds a complete bottom-up
 <!-- AUTO-MANAGED: c4-architecture-end -->
 
 ## Recent Architecture Changes
+
+### 2026-10-20 - Session scheduling engine (session-scheduling-engine)
+- **What Changed**: `modules/sessions` (one-off sessions, recurring series, publish through the banking gate, admin routes under `/teams/:teamId/sessions*` and `/teams/:teamId/session-series*`); the `recurrence-materialisation` sweep and its per-rule `recurrence-rule` and per-session `session-auto-enrol` jobs; the extended lock order with `recurring_session_rules`; the allocator port and its no-op default; migration `20261020000100000` (ledger D-70 to D-83 and D-85).
+- **Reason**: sessions are the producer for registration, billing and dashboards. The rules that make them safe (immutability after completion, default deadline, DST handling, fee locks) are fixed in the database, and the seat allocator is injected behind a port (`docs/adr/0019-session-scheduling-engine.md`).
+- **Trade-offs**: until the allocator ships, auto-enrol stays pending and waitlist promotion is a no-op, so the marker and the sweep carry the obligation. The horizon default (28 days) is applied by two code paths.
+- **Affected Components**: `apps/api` (`modules/sessions`, `jobs`, `session-allocator.ts`, `main.ts`, `worker.ts`), `packages/shared` (`sessions/`), `db/migrations`, `apps/web` (session admin pages).
 
 ### 2026-10-16 - Team banking and GST (team-banking-and-gst)
 - **What Changed**: `modules/team-banking` (five routes, service, repo, publish gate, change email); the publish gate `assertTeamCanPublishPaidSession` and its SQL backstop `game_sessions_paid_requires_payout`; the removal guard `team_banking_in_use` and trigger `teams_guard_banking_removal`; a generated `is_payout_configured` backed by `payout_blocked_at`; shared helpers `modules/teams/admin-lock.ts` and `lib/auth/team-refusals.ts`; the `nz/` validators (bank account, IRD/GST, GST rate); the team-admin "Banking and GST" manage area.

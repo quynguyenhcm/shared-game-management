@@ -25,6 +25,7 @@ import {
 } from '../helpers/progression-scene.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 const T0 = new Date('2027-01-15T00:00:00.000Z');
 const clock = createManualClock(T0);
@@ -45,6 +46,8 @@ beforeAll(async () => {
   });
   await worker.start();
   await registerJobs({
+    sessionAllocator: noopSessionAllocator,
+    webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier: createInMemoryNotifier(),
     crypto: testCrypto(),

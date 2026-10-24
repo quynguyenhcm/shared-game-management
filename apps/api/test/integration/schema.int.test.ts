@@ -12,6 +12,7 @@ import {
   insertPasswordIdentity,
   insertPayment,
   insertRegistration,
+  insertRule,
   insertSession,
   insertTeam,
   insertUser,
@@ -391,13 +392,7 @@ describe('financial retention (AC-VERIFY-11)', () => {
 describe('recurrence and auto-enrol (AC-VERIFY-12)', () => {
   it('rejects a second session for the same (recurring_rule_id, date) with 23505; one-offs are unconstrained', async () => {
     const teamId = await insertTeam(db.pool);
-    const { rows } = await db.pool.query<{ id: string }>(
-      `INSERT INTO recurring_session_rules (team_id, day_of_week, default_location, default_address,
-                                            default_max_players, default_start_time, default_end_time, fee_flat)
-       VALUES ($1, 3, 'Test Hall', '1 Test Street', 12, '19:00', '21:00', '17.00') RETURNING id`,
-      [teamId],
-    );
-    const ruleId = rows[0]?.id ?? '';
+    const ruleId = await insertRule(db.pool, teamId);
     await insertSession(db.pool, teamId, {}, { recurringRuleId: ruleId, date: '2026-10-07' });
     await expectPgError(
       insertSession(db.pool, teamId, {}, { recurringRuleId: ruleId, date: '2026-10-07' }),

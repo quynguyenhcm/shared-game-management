@@ -4,6 +4,7 @@ import { NonRetryableJobError } from '../lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../lib/notifications/adapters/in-memory.ts';
 import type { EmailMessage } from '../lib/notifications/notifier.ts';
 import { testCrypto } from '../../test/helpers/app-deps.ts';
+import { noopSessionAllocator } from '../modules/sessions/allocator-port.ts';
 import { registerJobs } from './bootstrap.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { QUEUES } from './registry.ts';
@@ -180,6 +181,8 @@ describe('registerJobs', () => {
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
       db: {} as never, // the auth-cleanup handler only touches it when a job runs
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
       expireSecondsOverride: 5,
     });
     expect(defined.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
@@ -193,6 +196,30 @@ describe('registerJobs', () => {
         'skill-progression',
       ].sort(),
     );
+  });
+
+  it('fails fast when webBaseUrl is missing (12-factor: no localhost fallback), before any queue is defined', async () => {
+    const defined: string[] = [];
+    const runner = {
+      defineQueue: (definition: { name: string }) => {
+        defined.push(definition.name);
+        return Promise.resolve();
+      },
+      work: () => Promise.resolve(),
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    const options = {
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+    };
+    // Cast: the option is required at compile time; this proves the runtime guard for a JS-shaped caller.
+    await expect(registerJobs(options as never)).rejects.toThrow(/webBaseUrl/);
+    await expect(registerJobs({ ...options, webBaseUrl: '' })).rejects.toThrow(/webBaseUrl/);
+    expect(defined).toEqual([]);
   });
 
   it('wires the injected MemberBannedHandler into the member-banned queue, and the no-op by default', async () => {
@@ -211,6 +238,8 @@ describe('registerJobs', () => {
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
       db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
     };
     await registerJobs(base);
     const defaultHandler = handlers.get('member-banned');
@@ -242,12 +271,76 @@ describe('skill-progression wiring', () => {
         throw new Error('db down');
       },
     } as never;
-    await registerJobs({ runner, notifier: createInMemoryNotifier(), crypto: testCrypto(), db });
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
     const handler = handlers.get('skill-progression');
     expect(handler).toBeTypeOf('function');
     const { ctx } = context();
     await expect(handler?.({}, { ...ctx, signal: new AbortController().signal })).rejects.toThrow(
       /db down/,
+    );
+  });
+});
+
+describe('recurrence wiring (session-scheduling-engine)', () => {
+  function wired() {
+    const handlers = new Map<string, (data: object, ctx: JobContext) => Promise<void>>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: (data: object, ctx: JobContext) => Promise<void>) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    return { handlers, runner };
+  }
+
+  it('works the recurrence-materialisation slot with the real sweep, not the placeholder', async () => {
+    const { handlers, runner } = wired();
+    // A database that is down: the placeholder would complete, the real sweep must fail.
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down');
+      },
+    } as never;
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    await expect(
+      handlers.get('recurrence-materialisation')?.(
+        {},
+        { ...ctx, signal: new AbortController().signal },
+      ),
+    ).rejects.toThrow(/db down/);
+  });
+
+  it('works the recurrence-rule queue with a handler that rejects a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    await expect(handlers.get('recurrence-rule')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(
+      NonRetryableJobError,
     );
   });
 });

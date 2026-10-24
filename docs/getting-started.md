@@ -91,6 +91,29 @@ level after 40 qualifying games since their last level change (see ADR 0017). To
 (the `send-email` queue does). Completed and failed jobs are retained for 7 days. Keep payloads minimal: prefer IDs over
 values, and do not put secrets, bank details or tokens in a job payload.
 
+## Sessions and recurring series
+
+Team admins create one-off sessions and recurring series (see ADR 0019). A series is materialised
+into sessions inside a rolling horizon, and the horizon is set by one environment variable, read by both the api and the
+worker:
+
+| Variable                  | Default | Allowed | Used by        | Meaning                                                          |
+| ------------------------- | ------- | ------- | -------------- | ---------------------------------------------------------------- |
+| `RECURRENCE_HORIZON_DAYS` | `28`    | 7 to 91 | api and worker | Series sessions exist from today to today plus N days (NZ time). |
+
+- **The worker does the work.** The `recurrence-materialisation` sweep runs at 03:00 Pacific/Auckland and once at every
+  worker boot. It fans out one `recurrence-rule` job per active series and one `session-auto-enrol` job per pending
+  session. Without a running worker, no series sessions are created and no auto-enrol runs.
+- **Manual runs.** `pnpm run jobs:trigger recurrence-materialisation` runs the sweep. `pnpm run jobs:trigger recurrence-rule '<json>'`
+  re-runs one series, with `{ "ruleId", "teamId", "trigger" }` as its payload. `pnpm run jobs:trigger session-auto-enrol '<json>'`
+  re-offers auto-enrol for one session, with `{ "sessionId", "teamId", "trigger" }`.
+- **Banking emails go to Mailpit.** A series whose sessions cannot be published because the team has no payout details
+  sends at most one email per admin per series per NZ week. In development it lands in the Mailpit inbox at http://localhost:8025.
+- **After pulling the amended migration, reset the dev database.** The session migration `20261020000100000_session_scheduling.sql`
+  was amended in place before it merged. A database that applied the earlier draft must run `pnpm run db:reset` once.
+- **End-to-end coverage.** `apps/web/e2e/sessions.spec.ts` (AC-VERIFY-8) scans the session pages with axe at desktop and
+  360 x 740 widths. It lives in `apps/web/e2e/sessions.spec.ts` and runs with `pnpm run test:e2e`.
+
 ## Add a notification adapter
 
 1. Implement `Notifier` (`send(message): Promise<SendResult>`) in `apps/api/src/lib/notifications/adapters/<name>.ts`.

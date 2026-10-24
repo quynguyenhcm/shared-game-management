@@ -15,6 +15,7 @@ import { captureLogs } from '../helpers/log-capture.ts';
 import { testCrypto } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
+import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 
 const NOW = new Date('2026-10-06T12:00:00Z');
 const MINUTE = 60_000;
@@ -235,6 +236,8 @@ describe('auth-cleanup queue (production wiring)', () => {
     await worker.start();
     await producer.start();
     await registerJobs({
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
       runner: worker,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),

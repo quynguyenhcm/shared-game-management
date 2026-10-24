@@ -11,7 +11,9 @@ describe('queue registry', () => {
         'member-banned',
         'post-game-billing',
         'recurrence-materialisation',
+        'recurrence-rule',
         'send-email',
+        'session-auto-enrol',
         'skill-progression',
       ].sort(),
     );
@@ -33,6 +35,8 @@ describe('queue registry', () => {
       authCleanup: 'auth-cleanup',
       memberBanned: 'member-banned',
       skillProgression: 'skill-progression',
+      sessionAutoEnrol: 'session-auto-enrol',
+      recurrenceRule: 'recurrence-rule',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -47,6 +51,16 @@ describe('queue registry', () => {
     expect(getQueue('member-banned').policy).toBe('exclusive');
     // One daily progression sweep at a time; the per-member row lock is the real guard (AC-ASYNC-2).
     expect(getQueue('skill-progression').policy).toBe('exclusive');
+    // One auto-enrol follow-up per session (`singletonKey = session-auto-enrol:<sessionId>`); the D-80 marker,
+    // stamped under the advisory lock, is the durable once-only guard (T-19).
+    expect(getQueue('session-auto-enrol').policy).toBe('exclusive');
+  });
+
+  it('runs one series at a time per key, with a trailing run, on a stately queue (SA-1, AC-ASYNC-1)', () => {
+    // `singletonKey = recurrence-rule:<ruleId>`: one queued and one active job per rule, so an edit that commits during a run
+    // queues exactly one trailing run that reads the latest rule. The sweep is exclusive: one sweep at a time.
+    expect(getQueue('recurrence-rule').policy).toBe('stately');
+    expect(getQueue('recurrence-materialisation').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {

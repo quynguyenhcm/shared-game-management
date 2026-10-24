@@ -11,6 +11,9 @@ describe('manageReducer (per-section status regions and one open confirm per sec
       banned: null,
       banking: null,
       gst: null,
+      sessions: null,
+      session: null,
+      series: null,
     };
     expect(state.status).toEqual(none);
     expect(state.open).toEqual(none);
