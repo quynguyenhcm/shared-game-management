@@ -200,7 +200,8 @@ describe('the daily reconciliation sweep (AC-ASYNC-3)', () => {
     const sessionId = await published(teamId);
     await insertRegistration(database.pool, { sessionId, teamId, userId: m.userId });
 
-    // No worker involved: a producer-only runner leaves the job queued while the sweep runs twice.
+    // Hold the membership's singleton slot with a deferred job (state `created`, startAfter far ahead): the worker will not take
+    // it, and the exclusive queue treats it as queued, so the sweep must count it instead of enqueueing a second one.
     const producer = createJobRunner({
       databaseUrl: database.url,
       logger: captureLogs().logger,
@@ -209,15 +210,30 @@ describe('the daily reconciliation sweep (AC-ASYNC-3)', () => {
     await producer.start();
     try {
       const db = createKysely(database.pool);
-      // Park the worker's copy of the job: a started job is only queued once, and the worker may take it, so a unique
-      // singleton key per run is checked through the producer with the job still `created`.
+      const row = (
+        await database.pool.query<{ banned_by: string; banned_at: Date }>(
+          `SELECT banned_by, banned_at FROM team_members WHERE id = $1`,
+          [m.membershipId],
+        )
+      ).rows[0];
+      await producer.enqueue(
+        'member-banned',
+        {
+          teamId,
+          userId: m.userId,
+          membershipId: m.membershipId,
+          bannedBy: row?.banned_by,
+          bannedAt: row?.banned_at.toISOString(),
+        },
+        {
+          singletonKey: `member-banned:${m.membershipId}`,
+          startAfter: new Date(clock.now().getTime() + 30 * 24 * 3_600_000),
+        },
+      );
       const recording = createRecordingJobs(producer);
-      const once = await reconcileBannedMembers({ db, jobs: recording, clock });
-      expect(once.enqueued + once.alreadyQueued).toBe(1);
-      const again = await reconcileBannedMembers({ db, jobs: recording, clock });
-      // Either the worker has not picked the first job up yet (alreadyQueued) or it already ran and withdrew the member
-      // (nothing scanned): never a second job for the same membership while one is queued or active.
-      expect(again.enqueued).toBe(0);
+      const counts = await reconcileBannedMembers({ db, jobs: recording, clock });
+      expect(counts).toEqual({ scanned: 1, enqueued: 0, alreadyQueued: 1, invalid: 0 });
+      expect(await memberJobs(m.membershipId)).toHaveLength(1);
       expect(
         recording.recorded.every((job) => job.inTransaction && job.queue === 'member-banned'),
       ).toBe(true);

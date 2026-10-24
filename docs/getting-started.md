@@ -87,6 +87,14 @@ level after 40 qualifying games since their last level change (see ADR 0017). To
 `pnpm run jobs:trigger skill-progression`. The run is idempotent, logs `skill.progression.completed` with its counts, and ends
 `failed` if any member could not be processed (`skill.progression.member_failed` names them by id), so it retries safely.
 
+**Ban reconciliation.** The `registration-ban-reconcile` queue runs daily at 05:45 Pacific/Auckland (the last daily slot), once at
+every worker boot, and on demand with `pnpm run jobs:trigger registration-ban-reconcile`. It finds banned members who still hold
+an active registration in a future published session of their team and re-enqueues one `member-banned` job each (a job already
+queued or active is not duplicated); the real ban handler then withdraws them and promotes the waitlist. It logs
+`registration.ban_reconcile.completed` with counts only. A `member-banned` job that ends `failed` logs
+`team.member.banned.hook_failed` at level error and is retried by the next sweep. The worker database pool is 5 connections,
+because the ban handler can hold one through a lock wait.
+
 **Data retention note.** pg-boss job payloads (`pgboss.job.data`) may carry personal information such as email addresses
 (the `send-email` queue does). Completed and failed jobs are retained for 7 days. Keep payloads minimal: prefer IDs over
 values, and do not put secrets, bank details or tokens in a job payload.

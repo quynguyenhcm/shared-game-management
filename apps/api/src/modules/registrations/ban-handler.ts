@@ -131,6 +131,10 @@ export function createRegistrationsBanHandler(deps: BanHandlerDeps): MemberBanne
               sessionId: target.sessionId,
               class: failureClass,
               sqlState: errorCodeOf(error),
+              // The row an operator must look at: an id, never row data.
+              ...(error instanceof RegistrationInvariantError && error.registrationId !== undefined
+                ? { registrationId: error.registrationId }
+                : {}),
             },
             'ban withdrawal failed for one session; the others are still processed',
           );

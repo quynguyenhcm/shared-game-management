@@ -568,7 +568,7 @@ export interface BannedCandidate {
 
 /**
  * BANNED memberships that still hold an active registration in a future PUBLISHED session of their own team, oldest ban first,
- * after the keyset `after` (`banned_at, id`). Handled members drop out of the set, so a page boundary is stable.
+ * after the keyset `after` (`banned_at, id`). The sweep only enqueues, so nothing drops out of the set within a run: a stable page boundary comes from the keyset order alone.
  */
 export async function listBannedWithActive(
   db: Kysely<DB>,
