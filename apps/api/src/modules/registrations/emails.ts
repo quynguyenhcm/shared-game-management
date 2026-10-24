@@ -62,9 +62,12 @@ function sessionLines(input: RegistrationEmailInput): string[] {
   return [`When: ${when}`, `Where: ${fold(input.location)}, ${fold(input.address)}`, ...feeLine];
 }
 
+const freeCancellationLine = (input: RegistrationEmailInput): string =>
+  `Free cancellation until ${formatNzDay(input.cancellationDeadline)}, ${formatNzTime(input.cancellationDeadline)}.`;
+
 const deadlineLine = (input: RegistrationEmailInput): string =>
   input.at.getTime() <= input.cancellationDeadline.getTime()
-    ? `Free cancellation until ${formatNzDay(input.cancellationDeadline)}, ${formatNzTime(input.cancellationDeadline)}.`
+    ? freeCancellationLine(input)
     : "The free cancellation deadline has passed. If you can't play, withdraw on the session page: you won't be charged if someone from the waitlist takes your place, otherwise the fee applies.";
 
 const link = (input: RegistrationEmailInput): string =>
@@ -111,9 +114,9 @@ export function buildAutoEnrolEmail(
       : `You've been added to the waitlist for ${team} on ${day}. We'll email you if a place opens up.`,
     '',
     ...sessionLines(input),
-    deadlineLine(input),
+    freeCancellationLine(input),
     '',
-    `Your team admin turned on Auto Enroll for you. Withdraw before ${formatNzDay(input.cancellationDeadline)}, ${formatNzTime(input.cancellationDeadline)} if you can't play.`,
+    `Your team admin turned on Auto Enroll for you. Withdraw on the session page if you can't play.`,
     '',
     link(input),
     '',

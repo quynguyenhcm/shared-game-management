@@ -261,7 +261,7 @@ describe('response schemas', () => {
 });
 
 describe('AllocationRefusalReason', () => {
-  it('is the closed union including auto_enroll_changed', () => {
+  it('is the closed union including auto_enroll_changed and the auto-enrol-only deadline_passed', () => {
     expect(AllocationRefusalReason.options).toEqual([
       'overdue_payments',
       'session_not_open',
@@ -272,6 +272,7 @@ describe('AllocationRefusalReason', () => {
       'late_withdrawal_fee_due',
       'cancellation_terms_changed',
       'auto_enroll_changed',
+      'deadline_passed',
       'not_found',
     ]);
   });

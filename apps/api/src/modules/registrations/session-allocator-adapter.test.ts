@@ -68,6 +68,7 @@ describe('createRegistrationsSessionAllocator', () => {
       g: { ok: false, reason: 'not_found' },
       h: { ok: false, reason: 'session_not_open' },
       i: { ok: false, reason: 'party_exceeds_capacity' },
+      j: { ok: false, reason: 'deadline_passed' },
     };
     const fake = fakeAllocator({
       autoEnrol: (_ctx, input) =>

@@ -48,6 +48,8 @@ export const AllocationRefusalReason = z.enum([
   'late_withdrawal_fee_due',
   'cancellation_terms_changed',
   'auto_enroll_changed',
+  /** Auto-enrol only (ADR 0018 O5): the free-cancellation deadline has passed. Never an HTTP error: manual registration after it stays allowed. */
+  'deadline_passed',
   'not_found',
 ]);
 export type AllocationRefusalReason = z.infer<typeof AllocationRefusalReason>;

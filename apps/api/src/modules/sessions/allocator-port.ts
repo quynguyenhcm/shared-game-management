@@ -35,7 +35,9 @@ export type AutoEnrolSkipReason =
   | 'auto_enroll_changed'
   | 'not_found'
   | 'session_not_open'
-  | 'party_exceeds_capacity';
+  | 'party_exceeds_capacity'
+  /** O5: `now` is past the locked session's `cancellation_deadline`; auto-enrol adds nobody (manual registration is unaffected). */
+  | 'deadline_passed';
 
 export type AutoEnrolEntryOutcome =
   | { readonly ok: true; readonly status: 'CONFIRMED' | 'WAITLISTED' }

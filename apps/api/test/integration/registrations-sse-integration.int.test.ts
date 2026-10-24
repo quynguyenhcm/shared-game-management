@@ -20,6 +20,7 @@ import { createManualClock } from '../../src/lib/clock.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createJobRunner, type JobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
+import { runSessionAutoEnrol } from '../../src/modules/sessions/auto-enrol.ts';
 import { createSessionAllocator } from '../../src/session-allocator.ts';
 import { TEST_WEB_BASE_URL, testCrypto } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
@@ -46,6 +47,9 @@ let database: TestDatabase;
 let producer: JobRunner;
 let failAfterEnqueue = false;
 const clock = createManualClock(START_TIME);
+// The sweep worker is started by test (1) and reused by the O5 sweep test below.
+let worker: JobRunner;
+const workerLogs = captureLogs();
 
 beforeAll(async () => {
   database = await createTestDatabase({ poolMax: 16 });
@@ -65,6 +69,7 @@ beforeAll(async () => {
   await producer.start();
 });
 afterAll(async () => {
+  await worker?.stop();
   await producer.stop();
   await database.close();
 });
@@ -100,13 +105,7 @@ const emailOf = async (userId: string): Promise<string> =>
 // ---------------------------------------------------------------------------------------------
 
 describe('(1) a session pending under the no-op is enrolled by the recurrence sweep (the marker proof, real adapter)', () => {
-  let worker: JobRunner;
-  const workerLogs = captureLogs();
   const notifier = createInMemoryNotifier();
-
-  afterAll(async () => {
-    await worker?.stop();
-  });
 
   it('enrols once in selection order with AUTO_ENROL rows and AC-HAPPY-11 emails, stamps the marker, and a second sweep enrols nobody', async () => {
     const { sessionId, teamId } = await insertPublishedSession(database.pool, undefined, {
@@ -200,8 +199,9 @@ describe('(1) a session pending under the no-op is enrolled by the recurrence sw
       new RegExp(`^You've been added to the waitlist for ${TEAM_NAME}, `),
     );
     expect(byTo('auto-0@example.test')?.text).toContain(
-      'Your team admin turned on Auto Enroll for you. Withdraw before',
+      "Your team admin turned on Auto Enroll for you. Withdraw on the session page if you can't play.",
     );
+    expect(byTo('auto-0@example.test')?.text).not.toContain('deadline has passed');
     expect(byTo('auto-0@example.test')?.idempotencyKey).toMatch(
       new RegExp(`^auto-enrol:${rows.find((row) => row.userId === order[0])?.id}:`),
     );
@@ -229,6 +229,96 @@ describe('(1) a session pending under the no-op is enrolled by the recurrence sw
     expect(placed).toHaveLength(3);
     expect(placed.every((line) => line.source === 'AUTO_ENROL')).toBe(true);
     expect(JSON.stringify(workerLogs.lines())).not.toContain('auto-0@example.test');
+  });
+});
+
+describe('O5: a session already inside its free-cancellation window enrols nobody and is still stamped', () => {
+  async function pendingInsideWindow(prefix: string) {
+    // Starts in 24 h, so the default deadline (start - 48 h) is already 24 h behind the clock.
+    const { sessionId, teamId } = await insertPublishedSession(database.pool, undefined, {
+      now: START_TIME,
+      maxPlayers: 4,
+      startsInHours: 24,
+    });
+    for (const [index, assignedAt] of ['2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z'].entries()) {
+      const userId = await insertMember(database.pool, teamId, {
+        email: `${prefix}-${index}@example.test`,
+      });
+      await setAutoEnroll(database.pool, {
+        teamId,
+        userId,
+        enabled: true,
+        assignedAt: new Date(assignedAt),
+      });
+    }
+    return { sessionId, teamId };
+  }
+  const markerOf = async (sessionId: string): Promise<Date | null> =>
+    (
+      await database.pool.query<{ auto_enrolled_at: Date | null }>(
+        `SELECT auto_enrolled_at FROM game_sessions WHERE id = $1`,
+        [sessionId],
+      )
+    ).rows[0]?.auto_enrolled_at ?? null;
+
+  it('runSessionAutoEnrol skips every member as deadline_passed, stamps the marker, and a second run is not due', async () => {
+    const { sessionId, teamId } = await pendingInsideWindow('inside-direct');
+    const logs = captureLogs();
+    const deps = {
+      db: createKysely(database.pool),
+      clock,
+      allocator: createSessionAllocator({
+        db: createKysely(database.pool),
+        jobs: producer,
+        clock,
+        webBaseUrl: TEST_WEB_BASE_URL,
+      }),
+      log: logs.logger,
+    };
+    expect(await runSessionAutoEnrol(deps, { teamId, sessionId })).toMatchObject({
+      kind: 'done',
+      candidates: 2,
+      confirmed: 0,
+      waitlisted: 0,
+      skipped: 2,
+    });
+    expect(await markerOf(sessionId)).not.toBeNull();
+    expect(await readRegistrations(database.pool, sessionId)).toEqual([]);
+    expect((await sendEmailJobs()).filter((mail) => mail.to.startsWith('inside-direct'))).toEqual(
+      [],
+    );
+    expect(await runSessionAutoEnrol(deps, { teamId, sessionId })).toMatchObject({
+      kind: 'not_due',
+    });
+  });
+
+  it('the recurrence sweep stamps such a session without enrolling anyone, and a second sweep changes nothing', async () => {
+    const { sessionId } = await pendingInsideWindow('inside-sweep');
+    expect(await markerOf(sessionId)).toBeNull();
+    const sweeps = (): number =>
+      workerLogs.lines().filter((line) => line.event === 'session.recurrence.sweep_completed')
+        .length;
+    for (let round = 0; round < 2; round += 1) {
+      const before = sweeps();
+      await waitFor(
+        async () =>
+          (await worker.trigger(QUEUE_NAMES.recurrenceMaterialisation)) === null ? undefined : true,
+        { timeoutMs: 10_000, label: 'a sweep to queue' },
+      );
+      await waitFor(() => (sweeps() > before ? true : undefined), {
+        timeoutMs: 30_000,
+        label: 'the sweep',
+      });
+      if (round === 0)
+        await waitFor(async () => ((await markerOf(sessionId)) !== null ? true : undefined), {
+          timeoutMs: 30_000,
+          label: 'the inside-window session to be stamped',
+        });
+    }
+    expect(await readRegistrations(database.pool, sessionId)).toEqual([]);
+    expect((await sendEmailJobs()).filter((mail) => mail.to.startsWith('inside-sweep'))).toEqual(
+      [],
+    );
   });
 });
 

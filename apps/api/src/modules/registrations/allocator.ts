@@ -117,7 +117,8 @@ export type AutoEnrolReason =
   | 'auto_enroll_changed'
   | 'not_found'
   | 'session_not_open'
-  | 'party_exceeds_capacity';
+  | 'party_exceeds_capacity'
+  | 'deadline_passed';
 
 export type AutoEnrolOutcome =
   | { readonly ok: true; readonly status: 'CONFIRMED' | 'WAITLISTED' }
@@ -613,6 +614,15 @@ export function createAllocator(deps: AllocatorDeps): Allocator {
       const closed = closedReason(session, now);
       if (closed !== null || session === undefined) {
         for (const member of gated) skip(member.index, member.userId, closed ?? 'not_found');
+        return settleAll();
+      }
+
+      // O5 (human ruling 2026-10-25): once the free-cancellation deadline has passed, auto-enrol adds nobody, CONFIRMED or
+      // WAITLISTED, so no member is enrolled into a late-fee position. The LOCKED row is judged (a deadline edit may have
+      // committed since the header read) and `now <= deadline` still enrols, matching `classifyWithdrawal`. Manual
+      // registration and waitlist promotion are not affected.
+      if (now.getTime() > session.cancellation_deadline.getTime()) {
+        for (const member of gated) skip(member.index, member.userId, 'deadline_passed');
         return settleAll();
       }
 

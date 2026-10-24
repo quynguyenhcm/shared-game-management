@@ -1125,9 +1125,9 @@ describe('autoEnrolInSession', () => {
     expect(sent[2]?.subject).toMatch(
       /^You've been added to the waitlist for .+, \w{3} \d{1,2} \w{3}$/,
     );
-    expect(sent[0]?.text).toContain(
-      'Your team admin turned on Auto Enroll for you. Withdraw before',
-    );
+    expect(sent[0]?.text).toContain("Withdraw on the session page if you can't play.");
+    expect(sent[0]?.text).toContain('Free cancellation until');
+    expect(sent[0]?.text).not.toContain('deadline has passed');
     expect(sent[0]?.idempotencyKey).toMatch(/^auto-enrol:[0-9a-f-]{36}:2026-10-20T00:00:00\.000Z$/);
     expect(jobs.recorded.every((job) => job.inTransaction)).toBe(true);
   });
@@ -1248,6 +1248,64 @@ describe('autoEnrolInSession', () => {
     );
     expect(missing[0]?.outcome).toEqual({ ok: false, reason: 'not_found' });
     expect(await readRegistrations(database.pool, s.sessionId)).toEqual([]);
+  });
+
+  it('O5: auto-enrol enrols while now <= deadline (the boundary included) and adds nobody once now > deadline, logging each skip once', async () => {
+    const s = await scene({ maxPlayers: 6 });
+    const atBoundary = await enrollee(s, 1, { email: 'boundary@example.test' });
+    clock.set(s.deadline);
+    expect((await autoEnrol(s, [atBoundary]))[0]?.outcome).toEqual({
+      ok: true,
+      status: 'CONFIRMED',
+    });
+
+    const late = await enrollee(s, 2, { email: 'late-1@example.test' });
+    const later = await enrollee(s, 3, { email: 'late-2@example.test' });
+    jobs.reset();
+    const before = logs.lines().length;
+    clock.set(new Date(s.deadline.getTime() + 1));
+    const results = await autoEnrol(s, [late, later]);
+    expect(results.map((entry) => entry.outcome)).toEqual([
+      { ok: false, reason: 'deadline_passed' },
+      { ok: false, reason: 'deadline_passed' },
+    ]);
+    expect((await readRegistrations(database.pool, s.sessionId)).map((row) => row.userId)).toEqual([
+      atBoundary.userId,
+    ]);
+    expect(jobs.emails()).toEqual([]);
+    const refused = logs
+      .lines()
+      .slice(before)
+      .filter((line) => line.event === 'registration.refused' && line.reason === 'deadline_passed');
+    expect(refused).toHaveLength(2);
+  });
+
+  it('O5: a capacity raise after the deadline promotes the existing waitlist but auto-enrols nobody new', async () => {
+    const s = await scene({ maxPlayers: 1 });
+    const holder = await insertMember(database.pool, s.teamId);
+    await register(s, holder);
+    const waiting = await insertMember(database.pool, s.teamId, { email: 'waiting@example.test' });
+    await register(s, waiting);
+    const fresh = await enrollee(s, 1, { email: 'fresh@example.test' });
+    await database.pool.query(`UPDATE game_sessions SET max_players = 3 WHERE id = $1`, [
+      s.sessionId,
+    ]);
+    clock.set(new Date(s.deadline.getTime() + 60_000));
+    jobs.reset();
+    expect((await promote(s)).map((seat) => seat.userId)).toEqual([waiting]);
+    expect((await autoEnrol(s, [fresh]))[0]?.outcome).toEqual({
+      ok: false,
+      reason: 'deadline_passed',
+    });
+    expect(await readRegistration(database.pool, s.sessionId, fresh.userId)).toBeUndefined();
+    expect(jobs.emails().map((mail) => mail.to)).toEqual(['waiting@example.test']);
+  });
+
+  it('O5: a member can still register by hand after the deadline', async () => {
+    const s = await scene({ maxPlayers: 4 });
+    clock.set(new Date(s.deadline.getTime() + 60_000));
+    const member = await insertMember(database.pool, s.teamId);
+    expect(await register(s, member)).toMatchObject({ ok: true, status: 'CONFIRMED' });
   });
 
   it('R2: a placed auto-enrol member releases the oldest owed late-withdrawal fee', async () => {

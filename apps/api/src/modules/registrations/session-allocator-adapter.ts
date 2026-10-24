@@ -35,6 +35,7 @@ function toPortOutcome(outcome: AutoEnrolOutcome): AutoEnrolEntryOutcome {
     case 'not_found':
     case 'session_not_open':
     case 'party_exceeds_capacity':
+    case 'deadline_passed':
       return { ok: false, reason: outcome.reason };
   }
 }
