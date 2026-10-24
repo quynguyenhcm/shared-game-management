@@ -18,3 +18,4 @@ export * from './skill/index.ts';
 export * from './time/time.ts';
 export type { Ciphertext } from './types/brands.ts';
 export * from './types/enums.ts';
+export * from './registrations/index.ts';

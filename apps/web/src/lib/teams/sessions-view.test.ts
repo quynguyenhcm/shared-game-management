@@ -625,7 +625,7 @@ describe('series change effect line (T-5)', () => {
       updated: 3,
       edited: 1,
       registered: 1,
-      line: "Your changes will apply to 3 upcoming sessions and to sessions added later. 1 edited session keeps its own details. 1 published session has registered players, so fees on it can only be lowered. Started, past and cancelled sessions don't change.",
+      line: "Your changes will apply to 3 upcoming sessions and to sessions added later. 1 edited session keeps its own details. 1 published session has a player who has registered or still owes a late-withdrawal fee, so fees on it can only be lowered. Started, past and cancelled sessions don't change.",
     });
   });
 
@@ -770,7 +770,7 @@ describe('series save report (T-5): counts only from the response outcome', () =
       'Series saved. 1 upcoming session updated.',
       '2 sessions were left as they are because they have started or closed.',
       '2 published sessions were left as they are because their cancellation deadline has passed.',
-      '3 published sessions kept their current fees because players have registered and fees can only be lowered.',
+      '3 published sessions kept their current fees because a player has registered or still owes a late-withdrawal fee, and fees can only be lowered.',
     ]);
     expect(
       seriesSavedLines({

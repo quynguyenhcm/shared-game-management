@@ -764,7 +764,7 @@ export function seriesEffect(
   }
   if (registered > 0) {
     parts.push(
-      `${plural(registered, 'published session')} ${registered === 1 ? 'has' : 'have'} registered players, so fees on ${registered === 1 ? 'it' : 'them'} can only be lowered.`,
+      `${plural(registered, 'published session')} ${registered === 1 ? 'has' : 'have'} a player who has registered or still owes a late-withdrawal fee, so fees on ${registered === 1 ? 'it' : 'them'} can only be lowered.`,
     );
   }
   if (updated + edited > 0) parts.push("Started, past and cancelled sessions don't change.");
@@ -819,7 +819,7 @@ export function seriesSavedLines(outcome: SeriesSaveCounts): string[] {
   }
   if (skipped.feeLocked > 0) {
     lines.push(
-      `${plural(skipped.feeLocked, 'published session')} kept ${skipped.feeLocked === 1 ? 'its' : 'their'} current fees because players have registered and fees can only be lowered.`,
+      `${plural(skipped.feeLocked, 'published session')} kept ${skipped.feeLocked === 1 ? 'its' : 'their'} current fees because a player has registered or still owes a late-withdrawal fee, and fees can only be lowered.`,
     );
   }
   return lines;

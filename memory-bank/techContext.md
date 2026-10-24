@@ -180,6 +180,8 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `apps/api/src/modules/auth/**` | 80% | Auth services, repo, sessions, throttle, providers (mostly through integration tests) |
 | `apps/web/src/lib/**` | 80% | Web config, api-client, auth actions, cookies, landing and messages |
 | `apps/api/src/modules/team-banking/**` | 80% | Banking routes, service, publish gate (added by team-banking-and-gst) |
+| `apps/api/src/modules/registrations/**` | 80% | Allocator, pure decision, repo, billing hand-off, port adapter (added by registration-and-waitlist, ADR 0018) |
+| `packages/shared/src/registrations/**` | 80% | Shared registration rules (added by registration-and-waitlist) |
 | `packages/shared/src/nz/**` | 80% | NZ bank-account, IRD and GST validators |
 | Other modules, generated types | Not required | Coverage gate applies only to listed modules |
 
@@ -207,6 +209,12 @@ The `.github/workflows/ci.yml` runs:
 Total time: ~5 min (varies with cache and Postgres startup). Each step must exit 0 for the job to pass.
 
 ## Recent Technology Changes
+
+### 2026-10-25 - Registration allocator and billing hand-off (registration-and-waitlist, Phase 2)
+- **What Changed**: no new libraries or infrastructure. New module `apps/api/src/modules/registrations/` (pure allocation decision, allocator, repo, billing hand-off, port adapter) and `packages/shared/src/registrations/`. The vitest coverage gate now also covers both paths. The adapter is built but not yet wired: `createSessionAllocator` still returns the no-op.
+- **Reason**: seats, waitlist promotion and the late-withdrawal liability need one writer and one pure decision under the session lock (`docs/adr/0018-registration-allocation-and-billing-handoff.md`).
+- **Impact**: `registrations` and `registration_guests` may be written only by `repo.ts` (structural test). Billing must read the hand-off in its own transaction at or after `starts_at`.
+- **Migration Notes**: none in this phase. The Phase 1 migration (`20261024000100000`, D-62 to D-69) is unchanged.
 
 ### 2026-10-20 - Session scheduling engine (session-scheduling-engine)
 - **What Changed**: no new libraries or infrastructure. Migration `20261020000100000` (ledger D-70 to D-83 and D-85): series anchor and court template, optimistic-concurrency `version`, lifecycle and immutability triggers, the 48 hour default deadline, content CHECKs and the fee-raise lock. New env var `RECURRENCE_HORIZON_DAYS` (7 to 91, default 28, read by api and worker). Three new pg-boss queues (see Background Jobs & Scheduling).
