@@ -56,14 +56,16 @@ async function expectTapTargets(page: Page, label: string): Promise<void> {
   const short = await page.evaluate(() => {
     const found: string[] = [];
     const targets = document.querySelectorAll(
-      'main button, main a[href], main label:has(input[type=radio])',
+      'main button, main a[href], main label:has(input[type=radio]), main input[type=text]',
     );
     for (const target of targets) {
       const box = target.getBoundingClientRect();
       if (box.width === 0 || box.height === 0) continue;
-      if (box.height < 43.5) {
+      // Height for every target; width too for buttons (a link may be a short inline word).
+      const narrow = target.tagName === 'BUTTON' && box.width < 43.5;
+      if (box.height < 43.5 || narrow) {
         found.push(
-          `${target.tagName.toLowerCase()} "${(target.textContent ?? '').trim().slice(0, 30)}" is ${Math.round(box.height)}px high`,
+          `${target.tagName.toLowerCase()} "${(target.textContent ?? '').trim().slice(0, 30)}" is ${Math.round(box.width)} x ${Math.round(box.height)} px`,
         );
       }
     }
