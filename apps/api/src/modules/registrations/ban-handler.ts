@@ -86,7 +86,11 @@ export function createRegistrationsBanHandler(deps: BanHandlerDeps): MemberBanne
     async handle(event, context) {
       const { logger, signal } = context;
       const ids = { teamId: event.teamId, userId: event.userId };
-      const targets = await listTargets(deps.db, ids, deps.clock.now());
+      // One clock reading for the whole run: selection and every per-session transaction act at this instant, so a
+      // session that starts mid-run is still withdrawn (a later reading would refuse it as closed).
+      const selectionNow = deps.clock.now();
+      const fixedClock: Clock = { now: () => selectionNow };
+      const targets = await listTargets(deps.db, ids, selectionNow);
 
       let affected = 0;
       let transientFailures = 0;
@@ -100,7 +104,7 @@ export function createRegistrationsBanHandler(deps: BanHandlerDeps): MemberBanne
           const outcome = await runTransaction(
             deps.db,
             JOB_POLICY,
-            { clock: deps.clock, teamId: event.teamId, path: 'ban', log: logger },
+            { clock: fixedClock, teamId: event.teamId, path: 'ban', log: logger },
             ({ trx, now }) =>
               allocator.withdrawFromSession(
                 { trx, now, log: logger },

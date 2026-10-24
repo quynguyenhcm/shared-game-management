@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
+import type { ComponentProps } from 'react';
 import { z } from 'zod';
 import { FormBanner } from '../../../components/auth/form-banner.tsx';
 import { LINK_CLASS } from '../../../components/auth/styles.ts';
 import { StripAuthParams } from '../../../components/flash-notice.tsx';
+import { UpcomingSessions } from '../../../components/registrations/upcoming-sessions.tsx';
 import { JoinTeamForm } from '../../../components/teams/join-team-form.tsx';
 import { Tag, TeamShell } from '../../../components/teams/team-shell.tsx';
 import { apiClient } from '../../../lib/api-client.ts';
@@ -61,6 +63,23 @@ export default async function TeamPage({
   const here = `/teams/${team.id}`;
   const notice = noticeText(firstParam(await searchParams, 'notice'), { teamName: team.name });
 
+  // "Upcoming sessions" (R8) is for APPROVED members only; its failure never takes the team page down with it.
+  let upcoming: ComponentProps<typeof UpcomingSessions>['result'] | null = null;
+  if (myStatus === 'APPROVED' && token !== null) {
+    const list = await apiClient.upcomingSessions(team.id, {
+      session: token,
+      incoming: await headers(),
+    });
+    if (!list.ok) {
+      log.warn('web.registrations.api_failure', {
+        action: 'upcoming_sessions',
+        status: list.status,
+        code: list.error.code,
+      });
+    }
+    upcoming = list.ok ? { ok: true, data: list.data } : { ok: false };
+  }
+
   return (
     <TeamShell>
       <title>{`${team.name} – Shared Game Management`}</title>
@@ -83,6 +102,7 @@ export default async function TeamPage({
         </p>
       )}
       {view.body === null ? null : <p className="text-base">{view.body}</p>}
+      {upcoming === null ? null : <UpcomingSessions teamId={team.id} result={upcoming} />}
 
       {view.action === 'sign_in' ? (
         <p className="flex flex-wrap gap-x-4">

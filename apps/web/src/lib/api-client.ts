@@ -26,6 +26,7 @@ import {
   OAuthPendingResponse,
   ProvidersResponse,
   PublishDraftsResponse,
+  RegistrationReadResponse,
   RemoveBankingResponse,
   ResetPasswordResponse,
   SeriesDetailResponse,
@@ -34,8 +35,11 @@ import {
   SessionDetailResponse,
   SessionListResponse,
   SessionEditResponse,
+  SessionRegisterResponse,
+  SessionWithdrawResponse,
   SessionWriteResponse,
   TeamDetailResponse,
+  UpcomingSessionsResponse,
   type CreateSeriesRequest,
   type CreateSessionRequest,
   type EndSeriesRequest,
@@ -43,6 +47,8 @@ import {
   type UpdateSessionRequest,
   type ListSessionsQuery,
   type SessionCommandRequest,
+  type SessionRegisterRequest,
+  type SessionWithdrawRequest,
   type BanMemberRequest,
   type CreateTeamRequest,
   type FindTeamsQuery,
@@ -727,5 +733,57 @@ export const apiClient = {
       method: 'POST',
       body: {},
       schema: PublishDraftsResponse,
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Registration (registration-and-waitlist; `MEMBER` routes: the API answers 403 to anyone who is not an APPROVED
+  // member of the team, before validation). The ids are encoded, so a hostile id can never change the path.
+  // -------------------------------------------------------------------------------------------
+
+  /** The next 10 PUBLISHED sessions that have not started, with places left and the caller's own status (R8). */
+  upcomingSessions: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/upcoming`,
+      method: 'GET',
+      schema: UpcomingSessionsResponse,
+    }),
+
+  /** The session page's read model: the session, the caller's registration and whether they can register. */
+  sessionRegistration: (teamId: string, sessionId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}/registration`,
+      method: 'GET',
+      schema: RegistrationReadResponse,
+    }),
+
+  registerForSession: (
+    teamId: string,
+    sessionId: string,
+    body: SessionRegisterRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}/registrations`,
+      method: 'POST',
+      body,
+      schema: SessionRegisterResponse,
+    }),
+
+  /** The body is strict `{ expectLate }` (R9): the caller's view of the terms, re-checked by the API in its transaction. */
+  withdrawFromSession: (
+    teamId: string,
+    sessionId: string,
+    body: SessionWithdrawRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/sessions/${encodeURIComponent(sessionId)}/registrations/me/withdraw`,
+      method: 'POST',
+      body,
+      schema: SessionWithdrawResponse,
     }),
 };

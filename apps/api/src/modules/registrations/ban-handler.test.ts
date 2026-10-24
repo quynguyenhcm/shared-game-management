@@ -68,6 +68,7 @@ function harness(
     userId: string;
   }[] = [];
   const transactions: { policy: AllocatorTxPolicy; path: string; teamId: string }[] = [];
+  const nows: Date[] = [];
   const listed: { teamId: string; userId: string; now: Date }[] = [];
   const clock = createManualClock(NOW);
   const controller = new AbortController();
@@ -82,10 +83,14 @@ function harness(
     },
     runTransaction: (_db, policy, txOptions: AllocatorTxOptions, work) => {
       transactions.push({ policy, path: txOptions.path, teamId: txOptions.teamId });
-      return work({ trx: { fake: true } as never, now: txOptions.clock.now() });
+      const result = work({ trx: { fake: true } as never, now: txOptions.clock.now() });
+      // Time passes while the per-session transactions run one after another.
+      clock.advance(60_000);
+      return result;
     },
     allocator: {
-      withdrawFromSession: (_ctx, input) => {
+      withdrawFromSession: (ctx, input) => {
+        nows.push(ctx.now);
         calls.push({
           sessionId: input.sessionId,
           cause: input.cause,
@@ -115,7 +120,7 @@ function harness(
     jobId: 'job-1',
     attempt: 1,
   };
-  return { handler, context, calls, transactions, logs, listed, controller, clock };
+  return { handler, context, calls, nows, transactions, logs, listed, controller, clock };
 }
 
 describe('classifyBanError', () => {
@@ -172,6 +177,13 @@ describe('createRegistrationsBanHandler', () => {
       { policy: JOB_POLICY, path: 'ban', teamId: TEAM },
       { policy: JOB_POLICY, path: 'ban', teamId: TEAM },
     ]);
+  });
+
+  it('gives every per-session transaction the selection clock reading, even when time passes between sessions', async () => {
+    const h = harness({ targets: [S1, S2, S3] });
+    await h.handler.handle(event, h.context);
+    // A session that starts mid-run must not be refused as closed: every transaction acts at the instant of selection.
+    expect(h.nows).toEqual([NOW, NOW, NOW]);
   });
 
   it('returns affected 0 and touches nothing when the member has no active registration (a redelivery)', async () => {

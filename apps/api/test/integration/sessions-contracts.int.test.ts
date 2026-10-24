@@ -64,7 +64,7 @@
  * (AC-INTEGRATION-6). This file keeps its recording double and stays green.
  */
 import { randomUUID } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PostgresDialect } from 'kysely';
 import type { LightMyRequestResponse } from 'fastify';
@@ -449,15 +449,41 @@ describe('every PUBLISHED session has what registration needs (assumed output 1,
 });
 
 // ---------------------------------------------------------------------------------------------
-// Output 3: no player page
+// Output 3: the player page is registration's; the admin pages stay under /manage/sessions
 // ---------------------------------------------------------------------------------------------
 
-describe("the player session page is registration-and-waitlist's (assumed output 3)", () => {
-  it('ships no page at /teams/[teamId]/sessions: the admin pages live under /manage/sessions', () => {
-    const playerRoot = fileURLToPath(
-      new URL('../../../web/src/app/teams/[teamId]/sessions', import.meta.url),
-    );
-    expect(existsSync(playerRoot)).toBe(false);
+describe("the player session page is registration-and-waitlist's (assumed output 3, R23)", () => {
+  // Phase 5 of registration-and-waitlist flips this from "no page exists" to "the page exists and is registration's".
+  const teamRoot = fileURLToPath(new URL('../../../web/src/app/teams/[teamId]', import.meta.url));
+  const playerRoot = `${teamRoot}/sessions`;
+
+  it("ships the player page at /teams/[teamId]/sessions/[sessionId], and it is registration's panel over the registration read model", () => {
+    const pagePath = `${playerRoot}/[sessionId]/page.tsx`;
+    expect(existsSync(pagePath)).toBe(true);
+    const source = readFileSync(pagePath, 'utf8');
+    // registration's slot: the panel, fed by GET .../registration (a MEMBER route), never SSE's TEAM_ADMIN GET .../sessions/:id
+    expect(source).toContain('RegistrationPanel');
+    expect(source).toContain('PlayerSessionSummary');
+    expect(source).toContain('sessionRegistration(');
+    expect(source).not.toContain('getSession(');
+    expect(source).not.toContain('/manage/sessions');
+  });
+
+  it('keeps the admin pages under /manage/sessions: the player tree holds only the [sessionId] page, SSE owns the rest', () => {
+    // nothing else lives at /teams/[teamId]/sessions (no list, no /new, no series): those are SSE's, under /manage
+    expect(readdirSync(playerRoot).sort()).toEqual(['[sessionId]']);
+    for (const adminPage of [
+      'manage/sessions/page.tsx',
+      'manage/sessions/new/page.tsx',
+      'manage/sessions/[sessionId]/page.tsx',
+      'manage/sessions/series/new/page.tsx',
+      'manage/sessions/series/[ruleId]/page.tsx',
+    ]) {
+      expect(existsSync(`${teamRoot}/${adminPage}`), adminPage).toBe(true);
+    }
+    // and the admin session component is not what the player page renders
+    const playerPage = readFileSync(`${playerRoot}/[sessionId]/page.tsx`, 'utf8');
+    expect(playerPage).not.toMatch(/components\/teams\/session-summary/);
   });
 });
 

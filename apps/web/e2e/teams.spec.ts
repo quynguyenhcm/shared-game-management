@@ -306,7 +306,7 @@ test.describe('team journeys', () => {
     const banPanel = member.getByRole('group');
     await expect(
       banPanel.getByText(
-        "Ban Hine Walker? They lose access to this team and can't register for its sessions.",
+        "Ban Hine Walker? They lose access to this team and can't register for its sessions. Their upcoming registrations will be cancelled.",
       ),
     ).toBeFocused();
     await page.keyboard.press('Escape');
