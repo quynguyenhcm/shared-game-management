@@ -441,6 +441,22 @@ describe('listBillableRegistrations (AC-INTEGRATION-3)', () => {
       ]);
     });
 
+    it('excludes a banned-before-start registrant with a guest: neither the registration nor its guest is billed', async () => {
+      const s = await scene(6);
+      const kept = await insertMember(database.pool, s.teamId);
+      const host = await insertMember(database.pool, s.teamId);
+      await register(s, kept);
+      clock.advance(1_000);
+      await register(s, host, guestsOf(1));
+      const before = await bill(s);
+      expect(before.find((row) => row.userId === host)?.guests).toHaveLength(1);
+      await banAt(s.teamId, host, new Date(s.startsAt.getTime() - 3_600_000));
+      const billable = await bill(s);
+      expect(users(billable)).toEqual([[kept, 'CONFIRMED']]);
+      // Guests ride only on their registration: no guest of the banned party appears anywhere in the list.
+      expect(billable.flatMap((row) => row.guests)).toEqual([]);
+    });
+
     it('is scoped to the session team: a ban in another team does not exclude the row', async () => {
       const s = await scene(4);
       const other = await scene(4);

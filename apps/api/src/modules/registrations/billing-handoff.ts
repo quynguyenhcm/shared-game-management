@@ -25,8 +25,11 @@
  * The O6 `team_members` read is a plain, unlocked read, on purpose:
  * - `team_members` comes BEFORE `game_sessions` in `LOCK_ORDER` (`sessions/locks.ts`), so locking it here, after the session
  *   lock, would invert the canonical order (the same reason the promotion's member read is unlocked, ADR 0018 C3).
- * - It is not needed for a stable answer. BANNED is terminal (D-42) and `banned_at` is written once, in the statement that
- *   bans (D-41), so a ban the read sees can never be undone. A ban the read misses commits with `banned_at` = that ban's own
+ * - It is not needed for a stable answer. BANNED is terminal (D-42), and `banned_at` is written only by the ban statement
+ *   (`teams/repo.ts`, guarded on `status = 'APPROVED'`), so a ban the read sees is never undone or re-dated by the
+ *   application. The database itself does not forbid a later `banned_at` write (`team_members_guard_update` fires on
+ *   `UPDATE OF status, team_id, user_id` only), so a future ban-date correction feature must respect billing finality
+ *   (never move `banned_at` across the `starts_at` of a session already billed). A ban the read misses commits with `banned_at` = that ban's own
  *   `now`, which is after `starts_at` for any ban that starts once billing can run, so a later read excludes it no more
  *   than this one did. The only gap is a ban whose transaction read its clock before `starts_at` and commits after this
  *   read, a window of one transaction's duration at the start instant; that member is billed, as billing's read decided.

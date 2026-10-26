@@ -6,6 +6,8 @@
 -- auto_enrol_required, auto_enrolled_at NULL). The first worker boot sweep enrols them all, and would send one R17
 -- auto-enrol email per placed member per session in one burst. That backlog is enrolled WITHOUT emails; sessions published
 -- after this migration email as normal (the column default). Placements, logs and the D-80 stamp are unchanged.
+-- The silent backlog is exactly what was pending when this migration ran: a session published by the old build after the
+-- migration but before the new worker boots defaults to true and emails as normal.
 
 -- D-86: per-session "send the R17 auto-enrol email". Read by runSessionAutoEnrol (readDue) and passed to the allocator port.
 ALTER TABLE game_sessions
