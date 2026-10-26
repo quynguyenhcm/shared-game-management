@@ -322,6 +322,100 @@ describe('O5: a session already inside its free-cancellation window enrols nobod
   });
 });
 
+describe('O8: the pre-deploy backlog (auto_enrol_notify = false) is enrolled without auto-enrol emails', () => {
+  async function pendingSession(prefix: string, notify: boolean) {
+    const { sessionId, teamId } = await insertPublishedSession(database.pool, undefined, {
+      now: START_TIME,
+      maxPlayers: 1,
+    });
+    if (!notify) {
+      await database.pool.query(
+        `UPDATE game_sessions SET auto_enrol_notify = false WHERE id = $1`,
+        [sessionId],
+      );
+    }
+    for (const [index, assignedAt] of ['2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z'].entries()) {
+      const userId = await insertMember(database.pool, teamId, {
+        email: `${prefix}-${index}@example.test`,
+      });
+      await setAutoEnroll(database.pool, {
+        teamId,
+        userId,
+        enabled: true,
+        assignedAt: new Date(assignedAt),
+      });
+    }
+    return { sessionId, teamId };
+  }
+  const depsWith = (log: ReturnType<typeof captureLogs>['logger']) => ({
+    db: createKysely(database.pool),
+    clock,
+    allocator: createSessionAllocator({
+      db: createKysely(database.pool),
+      jobs: producer,
+      clock,
+      webBaseUrl: TEST_WEB_BASE_URL,
+    }),
+    log,
+  });
+  const versionOf = async (sessionId: string): Promise<number> =>
+    (
+      await database.pool.query<{ version: number }>(
+        `SELECT version FROM game_sessions WHERE id = $1`,
+        [sessionId],
+      )
+    ).rows[0]?.version as number;
+
+  it('places the members as usual (AUTO_ENROL, CONFIRMED then WAITLISTED, marker stamped) and enqueues no send-email job', async () => {
+    const { sessionId, teamId } = await pendingSession('silent', false);
+    const logs = captureLogs();
+    expect(await runSessionAutoEnrol(depsWith(logs.logger), { teamId, sessionId })).toMatchObject({
+      kind: 'done',
+      candidates: 2,
+      confirmed: 1,
+      waitlisted: 1,
+      skipped: 0,
+    });
+    const rows = await readRegistrations(database.pool, sessionId);
+    expect(rows.map((row) => [row.status, row.source]).sort()).toEqual([
+      ['CONFIRMED', 'AUTO_ENROL'],
+      ['WAITLISTED', 'AUTO_ENROL'],
+    ]);
+    expect(
+      (
+        await database.pool.query<{ auto_enrolled_at: Date | null }>(
+          `SELECT auto_enrolled_at FROM game_sessions WHERE id = $1`,
+          [sessionId],
+        )
+      ).rows[0]?.auto_enrolled_at,
+    ).not.toBeNull();
+    expect((await sendEmailJobs()).filter((mail) => mail.to.startsWith('silent-'))).toEqual([]);
+    // The placements are still logged; the completed event says how many went out silently (counts only, no addresses).
+    expect(logs.lines().filter((line) => line.event === 'registration.created')).toHaveLength(2);
+    const completed = logs.lines().find((line) => line.event === 'session.auto_enrol.completed');
+    expect(completed).toMatchObject({ sessionId, teamId, confirmed: 1, waitlisted: 1, silent: 2 });
+    expect(JSON.stringify(logs.lines())).not.toContain('silent-0@example.test');
+  });
+
+  it('a default session (auto_enrol_notify = true) still emails every placed member, and the completed event has no silent count', async () => {
+    const { sessionId, teamId } = await pendingSession('loud', true);
+    const logs = captureLogs();
+    const version = await versionOf(sessionId);
+    await runSessionAutoEnrol(depsWith(logs.logger), { teamId, sessionId });
+    expect(
+      (await sendEmailJobs())
+        .filter((mail) => mail.to.startsWith('loud-'))
+        .map((mail) => mail.to)
+        .sort(),
+    ).toEqual(['loud-0@example.test', 'loud-1@example.test']);
+    const completed = logs.lines().find((line) => line.event === 'session.auto_enrol.completed');
+    expect(completed).toBeDefined();
+    expect(completed).not.toHaveProperty('silent');
+    // The D-80 stamp is bookkeeping, so the run leaves the session version alone.
+    expect(await versionOf(sessionId)).toBe(version);
+  });
+});
+
 // ---------------------------------------------------------------------------------------------
 // (2) and (3): a capacity raise through SSE's edit transactions
 // ---------------------------------------------------------------------------------------------

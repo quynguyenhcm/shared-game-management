@@ -160,7 +160,7 @@ const autoEnrol = (s: Scene, entries: { userId: string; assignedAt: Date }[]) =>
   op(s, 'auto_enrol', ({ trx, now }) =>
     allocator.autoEnrolInSession(
       { trx, now, log: logs.logger },
-      { teamId: s.teamId, sessionId: s.sessionId, entries },
+      { teamId: s.teamId, sessionId: s.sessionId, entries, notify: true },
     ),
   );
 
@@ -517,7 +517,12 @@ describe('the capacity backstop and writers that skip the allocator (R4)', () =>
       const results = await viaFresh(s, fresh, 'auto_enrol', ({ trx, now }) =>
         allocator.autoEnrolInSession(
           { trx, now, log: logs.logger },
-          { teamId: s.teamId, sessionId: s.sessionId, entries: [{ userId, assignedAt }] },
+          {
+            teamId: s.teamId,
+            sessionId: s.sessionId,
+            entries: [{ userId, assignedAt }],
+            notify: true,
+          },
         ),
       );
       expect(results[0]?.outcome).toEqual({ ok: true, status: 'CONFIRMED' });

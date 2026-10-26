@@ -9,6 +9,11 @@
  *
  * The no-op port (`enrols: false`) changes nothing and stamps nothing, so the session stays pending until a real allocator is
  * injected and a later run enrols it (the rollout gap, SA-5). Logs carry ids and counts, never member names or emails.
+ *
+ * O8 (registration ruling 2026-10-26, D-86): the session's `auto_enrol_notify` is read with the due check and passed to the
+ * port as `notify`. Sessions left pending before registration shipped were set false by migration, so the first boot sweep
+ * enrols that backlog without the R17 emails; `session.auto_enrol.completed` then carries `silent` (placements made without
+ * an email). Every session published since defaults to true.
  */
 import { z } from 'zod';
 import type { Selectable, Transaction } from 'kysely';
@@ -60,7 +65,7 @@ const NOT_DUE: AutoEnrolOutcome = {
 
 type DueSession = Pick<
   Selectable<GameSessions>,
-  'date' | 'status' | 'starts_at' | 'auto_enrol_required' | 'auto_enrolled_at'
+  'date' | 'status' | 'starts_at' | 'auto_enrol_required' | 'auto_enrolled_at' | 'auto_enrol_notify'
 >;
 
 /** The session when it is still due: PUBLISHED, obliged, not yet stamped and not started. A plain read, no lock. */
@@ -71,7 +76,14 @@ async function readDue(
 ): Promise<DueSession | undefined> {
   const session = await reader
     .selectFrom('game_sessions')
-    .select(['date', 'status', 'starts_at', 'auto_enrol_required', 'auto_enrolled_at'])
+    .select([
+      'date',
+      'status',
+      'starts_at',
+      'auto_enrol_required',
+      'auto_enrolled_at',
+      'auto_enrol_notify',
+    ])
     .where('id', '=', input.sessionId)
     .where('team_id', '=', input.teamId)
     .executeTakeFirst();
@@ -105,6 +117,8 @@ export async function runSessionAutoEnrol(
   }
 
   let skippedByReason: Record<string, number> = {};
+  // O8: the due session's flag, kept for the completed event (the last attempt's read wins).
+  let notify = true;
   let outcome: AutoEnrolOutcome;
   try {
     outcome = await runSessionTransaction(
@@ -119,6 +133,7 @@ export async function runSessionAutoEnrol(
 
         // A retried transaction starts its tally again.
         skippedByReason = {};
+        notify = session.auto_enrol_notify;
         const selected = await selectAutoEnrollees(trx, { ...input, sessionDate: session.date });
         let confirmed = 0;
         let waitlisted = 0;
@@ -135,6 +150,7 @@ export async function runSessionAutoEnrol(
                 assignedAt: member.assignedAt,
                 membershipId: member.membershipId,
               })),
+              notify,
             },
           );
           for (const { outcome: result } of results) {
@@ -182,6 +198,8 @@ export async function runSessionAutoEnrol(
         confirmed: outcome.confirmed,
         waitlisted: outcome.waitlisted,
         skipped: skippedByReason,
+        // O8: only for a backlog session; how many members were placed without the R17 email (a count, no ids of members).
+        ...(notify ? {} : { silent: outcome.confirmed + outcome.waitlisted }),
       },
       'auto-enrol completed',
     );

@@ -146,6 +146,8 @@ export interface Allocator {
       readonly teamId: string;
       readonly sessionId: string;
       readonly entries: readonly AutoEnrolInputEntry[];
+      /** O8: false places as usual but queues no R17 auto-enrol email (`game_sessions.auto_enrol_notify`, D-86). */
+      readonly notify: boolean;
     },
   ): Promise<readonly { readonly userId: string; readonly outcome: AutoEnrolOutcome }[]>;
   withdrawFromSession(
@@ -660,6 +662,9 @@ export function createAllocator(deps: AllocatorDeps): Allocator {
         }
         outcomes.set(member.index, { ok: true, status: placed.outcome.status });
         logCreated(ctx, session, member.userId, placed.outcome, 1, 'AUTO_ENROL');
+        // O8 (human ruling 2026-10-26): the pre-deploy backlog is enrolled silently. The placement, its log line and the
+        // "Added automatically (Auto Enroll)" label are unchanged; only the R17 email is not queued. SSE logs the count.
+        if (!input.notify) continue;
         const [context] = await readEmailContexts(trx, [placed.registrationId]);
         const email =
           context === undefined

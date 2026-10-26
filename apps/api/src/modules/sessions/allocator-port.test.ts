@@ -24,6 +24,7 @@ describe('noopSessionAllocator', () => {
         teamId: 't',
         sessionId: 's',
         entries: [{ userId: 'u', assignedAt: new Date('2026-10-01T00:00:00Z') }],
+        notify: true,
       }),
     ).resolves.toEqual([]);
   });

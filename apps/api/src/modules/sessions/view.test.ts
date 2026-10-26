@@ -43,6 +43,7 @@ function row(over: Partial<SessionRow> = {}): SessionRow {
     deadline_is_default: true,
     auto_enrol_required: true,
     auto_enrolled_at: null,
+    auto_enrol_notify: true,
     ...over,
   };
 }

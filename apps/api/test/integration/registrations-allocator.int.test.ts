@@ -190,11 +190,11 @@ const promote = (s: Scene) =>
     ),
   );
 
-const autoEnrol = (s: Scene, entries: { userId: string; assignedAt: Date }[]) =>
+const autoEnrol = (s: Scene, entries: { userId: string; assignedAt: Date }[], notify = true) =>
   run(s, 'auto_enrol', (trx, now) =>
     allocator.autoEnrolInSession(
       { trx, now, log: logs.logger },
-      { teamId: s.teamId, sessionId: s.sessionId, entries },
+      { teamId: s.teamId, sessionId: s.sessionId, entries, notify },
     ),
   );
 
@@ -1088,6 +1088,28 @@ describe('autoEnrolInSession', () => {
     return { userId, assignedAt: at };
   }
 
+  it('O8: notify false places the same members the same way and queues no email; the placements are still logged', async () => {
+    const s = await scene({ maxPlayers: 1 });
+    const first = await enrollee(s, 1, { email: 'quiet-first@example.test' });
+    const second = await enrollee(s, 2, { email: 'quiet-second@example.test' });
+    const created = () =>
+      logs
+        .lines()
+        .filter((line) => line.event === 'registration.created' && line.sessionId === s.sessionId);
+    const results = await autoEnrol(s, [first, second], false);
+    expect(results).toEqual([
+      { userId: first.userId, outcome: { ok: true, status: 'CONFIRMED' } },
+      { userId: second.userId, outcome: { ok: true, status: 'WAITLISTED' } },
+    ]);
+    expect(await readRegistration(database.pool, s.sessionId, first.userId)).toMatchObject({
+      status: 'CONFIRMED',
+      source: 'AUTO_ENROL',
+    });
+    expect(jobs.emails()).toEqual([]);
+    expect(jobs.recorded).toEqual([]);
+    expect(created()).toHaveLength(2);
+  });
+
   it('AC-HAPPY-11 / R17: places members in order with source AUTO_ENROL, the snapshot, and one email per placed member', async () => {
     const s = await scene({ maxPlayers: 2 });
     const first = await enrollee(s, 1, {
@@ -1243,7 +1265,7 @@ describe('autoEnrolInSession', () => {
     const missing = await run(s, 'auto_enrol', (trx, now) =>
       allocator.autoEnrolInSession(
         { trx, now, log: logs.logger },
-        { teamId: s.teamId, sessionId: randomUUID(), entries: [member] },
+        { teamId: s.teamId, sessionId: randomUUID(), entries: [member], notify: true },
       ),
     );
     expect(missing[0]?.outcome).toEqual({ ok: false, reason: 'not_found' });

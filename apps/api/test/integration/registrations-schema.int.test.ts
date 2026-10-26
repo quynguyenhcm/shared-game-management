@@ -636,9 +636,11 @@ describe('migrate, rollback, migrate round trip (AC-VERIFY-2)', () => {
       expect(latest.some((line) => line.includes('registrations_guard_update'))).toBe(true);
       expect(latest.some((line) => line.includes('fee_due'))).toBe(true);
 
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 1 });
-      expect(reverted).toHaveLength(1);
-      expect(reverted[0]).toContain('registration_lifecycle');
+      // The O8 backlog migration (D-86) sits on top; the lifecycle migration is the second one back.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      expect(reverted).toHaveLength(2);
+      expect(reverted[0]).toContain('auto_enrol_silent_backlog');
+      expect(reverted[1]).toContain('registration_lifecycle');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'registrations_guard_update',
@@ -722,4 +724,97 @@ describe('migrate, rollback, migrate round trip (AC-VERIFY-2)', () => {
       await empty.close();
     }
   }, 120_000);
+});
+
+describe('O8: the silent auto-enrol backlog migration (D-86)', () => {
+  interface NotifyRow {
+    id: string;
+    auto_enrol_notify: boolean;
+    version: number;
+    updated_at: Date;
+  }
+  const readNotify = async (pool: TestDatabase['pool'], ids: readonly string[]) => {
+    const { rows } = await pool.query<NotifyRow>(
+      `SELECT id, auto_enrol_notify, version, updated_at FROM game_sessions WHERE id = ANY($1)`,
+      [ids],
+    );
+    return Object.fromEntries(rows.map((r) => [r.id, r]));
+  };
+
+  it('defaults to true, and on the way up sets false only on PUBLISHED sessions still pending auto-enrol, without a version bump', async () => {
+    const empty = await createTestDatabase({ empty: true });
+    try {
+      await migrateToLatest({ databaseUrl: empty.url });
+      const latest = await catalogSnapshot(empty.pool);
+      expect(latest.some((line) => line.startsWith('column game_sessions.auto_enrol_notify'))).toBe(
+        true,
+      );
+      // The version-bump trigger treats the flag as bookkeeping, like the D-80 marker (its TG_ARGV list).
+      expect(
+        latest.find(
+          (line) => line.startsWith('trigger') && line.includes('game_sessions_version_bump'),
+        ),
+      ).toContain('auto_enrol_notify');
+
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 1 });
+      expect(reverted).toEqual([expect.stringContaining('auto_enrol_silent_backlog')]);
+      const before = await catalogSnapshot(empty.pool);
+      expect(before.filter((line) => line.includes('auto_enrol_notify'))).toEqual([]);
+
+      // The backlog SSE left at deploy, beside rows the backfill must not touch.
+      const team = await insertTeam(empty.pool, { payoutConfigured: true });
+      const pending = await insertSession(empty.pool, team, {}, { status: 'PUBLISHED' });
+      const stamped = await insertSession(empty.pool, team, {}, { status: 'PUBLISHED' });
+      const notRequired = await insertSession(empty.pool, team, {}, { status: 'PUBLISHED' });
+      const draft = await insertSession(empty.pool, team, {}, { status: 'DRAFT' });
+      const cancelled = await insertSession(empty.pool, team, {}, { status: 'PUBLISHED' });
+      await empty.pool.query(
+        `UPDATE game_sessions SET auto_enrol_required = true, auto_enrolled_at = NULL
+          WHERE id = ANY($1)`,
+        [[pending, stamped, draft, cancelled]],
+      );
+      await empty.pool.query(`UPDATE game_sessions SET auto_enrolled_at = now() WHERE id = $1`, [
+        stamped,
+      ]);
+      await empty.pool.query(
+        `UPDATE game_sessions SET auto_enrol_required = false, auto_enrolled_at = NULL WHERE id = $1`,
+        [notRequired],
+      );
+      await empty.pool.query(`UPDATE game_sessions SET status = 'CANCELLED' WHERE id = $1`, [
+        cancelled,
+      ]);
+      const { rows: stampsBefore } = await empty.pool.query<{
+        version: number;
+        updated_at: Date;
+      }>(`SELECT version, updated_at FROM game_sessions WHERE id = $1`, [pending]);
+
+      await migrateToLatest({ databaseUrl: empty.url });
+      expect(await catalogSnapshot(empty.pool)).toEqual(latest);
+      const after = await readNotify(empty.pool, [pending, stamped, notRequired, draft, cancelled]);
+      expect(after[pending]?.auto_enrol_notify).toBe(false);
+      for (const untouched of [stamped, notRequired, draft, cancelled]) {
+        expect(after[untouched]?.auto_enrol_notify, untouched).toBe(true);
+      }
+      // The backfill is not a content edit: no stale-save 409 for an admin form opened before the deploy.
+      expect(after[pending]).toMatchObject(stampsBefore[0] ?? {});
+
+      // A session created after the deploy notifies.
+      const fresh = await insertSession(empty.pool, team, {}, { status: 'PUBLISHED' });
+      expect((await readNotify(empty.pool, [fresh]))[fresh]?.auto_enrol_notify).toBe(true);
+    } finally {
+      await empty.close();
+    }
+  }, 120_000);
+
+  it('the flag is bookkeeping: changing it never bumps version or updated_at (D-72 TG_ARGV)', async () => {
+    const id = await session();
+    const [before] = Object.values(await readNotify(db.pool, [id]));
+    await db.pool.query(`UPDATE game_sessions SET auto_enrol_notify = false WHERE id = $1`, [id]);
+    const [after] = Object.values(await readNotify(db.pool, [id]));
+    expect(after).toMatchObject({
+      auto_enrol_notify: false,
+      version: before?.version,
+      updated_at: before?.updated_at,
+    });
+  });
 });

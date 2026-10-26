@@ -99,6 +99,7 @@ export interface CreditTransactions {
 
 export interface GameSessions {
   address: string;
+  auto_enrol_notify: Generated<boolean>;
   auto_enrol_required: Generated<boolean>;
   auto_enrolled_at: Timestamp | null;
   calculated_rate_per_player: MoneyString | null;

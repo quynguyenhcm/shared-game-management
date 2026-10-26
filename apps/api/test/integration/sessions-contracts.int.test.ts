@@ -38,7 +38,8 @@
  *        promoteWaitlist(ctx: SessionAllocatorContext, input: { teamId: string; sessionId: string }):
  *          Promise<readonly PromotedSeat[]>;
  *        autoEnrolInSession(ctx: SessionAllocatorContext, input: { teamId: string; sessionId: string;
- *          entries: readonly { userId: string; assignedAt: Date; membershipId?: string }[] }):
+ *          entries: readonly { userId: string; assignedAt: Date; membershipId?: string }[];
+ *          notify: boolean }):   // notify: registration O8 (D-86), game_sessions.auto_enrol_notify
  *          Promise<readonly { userId: string; outcome: AutoEnrolEntryOutcome }[]>;
  *      }
  *      // SessionAllocatorContext = { trx: Transaction<DB>; now: Date; log }. The composition function is

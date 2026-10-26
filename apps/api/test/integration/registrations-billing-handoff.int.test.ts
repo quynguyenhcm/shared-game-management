@@ -22,6 +22,7 @@ import {
   insertPaymentRows,
   insertPublishedSession,
   insertSession,
+  insertTeamMember,
 } from '../helpers/factories.ts';
 import { waitForLockWaiters } from '../helpers/lock-waiters.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
@@ -361,6 +362,94 @@ describe('listBillableRegistrations (AC-INTEGRATION-3)', () => {
     expect(
       (await readRegistration(database.pool, s.sessionId, billable[0]?.userId ?? ''))?.status,
     ).toBe('CONFIRMED');
+  });
+
+  describe('O6: a registrant banned in the team at or before starts_at is never billed (ADR 0018 C3 mitigation)', () => {
+    /**
+     * The C3 residual straight in the database: the member is BANNED while their row is still CONFIRMED or owes a late fee,
+     * because the `member-banned` job and the sweep never succeeded before the start. `banned_by` is the member's own id
+     * (any user satisfies D-41); the ban hook is deliberately not run.
+     */
+    const banAt = (teamId: string, userId: string, at: Date) =>
+      database.pool.query(
+        `UPDATE team_members SET status = 'BANNED', banned_at = $3, banned_by = user_id, ban_reason = 'Test ban'
+          WHERE team_id = $1 AND user_id = $2`,
+        [teamId, userId, at],
+      );
+    const users = (rows: readonly { userId: string; reason: string }[]) =>
+      rows.map((row) => [row.userId, row.reason]);
+
+    it('excludes a CONFIRMED row banned before the start and one banned exactly at starts_at; other members are billed', async () => {
+      const s = await scene(6);
+      const [kept, bannedBefore, bannedAtStart] = [
+        await insertMember(database.pool, s.teamId),
+        await insertMember(database.pool, s.teamId),
+        await insertMember(database.pool, s.teamId),
+      ];
+      for (const userId of [kept, bannedBefore, bannedAtStart]) {
+        clock.advance(1_000);
+        await register(s, userId);
+      }
+      await banAt(s.teamId, bannedBefore, new Date(s.startsAt.getTime() - 3_600_000));
+      await banAt(s.teamId, bannedAtStart, s.startsAt);
+      // The rows are still CONFIRMED: no handler ran, which is exactly the residual.
+      expect((await readRegistration(database.pool, s.sessionId, bannedBefore))?.status).toBe(
+        'CONFIRMED',
+      );
+      expect(users(await bill(s))).toEqual([[kept, 'CONFIRMED']]);
+    });
+
+    it('excludes a fee-due LATE withdrawal whose registrant was banned before the start', async () => {
+      const s = await scene(4);
+      const kept = await insertMember(database.pool, s.teamId);
+      const owing = await insertMember(database.pool, s.teamId);
+      const stillOwing = await insertMember(database.pool, s.teamId);
+      for (const userId of [kept, owing, stillOwing]) {
+        clock.advance(1_000);
+        await register(s, userId);
+      }
+      clock.set(new Date(s.deadline.getTime() + 60_000));
+      await withdraw(s, owing);
+      clock.advance(1_000);
+      await withdraw(s, stillOwing);
+      expect(users(await bill(s))).toEqual([
+        [kept, 'CONFIRMED'],
+        [owing, 'LATE_WITHDRAWAL'],
+        [stillOwing, 'LATE_WITHDRAWAL'],
+      ]);
+      await banAt(s.teamId, owing, new Date(s.deadline.getTime() + 120_000));
+      expect(users(await bill(s))).toEqual([
+        [kept, 'CONFIRMED'],
+        [stillOwing, 'LATE_WITHDRAWAL'],
+      ]);
+    });
+
+    it('still bills a registrant banned after starts_at (billing is final at the start)', async () => {
+      const s = await scene(4);
+      const kept = await insertMember(database.pool, s.teamId);
+      const bannedLater = await insertMember(database.pool, s.teamId);
+      await register(s, kept);
+      clock.advance(1_000);
+      await register(s, bannedLater);
+      const atStart = await bill(s);
+      await banAt(s.teamId, bannedLater, new Date(s.startsAt.getTime() + 1));
+      const later = new Date(s.startsAt.getTime() + 60_000);
+      expect(await bill(s, later)).toEqual(atStart);
+      expect(users(atStart)).toEqual([
+        [kept, 'CONFIRMED'],
+        [bannedLater, 'CONFIRMED'],
+      ]);
+    });
+
+    it('is scoped to the session team: a ban in another team does not exclude the row', async () => {
+      const s = await scene(4);
+      const other = await scene(4);
+      const member = await insertMember(database.pool, s.teamId);
+      await insertTeamMember(database.pool, { teamId: other.teamId, userId: member });
+      await register(s, member);
+      await banAt(other.teamId, member, new Date(s.startsAt.getTime() - 3_600_000));
+      expect(users(await bill(s))).toEqual([[member, 'CONFIRMED']]);
+    });
   });
 
   it('AC-VERIFY-10: the allocator and the hand-off write no money row', async () => {

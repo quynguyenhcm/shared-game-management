@@ -87,9 +87,10 @@ describe('createRegistrationsSessionAllocator', () => {
     }));
     const ctx = ctxIn(true);
 
-    const results = await port.autoEnrolInSession(ctx, { ...ids, entries });
+    // O8: `notify` passes through untouched (false is the silent backlog).
+    const results = await port.autoEnrolInSession(ctx, { ...ids, entries, notify: false });
 
-    expect(fake.autoEnrol).toHaveBeenCalledWith(ctx, { ...ids, entries });
+    expect(fake.autoEnrol).toHaveBeenCalledWith(ctx, { ...ids, entries, notify: false });
     expect(results.map((result) => result.userId)).toEqual(Object.keys(outcomes));
     expect(results.map((result) => result.outcome)).toEqual(Object.values(outcomes));
   });
@@ -100,9 +101,9 @@ describe('createRegistrationsSessionAllocator', () => {
     const entries = [{ userId: 'u1', assignedAt: NOW }];
 
     await expect(port.promoteWaitlist(ctxIn(false), ids)).rejects.toThrow(/transaction/);
-    await expect(port.autoEnrolInSession(ctxIn(false), { ...ids, entries })).rejects.toThrow(
-      /transaction/,
-    );
+    await expect(
+      port.autoEnrolInSession(ctxIn(false), { ...ids, entries, notify: true }),
+    ).rejects.toThrow(/transaction/);
     expect(fake.promote).not.toHaveBeenCalled();
     expect(fake.autoEnrol).not.toHaveBeenCalled();
   });
