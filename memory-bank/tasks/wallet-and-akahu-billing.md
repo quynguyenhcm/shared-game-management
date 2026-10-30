@@ -637,11 +637,49 @@ Provisional (pending creative): the defaults above. The creative architecture, a
 ## Creative Phases
 
 Level 4: creative is required.
-- [ ] **Architecture Design** (required): Q1 (Akahu integration shape: technical shape settled by spike, Plan Amendment A1; still design the gateway port, top-up/attempt flows and the manual R3 action per A3), Q2 (payment link identity), Q4 (ledger enforcement, lock order, transaction boundaries, module split, shared apply function). Status: pending.
-- [ ] **Algorithm Design** (required): Q3 (top-up intent, cap, duplicates per B3) and Q6 (post-game edge cases per B8/B9, departed members, long worker outage). Status: pending.
-- [ ] **User Journey Design** (required for Level 4): Q5 journey (top-up, pay-by-link, overdue, reminder; debt-block link target across teams; the seven emails' copy). Status: pending.
-- [ ] **UI/UX Design** (required): Q5 UI (wallet page, payment page, Payments manage area, processing and error states). Status: pending.
-- **Reconciliation step**: after the parallel creative docs return, write one binding Creative Reconciliation section here before build (lesson from team-management and registration-and-waitlist).
+- [x] **Architecture Design** (required): Q1, Q2, Q4. Status: COMPLETE, `memory-bank/creative/wallet-and-akahu-billing-billing-architecture.md`.
+- [x] **Algorithm Design** (required): Q3, Q6, A2 hold, A8, overdue, reminders, reconcile. Status: COMPLETE, `memory-bank/creative/wallet-and-akahu-billing-billing-algorithm.md`.
+- [x] **User Journey Design** (required for Level 4): Q5 journey, debt-block target, email copy. Status: COMPLETE, `memory-bank/creative/wallet-and-akahu-billing-billing-user-journey.md`.
+- [x] **UI/UX Design** (required): Q5 UI. Status: COMPLETE, `memory-bank/creative/wallet-and-akahu-billing-billing-uiux.md`.
+- [x] **Reconciliation step**: see Creative Reconciliation below.
+
+### Creative Reconciliation (binding, 2026-10-31)
+
+Where the four docs disagree, this section wins; where it is silent, the owning doc wins (architecture: modules, schema shape, routes, env, ADR 0020; algorithm: state machines, decision tables, job algorithms, test matrices; user journey: flows and email copy; UI/UX: pages, components, page copy). It supersedes the spec and plan where they conflict (with the Plan Amendment A1-A8 still above both). Items marked **[RULING]** change approved ACs or product policy and need the human's confirmation; the stated default applies until ruled, and each names the phase it gates.
+
+**Integration and state**
+- **CR-1 Intent states (algorithm names win; architecture deferred them).** One enum `payment_intent_status` = `CREATING`, `OPEN`, `HELD`, `APPLIED`, `UNAPPLIED`, `CLOSED`, shared by `payment_attempts` and `wallet_top_ups`. Architecture's names map: `CREATED`→`CREATING`, `AWAITING_PAYER`/`IN_FLIGHT`→`OPEN` (Akahu's status kept in `akahu_status`; "awaiting payer" = `akahu_status = READY`), `SUCCEEDED`→`APPLIED`, `NOT_CHARGED`→`CLOSED`. Blocking (one per wallet / per payment, partial unique) = `CREATING`, `OPEN`, `HELD`. Transition matrix: algorithm doc §state machine, with a shared TS/SQL fixture.
+- **CR-2 Gateway outcomes** are architecture's `OPEN | SUCCEEDED | NOT_CHARGED | INDETERMINATE | UNRECOGNISED`, mapped only in `lib/akahu/status.ts` (A2). INDETERMINATE and a SENT amount mismatch → `HELD`; a SENT that cannot be absorbed (over cap, duplicate, late for a closed intent that no longer fits) → `UNAPPLIED` with `unapplied_reason` (`OVER_CAP`, `DUPLICATE`, `LATE`); nothing is credited beyond the cap and no partial credit (B3, algorithm S1).
+- **CR-3 Apply entry point (architecture wins over algorithm RF-8).** Every result is applied only by the `akahu-sync` job (`singletonKey = akahu-sync:<akahuPaymentId>`, one queued + one active), which re-reads Akahu outside any transaction and runs the algorithm's pure decision table under the locks. Webhook, reconcile, start-path tx2 failures and the return-page GETs only enqueue (GETs at most once per 5 s per open intent). No request handler applies a result inline.
+- **CR-4 Lock order (architecture wins).** `teams -> recurring_session_rules -> team_members -> game_sessions -> registrations -> registration_guests -> wallet_top_ups -> player_credits -> payments -> payment_attempts`; multiple wallets in one statement ordered by `user_id`. This matches `bill-session`'s real acquisition (wallets locked before the new payments are inserted), so the `LOCK_ORDER` test asserts it literally. Both docs agree no path locks an existing `payments` row and then a wallet. **AC-VERIFY-3 amended**: "...then reads the hand-off, then locks the wallet rows (sorted by `user_id`), then inserts payments", because `payments.billing_type` is immutable and depends on the locked balance.
+- **CR-5 Ledger.** Architecture's trigger enforcement (BEFORE INSERT on `credit_transactions`; `player_credits` inserted at 0.00 and changed only from the trigger; append-only; REFUND refused in v1) **and** one TS writer `modules/wallet/ledger.ts` (`applyMovement`, `lockWallets`, `ensureWallet`). Test factory `insertWallet` moves balances through the ledger.
+- **CR-6 Resume URL.** `authorisation_url` stored sealed (FieldCrypto, AAD per row); a 409 `payment_in_progress` / `top_up_in_progress` returns it while the link has time left, otherwise cancel-and-replace (algorithm RF-6). `expires_at` default 30 min (`AKAHU_PAYMENT_EXPIRY_MINUTES`).
+- **CR-7 Payment link identity (Q2).** Authenticated payer-only `/payments/[id]`, uniform 404. `payment_link_token` is replaced by `payment_reference` (`SGM` + 8 Crockford base32, unique, not secret), sent as the Akahu statement reference; top-ups get the same kind of reference. Emails never carry an Akahu URL (A5).
+- **CR-8 Reminders.** Append-only `payment_reminders` (`change_key` unique) is the only record; `lastReminderAt` is derived from it (no `payments.last_reminder_at`, so the payments immutability guard is not widened). B6 cooldown = 24 h exact from the last manual reminder; replay by `changeKey` checked first.
+- **CR-9 B8 marker.** One table `billing_session_blocks(session_id PK, team_id, blocked_at, notified_at)` (algorithm name; replaces architecture's `billing_hold_notices`); single writer `billing/engine-repo.ts`.
+- **CR-10 `team_banking_in_use`** widened to any team `wallet_top_ups` or `payment_attempts` row in `CREATING`, `OPEN` or `HELD` (algorithm RF-5, superset of architecture's D-94). Service, trigger and parity tests change together (AC-VERIFY-11). No D-75 allowlist widening.
+- **CR-11 Migration** is ledger D-87..D-98 as numbered in the architecture doc, with CR-1/CR-8/CR-9 names substituted. Re-confirm ADR 0020 / D-87 free on `main` at the Phase 1 gate.
+- **CR-12 Env (A6).** `PAYMENTS_ADAPTER=akahu|fake` (default fake; fake refused in production; `akahu` refuses boot until Phase 4), `AKAHU_APP_TOKEN`, `AKAHU_APP_SECRET`, `AKAHU_PAYMENTS_API_URL`, `AKAHU_WEBHOOK_URL`, `AKAHU_PAYMENT_EXPIRY_MINUTES=30`, `AKAHU_RECONCILE_ORPHAN_AGE_SECONDS=120` (close stale `CREATING`), `AKAHU_RECONCILE_MIN_AGE_SECONDS=300` (re-read `OPEN`), `AKAHU_RECONCILE_STUCK_AFTER_SECONDS=21600`. Reconcile: `*/15`, 100 per run, 4 in parallel, stop on 429, never re-reads `HELD`.
+- **CR-13 Jobs.** New queues `bill-session` (exclusive, local concurrency 1, oldest first for B9), `akahu-sync`, `akahu-cancel`, `akahu-reconcile`; billing, overdue and reconcile sweeps also enqueued at worker boot (RF-11, RF-12).
+- **CR-14 Payout block (A3).** `POST /teams/:teamId/payout-block`, `requireGlobalRole('GLOBAL_ADMIN')`, reason enum + optional Akahu payment id + `changeKey` (no free text), `payout_block_events` audit, admin emails, best-effort `akahu-cancel` of the team's `OPEN`/READY intents; CLI wrapper; no unblock (banking re-save clears it). UI: a `ConfirmDisclosure` in the Payments manage area, visible to GLOBAL_ADMIN only. While blocked, top-up and attempt starts answer 409 `payout_not_configured` (C-BIL-PAY in tx1, both routes) and "Send reminder" is hidden.
+- **CR-15 Held resolution (A2 ops surface; journey #5, algorithm RF-7).** Two GLOBAL_ADMIN-only routes calling `resolveHeld`: `POST /payments/:paymentId/hold-resolution` and `POST /teams/:teamId/wallet/top-ups/:topUpId/hold-resolution`, strict body `{ outcome: 'RECEIVED' | 'NOT_RECEIVED', changeKey }`; `RECEIVED` → `APPLIED` (payment PAID / top-up credited, cap rules apply, else `UNAPPLIED`), `NOT_RECEIVED` → `CLOSED` (payable again); `resolved_by`/`resolved_at` on the intent; follow-up email (received or not-completed). UI: payment holds in the Payments manage area (GLOBAL_ADMIN); top-up holds via `cli billing reconcile` listing plus the route (no web UI in v1). New error code `payment_on_hold` (409; `payment_held` from the journey doc is renamed). Also `payment_provider_refused` (422).
+
+**Surfaces and copy**
+- **CR-16 Debt-block target (AC-ENTRY-4; UI/UX and journey agree).** New protected page `/payments` ("Unpaid payments": the caller's PENDING, OVERDUE and held payments across teams, grouped by team, "Pay now" on payable rows) backed by `GET /payments/me?status=UNPAID` (`authenticated()`, caller only). `proxy.ts` protects `/payments` and `/payments/*`. player-dashboard later aggregates or redirects; `/payments/[id]` stays the only place an attempt starts and the wallet page the only place a top-up starts (slot contract in ADR 0020).
+- **CR-17 Read-model additions.** Latest attempt / top-up carries `outcome: 'processing' | 'cancelled' | 'failed' | 'held' | 'none'`; payment reads and the admin list carry `onHold` and `payoutBlocked`; ledger items carry session location and `startsAt`; the wallet read carries the last closed top-up (for the B3 notice); `GET /teams/:teamId/payments/me` is cursor-paginated (`nextCursor`) like the others.
+- **CR-18 Hold copy.** Tag "Under review" (UI/UX wins over journey's "Checking with bank"); no pay button, no "You haven't been charged" wording, no reminder button.
+- **CR-19 Processing copy.** "Processing your top-up…" on the wallet page, "Processing your payment…" on the payment page; the slow-path promise "We'll email you when it does" is kept and backed by emails 5-7 below.
+- **CR-20 Emails (11 templates; journey doc owns copy).** 1 payment due, 2 low credit, 3 overdue, 4 manual reminder, 5 payment received (PER_GAME), 6 top-up received, 7 payment not completed (only after the payer approved at the bank and it then failed), 8 held notice (player), 9 money received but not applied (B3; player and team admins), 10 payout blocked (admins), 11 billing paused (B8, admins). Every link-bearing payload is sealed; idempotency keys from the cause.
+- **CR-21 GLOBAL_ADMIN who is not a team admin** sees only the Payments area in the manage nav, with a "Viewing as a global admin" line.
+- **CR-22 `RefreshWhilePending`** is generalised to take its copy as props before Phase 5 (it currently imports sessions copy).
+- **CR-23 Extra components** (added to the plan's file list): `ledger-list.tsx`, `payment-detail.tsx`, `admin-payments-table.tsx` (native table reflowing to labelled stacked rows below 640 px), `apps/web/src/app/payments/page.tsx`.
+
+**Rulings requested from the human**
+- **[RULING] H1 Overdue exceptions (refines AC-HAPPY-8; gates Phase 3).** Default: `daily-overdue` skips a PENDING payment whose attempt is `HELD` or `OPEN` with Akahu status `AUTHORISED`/`SUBMITTED` (algorithm RF-10), so money that may already have moved never counts toward the debt gate. Journey also proposed skipping payments of a team whose payout is blocked (the player cannot pay); **default: not skipped** (the block is ops-actioned and short-lived; due dates stay simple). Human to confirm both halves.
+- **[RULING] H2 Who resolves a held payment (CR-15; gates Phase 4).** Default: GLOBAL_ADMIN only, after checking with the team or Akahu; team admins cannot mark money received.
+- **[RULING] H3 Policy-stating copy (gates Phase 5).** Confirm "Wallet credit can only be used for {Team}'s game fees." and "The money goes to {Team}'s bank account." (UI/UX R8), and that a due charge cannot be paid from wallet credit topped up later (journey #10; explained in copy, a later candidate).
+
+**Unchanged:** B1-B10 defaults, A1 go/no-go (Phases 1-3 use only the port, the fake and provider-neutral code), A7 gates.
 
 ### Plan Amendment 2026-10-31 (binding; spike `akahu-payment-capability`, Gate #2)
 
@@ -662,17 +700,26 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: IDLE
+**Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Current Step**: Spike complete, Plan Amendment 2026-10-31 recorded; next /yay:creative
-**Can Resume**: NO
+**Current Step**: Dispatching creative agents (user journey, architecture, UI/UX, algorithm)
+**Step Started**: 2026-10-31
+**Can Resume**: YES
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
 ### Active Sub-Agents
-(none)
+- User Journey Design: COMPLETE
+- Architecture Design: COMPLETE
+- UI/UX Design: COMPLETE
+- Algorithm Design: COMPLETE
 
 ### Completed Steps
 - Step 0.1 - Task auto-provisioned from roadmap feature (2026-10-30)
 - Step 3 - Spec Writer Agent (Opus) - COMPLETE; taxonomy lint CLEAN; human approved with B1-B10 defaults (2026-10-30)
 - Steps 4-6 - Codebase analysis, Level 4 architectural plan, test strategy, 6 phases - COMPLETE (2026-10-30)
 - Spike akahu-payment-capability (deep; 4 lanes + DRP-001/002; synthesis Opus; 3 adversarial challenges, first-principles) - COMPLETE; Gate #2 option A, OV-1..OV-3 accepted; Plan Amendment A1-A8 (2026-10-31)
+- UI/UX Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-uiux.md
+- User Journey Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-user-journey.md
+- Architecture Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-architecture.md
+- Algorithm Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-algorithm.md
+- Creative Reconciliation CR-1..CR-23 written; rulings H1-H3 requested (2026-10-31)
