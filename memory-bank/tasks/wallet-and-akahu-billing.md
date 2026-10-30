@@ -227,6 +227,7 @@ Prepaid wallet, post-game billing and payment collection via Akahu (PRODDUCT-OVE
 **Given** team T with payout configured and a payment attempt whose Akahu result is a decline attributable to the destination account
 **When** the result is processed (webhook or reconcile)
 **Then** in one transaction billing takes `teams FOR NO KEY UPDATE`, sets `payout_blocked_at = now` (if not already set), and enqueues one email per approved admin naming no account details; `is_payout_configured` becomes false; publishing a paid session answers 409 `payout_not_configured`; the banking columns are untouched; re-saving banking clears the block (existing behaviour). The player sees "This team can't receive payments right now. We've told the team admins."
+*Amended 2026-10-31 (A3, binding; see Plan Amendment below): Akahu documents no "destination account rejected" signal, so the trigger is a manual action by a GLOBAL_ADMIN (ops), not an Akahu result. `FAILED/REJECTED` never sets `payout_blocked_at`. A create-time `invalid_payee` is added as an automatic trigger only if MVE-003 shows it means a bad account. The Then clause (lock, `payout_blocked_at`, admin emails, publish gate, banking untouched, player copy) is unchanged; fixtures are synthetic.*
 
 #### AC-ERROR-5: A session whose team cannot take payments at billing time is not half-billed
 **Priority**: MUST
@@ -636,11 +637,26 @@ Provisional (pending creative): the defaults above. The creative architecture, a
 ## Creative Phases
 
 Level 4: creative is required.
-- [ ] **Architecture Design** (required): Q1 (Akahu integration shape; `/yay:spike` recommended first), Q2 (payment link identity), Q4 (ledger enforcement, lock order, transaction boundaries, module split, shared apply function). Status: pending.
+- [ ] **Architecture Design** (required): Q1 (Akahu integration shape: technical shape settled by spike, Plan Amendment A1; still design the gateway port, top-up/attempt flows and the manual R3 action per A3), Q2 (payment link identity), Q4 (ledger enforcement, lock order, transaction boundaries, module split, shared apply function). Status: pending.
 - [ ] **Algorithm Design** (required): Q3 (top-up intent, cap, duplicates per B3) and Q6 (post-game edge cases per B8/B9, departed members, long worker outage). Status: pending.
 - [ ] **User Journey Design** (required for Level 4): Q5 journey (top-up, pay-by-link, overdue, reminder; debt-block link target across teams; the seven emails' copy). Status: pending.
 - [ ] **UI/UX Design** (required): Q5 UI (wallet page, payment page, Payments manage area, processing and error states). Status: pending.
 - **Reconciliation step**: after the parallel creative docs return, write one binding Creative Reconciliation section here before build (lesson from team-management and registration-and-waitlist).
+
+### Plan Amendment 2026-10-31 (binding; spike `akahu-payment-capability`, Gate #2)
+
+Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-spike.md` (approved; ADOPT 5 · BORROW 2 · TRAP 10 · DEFER 7) and its handoff. Overrides OV-1, OV-2, OV-3 accepted by Quy Nguyen. These supersede the spec and plan where they conflict; creative treats DR-001 to DR-005 as provisional inputs.
+
+- **A1 (DR-001, OV-2) Integration shape: Akahu One-Off Payments, conditional.** `POST api.payments.akahu.io/v1/one-off-payments` with platform app token + secret; payee = team account name + number decrypted per call (B10 at payment time); player redirected to `authorisation_url` from our `/payments/[id]` or top-up start. No per-player or per-team Akahu credentials; no per-player token table. Creative Q1 is answered for the technical shape. **Go/no-go**: Akahu's written answer to MVE-001 (third-party team payees under Tier 1, payee-verification liability, first-payment holds, distinct-payee caps) is required before signing the Akahu contract, accepting ADR 0020, or building the Phase 4 live adapter. If Akahu imposes a payee-verification liability term, the human rules on verifying team bank details at save time before ADR 0020 is accepted. A negative answer stops Phase 4 and triggers a re-plan (U10 platform-first settlement / U11 other vendors). Phases 1-3 proceed behind the gateway port and fake adapter, accepting that Phase 1's `payment_attempts`/`wallet_top_ups` tables encode the one-off lifecycle and may need a follow-up migration.
+- **A2 (DR-004, OV-1) Status mapping.** SENT → payment PAID / top-up credited once (re-read amount checked against stored amount); READY/AUTHORISED/SUBMITTED → attempt open, payment PENDING/OVERDUE; CANCELLED/* and FAILED/{REJECTED, BANK_ERROR, INTERNAL_ERROR} → attempt closed, payment payable (B4); **FAILED/BANK_ERROR_INDETERMINATE → hold**: payment not payable, no new attempt, flagged for ops, no "You haven't been charged" copy, until U4/MVE-004 resolves; unknown status → attempt left open and logged. AC-ERROR-3 and AC-ERROR-10 are read with this hold branch; algorithm creative designs the hold state and its admin/ops surface.
+- **A3 (OV-3) AC-ERROR-4 trigger is manual.** See the note under AC-ERROR-4. Architecture creative designs the GLOBAL_ADMIN "mark payout blocked" action (route, policy, audit log) that reuses the R3 transaction.
+- **A4 (DR-003) Webhook conditions.** `X-Akahu-Payments-Signature`/`-Signing-Key`, RSA-SHA256 over raw bytes, key from `GET /v1/webhooks/keys/{keyId}`; validate and URL-encode the key id, single-flight fetches, negative-cache unknown ids, cap fetches per window; answer 5xx (not 401) when the key fetch itself fails; correlate only by the stored `_payment` id, never URL params; ignore unknown `_payment`; the webhook is a signal, truth is `GET /v1/one-off-payments/{id}` plus `akahu-reconcile`; return 2xx within 10 s. Do not reuse the enduring-webhook dialect or the `akahu` SDK's `validateWebhook` unchanged. Add the signature headers to log redaction.
+- **A5 (DR-002, DR-005) Client and idempotency.** Thin hand-written client in `apps/api/src/lib/akahu/` over `FetchLike`/`providerFetch` with manual `traceparent` and 429 backoff; no `akahu` npm dependency. Create is an inline call between tx1 (intent row) and tx2 (record `_id`/`authorisation_url`), outside any lock, never blindly retried; the queued job is the reconcile/orphan-cleanup safety net (`PUT .../cancel` in READY). Never pre-create a payment at billing time or email an Akahu link. Read bank limits at runtime (`limits.oneoff[]`), never hard-code them.
+- **A6 Adapter config.** Rename the planned `AKAHU_ADAPTER` to follow the BORROW: `PAYMENTS_ADAPTER=akahu|fake`, fake refused in production; architecture creative fixes final env names.
+- **A7 New gates.** Phase 4 also requires: MVE-001 answer (go), sandbox credentials (MVE-002), and MVE-005 (a verified signed sandbox webhook stored as a fixture). Each AC-INTEGRATION-1 fixture carries provenance (sandbox-real, vendor-doc-derived, synthetic). Byte-level details (auth header, padding) are re-read from the live Akahu pages at the Phase 4 gate, because the spike read them through digests.
+- **A8 Open items for creative/ops** (no change to scope): the Akahu fee model (U8, outside B1-B10; human ruling after the quote); an open top-up holds no `payments` row, so it does not hold the `team_banking_in_use` guard (algorithm Q3 and the D-87+ migration decide); SENT received for a locally closed attempt or top-up routes to B3.
+
+**Action for the human (outside the code):** send the MVE-001/MVE-002 email to hello@akahu.nz (the handoff has the question list).
 
 ---
 
@@ -648,8 +664,9 @@ Level 4: creative is required.
 
 **Build Status**: IDLE
 **Current Phase**: CREATIVE
-**Current Step**: Planning complete; next /yay:creative (spike on Q1 recommended first)
+**Current Step**: Spike complete, Plan Amendment 2026-10-31 recorded; next /yay:creative
 **Can Resume**: NO
+**Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
 ### Active Sub-Agents
 (none)
@@ -658,3 +675,4 @@ Level 4: creative is required.
 - Step 0.1 - Task auto-provisioned from roadmap feature (2026-10-30)
 - Step 3 - Spec Writer Agent (Opus) - COMPLETE; taxonomy lint CLEAN; human approved with B1-B10 defaults (2026-10-30)
 - Steps 4-6 - Codebase analysis, Level 4 architectural plan, test strategy, 6 phases - COMPLETE (2026-10-30)
+- Spike akahu-payment-capability (deep; 4 lanes + DRP-001/002; synthesis Opus; 3 adversarial challenges, first-principles) - COMPLETE; Gate #2 option A, OV-1..OV-3 accepted; Plan Amendment A1-A8 (2026-10-31)
