@@ -1041,7 +1041,7 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 **Auto-Build Mode**: YES
 **Final Review Backend**: anthropic (codex unavailable: workspace out of credits). Verdict: ready to merge with fixes. 0 Critical, 1 Important (auto-enrol after the cancellation deadline; resolved by human ruling O5, 2184ce4), 8 Minor. C3 accepted by human ruling O6 (313b906, 9ecf2d0).
 **Current Phase**: COMPLETE
-**Current Step**: Archived 2026-10-30; PR to main opened by /yay:archive
+**Current Step**: Archived 2026-10-30; PR #8 to main opened by /yay:archive (https://github.com/quynguyenhcm/shared-game-management/pull/8)
 **Step Started**: 2026-10-30
 **Can Resume**: NO
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
