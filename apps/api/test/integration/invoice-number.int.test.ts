@@ -23,7 +23,8 @@ async function billedTeam(
   count: number,
 ): Promise<{ teamId: string; billed: BilledRegistration[] }> {
   const teamId = await insertTeam(db.pool);
-  const sessionId = await insertSession(db.pool, teamId);
+  // Public capacity must hold every billed player (the capacity backstop, D-65).
+  const sessionId = await insertSession(db.pool, teamId, {}, { maxPlayers: Math.max(count, 1) });
   const billed: BilledRegistration[] = [];
   for (let i = 0; i < count; i += 1)
     billed.push(await insertBilledRegistration(db.pool, teamId, sessionId));

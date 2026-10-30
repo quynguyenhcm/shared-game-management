@@ -170,6 +170,50 @@ describe('proxy.ts (Next 16 file convention; runs before every page)', () => {
     });
   });
 
+  describe('player session page (AC-ENTRY-1, AC-ENTRY-2, UI/UX 12)', () => {
+    const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+    const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+    const PAGE = `/teams/${TEAM_ID}/sessions/${SESSION_ID}`;
+    const withCookie = { headers: { cookie: 'sgm_session=x' } };
+
+    it('redirects anonymous callers to /login with the page as returnTo (and keeps a query)', () => {
+      const response = proxy(request(PAGE));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encodeURIComponent(PAGE)}`,
+      );
+      const withQuery = proxy(request(`${PAGE}?notice=x`));
+      expect(withQuery.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encodeURIComponent(`${PAGE}?notice=x`)}`,
+      );
+    });
+
+    it('lets a caller with a session cookie through and marks the page no-store (it shows their guests)', () => {
+      const response = proxy(request(PAGE, withCookie));
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('cache-control')).toContain('no-store');
+    });
+
+    it('does not protect a non-UUID session id, the team page itself, or a path that only looks like it', () => {
+      for (const path of [
+        `/teams/${TEAM_ID}/sessions/x`,
+        `/teams/x/sessions/${SESSION_ID}`,
+        `/teams/${TEAM_ID}/sessions`,
+        `/teams/${TEAM_ID}`,
+        `/teams/${TEAM_ID}/sessionsX/${SESSION_ID}`,
+      ]) {
+        const response = proxy(request(path));
+        expect(response.headers.get('location'), path).toBeNull();
+        expect(response.headers.get('cache-control'), path).toBeNull();
+      }
+    });
+
+    it('the admin pages stay protected by their own rule under /manage/sessions', () => {
+      const response = proxy(request(`/teams/${TEAM_ID}/manage/sessions/${SESSION_ID}`));
+      expect(response.status).toBe(307);
+    });
+  });
+
   it('matches pages but not static assets', () => {
     expect(config.matcher).toEqual(['/((?!_next/static|_next/image|favicon.ico).*)']);
   });

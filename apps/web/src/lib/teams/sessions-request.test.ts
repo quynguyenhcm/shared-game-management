@@ -256,10 +256,10 @@ describe('readIntent and raised fields', () => {
   it('maps the API raisedFields (snake_case columns) to the fee inputs, with the fee-over-the-limit copy', () => {
     expect(fieldErrorsFromRaised(['fee_flat', 'fee_male', 'pricing_structure'])).toEqual({
       customPlayerRate: [
-        'This is higher than the current fee. Fees can only be lowered once players have registered.',
+        'This is higher than the current fee. Fees can only be lowered once a player has registered or still owes a late-withdrawal fee.',
       ],
       feeMale: [
-        'This is higher than the current fee. Fees can only be lowered once players have registered.',
+        'This is higher than the current fee. Fees can only be lowered once a player has registered or still owes a late-withdrawal fee.',
       ],
     });
     expect(fieldErrorsFromRaised([])).toEqual({});

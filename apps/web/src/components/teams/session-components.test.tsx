@@ -343,12 +343,14 @@ describe('CostingFieldset and PricingFieldset (D2 option A)', () => {
     );
     expect(html).not.toContain('type="radio"');
     expect(html).toContain('Pricing: By sex');
-    expect(html).toContain('Players have registered, so fees can only be lowered.');
+    expect(html).toContain(
+      'Fees can only be lowered: a player has registered or still owes a late-withdrawal fee.',
+    );
     expect(html).toContain('name="feeMale"');
     expect(html).toContain('name="pricingStructure"');
     expect(html).toContain('type="hidden"');
     expect(html).toContain(
-      'This is higher than the current fee. Fees can only be lowered once players have registered.',
+      'This is higher than the current fee. Fees can only be lowered once a player has registered or still owes a late-withdrawal fee.',
     );
   });
 });

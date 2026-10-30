@@ -277,7 +277,11 @@ describe('buildSeriesExtras', () => {
   const row = (id: string, over: Record<string, unknown>): SessionRow =>
     ({ ...base, id, ...over }) as unknown as SessionRow;
 
-  const build = (rows: SessionRow[], counts: Record<string, number> = {}) =>
+  const build = (
+    rows: SessionRow[],
+    counts: Record<string, number> = {},
+    registered: Record<string, number> = counts,
+  ) =>
     buildSeriesExtras({
       rule: ruleRow(),
       templateCourts: [
@@ -286,6 +290,7 @@ describe('buildSeriesExtras', () => {
       rows,
       courtsByRow: new Map(),
       counts: new Map(Object.entries(counts)),
+      registeredCounts: new Map(Object.entries(registered)),
       draftCounts: { banking: 3, edited: 1 },
       isPayoutConfigured: true,
       now: new Date('2026-10-20T00:00:00Z'),
@@ -332,6 +337,25 @@ describe('buildSeriesExtras', () => {
     expect(extras.bankingDrafts).toBe(3);
     expect(extras.editedDrafts).toBe(1);
     expect(extras.isPayoutConfigured).toBe(true);
+  });
+
+  it('shows the display count while the fee lock drives has_registrations: an owed late fee is locked but not registered (R20)', () => {
+    const published = row('e', {
+      date: '2026-11-04',
+      status: 'PUBLISHED',
+      starts_at: new Date('2026-11-04T06:00:00Z'),
+      cancellation_deadline: new Date('2026-11-02T06:00:00Z'),
+    });
+    const extras = build([published], { e: 1 }, { e: 0 });
+    expect(extras.instances[0]).toMatchObject({
+      activeRegistrationCount: 0,
+      seriesChangeEffect: 'has_registrations',
+    });
+    const registeredOnly = build([published], { e: 0 }, { e: 2 });
+    expect(registeredOnly.instances[0]).toMatchObject({
+      activeRegistrationCount: 2,
+      seriesChangeEffect: 'will_update',
+    });
   });
 
   it('marks a started instance and a past draft closed', () => {

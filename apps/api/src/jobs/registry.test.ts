@@ -12,6 +12,7 @@ describe('queue registry', () => {
         'post-game-billing',
         'recurrence-materialisation',
         'recurrence-rule',
+        'registration-ban-reconcile',
         'send-email',
         'session-auto-enrol',
         'skill-progression',
@@ -37,6 +38,7 @@ describe('queue registry', () => {
       skillProgression: 'skill-progression',
       sessionAutoEnrol: 'session-auto-enrol',
       recurrenceRule: 'recurrence-rule',
+      registrationBanReconcile: 'registration-ban-reconcile',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -54,6 +56,8 @@ describe('queue registry', () => {
     // One auto-enrol follow-up per session (`singletonKey = session-auto-enrol:<sessionId>`); the D-80 marker,
     // stamped under the advisory lock, is the durable once-only guard (T-19).
     expect(getQueue('session-auto-enrol').policy).toBe('exclusive');
+    // One daily ban-reconciliation sweep at a time; the member-banned singleton key is the per-membership guard (O4).
+    expect(getQueue('registration-ban-reconcile').policy).toBe('exclusive');
   });
 
   it('runs one series at a time per key, with a trailing run, on a stately queue (SA-1, AC-ASYNC-1)', () => {

@@ -215,7 +215,7 @@ export function sortMyTeams<T extends MyTeamRow>(teams: readonly T[]): T[] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Team-admin (manage) area copy (UI/UX "Copy" table; the ban copy is the 2026-10-13 user decision)
+// Team-admin (manage) area copy (UI/UX "Copy" table; the ban prompt is restored by registration-and-waitlist, AC-HAPPY-10, R10)
 // ---------------------------------------------------------------------------------------------
 
 export const NO_ACCESS_HEADING = "You don't have access to manage this team.";
@@ -245,7 +245,7 @@ export const EMPTY_BANNED = 'No banned members.';
 export const BANNED_INTRO = "Banned members lose access to this team and can't ask to join again.";
 
 export function banPrompt(fullName: string): string {
-  return `Ban ${fullName}? They lose access to this team and can't register for its sessions.`;
+  return `Ban ${fullName}? They lose access to this team and can't register for its sessions. Their upcoming registrations will be cancelled.`;
 }
 
 export function adminBanBlockedHint(fullName: string): string {

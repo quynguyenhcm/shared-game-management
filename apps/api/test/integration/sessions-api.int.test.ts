@@ -1121,11 +1121,13 @@ describe('capacity edit on a published session (AC-HAPPY-8)', () => {
       await insertTeamMember(database.pool, { teamId: c.teamId, userId });
     }
     const players = [c.memberId, ...joiners];
-    const registrations = await Promise.all(
-      players.map((userId) =>
-        insertRegistration(database.pool, { sessionId: s.id, teamId: c.teamId, userId }),
-      ),
-    );
+    // One at a time: each commit takes the session row NOWAIT (D-65, R4), so concurrent raw inserts would collide.
+    const registrations: string[] = [];
+    for (const userId of players) {
+      registrations.push(
+        await insertRegistration(database.pool, { sessionId: s.id, teamId: c.teamId, userId }),
+      );
+    }
     allocator.promoted = [
       { registrationId: registrations[0] ?? '', userId: c.memberId, promotedAt: h.clock.now() },
       {

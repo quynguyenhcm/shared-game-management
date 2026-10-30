@@ -2,12 +2,12 @@
 name: Reconcile plan and doc claims against the tree at every review
 globs: ["memory-bank/tasks/*.md", "memory-bank/techContext.md", "memory-bank/systemPatterns.md"]
 paths: ["memory-bank/"]
-topics: ["review", "phase review", "observability", "documentation", "plan", "invariants", "cross-phase", "cross-feature", "creative", "critique", "idempotency", "replay", "reconciliation", "siblings", "concurrency"]
+topics: ["review", "phase review", "observability", "documentation", "plan", "invariants", "cross-phase", "cross-feature", "creative", "critique", "idempotency", "replay", "reconciliation", "siblings", "concurrency", "residuals", "human rulings", "product policy"]
 priority: medium
 auto_generated: true
-derived_from: [platform-foundation, auth-and-user-roles, team-management, team-banking-and-gst, skill-levels-and-auto-enroll, session-scheduling-engine]
-evidence_count: 6
-last_validated: 2026-10-24
+derived_from: [platform-foundation, auth-and-user-roles, team-management, team-banking-and-gst, skill-levels-and-auto-enroll, session-scheduling-engine, registration-and-waitlist]
+evidence_count: 7
+last_validated: 2026-10-30
 ---
 
 # Reconcile plan and doc claims against the built tree
@@ -24,3 +24,5 @@ last_validated: 2026-10-24
 - When a coordinator suggests a fix in a review hand-off, test it against the finding's own scenario before building it. In team-banking-and-gst a suggested "last change key" column could not have detected the replay it was meant to stop; the build agent correctly used a bounded key list.
 - A learned rule is not a check until a reviewer enumerates it. When a phase adds or changes a write on a resource, list every sibling write on the same page or resource and compare their guards (idempotency or stale check), lock order and where each reads the clock; record each difference as fixed or deliberately accepted. In skill-levels-and-auto-enroll the sibling-guard rule already existed, yet five phase reviews passed an unguarded Auto Enroll PUT beside a guarded override PUT, and only the final whole-branch review caught it and a clock-before-lock read.
 - Each UI acceptance criterion that lists, counts, labels or warns about items must name its authoritative server read: the endpoint or response field. Reviewers reject a section, count or banner derived from the rows already loaded on the current page. In session-scheduling-engine, the Series list section was built from the loaded session rows, which made AC-ENTRY-2, AC-ASYNC-6 and AC-HAPPY-15 unsatisfiable (Phase 5 HALT). The final review then found two more instances: the status of a series past its end date, and the list's banking notice.
+- A residual marked "pending human acknowledgement" (or "needs sign-off") is re-listed in every phase result and every phase review until a ruling is recorded in the task file; it never ages silently in the ledger. In registration-and-waitlist the ban/promotion residual C3 was flagged in Phase 2 and stayed pending through Phase 6; it was ruled (O6) only after BUILD_COMPLETE, together with a billing change it required.
+- Before build, the spec or creative reconciliation lists every product-policy choice hidden in a technical decision as a named human ruling: money rounding and release rules, what each automated actor (auto-enrol, sweeps, handlers) does at and after each time boundary, deploy-time backlog effects, and how bans or cancels interact with billing. In registration-and-waitlist four such rulings (O5 auto-enrol after the deadline, O6 ban vs billing, O7 all-or-nothing fee release, O8 first-deploy email burst) surfaced only after the build.

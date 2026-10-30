@@ -270,7 +270,12 @@ describe('recording allocator double', () => {
       );
       const results = await allocator.autoEnrolInSession(
         { trx, now: when, log: console },
-        { teamId: 't', sessionId: 's', entries: [{ userId: 'u1', assignedAt: when }] },
+        {
+          teamId: 't',
+          sessionId: 's',
+          entries: [{ userId: 'u1', assignedAt: when }],
+          notify: true,
+        },
       );
       expect(results).toEqual([{ userId: 'u1', outcome: { ok: true, status: 'CONFIRMED' } }]);
     });

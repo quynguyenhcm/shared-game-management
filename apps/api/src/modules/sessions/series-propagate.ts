@@ -233,7 +233,7 @@ export async function propagateSeriesEnd(
       removedDrafts += 1;
     } else if (action.kind === 'cancel' && row !== undefined) {
       // The cancel rules (AC-HAPPY-9): registrations are left as they are, nobody is emailed, the count is told.
-      registered += (await repo.countActiveRegistrations(trx, [row.id])).get(row.id) ?? 0;
+      registered += (await repo.countRegisteredPlayers(trx, [row.id])).get(row.id) ?? 0;
       if (
         !(await repo.cancelFrom(trx, row.id, 'PUBLISHED', {
           updated_at: stampFor(now, row),

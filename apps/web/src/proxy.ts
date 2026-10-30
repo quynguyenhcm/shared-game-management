@@ -19,6 +19,9 @@ const NO_STORE_PREFIXES = [
 /** `/teams/<uuid>/manage` (the team-admin area; it embeds the invite code). */
 const TEAM_MANAGE =
   /^\/teams\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/manage(?:\/|$)/i;
+/** `/teams/<uuid>/sessions/<uuid>` (the player session page: it shows the caller's own guests and status). */
+const TEAM_SESSION =
+  /^\/teams\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/sessions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\/|$)/i;
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
 const INTERNAL_HEADERS = ['x-sgm-client-ip', 'x-sgm-internal-auth'] as const;
 
@@ -26,11 +29,12 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-/** My teams (exactly `/teams`; Find and the team pages stay public), Create, the invite landing and manage. */
+/** My teams (exactly `/teams`; Find and the team pages stay public), Create, the invite landing, manage and a player session page. */
 function isProtected(pathname: string): boolean {
   return (
     pathname === '/teams' ||
     TEAM_MANAGE.test(pathname) ||
+    TEAM_SESSION.test(pathname) ||
     PROTECTED.some((prefix) => matchesPrefix(pathname, prefix))
   );
 }

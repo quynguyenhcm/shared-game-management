@@ -1,6 +1,7 @@
 export * from './api/auth.ts';
 export * from './api/errors.ts';
 export { HealthResponse } from './api/health.ts';
+export * from './api/registrations.ts';
 export * from './api/sessions.ts';
 export * from './api/skill-levels.ts';
 export * from './api/team-banking.ts';
@@ -17,3 +18,4 @@ export * from './skill/index.ts';
 export * from './time/time.ts';
 export type { Ciphertext } from './types/brands.ts';
 export * from './types/enums.ts';
+export * from './registrations/index.ts';

@@ -65,6 +65,14 @@ const AUTHORITATIVE_ERROR_CODES = [
   'session_not_editable',
   'session_state_conflict',
   'session_fee_locked',
+  // registration-and-waitlist (AC-VERIFY-7, R3, R9)
+  'overdue_payments',
+  'session_not_open',
+  'already_registered',
+  'not_registered',
+  'party_exceeds_capacity',
+  'late_withdrawal_fee_due',
+  'cancellation_terms_changed',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -86,6 +94,13 @@ const TEAM_ERROR_STATUSES = [
   ['session_not_editable', 409],
   ['session_state_conflict', 409],
   ['session_fee_locked', 409],
+  ['overdue_payments', 403],
+  ['session_not_open', 409],
+  ['already_registered', 409],
+  ['not_registered', 409],
+  ['party_exceeds_capacity', 422],
+  ['late_withdrawal_fee_due', 409],
+  ['cancellation_terms_changed', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];

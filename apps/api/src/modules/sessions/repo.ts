@@ -91,11 +91,40 @@ export async function listCourtsFor(
 }
 
 /**
- * Players with a CONFIRMED or WAITLISTED registration: the count behind "N players are registered" and the fee lock.
- * Read-only. The database function `game_session_has_active_registrations` (D-85) holds the same definition for the
- * raw-SQL backstop; registration-and-waitlist widens both to withdrawals with a fee due (ALG R-a, binding T-17).
+ * The FEE-LOCK count: registrations that stop a PUBLISHED session's fees from going up. It is the TypeScript twin of the
+ * database function `game_session_has_active_registrations` (D-85, widened by D-68): a CONFIRMED or WAITLISTED row, or a
+ * WITHDRAWN row whose late-withdrawal fee is still owed (`withdrawal_fee_due`, R20, binding T-17). It drives only
+ * `feesLocked`, the 409 `session_fee_locked` and the series `fee_locked` skip, and is NOT a "players registered" count:
+ * use `countRegisteredPlayers` for that. Read-only; `sessions-parity.int.test.ts` keeps the two sides aligned.
  */
 export async function countActiveRegistrations(
+  db: Database,
+  sessionIds: readonly string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>(sessionIds.map((id) => [id, 0]));
+  if (sessionIds.length === 0) return counts;
+  const rows = await db
+    .selectFrom('registrations')
+    .select(['session_id', (eb) => eb.fn.countAll<string>().as('n')])
+    .where('session_id', 'in', [...sessionIds])
+    .where((eb) =>
+      eb.or([
+        eb('status', 'in', ['CONFIRMED', 'WAITLISTED']),
+        eb.and([eb('status', '=', 'WITHDRAWN'), eb('withdrawal_fee_due', '=', true)]),
+      ]),
+    )
+    .groupBy('session_id')
+    .execute();
+  for (const row of rows) counts.set(row.session_id, Number(row.n));
+  return counts;
+}
+
+/**
+ * The DISPLAY count behind "{n} players are registered", the edit banner and the cancel and end-series counts (O1 ruling,
+ * R20): one per registration with a CONFIRMED or WAITLISTED status. A late withdrawer who still owes a fee is not a
+ * registered player, so it is not counted here although it is fee-locked. No SQL twin. Read-only.
+ */
+export async function countRegisteredPlayers(
   db: Database,
   sessionIds: readonly string[],
 ): Promise<Map<string, number>> {

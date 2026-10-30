@@ -261,9 +261,9 @@ describe('upgrading a pre-feature database', () => {
   });
 
   it('rolls back to a plain is_payout_configured column, recomputed from the block, and migrates forward again', async () => {
-    // Newest first: the session scheduling schema, the skill-level invariants and the change-key column (D-54) sit
-    // on top of the invariants migration.
-    await rollbackMigrations({ databaseUrl: db.url, count: 4 });
+    // Newest first: the auto-enrol backlog flag, the registration lifecycle, the session scheduling schema, the skill-level
+    // invariants and the change-key column (D-54) sit on top of the invariants migration.
+    await rollbackMigrations({ databaseUrl: db.url, count: 6 });
     const { rows } = await db.pool.query<{
       attgenerated: string;
       attnotnull: boolean;

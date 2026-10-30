@@ -38,7 +38,8 @@
  *        promoteWaitlist(ctx: SessionAllocatorContext, input: { teamId: string; sessionId: string }):
  *          Promise<readonly PromotedSeat[]>;
  *        autoEnrolInSession(ctx: SessionAllocatorContext, input: { teamId: string; sessionId: string;
- *          entries: readonly { userId: string; assignedAt: Date; membershipId?: string }[] }):
+ *          entries: readonly { userId: string; assignedAt: Date; membershipId?: string }[];
+ *          notify: boolean }):   // notify: registration O8 (D-86), game_sessions.auto_enrol_notify
  *          Promise<readonly { userId: string; outcome: AutoEnrolEntryOutcome }[]>;
  *      }
  *      // SessionAllocatorContext = { trx: Transaction<DB>; now: Date; log }. The composition function is
@@ -57,9 +58,14 @@
  *
  * The "marker proof" (AC-INTEGRATION-1, AC-INTEGRATION-2): a published session whose allocator has `enrols: false` stays
  * pending; once an `enrols: true` double is injected and the sweep runs, it is enrolled exactly once and stamped.
+ *
+ * What registration-and-waitlist now provides (Phase 3, R19, R26): `createSessionAllocator` returns its adapter
+ * (`name: 'registrations'`, `enrols: true`), the D-85 widening (a) and `already_registered` for any existing row (b) were built
+ * in Phases 1-2, and the marker proof is repeated with the REAL adapter in `registrations-sse-integration.int.test.ts`
+ * (AC-INTEGRATION-6). This file keeps its recording double and stays green.
  */
 import { randomUUID } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PostgresDialect } from 'kysely';
 import type { LightMyRequestResponse } from 'fastify';
@@ -254,15 +260,17 @@ async function withRegistration(
   sessionId: string,
   status: 'CONFIRMED' | 'WAITLISTED' | 'WITHDRAWN',
   queuePosition: number | null = null,
-): Promise<void> {
+  withdrawalFeeDue = false,
+): Promise<string> {
   const userId = await insertUser(database.pool, 'FEMALE');
   await insertTeamMember(database.pool, { teamId: c.teamId, userId });
-  await insertRegistration(database.pool, {
+  return insertRegistration(database.pool, {
     sessionId,
     teamId: c.teamId,
     userId,
     status,
     queuePosition,
+    withdrawalFeeDue,
   });
 }
 
@@ -442,15 +450,41 @@ describe('every PUBLISHED session has what registration needs (assumed output 1,
 });
 
 // ---------------------------------------------------------------------------------------------
-// Output 3: no player page
+// Output 3: the player page is registration's; the admin pages stay under /manage/sessions
 // ---------------------------------------------------------------------------------------------
 
-describe("the player session page is registration-and-waitlist's (assumed output 3)", () => {
-  it('ships no page at /teams/[teamId]/sessions: the admin pages live under /manage/sessions', () => {
-    const playerRoot = fileURLToPath(
-      new URL('../../../web/src/app/teams/[teamId]/sessions', import.meta.url),
-    );
-    expect(existsSync(playerRoot)).toBe(false);
+describe("the player session page is registration-and-waitlist's (assumed output 3, R23)", () => {
+  // Phase 5 of registration-and-waitlist flips this from "no page exists" to "the page exists and is registration's".
+  const teamRoot = fileURLToPath(new URL('../../../web/src/app/teams/[teamId]', import.meta.url));
+  const playerRoot = `${teamRoot}/sessions`;
+
+  it("ships the player page at /teams/[teamId]/sessions/[sessionId], and it is registration's panel over the registration read model", () => {
+    const pagePath = `${playerRoot}/[sessionId]/page.tsx`;
+    expect(existsSync(pagePath)).toBe(true);
+    const source = readFileSync(pagePath, 'utf8');
+    // registration's slot: the panel, fed by GET .../registration (a MEMBER route), never SSE's TEAM_ADMIN GET .../sessions/:id
+    expect(source).toContain('RegistrationPanel');
+    expect(source).toContain('PlayerSessionSummary');
+    expect(source).toContain('sessionRegistration(');
+    expect(source).not.toContain('getSession(');
+    expect(source).not.toContain('/manage/sessions');
+  });
+
+  it('keeps the admin pages under /manage/sessions: the player tree holds only the [sessionId] page, SSE owns the rest', () => {
+    // nothing else lives at /teams/[teamId]/sessions (no list, no /new, no series): those are SSE's, under /manage
+    expect(readdirSync(playerRoot).sort()).toEqual(['[sessionId]']);
+    for (const adminPage of [
+      'manage/sessions/page.tsx',
+      'manage/sessions/new/page.tsx',
+      'manage/sessions/[sessionId]/page.tsx',
+      'manage/sessions/series/new/page.tsx',
+      'manage/sessions/series/[ruleId]/page.tsx',
+    ]) {
+      expect(existsSync(`${teamRoot}/${adminPage}`), adminPage).toBe(true);
+    }
+    // and the admin session component is not what the player page renders
+    const playerPage = readFileSync(`${playerRoot}/[sessionId]/page.tsx`, 'utf8');
+    expect(playerPage).not.toMatch(/components\/teams\/session-summary/);
   });
 });
 
@@ -636,19 +670,73 @@ describe('cancelling changes no registration and calls no allocator (assumed out
 // ---------------------------------------------------------------------------------------------
 
 describe('the D-85 predicate is the contract registration re-checks', () => {
-  it('is the function and trigger named in the header, counting exactly CONFIRMED and WAITLISTED today', async () => {
+  it('is the function and trigger named in the header, counting CONFIRMED, WAITLISTED and a fee-due WITHDRAWN (R20)', async () => {
     const { rows } = await database.pool.query<{ def: string }>(
       `SELECT pg_get_functiondef('game_session_has_active_registrations(uuid)'::regprocedure) AS def`,
     );
     const def = rows[0]?.def ?? '';
     expect(def).toMatch(/STABLE/);
     expect(def.replaceAll(/\s+/g, ' ')).toContain(
-      "r.session_id = p_session_id AND r.status IN ('CONFIRMED', 'WAITLISTED')",
+      "r.session_id = p_session_id AND (r.status IN ('CONFIRMED', 'WAITLISTED') OR (r.status = 'WITHDRAWN' AND r.withdrawal_fee_due))",
     );
     const trigger = await database.pool.query(
       `SELECT 1 FROM pg_trigger WHERE tgname = 'game_sessions_fee_raise_locked' AND NOT tgisinternal`,
     );
     expect(trigger.rowCount).toBe(1);
+  });
+});
+
+describe('a late withdrawal whose fee is still owed locks the fees but is not a registered player (AC-VERIFY-12)', () => {
+  it('shows activeRegistrationCount 0 with feesLocked raise_only_blocked, refuses a raise 409, answers the cancel with 0, and unlocks on release', async () => {
+    const c = await scene();
+    const s = await publishedSession(c);
+    const registrationId = await withRegistration(c, s.id, 'WITHDRAWN', null, true);
+
+    const read = await call('GET', `${base(c)}/${s.id}`, c.admin);
+    expect(read.statusCode, read.body).toBe(200);
+    expect(sessionOf(read)).toMatchObject({
+      activeRegistrationCount: 0,
+      feesLocked: 'raise_only_blocked',
+    });
+    const listed = await call('GET', `${base(c)}?view=upcoming`, c.admin);
+    expect(listed.statusCode, listed.body).toBe(200);
+    expect(
+      listed.json<{ sessions: SessionResponse[] }>().sessions.find((x) => x.id === s.id),
+    ).toMatchObject({ activeRegistrationCount: 0, feesLocked: 'raise_only_blocked' });
+
+    const raise = await call(
+      'PUT',
+      `${base(c)}/${s.id}`,
+      c.admin,
+      editBody(s.body, s.version, { courtCost: '720.00' }),
+    );
+    expect(raise.statusCode, raise.body).toBe(409);
+    expect(raise.json<{ error: { code: string } }>().error.code).toBe('session_fee_locked');
+
+    // The fee is released (R2): nothing is locked any more, and the raise goes through.
+    await database.pool.query(`UPDATE registrations SET withdrawal_fee_due = false WHERE id = $1`, [
+      registrationId,
+    ]);
+    const released = await call('GET', `${base(c)}/${s.id}`, c.admin);
+    expect(sessionOf(released)).toMatchObject({ activeRegistrationCount: 0, feesLocked: null });
+    const raised = await call(
+      'PUT',
+      `${base(c)}/${s.id}`,
+      c.admin,
+      editBody(s.body, s.version, { courtCost: '720.00' }),
+    );
+    expect(raised.statusCode, raised.body).toBe(200);
+  });
+
+  it('cancelling such a session reports the display count: only a confirmed or waitlisted player is let known', async () => {
+    const c = await scene();
+    const s = await publishedSession(c);
+    await withRegistration(c, s.id, 'WITHDRAWN', null, true);
+    const cancelled = await call('POST', `${base(c)}/${s.id}/cancel`, c.admin, {
+      expectedVersion: s.version,
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    expect(cancelled.json<{ activeRegistrationCount: number }>().activeRegistrationCount).toBe(0);
   });
 });
 

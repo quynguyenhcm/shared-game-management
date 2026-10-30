@@ -153,9 +153,40 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 33 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series), none public.
-    expect(byRoute.size).toBe(33);
+    // Exactly the 37 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
+    // + four registration routes, asserted below), none public.
+    expect(byRoute.size).toBe(37);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
+    await app.close();
+  });
+
+  it('declares teamRole MEMBER without the global-admin bypass on every registration route, and none is public or optional (registration AC-VERIFY-1)', async () => {
+    const app = await buildApp(inertAppDeps(logger));
+    const byRoute = new Map(
+      listRoutePolicies(app)
+        .filter((entry) => entry.method !== 'HEAD' && entry.url.startsWith('/teams'))
+        .map((entry) => [`${entry.method} ${entry.url}`, entry.policy]),
+    );
+    const registrationRoutes = [
+      'GET /teams/:teamId/sessions/upcoming',
+      'GET /teams/:teamId/sessions/:sessionId/registration',
+      'POST /teams/:teamId/sessions/:sessionId/registrations',
+      'POST /teams/:teamId/sessions/:sessionId/registrations/me/withdraw',
+    ];
+    for (const route of registrationRoutes) {
+      expect(byRoute.get(route), route).toEqual({
+        kind: 'teamRole',
+        role: 'MEMBER',
+        teamIdParam: 'teamId',
+        allowGlobalAdmin: false,
+      });
+    }
+    // Every route under a session id carries the team in the same path, so the session is never resolved by its id alone.
+    const underSessionId = [...byRoute.keys()].filter((route) =>
+      route.includes('/sessions/:sessionId'),
+    );
+    expect(underSessionId.length).toBeGreaterThan(0);
+    for (const route of underSessionId) expect(route, route).toContain('/teams/:teamId/sessions/');
     await app.close();
   });
 

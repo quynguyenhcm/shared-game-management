@@ -56,6 +56,10 @@ export default defineConfig({
         'apps/api/src/jobs/{recurrence-materialisation,recurrence-rule,session-auto-enrol}.ts',
         'apps/api/src/session-allocator.ts',
         'packages/shared/src/sessions/**/*.ts',
+        // registration-and-waitlist (AC-VERIFY-9): the registrations module (allocator, repo, hand-off) and the shared fee rule.
+        'apps/api/src/modules/registrations/**/*.ts',
+        'apps/api/src/jobs/ban-reconcile.ts',
+        'packages/shared/src/registrations/**/*.ts',
         'packages/shared/src/nz/**/*.ts',
         'apps/web/src/lib/**/*.ts',
       ],

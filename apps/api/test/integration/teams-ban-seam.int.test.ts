@@ -1,12 +1,14 @@
 /**
  * THE CONTRACT TEST for the ban seam (Architecture 1B, ADR 0015, AC-ASYNC-1..3, AC-ERROR-12, AC-INTEGRATION-1).
  *
- * registration-and-waitlist's real `MemberBannedHandler` and its registration path MUST also pass this file:
- * swap the recording handler below for the real one (through `registerJobs({ memberBannedHandler })`) and the
- * assertions about the payload, the job commit, the retry, the idempotent redelivery and the
- * `assertApprovedMember` race still hold. It runs against a real cloned Postgres, a real pg-boss producer and
- * worker, and the real HTTP layer. The test only INSERTS a `registrations` row (the table exists); it implements
- * no waitlist logic beyond a guarded withdraw that stands in for the handler's selection-by-current-state.
+ * registration-and-waitlist's real `MemberBannedHandler` (`createRegistrationsBanHandler`, AC-INTEGRATION-2) runs inside the
+ * recording wrapper below, installed through `registerJobs({ memberBannedHandler })` exactly as `worker.ts` does. The
+ * assertions about the payload, the job commit, the retry, the idempotent redelivery and the `assertApprovedMember` race
+ * therefore prove the real handler against the contract. The wrapper still records what the handler saw and returned. Two
+ * cases keep their injected fault because the fault is the contract's subject: a transient error before the real handler
+ * runs (retry to success) and a permanent error instead of it (ends in `failed`, operator re-run). The real handler's own
+ * failure handling is proven in `registrations-ban.int.test.ts`. Sessions are PUBLISHED and in the future of the shared
+ * manual clock, which is what the real handler selects.
  */
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
@@ -15,20 +17,23 @@ import { registerJobs } from '../../src/jobs/bootstrap.ts';
 import { QUEUES } from '../../src/jobs/registry.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { NonRetryableJobError, createJobRunner, type JobRunner } from '../../src/lib/jobs/jobs.ts';
+import { createManualClock } from '../../src/lib/clock.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
+import { createRegistrationsBanHandler } from '../../src/modules/registrations/ban-handler.ts';
 import {
   noopMemberBannedHandler,
+  type MemberBannedHandler,
   type MemberBannedEvent,
   type MemberBannedHookContext,
   type MemberBannedOutcome,
 } from '../../src/modules/teams/ban-hook.ts';
 import { assertApprovedMember } from '../../src/modules/teams/membership.ts';
 import { testCrypto } from '../helpers/app-deps.ts';
-import { bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
+import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
+  insertPublishedSession,
   insertRegistration,
-  insertSession,
   insertTeam,
   insertTeamMember,
   insertUser,
@@ -52,16 +57,13 @@ interface HandlerCall {
   readonly seen: readonly string[];
 }
 
-/** The seam test's stand-in for the real handler: selects registrations by CURRENT state, withdraws, never remembers. */
-const withdrawActiveRegistrations: Behaviour = async (event) => {
-  const { rows } = await database.pool.query<{ id: string }>(
-    `UPDATE registrations SET status = 'WITHDRAWN', queue_position = NULL, updated_at = now()
-      WHERE team_id = $1 AND user_id = $2 AND status IN ('CONFIRMED', 'WAITLISTED')
-      RETURNING id`,
-    [event.teamId, event.userId],
-  );
-  return { affected: rows.length };
-};
+/** The real handler, built in `beforeAll` over the worker's runner and the shared manual clock. */
+let realHandler: MemberBannedHandler;
+const clock = createManualClock(START_TIME);
+
+/** The default behaviour: the real handler (selection by current state, withdraw through the allocator, promote). */
+const withdrawActiveRegistrations: Behaviour = (event, context) =>
+  realHandler.handle(event, context);
 
 let behaviour: Behaviour = withdrawActiveRegistrations;
 const calls: HandlerCall[] = [];
@@ -94,13 +96,21 @@ beforeAll(async () => {
   });
   await worker.start();
   await producer.start();
+  const workerDb = createKysely(database.pool);
+  realHandler = createRegistrationsBanHandler({
+    db: workerDb,
+    jobs: worker,
+    clock,
+    webBaseUrl: 'https://app.example.test',
+  });
   await registerJobs({
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,
     notifier: createInMemoryNotifier(),
     crypto: testCrypto(),
-    db: createKysely(database.pool),
+    db: workerDb,
+    clock,
     // A short retry policy so the transient-failure test runs in seconds.
     queues: QUEUES.map((queue) =>
       queue.name === 'member-banned'
@@ -173,10 +183,10 @@ interface Scene {
 async function scene(): Promise<Scene> {
   const admin = await person('Seam Admin');
   const member = await person('Seam Member');
-  const teamId = await insertTeam(database.pool);
+  const teamId = await insertTeam(database.pool, { payoutConfigured: true });
   await insertTeamMember(database.pool, { teamId, userId: admin.id, role: 'TEAM_ADMIN' });
   const membershipId = await insertTeamMember(database.pool, { teamId, userId: member.id });
-  const sessionId = await insertSession(database.pool, teamId);
+  const { sessionId } = await insertPublishedSession(database.pool, teamId, { now: clock.now() });
   return { teamId, admin, member, membershipId, sessionId };
 }
 
@@ -457,10 +467,10 @@ describe('assertApprovedMember serialises with a concurrent ban (AC-ASYNC-3, AC-
 
     const registering = h.db.transaction().execute(async (trx) => {
       await assertApprovedMember(trx, s.teamId, s.member.id);
-      await sql`INSERT INTO registrations (id, session_id, team_id, user_id, status)
-                VALUES (${registrationId}, ${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED')`.execute(
-        trx,
-      );
+      await sql`INSERT INTO registrations (id, session_id, team_id, user_id, status, registrant_sex,
+                                           registrant_skill_level)
+                VALUES (${registrationId}, ${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED',
+                        'MALE', 'BEGINNER')`.execute(trx);
       gateAcquired();
       await mayFinish;
     });
@@ -498,8 +508,10 @@ describe('assertApprovedMember serialises with a concurrent ban (AC-ASYNC-3, AC-
 
     const registering = h.db.transaction().execute(async (trx) => {
       await assertApprovedMember(trx, s.teamId, s.member.id);
-      await sql`INSERT INTO registrations (session_id, team_id, user_id, status)
-                VALUES (${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED')`.execute(trx);
+      await sql`INSERT INTO registrations (session_id, team_id, user_id, status, registrant_sex,
+                                           registrant_skill_level)
+                VALUES (${s.sessionId}, ${s.teamId}, ${s.member.id}, 'CONFIRMED', 'MALE',
+                        'BEGINNER')`.execute(trx);
     });
     // Attach the assertion before the ban commits so the rejection is never unhandled.
     const refused = expect(registering).rejects.toMatchObject({ code: 'forbidden' });

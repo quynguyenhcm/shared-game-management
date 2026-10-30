@@ -172,7 +172,9 @@ describe('SessionForm: edit a published session (E2)', () => {
       />,
     );
     expect(html).toContain('Pricing: Flat rate');
-    expect(html).toContain('Players have registered, so fees can only be lowered.');
+    expect(html).toContain(
+      'Fees can only be lowered: a player has registered or still owes a late-withdrawal fee.',
+    );
   });
 
   it('a series date shows its date as text with the move hint and posts it unchanged (the date cannot move)', () => {

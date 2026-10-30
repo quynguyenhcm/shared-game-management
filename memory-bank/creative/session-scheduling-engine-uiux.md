@@ -738,8 +738,8 @@ Codes are `?notice=` values. A `{n}` in a sentence takes a singular variant when
 | Status: published, just now | Published. Members can register. Members on Auto Enroll are being added. (shown for `?notice=published`) |
 | Registrations line | No one has registered yet. · {n} players are registered. |
 | Change notice (n > 0) | {n} players are registered. We don't email them about changes, so let them know if you change the date, times, place, cancellation deadline or fees. (BIND P-2) |
-| Fees locked | Players have registered, so fees can only be lowered. (BIND T-7) |
-| Fee over the limit | This is higher than the current fee. Fees can only be lowered once players have registered. |
+| Fees locked | Fees can only be lowered: a player has registered or still owes a late-withdrawal fee. (BIND T-7; reworded in registration-and-waitlist Phase 1, ADR 0018 D-85 widening) |
+| Fee over the limit | This is higher than the current fee. Fees can only be lowered once a player has registered or still owes a late-withdrawal fee. |
 | Capacity hint (published) | Lowering this won't remove anyone who's already in. |
 | Buttons | Save draft · Save and publish · Save changes · Cancel session |
 | Publish prompt | Publish this session? Members can register straight away, and each player is charged after the game: {fee summary}. Members on Auto Enroll will be added to it. (BIND P-1: every session) |
@@ -836,12 +836,12 @@ Material fields for the "Let them know" line: date (one-off only), earliest cour
 | Fixed fields | To change the day or how often it repeats, end this series and start a new one. (BIND P-3) |
 | Repeat until hint | You can extend or clear this date. To stop the series sooner, use End series. |
 | Shorten refused | To stop the series sooner, use End series. |
-| Effect line | Your changes will apply to {u} upcoming sessions and to sessions added later. [{e} edited sessions keep their own details.] [{r} published sessions have registered players, so fees on them can only be lowered.] Started, past and cancelled sessions don't change. |
+| Effect line | Your changes will apply to {u} upcoming sessions and to sessions added later. [{e} edited sessions keep their own details.] [{r} published sessions have a player who has registered or still owes a late-withdrawal fee, so fees on them can only be lowered.] Started, past and cancelled sessions don't change. |
 | Effect line, none upcoming | Your changes will apply to sessions added later. |
 | Save button | Save series / Saving… · link Cancel |
 | `series_saved` | Series saved. {u} upcoming sessions updated. [{e} edited sessions kept their own details.] |
 | `series_saved`, nothing upcoming | Series saved. Sessions added later will use the new details. |
-| Skip lines | {n} sessions were left as they are because they have started or closed. · {n} published sessions were left as they are because their cancellation deadline has passed. · {n} published sessions kept their current fees because players have registered and fees can only be lowered. (BIND T-5 reasons) |
+| Skip lines | {n} sessions were left as they are because they have started or closed. · {n} published sessions were left as they are because their cancellation deadline has passed. · {n} published sessions kept their current fees because a player has registered or still owes a late-withdrawal fee, and fees can only be lowered. (BIND T-5 reasons) |
 | Adding lines | We're adding the new dates. Refresh in a moment. |
 | `series_nothing_changed` | Nothing to change. |
 | Series banking refusal | Add your team's bank account details before publishing a paid session. (verbatim) · Nothing was saved. · link: Set up banking and GST (BIND T-5, whole-edit refusal) |

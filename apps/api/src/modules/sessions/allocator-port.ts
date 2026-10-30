@@ -35,7 +35,9 @@ export type AutoEnrolSkipReason =
   | 'auto_enroll_changed'
   | 'not_found'
   | 'session_not_open'
-  | 'party_exceeds_capacity';
+  | 'party_exceeds_capacity'
+  /** O5: `now` is past the locked session's `cancellation_deadline`; auto-enrol adds nobody (manual registration is unaffected). */
+  | 'deadline_passed';
 
 export type AutoEnrolEntryOutcome =
   | { readonly ok: true; readonly status: 'CONFIRMED' | 'WAITLISTED' }
@@ -75,6 +77,12 @@ export interface SessionAllocatorPort {
       readonly teamId: string;
       readonly sessionId: string;
       readonly entries: readonly AutoEnrolEntry[];
+      /**
+       * O8 (registration ruling 2026-10-26, D-86): `game_sessions.auto_enrol_notify` as `runSessionAutoEnrol` read it. When
+       * false the allocator places members exactly as usual but queues no R17 auto-enrol email (the pre-deploy backlog).
+       * Required, so every caller decides; there is no default.
+       */
+      readonly notify: boolean;
     },
   ): Promise<readonly { readonly userId: string; readonly outcome: AutoEnrolEntryOutcome }[]>;
 }

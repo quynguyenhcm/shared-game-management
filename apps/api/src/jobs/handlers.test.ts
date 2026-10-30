@@ -193,6 +193,7 @@ describe('registerJobs', () => {
         'daily-overdue',
         'post-game-billing',
         'recurrence-materialisation',
+        'registration-ban-reconcile',
         'skill-progression',
       ].sort(),
     );

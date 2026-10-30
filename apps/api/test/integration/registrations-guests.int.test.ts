@@ -180,7 +180,9 @@ describe('waitlist positions (AC-VERIFY-19)', () => {
     // A promoted (CONFIRMED) row drops its position; the freed number can be reused by the queue.
     await insertRegistration(db.pool, { sessionId, teamId, userId: c, status: 'CONFIRMED' });
     await db.pool.query(
-      `UPDATE registrations SET status = 'CONFIRMED', queue_position = NULL WHERE session_id = $1 AND user_id = $2`,
+      `UPDATE registrations SET status = 'CONFIRMED', queue_position = NULL, promoted_at = now(),
+                              registrant_sex = 'FEMALE', registrant_skill_level = 'BEGINNER'
+        WHERE session_id = $1 AND user_id = $2`,
       [sessionId, a],
     );
     await insertRegistration(db.pool, {

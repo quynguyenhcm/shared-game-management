@@ -251,11 +251,10 @@ describe('sortMyTeams (rows needing the user first, then by name)', () => {
 });
 
 describe('manage-area copy deck (UI/UX copy table; the ban copy is the user decision of 2026-10-13)', () => {
-  it('ban prompt promises no cancellation, and the reason label says only team admins see it', () => {
+  it('ban prompt says upcoming registrations will be cancelled (restored, AC-HAPPY-10, R10), and the reason label says only team admins see it', () => {
     expect(banPrompt('Dee Park')).toBe(
-      "Ban Dee Park? They lose access to this team and can't register for its sessions.",
+      "Ban Dee Park? They lose access to this team and can't register for its sessions. Their upcoming registrations will be cancelled.",
     );
-    expect(banPrompt('Dee Park')).not.toMatch(/cancel/i);
     expect(BAN_REASON_LABEL).toBe('Reason (optional, only team admins see this)');
   });
 

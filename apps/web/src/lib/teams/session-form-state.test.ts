@@ -382,7 +382,7 @@ describe('locked pricing (T-7: fees can only go down once players have registere
     state = sessionFormReducer(state, { type: 'set_fee', field: 'feeMale', value: '18.00' });
     expect(lockedFeeErrors(state)).toEqual({
       feeMale: [
-        'This is higher than the current fee. Fees can only be lowered once players have registered.',
+        'This is higher than the current fee. Fees can only be lowered once a player has registered or still owes a late-withdrawal fee.',
       ],
     });
     state = sessionFormReducer(state, { type: 'set_fee', field: 'feeMale', value: '15.00' });

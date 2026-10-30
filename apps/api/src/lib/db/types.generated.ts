@@ -36,6 +36,8 @@ export type PricingType = "BY_SEX" | "BY_SKILL_LEVEL" | "FLAT";
 
 export type RecurrenceFrequency = "FORTNIGHTLY" | "MONTHLY" | "WEEKLY";
 
+export type RegistrationSource = "AUTO_ENROL" | "MEMBER";
+
 export type RegistrationStatus = "CONFIRMED" | "WAITLISTED" | "WITHDRAWN";
 
 export type SessionStatus = "CANCELLED" | "COMPLETED" | "DRAFT" | "PUBLISHED";
@@ -49,6 +51,8 @@ export type TeamVisibility = "PRIVATE" | "PUBLIC";
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export type UserSex = "FEMALE" | "MALE" | "OTHER";
+
+export type WithdrawalKind = "BANNED" | "EARLY" | "LATE";
 
 export interface AuthIdentities {
   created_at: Generated<Timestamp>;
@@ -95,6 +99,7 @@ export interface CreditTransactions {
 
 export interface GameSessions {
   address: string;
+  auto_enrol_notify: Generated<boolean>;
   auto_enrol_required: Generated<boolean>;
   auto_enrolled_at: Timestamp | null;
   calculated_rate_per_player: MoneyString | null;
@@ -273,13 +278,20 @@ export interface RegistrationGuests {
 export interface Registrations {
   guest_count: Generated<number>;
   id: Generated<string>;
+  promoted_at: Timestamp | null;
   queue_position: number | null;
   registered_at: Generated<Timestamp>;
+  registrant_sex: UserSex | null;
+  registrant_skill_level: SkillTier | null;
   session_id: string;
+  source: Generated<RegistrationSource>;
   status: RegistrationStatus;
   team_id: string;
   updated_at: Generated<Timestamp>;
   user_id: string;
+  withdrawal_fee_due: Generated<boolean>;
+  withdrawal_kind: WithdrawalKind | null;
+  withdrawn_at: Timestamp | null;
 }
 
 export interface SessionCourts {

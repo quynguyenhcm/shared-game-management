@@ -46,12 +46,14 @@ export function toSessionResponse(
   courts: readonly CourtRow[],
   options: {
     readonly now: Date;
+    /** The display count: CONFIRMED and WAITLISTED players ("{n} players are registered"). */
     readonly activeRegistrationCount: number;
+    /** The fee-lock count (D-85, widened to a late fee still owed): drives `feesLocked` only. */
+    readonly feeLockCount: number;
     /** `seriesName` of the session's rule; null for a one-off. */
     readonly seriesName: string | null;
   },
 ): SessionResponse {
-  const count = options.activeRegistrationCount;
   return {
     id: row.id,
     teamId: row.team_id,
@@ -83,8 +85,9 @@ export function toSessionResponse(
     draftReason: draftReasonOf(row),
     seriesName: options.seriesName,
     version: row.version,
-    activeRegistrationCount: count,
-    feesLocked: row.status === 'PUBLISHED' && count > 0 ? 'raise_only_blocked' : null,
+    activeRegistrationCount: options.activeRegistrationCount,
+    feesLocked:
+      row.status === 'PUBLISHED' && options.feeLockCount > 0 ? 'raise_only_blocked' : null,
     courts: sortCourts(
       courts.map((court) => ({
         id: court.id,

@@ -58,6 +58,14 @@ export const ErrorCode = [
   'session_not_editable',
   'session_state_conflict',
   'session_fee_locked',
+  // registration and waitlist (registration-and-waitlist AC-VERIFY-7, R3, R9)
+  'overdue_payments',
+  'session_not_open',
+  'already_registered',
+  'not_registered',
+  'party_exceeds_capacity',
+  'late_withdrawal_fee_due',
+  'cancellation_terms_changed',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

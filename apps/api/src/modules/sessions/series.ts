@@ -201,11 +201,12 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
       today: instantToLocal(now).date,
     });
     const ids = rows.map((row) => row.id);
-    const [templateCourts, courtsByRow, counts, draftCounts, isPayoutConfigured] =
+    const [templateCourts, courtsByRow, counts, registeredCounts, draftCounts, isPayoutConfigured] =
       await Promise.all([
         seriesRepo.listRuleCourts(reader, rule.id),
         repo.listCourtsFor(reader, ids),
         repo.countActiveRegistrations(reader, ids),
+        repo.countRegisteredPlayers(reader, ids),
         seriesRepo.countRuleDrafts(reader, { ruleId: rule.id, teamId: rule.team_id }),
         repo.readPayoutConfigured(reader, rule.team_id),
       ]);
@@ -218,6 +219,7 @@ export function createSeriesService(deps: SeriesServiceDeps): SeriesService {
         rows,
         courtsByRow,
         counts,
+        registeredCounts,
         draftCounts,
         isPayoutConfigured,
         now,

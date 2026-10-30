@@ -60,7 +60,8 @@ describe('InlineConfirm (UI/UX: the one confirmation pattern; never window.confi
     fields: { teamId: TEAM_ID, userId: OTHER, fullName: 'Dee Park' },
     triggerLabel: 'Ban',
     triggerAriaLabel: 'Ban Dee Park',
-    prompt: "Ban Dee Park? They lose access to this team and can't register for its sessions.",
+    prompt:
+      "Ban Dee Park? They lose access to this team and can't register for its sessions. Their upcoming registrations will be cancelled.",
     confirmLabel: 'Ban member',
     pendingLabel: 'Banning…',
     destructive: true,

@@ -89,19 +89,26 @@ describe('recurrence-rule handler (AC-ERROR-9)', () => {
 describe('boot sweep (AC-ASYNC-5)', () => {
   const logger = { info: vi.fn(), warn: vi.fn() };
 
-  it('queues the recurrence-materialisation sweep once', async () => {
+  it('queues the recurrence-materialisation sweep and the ban reconciliation once each', async () => {
     const enqueue = vi.fn().mockResolvedValue('job-1');
     await enqueueBootSweeps({ enqueue }, logger);
-    expect(enqueue).toHaveBeenCalledTimes(1);
-    expect(enqueue).toHaveBeenCalledWith('recurrence-materialisation', expect.any(Object));
+    expect(enqueue).toHaveBeenCalledTimes(2);
+    expect(enqueue).toHaveBeenCalledWith('recurrence-materialisation', { source: 'boot' });
+    // registration-and-waitlist AC-ASYNC-3 / Q4: closes the deploy window of the no-op handler without a runbook step.
+    expect(enqueue).toHaveBeenCalledWith('registration-ban-reconcile', { source: 'boot' });
   });
 
-  it('never stops the worker when the enqueue fails', async () => {
+  it('never stops the worker when the enqueue fails, and one failing sweep does not stop the other', async () => {
     const enqueue = vi.fn().mockRejectedValue(new Error('db down'));
     await expect(enqueueBootSweeps({ enqueue }, logger)).resolves.toBeUndefined();
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'session.recurrence.boot_sweep_failed' }),
       expect.any(String),
     );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'registration.ban_reconcile.boot_sweep_failed' }),
+      expect.any(String),
+    );
+    expect(enqueue).toHaveBeenCalledTimes(2);
   });
 });
