@@ -1,13 +1,13 @@
 ---
 slug: wallet-and-akahu-billing
 feature: wallet-and-akahu-billing
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # wallet-and-akahu-billing: Wallet and Akahu Billing
 
 **Complexity**: Level 4 (inherited from wallet-and-akahu-billing)
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: wallet-and-akahu-billing
 **Branch**: feature/wallet-and-akahu-billing
 **Worktree**: ~/yay-wt/shared-game-management/feature-wallet-and-akahu-billing
@@ -664,6 +664,10 @@ Where the four docs disagree, this section wins; where it is silent, the owning 
 - **CR-14 Payout block (A3).** `POST /teams/:teamId/payout-block`, `requireGlobalRole('GLOBAL_ADMIN')`, reason enum + optional Akahu payment id + `changeKey` (no free text), `payout_block_events` audit, admin emails, best-effort `akahu-cancel` of the team's `OPEN`/READY intents; CLI wrapper; no unblock (banking re-save clears it). UI: a `ConfirmDisclosure` in the Payments manage area, visible to GLOBAL_ADMIN only. While blocked, top-up and attempt starts answer 409 `payout_not_configured` (C-BIL-PAY in tx1, both routes) and "Send reminder" is hidden.
 - **CR-15 Held resolution (A2 ops surface; journey #5, algorithm RF-7).** Two GLOBAL_ADMIN-only routes calling `resolveHeld`: `POST /payments/:paymentId/hold-resolution` and `POST /teams/:teamId/wallet/top-ups/:topUpId/hold-resolution`, strict body `{ outcome: 'RECEIVED' | 'NOT_RECEIVED', changeKey }`; `RECEIVED` → `APPLIED` (payment PAID / top-up credited, cap rules apply, else `UNAPPLIED`), `NOT_RECEIVED` → `CLOSED` (payable again); `resolved_by`/`resolved_at` on the intent; follow-up email (received or not-completed). UI: payment holds in the Payments manage area (GLOBAL_ADMIN); top-up holds via `cli billing reconcile` listing plus the route (no web UI in v1). New error code `payment_on_hold` (409; `payment_held` from the journey doc is renamed). Also `payment_provider_refused` (422).
 
+- **CR-24 Top-up start order (algorithm wins over architecture §top-up start; Codex critique F1).** tx1 inserts the `CREATING` row first (claiming the one-blocking slot; a 23505 → 409 `top_up_in_progress`), **then** reads the balance in a fresh statement (`player_credits FOR SHARE`) and checks B1 minimum and headroom; on failure the transaction rolls back (422). Architecture's "read the balance unlocked, then insert" is rejected: a start blocked on the index behind a committing credit would validate stale headroom. Phase 4 adds the race "previous top-up credits while the next start waits on the index".
+- **CR-25 Finality polling (Codex critique F3; amends CR-12 "never re-reads HELD").** Reconcile also re-reads `HELD` intents and `CLOSED` intents that have an `akahu_payment_id`, with backoff (hourly, then daily), until a finality horizon (`AKAHU_FINALITY_HORIZON_HOURS`, default 168) after `closed_at`/hold; a late SENT then follows the CR-2/B3 absorb rule. Tests: missed webhook for HELD→SENT and CLOSED→SENT, each followed by a retry on the payment, never ending with the payment paid twice unnoticed (the second success is `UNAPPLIED (DUPLICATE)` and surfaced).
+- **CR-26 Hold resolution guards (Codex critique F2; amends CR-15).** Every `resolveHeld` first re-reads Akahu (inline, outside locks); if Akahu now reports a definite status, that wins and the manual outcome is refused (409 `hold_resolved_by_provider`). `NOT_RECEIVED` is allowed only when the fresh read is still INDETERMINATE (or not SENT) and records a `resolution_reason` enum. A hold with `hold_reason = AMOUNT_MISMATCH` cannot be resolved `RECEIVED`: the resolution body requires `observedAmount`, and `APPLIED` is allowed only when it equals the intent amount; otherwise the intent becomes `UNAPPLIED (AMOUNT_MISMATCH)` (B3: recorded, notified, refunded by the team outside the app; payment stays payable, no wallet credit). `resolved_by`, `resolved_at`, `resolution_reason`, `observed_amount` are stored on the intent and audited; no free text.
+
 **Surfaces and copy**
 - **CR-16 Debt-block target (AC-ENTRY-4; UI/UX and journey agree).** New protected page `/payments` ("Unpaid payments": the caller's PENDING, OVERDUE and held payments across teams, grouped by team, "Pay now" on payable rows) backed by `GET /payments/me?status=UNPAID` (`authenticated()`, caller only). `proxy.ts` protects `/payments` and `/payments/*`. player-dashboard later aggregates or redirects; `/payments/[id]` stays the only place an attempt starts and the wallet page the only place a top-up starts (slot contract in ADR 0020).
 - **CR-17 Read-model additions.** Latest attempt / top-up carries `outcome: 'processing' | 'cancelled' | 'failed' | 'held' | 'none'`; payment reads and the admin list carry `onHold` and `payoutBlocked`; ledger items carry session location and `startsAt`; the wallet read carries the last closed top-up (for the B3 notice); `GET /teams/:teamId/payments/me` is cursor-paginated (`nextCursor`) like the others.
@@ -680,6 +684,16 @@ Where the four docs disagree, this section wins; where it is silent, the owning 
 - **[RULING] H3 Policy-stating copy (gates Phase 5).** Confirm "Wallet credit can only be used for {Team}'s game fees." and "The money goes to {Team}'s bank account." (UI/UX R8), and that a due charge cannot be paid from wallet credit topped up later (journey #10; explained in copy, a later candidate).
 
 **Unchanged:** B1-B10 defaults, A1 go/no-go (Phases 1-3 use only the port, the fake and provider-neutral code), A7 gates.
+
+### Design Critique (advisory)
+
+- **Backend**: codex (`adversarial-review`, 2026-10-31), run over commit `ed728dd`.
+- **Verdict**: needs-attention. Summary: the design as first reconciled still allowed lost top-ups, full settlement of amount-mismatched transfers, and missed late successes leading to an unnoticed double payment.
+- **Findings** (all high):
+  - F1 stale headroom check in top-up start (architecture §top-up start, line 457). Addressed by CR-24.
+  - F2 amount-mismatch holds resolvable as full payment (CR-15). Addressed by CR-26.
+  - F3 HELD/CLOSED late successes outside the reconcile safety net (CR-12). Addressed by CR-25.
+- Full log: `.claude-logs/codex-critique-wallet-20261031.log` (main checkout, not committed).
 
 ### Plan Amendment 2026-10-31 (binding; spike `akahu-payment-capability`, Gate #2)
 
@@ -700,11 +714,11 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Dispatching creative agents (user journey, architecture, UI/UX, algorithm)
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete (4 docs + reconciliation CR-1..CR-26); rulings H1-H3 pending; next /yay:build Phase 1
 **Step Started**: 2026-10-31
-**Can Resume**: YES
+**Can Resume**: NO
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
 ### Active Sub-Agents
@@ -723,3 +737,4 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Architecture Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-architecture.md
 - Algorithm Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-algorithm.md
 - Creative Reconciliation CR-1..CR-23 written; rulings H1-H3 requested (2026-10-31)
+- CREATIVE CRITIQUE: codex — usable. Verdict needs-attention (3 high); folded in as CR-24..CR-26 (2026-10-31)
