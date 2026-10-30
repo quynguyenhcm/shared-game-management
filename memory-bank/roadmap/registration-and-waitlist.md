@@ -1,6 +1,6 @@
 ---
 version: v1.0.0
-status: planned
+status: complete
 priority: high
 complexity: 4
 linked_tasks: [registration-and-waitlist]

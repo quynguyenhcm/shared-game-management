@@ -2,17 +2,20 @@
 slug: registration-and-waitlist
 legacy_id:
 feature: registration-and-waitlist
-status: BUILD_COMPLETE
+status: COMPLETE
 ---
 
 # registration-and-waitlist: Registration and Waitlist
 
 **Complexity**: Level 4 (inherited from registration-and-waitlist)
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
 **Reflection**: memory-bank/reflection/registration-and-waitlist-reflection.md
+**Archived**: memory-bank/archive/registration-and-waitlist-archive.md
+**Completed**: 2026-10-30
+**Latest Commit**: 1b2ef5d
 **Roadmap**: registration-and-waitlist
 **Branch**: feature/registration-and-waitlist
-**Worktree**: N/A (main checkout)
+**Worktree**: ~/yay-wt/shared-game-management/registration-and-waitlist
 
 ## Task Description
 
@@ -1037,9 +1040,9 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 **Build Status**: IDLE
 **Auto-Build Mode**: YES
 **Final Review Backend**: anthropic (codex unavailable: workspace out of credits). Verdict: ready to merge with fixes. 0 Critical, 1 Important (auto-enrol after the cancellation deadline; resolved by human ruling O5, 2184ce4), 8 Minor. C3 accepted by human ruling O6 (313b906, 9ecf2d0).
-**Current Phase**: REFLECT → ARCHIVE
-**Current Step**: Step 4 - Git Commit - COMPLETE. Next: /yay:archive registration-and-waitlist.
-**Step Started**: 2026-10-27
+**Current Phase**: COMPLETE
+**Current Step**: Archived 2026-10-30; PR to main opened by /yay:archive
+**Step Started**: 2026-10-30
 **Can Resume**: NO
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (needs-attention; 3 high + 1 medium, all resolved in the reconciliation)
 
@@ -1075,6 +1078,7 @@ This amendment follows the rebase onto `main` after session-scheduling-engine (S
 - Phase 4 BUILD COMPLETE (2026-10-25): real `MemberBannedHandler` (`modules/registrations/ban-handler.ts`, name 'registrations', one session per transaction under JOB_POLICY, continue on error, transient-first classification), sweep (`modules/registrations/reconcile.ts` + `jobs/ban-reconcile.ts`), queue and slot `registration-ban-reconcile` at `45 5 * * *` (O4), boot enqueue in `enqueueBootSweeps`, worker wiring and pool 2 to 5, repo reads `listBanTargets` / `listBannedWithActive`. `teams-ban-seam.int.test.ts` now runs the real handler (AC-INTEGRATION-2); AC-INTEGRATION-1 race (d) repeated over HTTP through the real handler path. ADR 0018 sections 10, 11 and Consequences updated (Phase 3 gate bucket 2 items i to iii, C3 sweep analysis).
 - Phase 5 BUILD COMPLETE (2026-10-25): player session page + stacked RegistrationPanel, PlayerSessionSummary, Upcoming sessions section, Server Actions/api-client/proxy, ConfirmDisclosure extraction, restored ban confirmation copy, R17 label, SSE tripwire flipped; ban-handler fixed-clock carry-forward.
 - Phase 6 BUILD COMPLETE (2026-10-25): `apps/web/e2e/registrations.spec.ts` (4 journeys x desktop and 360x740: register with a guest, waitlist a party of three, promotion on early withdrawal with Mailpit email, ban withdrawn within 30 s; late withdrawal wording; debt block; cancelled session), axe + no-horizontal-scroll + 44 px targets at every state; sessions created and published through SSE's admin API; docs (systemPatterns Test Scope Preferences, techContext, ADR 0018 status). 8/8 e2e passing.
+- Archive: COMPLETE (2026-10-30) - Output: memory-bank/archive/registration-and-waitlist-archive.md. Learning consolidation (additive): evidence and bullets added to `_learned/db-derived-flags-and-gates.md`, `review-process-plan-claims.md` and `git-worktree-attached-head.md` (promoted to medium); agent-rules-index regenerated; roadmap feature set to complete.
 
 ### Guard & Recovery Log
 - Post-build O6-O8 (2026-10-26): three human rulings implemented test-first. O6 RED seen (billing hand-off integration: banned-before-start CONFIRMED and fee-due LATE rows were still returned, 2 failed); O8 RED seen twice (column missing before the migration; then the backlog session still queued 2 send-email jobs before the flag was threaded). O7 is docs only. Rollback-count assertions in the teams, team-banking, skill-levels, sessions and registrations schema suites moved by one for the new migration. Guard result recorded at commit.

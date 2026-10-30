@@ -90,7 +90,7 @@
 - **Linting & Formatting**: ESLint 9.39.5 + TypeScript support, Prettier 3.9.9
   - **Type checking**: `tsc --noEmit` strict mode (no `any`, explicit return types)
   - **Code quality**: `no-console` error in `apps/api/src` (except `cli.ts`); bans on unsafe money operations (parseFloat, toFixed); host-TZ independence rules in `packages/shared/src/time/`
-- **macOS tooling**: macOS has no GNU `timeout`. Scripts and agent wrappers that need one should use `gtimeout` (`brew install coreutils`) or call the tool directly; the Codex companion works when invoked without `timeout`. In session-scheduling-engine the per-phase Codex reviews for Phases 3–6 were silently lost to this.
+- **macOS tooling**: macOS has no GNU `timeout`. Scripts and agent wrappers that need one should use `gtimeout` (`brew install coreutils`) or call the tool directly; the Codex companion works when invoked without `timeout`. In session-scheduling-engine the per-phase Codex reviews for Phases 3–6 were silently lost to this. Also check the Codex workspace has credits before a long `/yay:build --auto`: in registration-and-waitlist Codex ran out mid-build, so the later phase reviews and the final whole-branch review were Anthropic only.
 - **CI/CD**: GitHub Actions (`.github/workflows/ci.yml`), PostgreSQL 17 service container, 10-minute budget
 
 ## Component Structure
