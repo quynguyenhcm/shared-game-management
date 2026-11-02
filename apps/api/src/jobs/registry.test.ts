@@ -6,6 +6,7 @@ describe('queue registry', () => {
     expect(QUEUES.map((queue) => queue.name).sort()).toEqual(
       [
         'auth-cleanup',
+        'bill-session',
         'daily-overdue',
         'heartbeat',
         'member-banned',
@@ -31,6 +32,7 @@ describe('queue registry', () => {
       heartbeat: 'heartbeat',
       recurrenceMaterialisation: 'recurrence-materialisation',
       postGameBilling: 'post-game-billing',
+      billSession: 'bill-session',
       dailyOverdue: 'daily-overdue',
       sendEmail: 'send-email',
       authCleanup: 'auth-cleanup',
@@ -47,6 +49,9 @@ describe('queue registry', () => {
   it('uses exclusive policy where a singletonKey must suppress concurrent duplicates', () => {
     expect(getQueue('send-email').policy).toBe('exclusive');
     expect(getQueue('post-game-billing').policy).toBe('exclusive');
+    // One billing job per session (`singletonKey = bill-session:<sessionId>`, CR-13); the COMPLETED guard and
+    // `UNIQUE(registration_id)` are the durable once-only guards.
+    expect(getQueue('bill-session').policy).toBe('exclusive');
     // One cleanup run at a time: two overlapping runs would only fight over the same rows.
     expect(getQueue('auth-cleanup').policy).toBe('exclusive');
     // One ban job per membership (`singletonKey = member-banned:<membershipId>`), enqueued in the ban transaction.

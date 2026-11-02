@@ -396,7 +396,7 @@ describe('schedules (AC-ASYNC-2)', () => {
       { name: 'registration-ban-reconcile', cron: '45 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
     ]);
-    // The recurrence slot has its real sweep (session-scheduling-engine); the billing slots are still placeholders.
+    // The recurrence slot has its real sweep (session-scheduling-engine); daily-overdue is still a placeholder.
     const sweepId = await worker.trigger('recurrence-materialisation', {
       source: 'integration-test',
     });
@@ -410,7 +410,17 @@ describe('schedules (AC-ASYNC-2)', () => {
         ),
       'recurrence-materialisation',
     ).toMatchObject({ rulesScanned: expect.any(Number) as number });
-    for (const slot of ['post-game-billing', 'daily-overdue']) {
+    // The post-game billing slot has its real sweep (wallet-and-akahu-billing Phase 2); daily-overdue is still a placeholder.
+    const billingId = await worker.trigger('post-game-billing', { source: 'integration-test' });
+    expect(billingId, 'post-game-billing').toEqual(expect.any(String));
+    await waitForState('post-game-billing', billingId as string, 'completed');
+    expect(
+      workerLogs
+        .lines()
+        .find((line) => line.event === 'billing.sweep.enqueued' && line.jobId === billingId),
+      'post-game-billing',
+    ).toMatchObject({ scanned: expect.any(Number) as number });
+    for (const slot of ['daily-overdue']) {
       const id = await worker.trigger(slot, { source: 'integration-test' });
       expect(id, slot).toEqual(expect.any(String));
       await waitForState(slot, id as string, 'completed');

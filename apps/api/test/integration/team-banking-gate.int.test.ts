@@ -13,7 +13,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
+import { createManualClock } from '../../src/lib/clock.ts';
 import { AppError } from '../../src/lib/http/errors.ts';
+import { billSession, type BillSessionOutcome } from '../../src/modules/billing/bill-session.ts';
 import {
   assertTeamCanPublishPaidSession,
   checkTeamCanPublishPaidSession,
@@ -23,6 +25,7 @@ import {
   type PublishGateFees,
 } from '../../src/modules/team-banking/publish-gate.ts';
 import { PAID_SESSION_MATRIX, type PaidSessionCase } from '../fixtures/paid-session-matrix.ts';
+import { testCrypto } from '../helpers/app-deps.ts';
 import { buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   ACCOUNT_A,
@@ -33,6 +36,7 @@ import {
 } from '../helpers/banking-scene.ts';
 import {
   insertPayment,
+  insertPublishedSession,
   insertRegistration,
   insertSession,
   insertTeam,
@@ -40,7 +44,7 @@ import {
 } from '../helpers/factories.ts';
 import { holdTeamLock, raceUnderTeamLock, waitForLockWaiters } from '../helpers/lock-waiters.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
-import { attemptStandInPayment, createStandInPayment } from '../helpers/payment-stand-in.ts';
+import { createRecordingJobs } from '../helpers/registration-scene.ts';
 import {
   createTestDatabase,
   expectPgError,
@@ -793,21 +797,39 @@ describe('AC-VERIFY-9: publish, removal and payment races (no sleeps, no deadloc
     });
   });
 
-  describe('R4 C-BIL-PAY: a payment for an already COMPLETED session races a removal', () => {
-    /** A configured team whose paid session was published, registered for, and COMPLETED. */
-    async function completedSessionScene() {
+  describe('R4 C-BIL-PAY: the real bill-session path races a banking removal (replaces the payment stand-in)', () => {
+    const BILLING_BASE = new Date('2026-10-20T00:00:00.000Z');
+    const billingClock = createManualClock(BILLING_BASE);
+
+    /** The real post-game billing of one session, in its own transaction; the outcome is settled so a race can await it. */
+    const billSettled = (sessionId: string): Promise<BillSessionOutcome | { failed: unknown }> =>
+      billSession(
+        {
+          db: h.db,
+          jobs: createRecordingJobs(),
+          clock: billingClock,
+          crypto: testCrypto(),
+          webBaseUrl: 'https://games.example.nz',
+          log: captureLogs().logger,
+        },
+        { sessionId },
+      ).catch((failed: unknown) => ({ failed }));
+
+    /** A configured team whose paid session (default fee $17.00) has ended with one unpaid registration, due to be billed. */
+    async function endedPaidSessionScene() {
       const admin = await scene.person();
       const teamId = await scene.team([admin], { payoutConfigured: true });
-      const sessionId = await paidDraft(teamId);
-      await publishRaw(sessionId);
+      const { sessionId } = await insertPublishedSession(database.pool, teamId, {
+        now: BILLING_BASE,
+      });
       const userId = await insertUser(database.pool);
-      const registrationId = await insertRegistration(database.pool, { sessionId, teamId, userId });
-      await setStatus(sessionId, 'COMPLETED');
-      return {
-        admin,
-        teamId,
-        payment: { userId, teamId, registrationId, amount: '17.00' } as const,
-      };
+      await insertRegistration(database.pool, { sessionId, teamId, userId });
+      const { rows } = await database.pool.query<{ ends_at: Date }>(
+        'SELECT ends_at FROM game_sessions WHERE id = $1',
+        [sessionId],
+      );
+      billingClock.set(rows[0]?.ends_at ?? BILLING_BASE);
+      return { admin, teamId, sessionId };
     }
 
     const paymentCount = async (teamId: string): Promise<number> => {
@@ -818,55 +840,76 @@ describe('AC-VERIFY-9: publish, removal and payment races (no sleeps, no deadloc
       return rows[0]?.n ?? 0;
     };
 
-    it('payment first: the removal waits, then refuses banking_in_use because the payment is PENDING', async () => {
-      const { admin, teamId, payment } = await completedSessionScene();
-      const client = await database.pool.connect();
+    const blockPayout = (teamId: string) =>
+      `UPDATE teams SET payout_blocked_at = '${BILLING_BASE.toISOString()}' WHERE id = '${teamId}'`;
+
+    it('billing first: the removal waits behind teams FOR KEY SHARE, then refuses banking_in_use because the payment is PENDING', async () => {
+      const { admin, teamId, sessionId } = await endedPaidSessionScene();
+      // The test holds the session row, so billing has taken `teams FOR KEY SHARE` and waits for the session.
+      const hold = await database.pool.connect();
       let finished = false;
       try {
-        await client.query('BEGIN');
-        await createStandInPayment(client, payment);
+        await hold.query('BEGIN');
+        await hold.query('SELECT id FROM game_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
+        const billing = billSettled(sessionId);
+        await waitForLockWaiters(database.pool, 1, 'billing blocked on the session row');
         const removal = scene.deleteBanking(teamId, admin);
-        await waitForLockWaiters(database.pool, 1, 'removal blocked behind the payment');
-        await client.query('COMMIT');
+        await waitForLockWaiters(database.pool, 2, 'removal blocked behind the billing KEY SHARE');
+        await hold.query('COMMIT');
         finished = true;
+        expect(await billing).toMatchObject({ kind: 'completed', linked: 1 });
         const response = await removal;
         expect(response.statusCode).toBe(409);
         expect(json<ErrorBody>(response).error.code).toBe('banking_in_use');
       } finally {
-        if (!finished) await client.query('ROLLBACK').catch(() => undefined);
-        client.release();
+        if (!finished) await hold.query('ROLLBACK').catch(() => undefined);
+        hold.release();
       }
+      expect(await paymentCount(teamId)).toBe(1);
+      expect(await statusOf(sessionId)).toBe('COMPLETED');
+      expect(await configured(teamId)).toBe(true);
+    });
+
+    it('removal first: it is refused while the paid session is PUBLISHED, so billing then completes with the destination intact (no payment without banking)', async () => {
+      const { admin, teamId, sessionId } = await endedPaidSessionScene();
+      const response = await scene.deleteBanking(teamId, admin);
+      expect(response.statusCode).toBe(409);
+      expect(json<ErrorBody>(response).error.code).toBe('banking_in_use');
+      expect(await billSettled(sessionId)).toMatchObject({ kind: 'completed', linked: 1 });
       expect(await paymentCount(teamId)).toBe(1);
       expect(await configured(teamId)).toBe(true);
     });
 
-    it('removal first: the stand-in waits, finds no banking and fails cleanly with payout_not_configured, inserting nothing', async () => {
-      const { teamId, payment } = await completedSessionScene();
+    it('destination gone first (the team row held, then the payout block commits): billing waits, finds no destination, inserts nothing and holds the session (B8)', async () => {
+      const { teamId, sessionId } = await endedPaidSessionScene();
       const [outcome] = await raceUnderTeamLock(
         database.pool,
         teamId,
-        [() => attemptStandInPayment(database.pool, payment)],
+        [() => billSettled(sessionId)],
         {
           beforeRelease: async (lock) => {
-            await lock.query(CLEAR_BANKING, [teamId]);
+            await lock.query(blockPayout(teamId));
           },
         },
       );
-      expect(outcome).toHaveProperty('refused');
-      const refused = (outcome as { refused: unknown }).refused;
-      noDeadlock(refused);
-      expectRefusal(refused);
+      expect(outcome).toEqual({ kind: 'blocked' });
+      noDeadlock(outcome);
       expect(await paymentCount(teamId)).toBe(0);
+      expect(await statusOf(sessionId)).toBe('PUBLISHED');
       expect(await configured(teamId)).toBe(false);
+      const { rows } = await database.pool.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM billing_session_blocks WHERE session_id = $1',
+        [sessionId],
+      );
+      expect(rows[0]?.n).toBe(1);
     });
 
-    it('a stand-in payment on an already removed destination is refused at once', async () => {
-      const { teamId, payment } = await completedSessionScene();
-      await database.pool.query(CLEAR_BANKING, [teamId]);
-      const outcome = await attemptStandInPayment(database.pool, payment);
-      expect(outcome).toHaveProperty('refused');
-      expectRefusal((outcome as { refused: unknown }).refused);
+    it('an already blocked destination is refused at once: nothing inserted, the session stays PUBLISHED', async () => {
+      const { teamId, sessionId } = await endedPaidSessionScene();
+      await database.pool.query(blockPayout(teamId));
+      expect(await billSettled(sessionId)).toEqual({ kind: 'blocked' });
       expect(await paymentCount(teamId)).toBe(0);
+      expect(await statusOf(sessionId)).toBe('PUBLISHED');
     });
   });
 });

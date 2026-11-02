@@ -345,3 +345,55 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
     );
   });
 });
+
+describe('billing wiring (wallet-and-akahu-billing Phase 2)', () => {
+  function wired() {
+    const handlers = new Map<string, (data: object, ctx: JobContext) => Promise<void>>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: (data: object, ctx: JobContext) => Promise<void>) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    return { handlers, runner };
+  }
+
+  it('works the post-game-billing slot with the real sweep, not the placeholder', async () => {
+    const { handlers, runner } = wired();
+    // A database that is down: the placeholder would complete, the real sweep must fail.
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down');
+      },
+    } as never;
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    await expect(handlers.get('post-game-billing')?.({}, ctx)).rejects.toThrow(/db down/);
+  });
+
+  it('works the bill-session queue with a handler that rejects a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await registerJobs({
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    await expect(handlers.get('bill-session')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(
+      NonRetryableJobError,
+    );
+  });
+});

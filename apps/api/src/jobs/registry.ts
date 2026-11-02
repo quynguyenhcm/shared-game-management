@@ -18,6 +18,7 @@ export const QUEUE_NAMES = {
   heartbeat: 'heartbeat',
   recurrenceMaterialisation: 'recurrence-materialisation',
   postGameBilling: 'post-game-billing',
+  billSession: 'bill-session',
   dailyOverdue: 'daily-overdue',
   sendEmail: 'send-email',
   authCleanup: 'auth-cleanup',
@@ -43,6 +44,10 @@ export const QUEUES: readonly QueueDefinition[] = [
   // Schedule slots: the scheduler enqueues into the queue named like the slot. One run at a time.
   { ...DEFAULTS, name: QUEUE_NAMES.recurrenceMaterialisation, policy: 'exclusive' },
   { ...DEFAULTS, name: QUEUE_NAMES.postGameBilling, policy: 'exclusive' },
+  // One billing job per ended session (wallet-and-akahu-billing CR-13, `singletonKey = bill-session:<sessionId>`), enqueued by the
+  // sweep. The worker runs it with local concurrency 1, so a backlog is billed oldest first (B9). The guarded PUBLISHED ->
+  // COMPLETED move and `UNIQUE(registration_id)`, not this policy, are the durable once-only guards.
+  { ...DEFAULTS, name: QUEUE_NAMES.billSession, policy: 'exclusive' },
   { ...DEFAULTS, name: QUEUE_NAMES.dailyOverdue, policy: 'exclusive' },
   // One email per idempotency key at a time (`singletonKey = notify:<idempotencyKey>`).
   { ...DEFAULTS, name: QUEUE_NAMES.sendEmail, policy: 'exclusive' },

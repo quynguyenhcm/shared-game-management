@@ -220,6 +220,12 @@ Total time: ~5 min (varies with cache and Postgres startup). Each step must exit
 - **Reason**: AC-INTEGRATION-4 (the journey in a real browser), AC-VERIFY-8 (accessibility on both viewports) and AC-VERIFY-9 (the coverage gate).
 - **Migration Notes**: none.
 
+### 2026-11-03 - Post-game billing engine and wallet ledger (wallet-and-akahu-billing, Phase 2)
+- **What Changed**: no new libraries. New modules `apps/api/src/modules/billing/` (sweep, per-session engine, fee computation, emails) and `apps/api/src/modules/wallet/` (`ledger.ts` is the only writer of `player_credits` and `credit_transactions`), jobs `post-game-billing` (sweep) and `bill-session` (per session, singleton key). The vitest coverage gate includes the new paths.
+- **Reason**: ended sessions must be billed exactly once, all-or-nothing against wallet credit (`docs/adr/0020-wallet-and-akahu-billing.md`).
+- **Impact**: `bill-session` rethrows a sanitized error so the job runner's generic logger never sees driver messages. Run unit and integration suites sequentially (concurrent runs cause timing failures).
+- **Migration Notes**: none; Phase 1 migration unchanged.
+
 ### 2026-10-25 - Registration allocator and billing hand-off (registration-and-waitlist, Phase 2)
 - **What Changed**: no new libraries or infrastructure. New module `apps/api/src/modules/registrations/` (pure allocation decision, allocator, repo, billing hand-off, port adapter) and `packages/shared/src/registrations/`. The vitest coverage gate now also covers both paths. The adapter is built but not yet wired: `createSessionAllocator` still returns the no-op.
 - **Reason**: seats, waitlist promotion and the late-withdrawal liability need one writer and one pure decision under the session lock (`docs/adr/0018-registration-allocation-and-billing-handoff.md`).

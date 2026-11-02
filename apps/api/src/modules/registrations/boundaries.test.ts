@@ -48,6 +48,25 @@ describe('who writes registrations', () => {
     ]);
   });
 
+  it('billing and the wallet write no registrations row, and the billing hand-off is their only way in (C-ALL-1, AC-VERIFY-11)', () => {
+    const consumers = sourceFiles(path.join(SRC, 'modules')).filter((file) =>
+      /[\\/]modules[\\/](?:billing|wallet)[\\/]/.test(file),
+    );
+    expect(consumers.length).toBeGreaterThanOrEqual(6);
+    for (const file of consumers) {
+      expect(read(file), path.relative(SRC, file)).not.toMatch(WRITES);
+      expect(read(file), path.relative(SRC, file)).not.toMatch(
+        /registrations\/(?:repo|allocator|tx)\.ts/,
+      );
+    }
+    const handoff = consumers.filter((file) => /billing-handoff\.ts/.test(read(file)));
+    // bill-session.ts calls it; charge.ts imports its types. The wallet never needs the registrations module at all.
+    expect(handoff.map((file) => path.relative(SRC, file).split(path.sep).join('/'))).toEqual([
+      'modules/billing/bill-session.ts',
+      'modules/billing/charge.ts',
+    ]);
+  });
+
   it('only allocator.ts imports the promotion writer, and the writer exists', () => {
     expect(read(named('repo.ts'))).toMatch(/export (?:async )?function promoteRegistrations\b/);
     const importers = own.filter(

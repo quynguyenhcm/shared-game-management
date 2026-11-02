@@ -1,5 +1,6 @@
 import { AssignableGlobalRole, normaliseEmail } from '@sgm/shared';
 import type { Config } from './lib/config/config.ts';
+import { BillSessionPayload, billSessionKey } from './jobs/bill-session.ts';
 import { RecurrenceRulePayload, recurrenceRuleKey } from './jobs/recurrence-rule.ts';
 import { SessionAutoEnrolPayload, sessionAutoEnrolKey } from './jobs/session-auto-enrol.ts';
 import { MemberBannedPayload, memberBannedSingletonKey } from './modules/teams/ban-hook.ts';
@@ -154,5 +155,18 @@ export function parseSessionAutoEnrolTrigger(
     (payload) => sessionAutoEnrolKey(payload.sessionId),
     'session-auto-enrol',
     'Usage: jobs trigger session-auto-enrol \'{"sessionId":…,"teamId":…,"trigger":"manual"}\'',
+  );
+}
+
+/** Validates `jobs trigger bill-session '<json>'` (re-run one session's billing), keyed like the sweep's job. */
+export function parseBillSessionTrigger(
+  raw: string | undefined,
+): SessionJobTrigger<BillSessionPayload> {
+  return parseKeyed(
+    raw,
+    BillSessionPayload,
+    (payload) => billSessionKey(payload.sessionId),
+    'bill-session',
+    'Usage: jobs trigger bill-session \'{"sessionId":…,"trigger":"manual"}\'',
   );
 }
