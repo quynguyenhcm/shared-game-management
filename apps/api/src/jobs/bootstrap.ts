@@ -1,5 +1,6 @@
 import { systemClock, type Clock } from '../lib/clock.ts';
 import type { FieldCrypto } from '../lib/crypto/crypto.ts';
+import type { PaymentsGateway } from '../lib/akahu/gateway.ts';
 import type { Database } from '../lib/db/kysely.ts';
 import type { JobHandler, JobRunner, QueueDefinition } from '../lib/jobs/jobs.ts';
 import type { Notifier } from '../lib/notifications/notifier.ts';
@@ -10,6 +11,7 @@ import { noopMemberBannedHandler, type MemberBannedHandler } from '../modules/te
 import { createAuthCleanupHandler } from './auth-cleanup.ts';
 import { createBanReconcileHandler } from './ban-reconcile.ts';
 import { createBillSessionHandler } from './bill-session.ts';
+import { createDailyOverdueHandler } from './daily-overdue.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { createMemberBannedJobHandler } from './member-banned.ts';
 import { createPostGameBillingHandler } from './post-game-billing.ts';
@@ -49,6 +51,11 @@ export interface RegisterJobsOptions {
   readonly sessionAllocator: SessionAllocatorPort;
   /** `RECURRENCE_HORIZON_DAYS` (7-91): how far ahead the series materialiser creates sessions. Defaults to 28. */
   readonly recurrenceHorizonDays?: number;
+  /**
+   * The payments gateway `daily-overdue` re-reads open attempts through (ruling H1). REQUIRED: `worker.ts` builds it with
+   * `createPaymentsGateway`, so an entrypoint that forgets it does not compile.
+   */
+  readonly paymentsGateway: PaymentsGateway;
   /** `config.auth.webBaseUrl`: origin for the links in the series banking notice. REQUIRED (12-factor: no localhost fallback). */
   readonly webBaseUrl: string;
   /** Defaults to the registry; tests pass tuned copies. */
@@ -94,6 +101,15 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
       db: options.db,
       jobs: runner,
       clock: options.clock ?? systemClock,
+    }),
+    // The real overdue job replaces the 04:00 placeholder (CR-13, CR-27): it re-reads Akahu for open attempts before it flips.
+    [QUEUE_NAMES.dailyOverdue]: createDailyOverdueHandler({
+      db: options.db,
+      gateway: options.paymentsGateway,
+      jobs: runner,
+      clock: options.clock ?? systemClock,
+      crypto: options.crypto,
+      webBaseUrl: options.webBaseUrl,
     }),
     [QUEUE_NAMES.billSession]: createBillSessionHandler({
       db: options.db,
@@ -156,7 +172,8 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
  *    window of the old no-op handler closes at the first boot instead of at 05:45.
  *  - the post-game billing sweep (wallet-and-akahu-billing CR-13) bills every ended PUBLISHED session at the first boot, oldest
  *    first (B9), instead of waiting for the next 5-minute tick.
- * All three queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
+ *  - `daily-overdue` (CR-13, RF-11) marks the payments that fell due while the worker was down, instead of waiting for 04:00.
+ * All four queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
  * never stops the worker (the cron slots are still registered), and one failing sweep never prevents the others.
  */
 export async function enqueueBootSweeps(
@@ -197,6 +214,18 @@ export async function enqueueBootSweeps(
     logger.warn(
       { event: 'billing.sweep.boot_failed', err: error },
       'post-game billing sweep could not be queued',
+    );
+  }
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.dailyOverdue, { source: 'boot' });
+    logger.info(
+      { event: 'billing.overdue.boot', enqueued: jobId !== null },
+      jobId === null ? 'daily-overdue already queued' : 'daily-overdue queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'billing.overdue.boot_failed', err: error },
+      'daily-overdue could not be queued',
     );
   }
 }

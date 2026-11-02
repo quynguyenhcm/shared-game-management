@@ -12,6 +12,7 @@ import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import { createJobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createLogger, loggerOptionsFromConfig } from '../../src/lib/logger/logger.ts';
+import { testPaymentsGateway } from './app-deps.ts';
 import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 
@@ -29,6 +30,7 @@ const runner = createJobRunner({
 });
 await runner.start();
 await registerJobs({
+  paymentsGateway: testPaymentsGateway(),
   runner,
   notifier: createInMemoryNotifier(),
   crypto: createCrypto(keyProviderFromConfig(config)),

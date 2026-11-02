@@ -16187,6 +16187,933 @@ paths:
                 required:
                   - error
                 additionalProperties: false
+  /teams/{teamId}/payments:
+    get:
+      operationId: listTeamPayments
+      summary: List a team's payments (admin)
+      description: "The team's payments, one page of 50 (`nextCursor` is opaque; pass
+        it back as `cursor`). `status` is `UNPAID` (PENDING and OVERDUE, the
+        default, oldest due first), `PENDING`, `OVERDUE`, `PAID`, `FAILED` or
+        `ALL` (newest due first). Each row carries the payer's display name only
+        (never an email address or a bank detail), the amount, the due and paid
+        instants, `lastReminderAt` (the last manual reminder, derived from the
+        reminder log) and `onHold` (an Akahu attempt is under review).
+        `payoutBlocked` says the team's payout account is blocked. A bad
+        `status`, an unknown query key or an unreadable `cursor` is 422.
+        TEAM_ADMIN of this team, or a GLOBAL_ADMIN (`allowGlobalAdmin` is on). A
+        payment is always resolved together with the team in the path: another
+        team's payment and an unknown id answer the same 404 `not_found`."
+      parameters:
+        - schema:
+            default: UNPAID
+            type: string
+            enum:
+              - UNPAID
+              - PENDING
+              - OVERDUE
+              - PAID
+              - FAILED
+              - ALL
+          in: query
+          name: status
+          required: false
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        reference:
+                          type: string
+                        player:
+                          type: object
+                          properties:
+                            userId:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            fullName:
+                              type: string
+                          required:
+                            - userId
+                            - fullName
+                          additionalProperties: false
+                        sessionStartsAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        amount: {}
+                        status:
+                          type: string
+                          enum:
+                            - PENDING
+                            - PAID
+                            - FAILED
+                            - OVERDUE
+                        dueDate:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        paidAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                        lastReminderAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                        onHold:
+                          type: boolean
+                      required:
+                        - id
+                        - reference
+                        - player
+                        - sessionStartsAt
+                        - amount
+                        - status
+                        - dueDate
+                        - paidAt
+                        - lastReminderAt
+                        - onHold
+                      additionalProperties: false
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
+                  payoutBlocked:
+                    type: boolean
+                required:
+                  - payments
+                  - nextCursor
+                  - payoutBlocked
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/payments/{paymentId}/reminders:
+    post:
+      operationId: sendPaymentReminder
+      summary: Email a player a reminder about an unpaid payment (admin)
+      description: "Enqueues one sealed reminder email to the payer and answers 202 `{
+        sent: true, lastReminderAt }`. The append-only reminder record and the
+        email are written in one transaction. `changeKey` is a UUID v4 the form
+        generates once per render: a replay of a recorded request answers the
+        same 202 and sends nothing (checked first, so even inside the cooldown).
+        409 `payment_settled` for a PAID payment; 409 `reminder_too_soon` within
+        24 hours of the last manual reminder (exactly 24 hours later is
+        allowed); 404 `not_found` for a payment that is not this team's. The
+        body is strict (422 for extra keys or a bad key); the team guard runs
+        before it, so a MEMBER is 403 whatever the body. TEAM_ADMIN of this
+        team, or a GLOBAL_ADMIN (`allowGlobalAdmin` is on). A payment is always
+        resolved together with the team in the path: another team's payment and
+        an unknown id answer the same 404 `not_found`."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                changeKey:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$
+              required:
+                - changeKey
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: paymentId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "202":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: boolean
+                    enum:
+                      - true
+                  lastReminderAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                required:
+                  - sent
+                  - lastReminderAt
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
   /teams/{teamId}/sessions:
     get:
       operationId: listTeamSessions

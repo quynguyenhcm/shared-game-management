@@ -2,10 +2,12 @@
  * Structural guards for money state (wallet-and-akahu-billing; ADR 0020; AC-VERIFY-11, AC-VERIFY-4; CR-5, CR-9, C-ALL-1). The
  * counterpart of `registrations/boundaries.test.ts` for the money tables:
  *
- * - `payments`, `payment_line_items` and `billing_session_blocks` are written only from `modules/billing/engine-repo.ts`.
+ * - `payment_line_items` and `billing_session_blocks` are written only from `modules/billing/engine-repo.ts`; `payments` only from
+ *   there and from `modules/billing/overdue.ts` (the daily job's OVERDUE flip and its minimal PAID apply, until Phase 4's
+ *   `applyAkahuResult` takes over the latter); `payment_reminders` only from `modules/billing/reminders.ts`.
  * - `player_credits` and `credit_transactions` are written only from `modules/wallet/ledger.ts`.
- * - `game_sessions.status = 'COMPLETED'` is written only by the billing engine; `payments.status = 'OVERDUE'` only by the
- *   daily-overdue job (the files below are the allowed paths for the later phases; none exists yet).
+ * - `game_sessions.status = 'COMPLETED'` is written only by the billing engine; `payments.status = 'OVERDUE'` only by
+ *   `modules/billing/overdue.ts` (C-BIL-2: only billing's daily-overdue job writes OVERDUE; the job file is a thin handler).
  * - Billing and the wallet never write `registrations` or `registration_guests` and reach other modules only through their public
  *   files. No billing or wallet code uses floating-point money.
  *
@@ -44,24 +46,32 @@ const writeTo = (tables: readonly string[]): RegExp => {
     'i',
   );
 };
+/** A write that sets a payment to OVERDUE: a query-builder `.set({ status: 'OVERDUE' ...})` or a SQL `SET status = 'OVERDUE'`. */
+const OVERDUE_WRITE = /\.set\(\s*\{\s*status:\s*'OVERDUE'|SET\s+status\s*=\s*'OVERDUE'/i;
 const writers = (pattern: RegExp): string[] =>
   all.filter(({ code }) => pattern.test(code)).map(({ rel }) => rel);
 
 const ENGINE = 'modules/billing/engine-repo.ts';
 const LEDGER = 'modules/wallet/ledger.ts';
-/** Where the daily-overdue job may live (Phase 3); today nothing writes OVERDUE. */
-const OVERDUE_WRITERS = ['jobs/daily-overdue.ts', 'modules/billing/overdue.ts'];
+const OVERDUE = 'modules/billing/overdue.ts';
+const REMINDERS = 'modules/billing/reminders.ts';
 
 describe('single writers of money state', () => {
   it('has the writer files to guard', () => {
     const files = all.map(({ rel }) => rel);
-    expect(files).toEqual(expect.arrayContaining([ENGINE, LEDGER]));
+    expect(files).toEqual(expect.arrayContaining([ENGINE, LEDGER, OVERDUE, REMINDERS]));
   });
 
-  it('payments, payment_line_items and billing_session_blocks are written only from billing/engine-repo.ts', () => {
-    expect(writers(writeTo(['payments', 'payment_line_items', 'billing_session_blocks']))).toEqual([
-      ENGINE,
-    ]);
+  it('payment_line_items and billing_session_blocks are written only from billing/engine-repo.ts', () => {
+    expect(writers(writeTo(['payment_line_items', 'billing_session_blocks']))).toEqual([ENGINE]);
+  });
+
+  it('payments are written only from billing/engine-repo.ts (insert) and billing/overdue.ts (OVERDUE flip, minimal PAID apply)', () => {
+    expect(writers(writeTo(['payments']))).toEqual([ENGINE, OVERDUE]);
+  });
+
+  it('payment_reminders is written only from billing/reminders.ts', () => {
+    expect(writers(writeTo(['payment_reminders']))).toEqual([REMINDERS]);
   });
 
   it('player_credits and credit_transactions are written only from wallet/ledger.ts', () => {
@@ -74,9 +84,10 @@ describe('single writers of money state', () => {
     expect(writers(completes)).toEqual([ENGINE]);
   });
 
-  it('payments become OVERDUE only in the daily-overdue job (none exists yet)', () => {
-    const overdue = /\.set\(\s*\{\s*status:\s*'OVERDUE'|SET\s+status\s*=\s*'OVERDUE'/i;
-    for (const rel of writers(overdue)) expect(OVERDUE_WRITERS).toContain(rel);
+  it('payments become OVERDUE only in billing/overdue.ts (the daily-overdue job body; C-BIL-2, AC-HAPPY-8)', () => {
+    const writes = writers(OVERDUE_WRITE);
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes).toEqual([OVERDUE]);
   });
 
   it('wallet files never touch payments and billing never writes a wallet table (each module owns its tables)', () => {
@@ -88,6 +99,14 @@ describe('single writers of money state', () => {
     for (const { rel, code } of billing) {
       expect(code, rel).not.toMatch(writeTo(['player_credits', 'credit_transactions']));
     }
+  });
+
+  it('detects an OVERDUE write in each shape the code could take (the OVERDUE rule cannot go vacuous)', () => {
+    expect(OVERDUE_WRITE.test(`trx.updateTable('payments').set({ status: 'OVERDUE' })`)).toBe(true);
+    expect(OVERDUE_WRITE.test(`.set({\n status: 'OVERDUE',\n })`)).toBe(true);
+    expect(OVERDUE_WRITE.test(`UPDATE payments SET status = 'OVERDUE'::payment_status`)).toBe(true);
+    expect(OVERDUE_WRITE.test(`.where('status', '=', 'OVERDUE')`)).toBe(false);
+    expect(OVERDUE_WRITE.test(`status: 'OVERDUE' as const`)).toBe(false);
   });
 
   it('detects a violation (the guard itself works)', () => {
@@ -121,7 +140,8 @@ describe('imports of billing and wallet', () => {
       rel.startsWith('modules/billing/') ||
       rel.startsWith('modules/wallet/') ||
       rel === 'jobs/bill-session.ts' ||
-      rel === 'jobs/post-game-billing.ts',
+      rel === 'jobs/post-game-billing.ts' ||
+      rel === 'jobs/daily-overdue.ts',
   );
   const PUBLIC = new Set([
     '../registrations/billing-handoff.ts',
@@ -165,7 +185,8 @@ describe('exact money and observability in billing and wallet code (AC-VERIFY-4,
       rel.startsWith('modules/billing/') ||
       rel.startsWith('modules/wallet/') ||
       rel === 'jobs/bill-session.ts' ||
-      rel === 'jobs/post-game-billing.ts',
+      rel === 'jobs/post-game-billing.ts' ||
+      rel === 'jobs/daily-overdue.ts',
   );
 
   it('uses no floating-point arithmetic or parsing for money', () => {

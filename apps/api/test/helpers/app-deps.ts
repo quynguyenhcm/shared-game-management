@@ -8,6 +8,8 @@ import { createManualClock } from '../../src/lib/clock.ts';
 import { loadConfig, type Config } from '../../src/lib/config/config.ts';
 import { createCrypto, type FieldCrypto } from '../../src/lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
+import { createFakePaymentsGateway } from '../../src/lib/akahu/fake-adapter.ts';
+import type { PaymentsGateway } from '../../src/lib/akahu/gateway.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
@@ -33,6 +35,11 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
 /** Field crypto over the fixed test keyring: the API, the worker and the tests all seal and open with it. */
 export function testCrypto(): FieldCrypto {
   return createCrypto(keyProviderFromConfig(testConfig()));
+}
+
+/** The stateless fake payments gateway (`registerJobs` requires one; most suites never reach it). */
+export function testPaymentsGateway(): PaymentsGateway {
+  return createFakePaymentsGateway();
 }
 
 export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): AppDeps {

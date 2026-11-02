@@ -135,6 +135,28 @@ describe('OpenAPI document', () => {
     }
   });
 
+  it('documents the two admin payment routes with the bearer requirement, the guard answers and their own (billing AC-VERIFY-1)', async () => {
+    const document = (await generateOpenApiDocument()) as unknown as OpenApiDocument;
+    const routes: [string, string, string[]][] = [
+      ['/teams/{teamId}/payments', 'get', ['200', '401', '403', '422']],
+      [
+        '/teams/{teamId}/payments/{paymentId}/reminders',
+        'post',
+        ['202', '401', '403', '404', '409', '422'],
+      ],
+    ];
+    for (const [path, method, codes] of routes) {
+      const operation = operationOf(document, path, method);
+      expect(
+        operation.security?.some((entry) => 'sessionToken' in entry),
+        `${method} ${path}`,
+      ).toBe(true);
+      expect(Object.keys(operation.responses ?? {}), `${method} ${path}`).toEqual(
+        expect.arrayContaining(codes),
+      );
+    }
+  });
+
   it('is built from the shared zod contract: the web api-client and the Fastify routes import the same schemas (AC-VERIFY-8)', async () => {
     const routes = await readFile(new URL('./modules/auth/routes.ts', import.meta.url), 'utf8');
     const client = await readFile(

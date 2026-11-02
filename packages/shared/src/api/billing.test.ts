@@ -129,6 +129,7 @@ describe('action request bodies are strict and carry no money or ownership', () 
       cursor: 'abc',
     });
     expect(failure(AdminPaymentsQuery, { status: 'LATE' })[0]?.path).toEqual(['status']);
+    expect(AdminPaymentsQuery.parse({ status: 'ALL' })).toEqual({ status: 'ALL' });
   });
 });
 

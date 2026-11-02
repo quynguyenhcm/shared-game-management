@@ -658,6 +658,11 @@ export interface PaymentInput {
   /** The snapshotted GST number; defaults to a valid one when `gstRegistered` (the CHECK ties them), NULL otherwise. */
   readonly gstNumber?: string;
   readonly lines?: readonly LineInput[];
+  /** Default 2026-10-10T00:00:00Z (long past, so a daily-overdue run at any later clock sees it due). */
+  readonly dueDate?: Date;
+  /** Default PENDING. PAID gets `paidAt` (default the due date); OVERDUE is the state `daily-overdue` writes. */
+  readonly status?: 'PENDING' | 'PAID' | 'OVERDUE';
+  readonly paidAt?: Date;
 }
 
 const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -674,8 +679,8 @@ export async function insertPaymentRows(db: Queryable, input: PaymentInput): Pro
   const paymentId = await insertId(
     db,
     `INSERT INTO payments (user_id, team_id, registration_id, pricing_structure, gst_registered, gst_rate_bps,
-                           amount, payment_reference, gst_number, due_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '2026-10-10T00:00:00Z') RETURNING id`,
+                           amount, payment_reference, gst_number, due_date, status, paid_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::payment_status, $12) RETURNING id`,
     [
       input.userId,
       input.teamId,
@@ -686,6 +691,11 @@ export async function insertPaymentRows(db: Queryable, input: PaymentInput): Pro
       input.amount,
       paymentReference(),
       gst ? (input.gstNumber ?? '123456789') : null,
+      input.dueDate ?? new Date('2026-10-10T00:00:00Z'),
+      input.status ?? 'PENDING',
+      input.status === 'PAID'
+        ? (input.paidAt ?? input.dueDate ?? new Date('2026-10-10T00:00:00Z'))
+        : null,
     ],
   );
   const lines = input.lines ?? [
@@ -714,6 +724,47 @@ export async function insertPaymentRows(db: Queryable, input: PaymentInput): Pro
 /** Inserts a payment with its lines and commits (deferred line checks run at COMMIT). */
 export function insertPayment(pool: pg.Pool, input: PaymentInput): Promise<string> {
   return inTransaction(pool, (client) => insertPaymentRows(client, input));
+}
+
+export interface AttemptInput {
+  readonly paymentId: string;
+  /** The payment's amount (an attempt pays the stored amount). */
+  readonly amount: string;
+  /** A blocking state; OPEN and HELD walk the legal path (CREATING -> OPEN -> HELD) one UPDATE per step. */
+  readonly status: 'CREATING' | 'OPEN' | 'HELD';
+  /** Required from OPEN on; the fake adapter reads `fake_<scenario>_<cents>_<createdAtMs>_<rand>`. */
+  readonly akahuPaymentId?: string;
+  /** The stored mirror of Akahu's status (`READY`, `AUTHORISED`, ...); default READY for OPEN. */
+  readonly akahuStatus?: string;
+}
+
+/** A syntactically valid sealed authorisation URL (the column CHECK checks the envelope format only). */
+const FAKE_AUTHORISATION_ENVELOPE = 'v1.dev1.AAAAAAAAAAAAAAAA.AAAA.AAAAAAAAAAAAAAAAAAAAAA';
+
+/** A blocking payment attempt (at most one per payment). Returns its id. */
+export async function insertPaymentAttempt(db: Queryable, input: AttemptInput): Promise<string> {
+  const id = await insertId(
+    db,
+    `INSERT INTO payment_attempts (payment_id, idempotency_key, amount) VALUES ($1, $2, $3) RETURNING id`,
+    [input.paymentId, randomUUID(), input.amount],
+  );
+  if (input.status === 'CREATING') return id;
+  if (input.akahuPaymentId === undefined)
+    throw new Error('insertPaymentAttempt: akahuPaymentId required');
+  await db.query(
+    `UPDATE payment_attempts
+        SET status = 'OPEN', akahu_payment_id = $2, akahu_status = $3, authorisation_url_enc = $4,
+            expires_at = now() + interval '30 minutes'
+      WHERE id = $1`,
+    [id, input.akahuPaymentId, input.akahuStatus ?? 'READY', FAKE_AUTHORISATION_ENVELOPE],
+  );
+  if (input.status === 'HELD') {
+    await db.query(
+      `UPDATE payment_attempts SET status = 'HELD', hold_reason = 'INDETERMINATE', held_at = now() WHERE id = $1`,
+      [id],
+    );
+  }
+  return id;
 }
 
 export interface BilledRegistration {

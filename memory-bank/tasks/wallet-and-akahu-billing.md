@@ -631,7 +631,7 @@ Provisional (pending creative): the defaults above. The creative architecture, a
 
 - [x] **Phase 1: Schema, shared contracts and the Akahu port**: the D-87+ migration, regenerated types, zod contracts, transition matrix fixture, due-date rule, error codes, Akahu config (fail-fast, fake refused in production), gateway port with the fake adapter, `LOCK_ORDER` gains the wallet, factories. ACs: AC-VERIFY-2, AC-VERIFY-5 (schema half), AC-VERIFY-8.
 - [x] **Phase 2: Post-game billing engine and wallet ledger**: `post-game-billing` sweep, `bill-session` queue and handler, fee computation from snapshots, payments + line items + GST snapshot, all-or-nothing deduction through `wallet/ledger.ts`, B2/B5/B7/B8/B9, payment-due and low-credit emails, C-BIL-PAY at every creation path (replacing `payment-stand-in.ts` in the gate race), single-writer structural test, ADR 0020 draft. ACs: AC-HAPPY-2, 3, 5, 6, 7, 11, AC-ASYNC-1, AC-ASYNC-4 (billing emails), AC-ERROR-5, 9, AC-VERIFY-3, 4, 5, 6, 11, AC-INTEGRATION-2, AC-INTEGRATION-3 (billing races).
-- [ ] **Phase 3: Overdue job, admin payments list and reminders**: real `daily-overdue` handler, overdue emails, `GET /teams/:teamId/payments`, `POST .../reminders` with B6 cooldown and `changeKey`, route policies, OpenAPI. ACs: AC-HAPPY-8, 10, AC-ERROR-8, AC-VERIFY-1 (these routes), AC-VERIFY-6 (overdue boundary).
+- [x] **Phase 3: Overdue job, admin payments list and reminders**: real `daily-overdue` handler, overdue emails, `GET /teams/:teamId/payments`, `POST .../reminders` with B6 cooldown and `changeKey`, route policies, OpenAPI. ACs: AC-HAPPY-8, 10, AC-ERROR-8, AC-VERIFY-1 (these routes), AC-VERIFY-6 (overdue boundary).
 - [ ] **Phase 4: Akahu flows: top-ups, payment attempts, webhook and reconcile** (follows the Q1 spike and architecture creative): live adapter against recorded fixtures, top-up and attempt routes, `GET /payments/:id`, `GET .../wallet`, `GET .../payments/me`, `POST /webhooks/akahu` with raw-body signature verification, `applyAkahuResult`, payout block (R3), B3 overflow and duplicates, B10 payee at payment time, `akahu-reconcile` queue and slot, payment-received email. ACs: AC-HAPPY-1, 4, 9, 12 (API side), AC-ERROR-1, 2, 3, 4, 6, 7, 10, AC-ASYNC-3, AC-VERIFY-7, AC-INTEGRATION-1, AC-INTEGRATION-3 (Akahu races).
 - [ ] **Phase 5: Web wallet, payment page and Payments manage area** (follows the UI/UX and journey creative docs): team-page wallet line, `/teams/[teamId]/wallet`, `/payments/[paymentId]` with processing states (`RefreshWhilePending`), `/teams/[teamId]/manage/payments` with `ConfirmDisclosure` reminder, `MANAGE_AREAS`, proxy, api-client, Server Actions, debt-block link. ACs: AC-ENTRY-1 to 4, AC-ASYNC-2, web side of AC-HAPPY-1, 4, 9, 10, 12 and AC-ERROR-1, 3, 4, 7.
 - [ ] **Phase 6: E2E, reconciliation CLI, accessibility and docs**: `apps/web/e2e/billing.spec.ts` on both viewports with axe, `cli billing reconcile`, coverage gate, ADR 0020 final, operations guide in `docs/getting-started.md`, `systemPatterns.md`/`techContext.md`/`productBrief.md` updates, sandbox smoke test checklist. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-9, 10, 12, AC-INTEGRATION-4.
@@ -725,13 +725,13 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: RUNNING (auto-build; Phase 2 of 6 complete; Phase 3 next)
+**Build Status**: RUNNING (auto-build; Phase 3 of 6 complete; Phases 2-3 scope done, halt before Phase 4)
 **Auto-Build Mode**: YES
 **Auto-Build Scope**: Phases 2-3 only. Halt before Phase 4: Akahu MVE-001 answer, MVE-002 credentials and MVE-005 fixture not yet received (human, 2026-11-03).
 **Current Build**: none
-**Last Completed**: Phase 2 of 6: Post-game billing engine and wallet ledger (2026-11-03)
+**Last Completed**: Phase 3 of 6: Overdue job, admin payments list and reminders (2026-11-03)
 **Current Phase**: BUILD (between phases)
-**Current Step**: Phase 2 committed; next /yay:build wallet-and-akahu-billing (Phase 3)
+**Current Step**: Phase 3 committed; Phase 4 gated on Akahu (human)
 **Can Resume**: NO
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
@@ -755,12 +755,19 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Auto-build pre-flight (2026-11-03): H2 ruled (payee-team admins or GLOBAL_ADMIN resolve holds), H3 approved; run scoped to Phases 2-3 pending Akahu.
 - Phase 1 BUILD: COMPLETE (2026-11-02) - migration 20261102000100000_wallet_and_billing.sql (D-87..D-98), LOCK_ORDER (CR-4), shared contracts + matrices, error codes, factories, lib/akahu port + fake + status + webhook signature + key cache + payee, config fail-fast (PAYMENTS_ADAPTER), redaction. Unit 2457, integration 879 passing; typecheck, lint, build, openapi drift clean. Code review: codex companion direct, 3 P2 fixed (terminal UNAPPLIED needs closed_at; billing_session_blocks composite FK to game_sessions (id, team_id); payout_block_events.akahu_payment_id format CHECK).
 - Phase 2 BUILD: COMPLETE (2026-11-03) - billing engine (modules/billing), wallet ledger (modules/wallet), post-game-billing sweep + bill-session job, stand-in replaced by real C-BIL-PAY, ADR 0020 draft. Unit 2505, integration 923, coverage run 3428 passing; typecheck, lint, build, openapi drift clean. Code review: codex companion direct, 1 P1 fixed (bill-session handler rethrew the driver error / cause to the job runner's generic logger; now throws a sanitized error carrying only class and SQLSTATE).
+- Phase 3 BUILD: COMPLETE (2026-11-03) - daily-overdue job (modules/billing/overdue.ts, CR-27/H1), GET /teams/:teamId/payments, POST .../reminders (append-only payment_reminders, 24 h cooldown, changeKey replay), overdue + reminder emails, boundaries test made real, OpenAPI regenerated. Unit 2529, integration 963 passing; typecheck, lint, build clean. Code review: codex companion direct, P2 fixed (reminder refused 409 payment_on_hold when an attempt is HELD), P1 deferred (see Deviations).
 
 ### Deviations
 <!-- Auto-build ledger: - Phase <N> | <file:line/artifact> | <rationale> -->
 - Phase 2 | apps/api/test/integration/team-banking-gate.int.test.ts | AC-VERIFY-3 "removal commits first, billing inserts nothing" is proven via a committed payout block (B8 hold), because the publish gate refuses banking removal (409 banking_in_use) while a paid PUBLISHED session exists, so the literal ordering is unreachable. Accepted by phase reviewer.
 - Phase 2 | apps/api/src/modules/billing/boundaries.test.ts:77 | "OVERDUE only by daily-overdue" grep test is a placeholder until Phase 3 adds the job. Phase 3 must make it real.
-- Phase 2 | AC-VERIFY-6 | Only the billing half covered (ends_at boundary, 72 h across DST end); the due_date overdue boundary is Phase 3.
+- Phase 2 | AC-VERIFY-6 | Only the billing half covered (ends_at boundary, 72 h across DST end); the due_date overdue boundary is Phase 3. RESOLVED in Phase 3 (billing-overdue.int.test.ts, incl. DST).
+- Phase 3 | boundaries.test.ts OVERDUE placeholder | RESOLVED: now asserts the only OVERDUE writer is modules/billing/overdue.ts.
+- Phase 3 | modules/billing/overdue.ts minimal apply | No applyAkahuResult exists yet, so a fresh SENT with matching amount is applied minimally (attempt APPLIED, payment PAID, no email); amount mismatch sets attempt HELD(AMOUNT_MISMATCH). Phase 4's apply function must replace this (and add the payment-received email).
+- Phase 3 | modules/billing/overdue.ts NOT_CHARGED | A fresh NOT_CHARGED is skipped this run only when the stored mirror was AUTHORISED/SUBMITTED/SETTLEMENT_IN_PROGRESS (Phase 4 owns the 24 h grace write); otherwise the payment is flipped. INDETERMINATE skipped untouched. The port has no 429 signal, so any GatewayUnavailableError defers that payment (no run-wide stop).
+- Phase 3 | packages/shared/src/api/billing.ts | AdminPaymentsQuery.status gains 'ALL' (AC-ENTRY-3 "All" filter) and TeamPaymentParams was added.
+- Phase 3 | billing/service.ts sendReminder | Codex P1 deferred: the actor's team role is checked by the route policy (onRequest), not re-checked inside the reminder transaction, the same pattern as the other team routes. Window is one request; revisit if a demotion race matters.
+- Phase 3 | worker.ts / jobs/bootstrap.ts | registerJobs now requires paymentsGateway (fake outside production; production still cannot boot until Phase 4, see Phase 1 Notes).
 
 ### Phase 1 Notes for later phases
 - Production cannot boot until Phase 4: `PAYMENTS_ADAPTER=fake` is refused in production and `akahu` refuses boot (CR-12/A6 read literally). `apps/api/Dockerfile` sets NODE_ENV=production and `cli.ts` loads config, so a production image fails until the live adapter ships; compose/dev/CI/E2E are unaffected. `cli-guards.test.ts` accepts either refusal for the NODE_ENV=production case. Revisit if a deploy is needed before Phase 4.
@@ -776,6 +783,14 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Phases 3-4 must add their payment writers to the allow lists in `modules/billing/boundaries.test.ts`.
 - Verification notes: run unit and integration suites sequentially (concurrent runs cause timing failures in schedules.test.ts and time.test.ts); integration needs inline env (DATABASE_URL, ENCRYPTION_*, etc.). The first full integration run had load flakes in registrations-http-races and teams-api (503s under contention; both pass alone and on rerun, files untouched by Phase 2).
 
+### Phase 3 Notes for later phases
+- Phase 4's `applyAkahuResult` must absorb the overdue job's minimal SENT apply and own the 24 h grace write (CR-27) when an attempt closes after authorisation or a hold is released NOT_RECEIVED. `daily-overdue` respects the stored `due_date` and never writes grace.
+- Reminders are refused with 409 `payment_on_hold` while an attempt is HELD (CR-18); the web "Send reminder" button must be hidden for held payments and for payout-blocked teams (`AdminPaymentsResponse.payoutBlocked`, per-row `onHold`).
+- `payments` writers allow list is [engine-repo.ts, overdue.ts]; Phase 4 adds apply-akahu-result.ts. `payment_reminders` is written only from reminders.ts.
+- Admin list ordering: oldest-due-first for unpaid, newest-first for PAID/ALL; page size 50; opaque cursor on (due_date, id).
+- `registerJobs` takes `paymentsGateway`; Phase 4's akahu-sync/reconcile handlers reuse it. daily-overdue is also enqueued at worker boot.
+
 ### Guard & Recovery Log
 - Phase 1: commit guard PASS first try (see commit); no recovery needed. Verifier subagent reverted a tracked apps/api/openapi.yaml to HEAD mid-run; orchestrator regenerated it (seam check) before commit.
 - Phase 2: earlier verifier attempt stopped (parallel suites caused timing failures); orchestrator re-ran suites sequentially. Commit guard result recorded in commit.
+- Phase 3: commit guard result recorded in commit. TDD agent was launched async rather than blocking; completion arrived by message, verification run by the orchestrator sequentially.

@@ -32,6 +32,8 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import { billingRoutes } from './modules/billing/routes.ts';
+import { createBillingService } from './modules/billing/service.ts';
 import { registrationsRoutes } from './modules/registrations/routes.ts';
 import { createRegistrationsService } from './modules/registrations/service.ts';
 import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
@@ -205,6 +207,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     service: createRegistrationsService({
       db: deps.db,
       clock: deps.clock,
+      jobs: deps.jobs,
+      webBaseUrl: deps.auth.webBaseUrl,
+    }),
+  });
+  // wallet-and-akahu-billing: the team admin's payments list and the manual reminder (`/teams/:teamId/payments...`).
+  await app.register(billingRoutes, {
+    prefix: '/teams',
+    service: createBillingService({
+      db: deps.db,
+      clock: deps.clock,
+      crypto: deps.crypto,
       jobs: deps.jobs,
       webBaseUrl: deps.auth.webBaseUrl,
     }),

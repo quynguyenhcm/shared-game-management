@@ -19,7 +19,7 @@ import {
   type EmailMessage,
   type Notifier,
 } from '../../src/lib/notifications/notifier.ts';
-import { TEST_WEB_BASE_URL, testCrypto } from '../helpers/app-deps.ts';
+import { TEST_WEB_BASE_URL, testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
 import {
   bearer,
   buildAuthTestApp,
@@ -90,6 +90,7 @@ beforeAll(async () => {
   await producer.start();
   await worker.start();
   await registerJobs({
+    paymentsGateway: testPaymentsGateway(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

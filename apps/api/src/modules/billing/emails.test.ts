@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseMoney } from '@sgm/shared';
-import { buildBillingPausedEmail, buildLowCreditEmail, buildPaymentDueEmail } from './emails.ts';
+import {
+  buildBillingPausedEmail,
+  buildLowCreditEmail,
+  buildOverdueEmail,
+  buildPaymentDueEmail,
+  buildReminderEmail,
+} from './emails.ts';
 
 const WEB = 'https://games.example.nz';
 // 2026-10-07 19:00 in Auckland (UTC+13 in NZDT).
@@ -102,5 +108,79 @@ describe('billing paused email (journey email 11, B8)', () => {
     expect(email.text).toContain(`${WEB}/teams/team-1/manage/banking`);
     expect(email.idempotencyKey).toBe('billing-paused:sess-1:admin-1');
     expect(email.tags).toEqual({ template: 'billing-paused' });
+  });
+});
+
+describe('overdue email (journey email 3)', () => {
+  const overdue = {
+    ...base,
+    paymentId: 'pay-1',
+    amount: parseMoney('17.00'),
+    dueDate: DUE,
+    overdueCount: 1,
+  } as const;
+
+  it('states the amount and due instant, links our payment page and never an Akahu URL or bank detail', () => {
+    const email = buildOverdueEmail(overdue);
+    expect(email.to).toBe('sam@example.test');
+    expect(email.subject).toBe('Overdue: Tuesday Smashers, $17.00');
+    expect(email.text).toContain(
+      'Your payment of $17.00 for Test Hall on Wed 7 Oct was due by Sat 10 Oct, 7:12 pm and has',
+    );
+    expect(email.text).toContain(`${WEB}/payments/pay-1`);
+    expect(email.text).not.toMatch(/akahu/i);
+    expect(email.text).not.toMatch(/\b\d{2}-\d{4}-\d{7}-\d{2,3}\b/);
+    expect(email.idempotencyKey).toBe('payment-overdue:pay-1');
+    expect(email.tags).toEqual({ template: 'payment-overdue' });
+  });
+
+  it('folds user-entered text onto one line so it cannot forge lines or subject text', () => {
+    const email = buildOverdueEmail({
+      ...overdue,
+      teamName: 'A\r\nBcc: x@y.test',
+      firstName: 'Sam\nEvil',
+    });
+    expect(email.subject).not.toMatch(/[\r\n]/);
+    expect(email.text).toContain('Hi Sam Evil,');
+    expect(email.text).not.toContain('\nBcc:');
+  });
+
+  it('adds the registration-block line only at 3 or more overdue payments', () => {
+    expect(buildOverdueEmail(overdue).text).not.toContain('so you can');
+    const blocked = buildOverdueEmail({ ...overdue, overdueCount: 3 });
+    expect(blocked.text).toContain(
+      "You have 3 overdue payments, so you can't register for new sessions right now.",
+    );
+    expect(blocked.text).toContain(`${WEB}/payments`);
+  });
+});
+
+describe('manual reminder email (journey email 4)', () => {
+  const reminder = {
+    ...base,
+    paymentId: 'pay-1',
+    changeKey: 'key-1',
+    amount: parseMoney('17.00'),
+    dueDate: DUE,
+    overdue: false,
+  } as const;
+
+  it('says the team asked for it, links our payment page and carries the changeKey key', () => {
+    const email = buildReminderEmail(reminder);
+    expect(email.subject).toBe('Reminder: $17.00 for Tuesday Smashers, Wed 7 Oct');
+    expect(email.text).toContain(
+      'Tuesday Smashers asked us to remind you about your payment of $17.00 for Test Hall on Wed 7 Oct.',
+    );
+    expect(email.text).toContain("It's due by Sat 10 Oct, 7:12 pm.");
+    expect(email.text).toContain(`${WEB}/payments/pay-1`);
+    expect(email.text).not.toMatch(/akahu/i);
+    expect(email.idempotencyKey).toBe('payment-reminder:pay-1:key-1');
+    expect(email.tags).toEqual({ template: 'payment-reminder' });
+  });
+
+  it('says it is now overdue when it is', () => {
+    expect(buildReminderEmail({ ...reminder, overdue: true }).text).toContain(
+      'It was due by Sat 10 Oct, 7:12 pm and is now overdue.',
+    );
   });
 });

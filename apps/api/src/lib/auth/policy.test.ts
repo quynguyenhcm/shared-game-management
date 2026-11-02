@@ -153,9 +153,9 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 37 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
-    // + four registration routes, asserted below), none public.
-    expect(byRoute.size).toBe(37);
+    // Exactly the 39 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
+    // + four registration routes + two billing routes, both asserted below), none public.
+    expect(byRoute.size).toBe(39);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });
@@ -187,6 +187,27 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     );
     expect(underSessionId.length).toBeGreaterThan(0);
     for (const route of underSessionId) expect(route, route).toContain('/teams/:teamId/sessions/');
+    await app.close();
+  });
+
+  it('declares teamRole TEAM_ADMIN WITH the global-admin bypass on the two admin payment routes (billing AC-VERIFY-1)', async () => {
+    const app = await buildApp(inertAppDeps(logger));
+    const byRoute = new Map(
+      listRoutePolicies(app)
+        .filter((entry) => entry.method !== 'HEAD' && entry.url.startsWith('/teams'))
+        .map((entry) => [`${entry.method} ${entry.url}`, entry.policy]),
+    );
+    for (const route of [
+      'GET /teams/:teamId/payments',
+      'POST /teams/:teamId/payments/:paymentId/reminders',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({
+        kind: 'teamRole',
+        role: 'TEAM_ADMIN',
+        teamIdParam: 'teamId',
+        allowGlobalAdmin: true,
+      });
+    }
     await app.close();
   });
 

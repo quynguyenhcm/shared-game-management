@@ -64,7 +64,7 @@ export default defineConfig({
         // wallet-and-akahu-billing: the billing engine, the wallet ledger, the billing jobs, the Akahu port and its fake, and the
         // shared billing rules (due date, status matrices, wallet limits).
         'apps/api/src/modules/{billing,wallet}/**/*.ts',
-        'apps/api/src/jobs/{bill-session,post-game-billing}.ts',
+        'apps/api/src/jobs/{bill-session,post-game-billing,daily-overdue}.ts',
         'apps/api/src/lib/akahu/**/*.ts',
         'packages/shared/src/billing/**/*.ts',
         'apps/web/src/lib/**/*.ts',

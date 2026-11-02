@@ -117,11 +117,18 @@ export const PayoutBlockRequest = z.strictObject({
 });
 export type PayoutBlockRequest = z.infer<typeof PayoutBlockRequest>;
 
+/** `:teamId` and `:paymentId` of the team-scoped payment routes: a payment is always resolved together with its team. */
+export const TeamPaymentParams = z.object({ teamId: z.uuid(), paymentId: z.uuid() });
+export type TeamPaymentParams = z.infer<typeof TeamPaymentParams>;
+
 const cursor = z.string().min(1).max(512);
 
-/** `GET /teams/:teamId/payments?status=&cursor=`: "UNPAID" is PENDING and OVERDUE (the default). */
+/**
+ * `GET /teams/:teamId/payments?status=&cursor=`: "UNPAID" is PENDING and OVERDUE (the default), "ALL" is every status (the
+ * manage page's "Unpaid", "Paid" and "All" filters, AC-ENTRY-3).
+ */
 export const AdminPaymentsQuery = z.strictObject({
-  status: z.enum(['UNPAID', 'PENDING', 'OVERDUE', 'PAID', 'FAILED']).default('UNPAID'),
+  status: z.enum(['UNPAID', 'PENDING', 'OVERDUE', 'PAID', 'FAILED', 'ALL']).default('UNPAID'),
   cursor: cursor.optional(),
 });
 export type AdminPaymentsQuery = z.infer<typeof AdminPaymentsQuery>;

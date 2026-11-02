@@ -22,7 +22,7 @@ import { createJobRunner, type JobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 import { runSessionAutoEnrol } from '../../src/modules/sessions/auto-enrol.ts';
 import { createSessionAllocator } from '../../src/session-allocator.ts';
-import { TEST_WEB_BASE_URL, testCrypto } from '../helpers/app-deps.ts';
+import { TEST_WEB_BASE_URL, testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
@@ -149,6 +149,7 @@ describe('(1) a session pending under the no-op is enrolled by the recurrence sw
     });
     await worker.start();
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
       runner: worker,
       notifier,
       crypto: testCrypto(),

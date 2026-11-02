@@ -12,7 +12,7 @@ import { createJobRunner, type JobContext, type JobRunner } from '../../src/lib/
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 import { insertAuthSession, insertResetToken, insertUser } from '../helpers/factories.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
 import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
@@ -236,6 +236,7 @@ describe('auth-cleanup queue (production wiring)', () => {
     await worker.start();
     await producer.start();
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
       sessionAllocator: noopSessionAllocator,
       webBaseUrl: 'https://app.example.test',
       runner: worker,

@@ -89,10 +89,12 @@ describe('recurrence-rule handler (AC-ERROR-9)', () => {
 describe('boot sweep (AC-ASYNC-5)', () => {
   const logger = { info: vi.fn(), warn: vi.fn() };
 
-  it('queues the recurrence-materialisation sweep, the ban reconciliation and the post-game billing sweep once each', async () => {
+  it('queues the recurrence-materialisation sweep, the ban reconciliation, the post-game billing sweep and daily-overdue once each', async () => {
     const enqueue = vi.fn().mockResolvedValue('job-1');
     await enqueueBootSweeps({ enqueue }, logger);
-    expect(enqueue).toHaveBeenCalledTimes(3);
+    expect(enqueue).toHaveBeenCalledTimes(4);
+    // wallet-and-akahu-billing CR-13 / RF-11: a worker that was down across 04:00 marks the overdue payments at once.
+    expect(enqueue).toHaveBeenCalledWith('daily-overdue', { source: 'boot' });
     // wallet-and-akahu-billing CR-13: a worker that was down for days bills the backlog at the first boot (B9).
     expect(enqueue).toHaveBeenCalledWith('post-game-billing', { source: 'boot' });
     expect(enqueue).toHaveBeenCalledWith('recurrence-materialisation', { source: 'boot' });
@@ -115,6 +117,10 @@ describe('boot sweep (AC-ASYNC-5)', () => {
       expect.objectContaining({ event: 'billing.sweep.boot_failed' }),
       expect.any(String),
     );
-    expect(enqueue).toHaveBeenCalledTimes(3);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'billing.overdue.boot_failed' }),
+      expect.any(String),
+    );
+    expect(enqueue).toHaveBeenCalledTimes(4);
   });
 });

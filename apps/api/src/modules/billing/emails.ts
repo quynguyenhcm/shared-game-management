@@ -1,6 +1,7 @@
 /**
- * The billing emails `bill-session` enqueues in its own transaction (P5): payment due (journey email 1), low credit (email 2)
- * and billing paused (email 11, B8). Plain text; the copy is the user-journey doc's. Rules shared by all of them:
+ * The billing emails enqueued in the transaction that causes them (P5): payment due (journey email 1), low credit (email 2) and
+ * billing paused (email 11, B8) by `bill-session`; overdue (email 3) by `daily-overdue`; the manual reminder (email 4) by the
+ * reminder route. Plain text; the copy is the user-journey doc's. Rules shared by all of them:
  *
  * - Every link is our own web origin plus a path, never an Akahu URL (A5); the payment link is the authenticated, payer-only
  *   `/payments/<id>` page (CR-7).
@@ -157,5 +158,94 @@ export function buildBillingPausedEmail(input: BillingPausedEmailInput): EmailMe
     text,
     idempotencyKey: `billing-paused:${input.sessionId}:${input.adminId}`,
     tags: { template: 'billing-paused' },
+  };
+}
+
+export interface OverdueEmailInput extends SessionFacts {
+  readonly to: string;
+  readonly firstName: string;
+  readonly paymentId: string;
+  readonly amount: Money;
+  readonly dueDate: Date;
+  /** The payer's OVERDUE payments across every team after this transition (3 or more blocks registering). */
+  readonly overdueCount: number;
+}
+
+/** The "due by" instant as the player reads it: `Sat 10 Oct, 7:12 pm` (Pacific/Auckland). */
+const dueText = (dueDate: Date): string => `${formatNzDay(dueDate)}, ${formatNzTime(dueDate)}`;
+
+/** Journey email 3: sent once, in the transaction that moves the payment PENDING -> OVERDUE. */
+export function buildOverdueEmail(input: OverdueEmailInput): EmailMessage {
+  const team = fold(input.teamName);
+  const amount = formatNZD(input.amount);
+  const blockedLines =
+    input.overdueCount >= 3
+      ? [
+          `You have ${input.overdueCount} overdue payments, so you can't register for new sessions right now. See them all:`,
+          `${input.webBaseUrl}/payments`,
+        ]
+      : [];
+  const text = [
+    `Hi ${fold(input.firstName)},`,
+    '',
+    `Your payment of ${amount} for ${fold(input.location)} on ${formatNzDay(input.startsAt)} was due by ${dueText(input.dueDate)} and hasn't been paid.`,
+    '',
+    'Pay now:',
+    `${input.webBaseUrl}/payments/${input.paymentId}`,
+    '',
+    "Players with 3 or more overdue payments, across all their teams, can't register for new sessions until they pay.",
+    ...blockedLines,
+    '',
+    SIGN_OFF,
+    '',
+  ].join('\n');
+  return {
+    to: input.to,
+    subject: `Overdue: ${team}, ${amount}`,
+    text,
+    idempotencyKey: `payment-overdue:${input.paymentId}`,
+    tags: { template: 'payment-overdue' },
+  };
+}
+
+export interface ReminderEmailInput extends SessionFacts {
+  readonly to: string;
+  readonly firstName: string;
+  readonly paymentId: string;
+  /** The request's `changeKey`: one reminder per key, so a replay enqueues the same idempotency key. */
+  readonly changeKey: string;
+  readonly amount: Money;
+  readonly dueDate: Date;
+  /** True when the payment is OVERDUE or its due instant has passed. */
+  readonly overdue: boolean;
+}
+
+/** Journey email 4: an admin asked for a reminder. Never names the admin, and carries no bank detail. */
+export function buildReminderEmail(input: ReminderEmailInput): EmailMessage {
+  const team = fold(input.teamName);
+  const amount = formatNZD(input.amount);
+  const day = formatNzDay(input.startsAt);
+  const text = [
+    `Hi ${fold(input.firstName)},`,
+    '',
+    `${team} asked us to remind you about your payment of ${amount} for ${fold(input.location)} on ${day}.`,
+    input.overdue
+      ? `It was due by ${dueText(input.dueDate)} and is now overdue.`
+      : `It's due by ${dueText(input.dueDate)}.`,
+    '',
+    'Pay now:',
+    `${input.webBaseUrl}/payments/${input.paymentId}`,
+    '',
+    'If you paid in the last few minutes, you can ignore this email.',
+    '',
+    SIGN_OFF,
+    '',
+  ].join('\n');
+  return {
+    to: input.to,
+    subject: `Reminder: ${amount} for ${team}, ${day}`,
+    text,
+    idempotencyKey: `payment-reminder:${input.paymentId}:${input.changeKey}`,
+    tags: { template: 'payment-reminder' },
   };
 }
