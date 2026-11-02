@@ -46,7 +46,11 @@ describe('db rollback guard', () => {
       },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('db rollback is refused when NODE_ENV=production');
+    // Until the live Akahu adapter ships (Phase 4) a production config is refused at load (fake refused, akahu
+    // unavailable), before the rollback guard runs; either refusal is "exit 1 before touching the database".
+    expect(result.stderr).toMatch(
+      /db rollback is refused when NODE_ENV=production|PAYMENTS_ADAPTER — /,
+    );
     expect(result.stderr).not.toContain('failed:');
   });
 });

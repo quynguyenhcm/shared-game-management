@@ -85,6 +85,46 @@ export const FeeBasis = [
 ] as const;
 export type FeeBasis = (typeof FeeBasis)[number];
 
+/**
+ * wallet-and-akahu-billing CR-1: the lifecycle of one Akahu payment intent, shared by `payment_attempts` and
+ * `wallet_top_ups`. CREATING, OPEN and HELD block a new intent for the same payment or wallet.
+ */
+export const PaymentIntentStatus = [
+  'CREATING',
+  'OPEN',
+  'HELD',
+  'APPLIED',
+  'UNAPPLIED',
+  'CLOSED',
+] as const;
+export type PaymentIntentStatus = (typeof PaymentIntentStatus)[number];
+
+/** Why an intent is HELD (CR-2, CR-26): an indeterminate bank error, or a SENT amount that differs from ours. */
+export const PaymentHoldReason = ['INDETERMINATE', 'AMOUNT_MISMATCH'] as const;
+export type PaymentHoldReason = (typeof PaymentHoldReason)[number];
+
+/** Why a SENT payment could not be absorbed (B3): over the wallet cap, a duplicate, late, or a mismatched amount. */
+export const PaymentUnappliedReason = ['OVER_CAP', 'DUPLICATE', 'LATE', 'AMOUNT_MISMATCH'] as const;
+export type PaymentUnappliedReason = (typeof PaymentUnappliedReason)[number];
+
+/** How a GLOBAL_ADMIN resolved a HELD intent (CR-15, CR-26); no free text. */
+export const PaymentResolutionReason = [
+  'RECEIVED',
+  'AMOUNT_MISMATCH',
+  'NOT_RECEIVED_INDETERMINATE',
+  'NOT_RECEIVED_NOT_SENT',
+] as const;
+export type PaymentResolutionReason = (typeof PaymentResolutionReason)[number];
+
+/** Why a GLOBAL_ADMIN marked a team's payout destination as blocked (A3, CR-14); no free text. */
+export const PayoutBlockReason = [
+  'AKAHU_REPORTED_ACCOUNT_PROBLEM',
+  'FUNDS_RETURNED',
+  'TEAM_REQUESTED',
+  'OTHER',
+] as const;
+export type PayoutBlockReason = (typeof PayoutBlockReason)[number];
+
 /** Every public PostgreSQL enum type, keyed by its DB name. */
 export const DB_ENUMS = {
   user_sex: UserSex,
@@ -104,4 +144,9 @@ export const DB_ENUMS = {
   credit_transaction_type: CreditTransactionType,
   auth_provider: AuthProvider,
   fee_basis: FeeBasis,
+  payment_intent_status: PaymentIntentStatus,
+  payment_hold_reason: PaymentHoldReason,
+  payment_unapplied_reason: PaymentUnappliedReason,
+  payment_resolution_reason: PaymentResolutionReason,
+  payout_block_reason: PayoutBlockReason,
 } as const satisfies Readonly<Record<string, readonly string[]>>;

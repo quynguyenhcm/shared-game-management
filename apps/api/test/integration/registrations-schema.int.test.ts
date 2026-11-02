@@ -636,11 +636,12 @@ describe('migrate, rollback, migrate round trip (AC-VERIFY-2)', () => {
       expect(latest.some((line) => line.includes('registrations_guard_update'))).toBe(true);
       expect(latest.some((line) => line.includes('fee_due'))).toBe(true);
 
-      // The O8 backlog migration (D-86) sits on top; the lifecycle migration is the second one back.
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
-      expect(reverted).toHaveLength(2);
-      expect(reverted[0]).toContain('auto_enrol_silent_backlog');
-      expect(reverted[1]).toContain('registration_lifecycle');
+      // The billing migration (D-87..D-98) and the O8 backlog migration (D-86) sit on top; the lifecycle migration is third back.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 3 });
+      expect(reverted).toHaveLength(3);
+      expect(reverted[0]).toContain('wallet_and_billing');
+      expect(reverted[1]).toContain('auto_enrol_silent_backlog');
+      expect(reverted[2]).toContain('registration_lifecycle');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'registrations_guard_update',
@@ -756,8 +757,11 @@ describe('O8: the silent auto-enrol backlog migration (D-86)', () => {
         ),
       ).toContain('auto_enrol_notify');
 
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 1 });
-      expect(reverted).toEqual([expect.stringContaining('auto_enrol_silent_backlog')]);
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 2 });
+      expect(reverted).toEqual([
+        expect.stringContaining('wallet_and_billing'),
+        expect.stringContaining('auto_enrol_silent_backlog'),
+      ]);
       const before = await catalogSnapshot(empty.pool);
       expect(before.filter((line) => line.includes('auto_enrol_notify'))).toEqual([]);
 

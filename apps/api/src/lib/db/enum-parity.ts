@@ -26,4 +26,9 @@ export type EnumParity = [
   Assert<Equal<Generated.CreditTransactionType, Shared.CreditTransactionType>>,
   Assert<Equal<Generated.AuthProvider, Shared.AuthProvider>>,
   Assert<Equal<Generated.FeeBasis, Shared.FeeBasis>>,
+  Assert<Equal<Generated.PaymentIntentStatus, Shared.PaymentIntentStatus>>,
+  Assert<Equal<Generated.PaymentHoldReason, Shared.PaymentHoldReason>>,
+  Assert<Equal<Generated.PaymentUnappliedReason, Shared.PaymentUnappliedReason>>,
+  Assert<Equal<Generated.PaymentResolutionReason, Shared.PaymentResolutionReason>>,
+  Assert<Equal<Generated.PayoutBlockReason, Shared.PayoutBlockReason>>,
 ];

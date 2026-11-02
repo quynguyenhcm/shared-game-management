@@ -400,4 +400,51 @@ describe('auth log hygiene (AC-VERIFY-6)', () => {
     expect(serialised).not.toContain('AUTH-CODE-1');
     expect(serialised).toContain('provider request failed');
   });
+
+  it('redacts the Akahu webhook signature headers and the payment link and payee keys at any depth (wallet-and-akahu-billing A4)', () => {
+    const sink = capture();
+    const logger = createLogger({ ...baseOptions, redactPatterns: [] }, sink.stream);
+    logger.info(
+      {
+        req: {
+          method: 'POST',
+          url: '/webhooks/akahu',
+          headers: {
+            'x-akahu-payments-signature': 'signature-secret-1',
+            'x-akahu-payments-signing-key': 'signing-key-secret-2',
+            accept: 'application/json',
+          },
+        },
+        authorisationUrl: 'https://secret-link-3.example/pay',
+        payeeAccountNumber: 'secret-number-4',
+        payeeName: 'secret-name-5',
+        nested: { authorisationUrl: 'secret-link-6', payeeName: 'secret-name-7' },
+        akahuPaymentId: 'pay_1',
+        payeeAccountLast4: '6700',
+        providerStatus: 'SENT',
+      },
+      'akahu',
+    );
+    logger.child({ payeeName: 'secret-name-8' }).info('child binding');
+    const lines = sink.lines();
+    const serialised = JSON.stringify(lines);
+    for (const secret of [
+      'signature-secret-1',
+      'signing-key-secret-2',
+      'secret-link-3',
+      'secret-number-4',
+      'secret-name-5',
+      'secret-link-6',
+      'secret-name-7',
+      'secret-name-8',
+    ]) {
+      expect(serialised).not.toContain(secret);
+    }
+    expect(serialised).toContain('application/json');
+    expect(lines[0]).toMatchObject({
+      akahuPaymentId: 'pay_1',
+      payeeAccountLast4: '6700',
+      providerStatus: 'SENT',
+    });
+  });
 });

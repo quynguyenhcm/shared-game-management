@@ -44,8 +44,8 @@ describe('payment team routing (AC-VERIFY-8)', () => {
     await expectPgError(
       db.pool.query(
         `INSERT INTO payments (user_id, team_id, registration_id, pricing_structure, gst_registered, gst_rate_bps,
-                               amount, payment_link_token, due_date)
-         VALUES ($1, NULL, $2, 'FLAT', true, 1500, '17.00', 'link-no-team', now())`,
+                               amount, payment_reference, gst_number, due_date)
+         VALUES ($1, NULL, $2, 'FLAT', true, 1500, '17.00', 'SGM0000NTMX', '123456789', now())`,
         [userId, registrationId],
       ),
       '23502',

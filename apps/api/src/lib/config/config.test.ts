@@ -42,6 +42,12 @@ function issuesFor(env: NodeJS.ProcessEnv): readonly string[] {
   throw new Error('expected loadConfig to throw');
 }
 
+/** Production cannot boot in this build (fake refused, akahu unavailable until Phase 4): drop those issues. */
+const PAYMENTS_ISSUE = /PAYMENTS_ADAPTER/;
+function productionIssuesFor(env: NodeJS.ProcessEnv): readonly string[] {
+  return issuesFor(env).filter((issue) => !PAYMENTS_ISSUE.test(issue));
+}
+
 describe('loadConfig', () => {
   it('returns typed config with defaults for a valid environment', () => {
     const config = loadConfig(validEnv());
@@ -166,8 +172,7 @@ describe('configuration edge cases', () => {
   });
 
   it('accepts sslmode=require in production', () => {
-    const config = loadConfig(productionEnv());
-    expect(config.nodeEnv).toBe('production');
+    expect(productionIssuesFor(productionEnv())).toEqual([]);
   });
 
   it('loadConfigOrExit prints value-free issues to stderr and exits 1', () => {
@@ -338,17 +343,19 @@ describe('auth configuration (AC-VERIFY-7)', () => {
       expect(issues).toEqual([expect.stringContaining('Invalid configuration: WEB_BASE_URL — ')]);
       expect(issues.join('\n')).not.toContain('secret-host');
     }
-    expect(issuesFor(productionEnv({ WEB_BASE_URL: 'http://games.example.nz' }))).toEqual([
-      expect.stringContaining('WEB_BASE_URL — must use https in production'),
-    ]);
+    expect(productionIssuesFor(productionEnv({ WEB_BASE_URL: 'http://games.example.nz' }))).toEqual(
+      [expect.stringContaining('WEB_BASE_URL — must use https in production')],
+    );
     // The API has no localhost exception: only the web does.
-    expect(issuesFor(productionEnv({ WEB_BASE_URL: 'http://localhost:3000' }))).toEqual([
+    expect(productionIssuesFor(productionEnv({ WEB_BASE_URL: 'http://localhost:3000' }))).toEqual([
       expect.stringContaining('WEB_BASE_URL — must use https in production'),
     ]);
-    expect(issuesFor(productionEnv({ WEB_BASE_URL: undefined }))).toEqual([
+    expect(productionIssuesFor(productionEnv({ WEB_BASE_URL: undefined }))).toEqual([
       expect.stringContaining('WEB_BASE_URL — is required'),
     ]);
-    expect(loadConfig(productionEnv()).auth.webBaseUrl).toBe('https://games.example.nz');
+    expect(loadConfig(productionEnv({ NODE_ENV: 'test' })).auth.webBaseUrl).toBe(
+      'https://games.example.nz',
+    );
   });
 
   it('normalises WEB_BASE_URL to an origin without a trailing slash', () => {
@@ -402,7 +409,7 @@ describe('auth configuration (AC-VERIFY-7)', () => {
   });
 
   it('refuses AUTH_FAKE_OAUTH=true in production and allows it elsewhere', () => {
-    expect(issuesFor(productionEnv({ AUTH_FAKE_OAUTH: 'true' }))).toEqual([
+    expect(productionIssuesFor(productionEnv({ AUTH_FAKE_OAUTH: 'true' }))).toEqual([
       expect.stringContaining('AUTH_FAKE_OAUTH — must not be true in production'),
     ]);
     expect(loadConfig(validEnv({ AUTH_FAKE_OAUTH: 'true' })).auth.fakeOAuth).toBe(true);
@@ -412,21 +419,23 @@ describe('auth configuration (AC-VERIFY-7)', () => {
   });
 
   it('requires API_INTERNAL_SHARED_SECRET (at least 32 characters) in production and checks length elsewhere when set', () => {
-    expect(issuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: undefined }))).toEqual([
+    expect(productionIssuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: undefined }))).toEqual([
       expect.stringContaining('API_INTERNAL_SHARED_SECRET — is required in production'),
     ]);
-    const short = issuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: 'too-short-secret' }));
+    const short = productionIssuesFor(
+      productionEnv({ API_INTERNAL_SHARED_SECRET: 'too-short-secret' }),
+    );
     expect(short).toEqual([
       expect.stringContaining('API_INTERNAL_SHARED_SECRET — must be at least 32'),
     ]);
     expect(short.join('\n')).not.toContain('too-short-secret');
     expect(issuesFor(validEnv({ API_INTERNAL_SHARED_SECRET: 'short' }))).toHaveLength(1);
-    expect(loadConfig(productionEnv()).internalAuthSecret).toBe(SECRET_32);
+    expect(loadConfig(productionEnv({ NODE_ENV: 'test' })).internalAuthSecret).toBe(SECRET_32);
   });
 
   it('rejects the known dev placeholder API_INTERNAL_SHARED_SECRET in production, without echoing it', () => {
     const placeholder = 'dev-only-internal-secret-change-me-0123456789';
-    const issues = issuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: placeholder }));
+    const issues = productionIssuesFor(productionEnv({ API_INTERNAL_SHARED_SECRET: placeholder }));
     expect(issues).toEqual([expect.stringContaining('API_INTERNAL_SHARED_SECRET')]);
     expect(issues.join('\n')).not.toContain(placeholder);
     expect(
@@ -442,5 +451,81 @@ describe('auth configuration (AC-VERIFY-7)', () => {
       expect(example, `.env.example ${name}`).toMatch(new RegExp(`^#?\\s*${name}=`, 'm'));
       expect(guide, `getting-started ${name}`).toContain(name);
     }
+  });
+});
+
+describe('loadConfig payments (CR-12, A6, AC-VERIFY-8)', () => {
+  it('defaults to the fake adapter with the documented tunables', () => {
+    expect(loadConfig(validEnv()).payments).toEqual({
+      adapter: 'fake',
+      akahu: null,
+      paymentExpiryMinutes: 30,
+      reconcileOrphanAgeSeconds: 120,
+      reconcileMinAgeSeconds: 300,
+      reconcileStuckAfterSeconds: 21600,
+      finalityHorizonHours: 168,
+    });
+    expect(loadConfig(validEnv({ PAYMENTS_ADAPTER: 'fake' })).payments.adapter).toBe('fake');
+  });
+
+  it('refuses the fake adapter in production, naming the variable', () => {
+    expect(issuesFor(productionEnv())).toContain(
+      'Invalid configuration: PAYMENTS_ADAPTER — fake is not allowed in production',
+    );
+  });
+
+  it('refuses PAYMENTS_ADAPTER=akahu with the named not-available error and still reports missing credentials in one pass', () => {
+    const issues = issuesFor(validEnv({ PAYMENTS_ADAPTER: 'akahu' }));
+    expect(issues).toContain(
+      'Invalid configuration: PAYMENTS_ADAPTER — PAYMENTS_ADAPTER=akahu is not available in this build',
+    );
+    for (const name of ['AKAHU_APP_TOKEN', 'AKAHU_APP_SECRET', 'AKAHU_WEBHOOK_URL']) {
+      expect(issues).toContain(
+        `Invalid configuration: ${name} — is required when PAYMENTS_ADAPTER=akahu`,
+      );
+    }
+    const complete = issuesFor(
+      validEnv({
+        PAYMENTS_ADAPTER: 'akahu',
+        AKAHU_APP_TOKEN: 'app-token-value',
+        AKAHU_APP_SECRET: 'app-secret-value',
+        AKAHU_WEBHOOK_URL: 'https://api.example.nz/webhooks/akahu',
+      }),
+    );
+    expect(complete).toEqual([expect.stringContaining('is not available in this build')]);
+    expect(complete.join('\n')).not.toMatch(/app-(token|secret)-value/);
+  });
+
+  it('fails fast with value-free named errors for malformed Akahu settings', () => {
+    const bad: Array<[string, string]> = [
+      ['PAYMENTS_ADAPTER', 'stripe'],
+      ['AKAHU_PAYMENTS_API_URL', 'not a url'],
+      ['AKAHU_WEBHOOK_URL', 'https://api.example.nz/webhooks/akahu?x=1'],
+      ['AKAHU_PAYMENT_EXPIRY_MINUTES', '14'],
+      ['AKAHU_PAYMENT_EXPIRY_MINUTES', '121'],
+      ['AKAHU_PAYMENT_EXPIRY_MINUTES', 'soon'],
+      ['AKAHU_RECONCILE_ORPHAN_AGE_SECONDS', '10'],
+      ['AKAHU_RECONCILE_MIN_AGE_SECONDS', '59'],
+      ['AKAHU_RECONCILE_STUCK_AFTER_SECONDS', '100'],
+      ['AKAHU_FINALITY_HORIZON_HOURS', '0'],
+    ];
+    for (const [name, value] of bad) {
+      const issues = issuesFor(validEnv({ [name]: value }));
+      expect(issues, `${name}=${value}`).toEqual([
+        expect.stringContaining(`Invalid configuration: ${name} — `),
+      ]);
+      expect(issues.join('\n')).not.toContain(value === 'stripe' ? 'stripe' : `=${value}`);
+    }
+  });
+
+  it('requires https and an akahu.io host for the payments API URL in production', () => {
+    expect(
+      productionIssuesFor(
+        productionEnv({ AKAHU_PAYMENTS_API_URL: 'http://api.payments.akahu.io' }),
+      ),
+    ).toEqual([expect.stringContaining('AKAHU_PAYMENTS_API_URL — must use https in production')]);
+    expect(
+      productionIssuesFor(productionEnv({ AKAHU_PAYMENTS_API_URL: 'https://evil.example.com' })),
+    ).toEqual([expect.stringContaining('AKAHU_PAYMENTS_API_URL — host must end in .akahu.io')]);
   });
 });

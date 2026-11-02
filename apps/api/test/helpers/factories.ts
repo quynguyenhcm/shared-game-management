@@ -655,7 +655,16 @@ export interface PaymentInput {
   readonly amount: string;
   readonly pricing?: Pricing;
   readonly gstRegistered?: boolean;
+  /** The snapshotted GST number; defaults to a valid one when `gstRegistered` (the CHECK ties them), NULL otherwise. */
+  readonly gstNumber?: string;
   readonly lines?: readonly LineInput[];
+}
+
+const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** A payment or top-up reference: `SGM` plus 8 Crockford base32 characters (the column CHECK's format). */
+export function paymentReference(): string {
+  return `SGM${Array.from(randomBytes(8), (byte) => CROCKFORD_BASE32[byte % 32]).join('')}`;
 }
 
 /** Inserts a payment header and its line items on `db` (caller controls the transaction). */
@@ -665,8 +674,8 @@ export async function insertPaymentRows(db: Queryable, input: PaymentInput): Pro
   const paymentId = await insertId(
     db,
     `INSERT INTO payments (user_id, team_id, registration_id, pricing_structure, gst_registered, gst_rate_bps,
-                           amount, payment_link_token, due_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '2026-10-10T00:00:00Z') RETURNING id`,
+                           amount, payment_reference, gst_number, due_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '2026-10-10T00:00:00Z') RETURNING id`,
     [
       input.userId,
       input.teamId,
@@ -675,7 +684,8 @@ export async function insertPaymentRows(db: Queryable, input: PaymentInput): Pro
       gst,
       gst ? 1500 : 0,
       input.amount,
-      `link-${randomUUID()}`,
+      paymentReference(),
+      gst ? (input.gstNumber ?? '123456789') : null,
     ],
   );
   const lines = input.lines ?? [
@@ -729,15 +739,57 @@ export async function insertBilledRegistration(
   return { userId, registrationId, paymentId };
 }
 
+/**
+ * A wallet at 0.00 whose balance is then moved through the ledger: the `player_credits` guard refuses a direct balance
+ * write (CR-5), so a funded wallet is a synthetic APPLIED top-up intent plus one TOPUP row for the whole balance
+ * (so `balance` must be between 1.00 and 100.00, the top-up amount range, or exactly 0.00). Returns the wallet id.
+ */
 export async function insertWallet(
   db: Queryable,
   userId: string,
   teamId: string,
   balance = '0.00',
 ): Promise<string> {
-  return insertId(
+  const walletId = await insertId(
     db,
-    `INSERT INTO player_credits (user_id, team_id, balance) VALUES ($1, $2, $3) RETURNING id`,
-    [userId, teamId, balance],
+    `INSERT INTO player_credits (user_id, team_id) VALUES ($1, $2) RETURNING id`,
+    [userId, teamId],
   );
+  if (balance !== '0.00') {
+    const akahuPaymentId = `synthetic-${randomUUID()}`;
+    const topUpId = await insertId(
+      db,
+      `INSERT INTO wallet_top_ups (user_id, team_id, reference, idempotency_key, amount, status, akahu_payment_id)
+       VALUES ($1, $2, $3, $4, $5, 'APPLIED', $6) RETURNING id`,
+      [userId, teamId, paymentReference(), randomUUID(), balance, akahuPaymentId],
+    );
+    await db.query(
+      `INSERT INTO credit_transactions (user_id, team_id, amount, transaction_type, akahu_payment_id,
+                                        wallet_top_up_id, resulting_balance)
+       VALUES ($1, $2, $3, 'TOPUP', $4, $5, $3)`,
+      [userId, teamId, balance, akahuPaymentId, topUpId],
+    );
+  }
+  return walletId;
+}
+
+/**
+ * Moves a payment to `status` with the status-transition guard disabled for that one statement (owner-level,
+ * transactional). Only for states the guard makes unreachable (FAILED: nothing enters it, B4), so a suite can still prove
+ * that code which counts or ignores such rows behaves.
+ */
+export async function setPaymentStatusUnchecked(
+  pool: pg.Pool,
+  paymentId: string,
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'OVERDUE',
+): Promise<void> {
+  await inTransaction(pool, async (client) => {
+    await client.query('ALTER TABLE payments DISABLE TRIGGER payments_guard_status');
+    await client.query(
+      `UPDATE payments SET status = $2::payment_status,
+              paid_at = CASE WHEN $2::text = 'PAID' THEN now() END WHERE id = $1`,
+      [paymentId, status],
+    );
+    await client.query('ALTER TABLE payments ENABLE TRIGGER payments_guard_status');
+  });
 }

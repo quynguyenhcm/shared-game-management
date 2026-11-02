@@ -262,10 +262,16 @@ async function makeOverdue(userId: string): Promise<number> {
       await db.query('BEGIN');
       const payment = await db.query(
         `INSERT INTO payments (user_id, team_id, registration_id, pricing_structure, gst_registered, gst_rate_bps,
-                               amount, payment_link_token, due_date, status)
-         VALUES ($1, $2, $3, 'FLAT', true, 1500, '17.00', $4, now() - interval '3 days', 'OVERDUE')
+                               amount, payment_reference, gst_number, due_date, status)
+         VALUES ($1, $2, $3, 'FLAT', true, 1500, '17.00', $4, '123456789', now() - interval '3 days', 'OVERDUE')
          RETURNING id`,
-        [userId, row.teamId, row.id, `link-${randomUUID()}`],
+        // A payment reference is SGM plus 8 Crockford characters; hex digits are a subset.
+        [
+          userId,
+          row.teamId,
+          row.id,
+          `SGM${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
+        ],
       );
       await db.query(
         `INSERT INTO payment_line_items (payment_id, party_position, pricing_structure, applied_basis,

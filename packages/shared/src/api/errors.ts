@@ -66,6 +66,15 @@ export const ErrorCode = [
   'party_exceeds_capacity',
   'late_withdrawal_fee_due',
   'cancellation_terms_changed',
+  // wallet and Akahu billing (wallet-and-akahu-billing architecture Q1c, CR-15); payout_not_configured and not_found are reused
+  'payment_settled',
+  'payment_in_progress',
+  'payment_on_hold',
+  'top_up_in_progress',
+  'payment_provider_unavailable',
+  'payment_provider_refused',
+  'reminder_too_soon',
+  'hold_resolved_by_provider',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

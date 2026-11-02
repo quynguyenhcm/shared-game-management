@@ -629,7 +629,7 @@ Provisional (pending creative): the defaults above. The creative architecture, a
 ### Phases
 **Build gate**: do not start Phase 1 until the creative docs (architecture, algorithm, user journey, UI/UX) and a binding Creative Reconciliation section exist here. Do not start Phase 4 until creative Q1 (Akahu capability) is resolved with cited Akahu documentation; if it changes the integration shape, amend this plan first. Before Phase 1, re-confirm that ADR 0020 and D-87 are still free on `main` and that no migration newer than `20261026000100000` has landed.
 
-- [ ] **Phase 1: Schema, shared contracts and the Akahu port**: the D-87+ migration, regenerated types, zod contracts, transition matrix fixture, due-date rule, error codes, Akahu config (fail-fast, fake refused in production), gateway port with the fake adapter, `LOCK_ORDER` gains the wallet, factories. ACs: AC-VERIFY-2, AC-VERIFY-5 (schema half), AC-VERIFY-8.
+- [x] **Phase 1: Schema, shared contracts and the Akahu port**: the D-87+ migration, regenerated types, zod contracts, transition matrix fixture, due-date rule, error codes, Akahu config (fail-fast, fake refused in production), gateway port with the fake adapter, `LOCK_ORDER` gains the wallet, factories. ACs: AC-VERIFY-2, AC-VERIFY-5 (schema half), AC-VERIFY-8.
 - [ ] **Phase 2: Post-game billing engine and wallet ledger**: `post-game-billing` sweep, `bill-session` queue and handler, fee computation from snapshots, payments + line items + GST snapshot, all-or-nothing deduction through `wallet/ledger.ts`, B2/B5/B7/B8/B9, payment-due and low-credit emails, C-BIL-PAY at every creation path (replacing `payment-stand-in.ts` in the gate race), single-writer structural test, ADR 0020 draft. ACs: AC-HAPPY-2, 3, 5, 6, 7, 11, AC-ASYNC-1, AC-ASYNC-4 (billing emails), AC-ERROR-5, 9, AC-VERIFY-3, 4, 5, 6, 11, AC-INTEGRATION-2, AC-INTEGRATION-3 (billing races).
 - [ ] **Phase 3: Overdue job, admin payments list and reminders**: real `daily-overdue` handler, overdue emails, `GET /teams/:teamId/payments`, `POST .../reminders` with B6 cooldown and `changeKey`, route policies, OpenAPI. ACs: AC-HAPPY-8, 10, AC-ERROR-8, AC-VERIFY-1 (these routes), AC-VERIFY-6 (overdue boundary).
 - [ ] **Phase 4: Akahu flows: top-ups, payment attempts, webhook and reconcile** (follows the Q1 spike and architecture creative): live adapter against recorded fixtures, top-up and attempt routes, `GET /payments/:id`, `GET .../wallet`, `GET .../payments/me`, `POST /webhooks/akahu` with raw-body signature verification, `applyAkahuResult`, payout block (R3), B3 overflow and duplicates, B10 payee at payment time, `akahu-reconcile` queue and slot, payment-received email. ACs: AC-HAPPY-1, 4, 9, 12 (API side), AC-ERROR-1, 2, 3, 4, 6, 7, 10, AC-ASYNC-3, AC-VERIFY-7, AC-INTEGRATION-1, AC-INTEGRATION-3 (Akahu races).
@@ -725,10 +725,11 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: CREATIVE → BUILD
-**Current Step**: Creative complete (4 docs + reconciliation CR-1..CR-26); rulings H1-H3 pending; next /yay:build Phase 1
-**Step Started**: 2026-10-31
+**Build Status**: IDLE (Phase 1 of 6 complete; Phase 2 next)
+**Current Build**: none
+**Last Completed**: Phase 1 of 6: Schema, shared contracts and the Akahu port (2026-11-02)
+**Current Phase**: BUILD (between phases)
+**Current Step**: Phase 1 committed; next /yay:build wallet-and-akahu-billing (Phase 2)
 **Can Resume**: NO
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
@@ -749,3 +750,13 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Algorithm Creative Design: COMPLETE (2026-10-31) - Output: memory-bank/creative/wallet-and-akahu-billing-billing-algorithm.md
 - Creative Reconciliation CR-1..CR-23 written; rulings H1-H3 requested (2026-10-31)
 - CREATIVE CRITIQUE: codex — usable. Verdict needs-attention (3 high); folded in as CR-24..CR-26 (2026-10-31)
+- Phase 1 BUILD: COMPLETE (2026-11-02) - migration 20261102000100000_wallet_and_billing.sql (D-87..D-98), LOCK_ORDER (CR-4), shared contracts + matrices, error codes, factories, lib/akahu port + fake + status + webhook signature + key cache + payee, config fail-fast (PAYMENTS_ADAPTER), redaction. Unit 2457, integration 879 passing; typecheck, lint, build, openapi drift clean. Code review: codex companion direct, 3 P2 fixed (terminal UNAPPLIED needs closed_at; billing_session_blocks composite FK to game_sessions (id, team_id); payout_block_events.akahu_payment_id format CHECK).
+
+### Phase 1 Notes for later phases
+- Production cannot boot until Phase 4: `PAYMENTS_ADAPTER=fake` is refused in production and `akahu` refuses boot (CR-12/A6 read literally). `apps/api/Dockerfile` sets NODE_ENV=production and `cli.ts` loads config, so a production image fails until the live adapter ships; compose/dev/CI/E2E are unaffected. `cli-guards.test.ts` accepts either refusal for the NODE_ENV=production case. Revisit if a deploy is needed before Phase 4.
+- Not enforced in the DB (Phase 2/4 must): forward-only `akahu_status` mirror rank; top-up credit amount equals intent amount; attempt amount equals payment amount. Attempts have no `reference` column (use `payments.payment_reference`).
+- `idx_game_sessions_billing_due` already serves the sweep; architecture's `idx_game_sessions_published_ends_at` not duplicated.
+- AUTHORISED/SUBMITTED mapped OPEN/IN_FLIGHT and the payee charset are assumptions to re-read at the Phase 4 gate.
+
+### Guard & Recovery Log
+- Phase 1: commit guard PASS first try (see commit); no recovery needed. Verifier subagent reverted a tracked apps/api/openapi.yaml to HEAD mid-run; orchestrator regenerated it (seam check) before commit.

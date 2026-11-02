@@ -269,6 +269,33 @@ first release, with real credentials: register once with Google and once with Fa
 and connect and disconnect each from `/account`. Record the result, and confirm in particular that Facebook accepts the
 `Authorization` header for the Graph call (see the Facebook deviation in the task notes).
 
+## Payments and Akahu configuration
+
+Billing takes payments through a provider-neutral port (`apps/api/src/lib/akahu/gateway.ts`). The adapter is chosen only
+by `PAYMENTS_ADAPTER`, like `NOTIFIER_ADAPTER` and `AUTH_FAKE_OAUTH`.
+
+- **`fake` (default).** A stateless fake that works across the api and the worker: `$17.00` succeeds, `$5.15` is declined,
+  `$5.20` stays processing. It is refused when `NODE_ENV=production`.
+- **`akahu`.** The live adapter is not available until Phase 4: selecting it stops boot with
+  `PAYMENTS_ADAPTER=akahu is not available in this build`. Until then a production boot is refused outright.
+- **Webhook path.** Akahu will call `POST /webhooks/akahu` (set `AKAHU_WEBHOOK_URL` to its absolute public URL). The
+  signature headers `x-akahu-payments-signature` and `x-akahu-payments-signing-key` are redacted from logs.
+
+Every malformed value stops boot with an error that names the variable and never prints its value.
+
+| Variable                              | Default                         | Allowed               | Meaning                                                                                |
+| ------------------------------------- | ------------------------------- | --------------------- | -------------------------------------------------------------------------------------- |
+| `PAYMENTS_ADAPTER`                    | `fake`                          | `akahu` or `fake`     | Which gateway to build. `fake` is refused in production; `akahu` is Phase 4.           |
+| `AKAHU_APP_TOKEN`                     | unset                           | non-empty             | Akahu app token. Required with `akahu`.                                                |
+| `AKAHU_APP_SECRET`                    | unset                           | non-empty             | Akahu app secret. Required with `akahu`.                                               |
+| `AKAHU_PAYMENTS_API_URL`              | `https://api.payments.akahu.io` | URL                   | Payments API base. In production: https and a host ending in `.akahu.io`.              |
+| `AKAHU_WEBHOOK_URL`                   | unset                           | http(s) URL, no query | Public URL sent to Akahu as `webhook_uri`. Required with `akahu`; https in production. |
+| `AKAHU_PAYMENT_EXPIRY_MINUTES`        | `30`                            | 15 to 120             | Expiry set on every created payment.                                                   |
+| `AKAHU_RECONCILE_ORPHAN_AGE_SECONDS`  | `120`                           | 30 to 3600            | Age after which reconcile closes a stale `CREATING` intent.                            |
+| `AKAHU_RECONCILE_MIN_AGE_SECONDS`     | `300`                           | 60 to 3600            | Age after which reconcile re-reads an `OPEN` intent.                                   |
+| `AKAHU_RECONCILE_STUCK_AFTER_SECONDS` | `21600`                         | 3600 to 604800        | Age after which an open intent is logged as stuck.                                     |
+| `AKAHU_FINALITY_HORIZON_HOURS`        | `168`                           | 1 to 720              | How long after close or hold reconcile keeps re-reading for a late success.            |
+
 ## Money and time rules
 
 - Money in the database is `NUMERIC(10,2)`, on the wire a 2-decimal string (`MoneyString`), and in TypeScript branded `bigint`

@@ -151,6 +151,36 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     message:
       'The cancellation deadline has passed since you opened this. Review the late-withdrawal terms and confirm again.',
   },
+  payment_settled: { status: 409, message: 'This payment has already been paid.' },
+  payment_in_progress: {
+    status: 409,
+    message: 'A payment for this charge is already in progress.',
+  },
+  payment_on_hold: {
+    status: 409,
+    message: 'This payment is being checked with the bank. You can try again once that is settled.',
+  },
+  top_up_in_progress: {
+    status: 409,
+    message: 'A top-up for this wallet is already in progress.',
+  },
+  payment_provider_unavailable: {
+    status: 503,
+    message:
+      "We couldn't reach the payment provider. Nothing has been charged. Try again in a few minutes.",
+  },
+  payment_provider_refused: {
+    status: 422,
+    message: "The payment provider couldn't start this payment. Nothing has been charged.",
+  },
+  reminder_too_soon: {
+    status: 409,
+    message: 'A reminder was sent for this payment in the last 24 hours.',
+  },
+  hold_resolved_by_provider: {
+    status: 409,
+    message: 'The payment provider has since reported the outcome, so it cannot be set by hand.',
+  },
 };
 
 export interface AppErrorOptions {

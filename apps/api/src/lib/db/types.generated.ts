@@ -30,7 +30,17 @@ export type GlobalRole = "GLOBAL_ADMIN" | "PLAYER" | "TEAM_ADMIN";
 
 export type MembershipStatus = "APPROVED" | "BANNED" | "PENDING" | "REJECTED";
 
+export type PaymentHoldReason = "AMOUNT_MISMATCH" | "INDETERMINATE";
+
+export type PaymentIntentStatus = "APPLIED" | "CLOSED" | "CREATING" | "HELD" | "OPEN" | "UNAPPLIED";
+
+export type PaymentResolutionReason = "AMOUNT_MISMATCH" | "NOT_RECEIVED_INDETERMINATE" | "NOT_RECEIVED_NOT_SENT" | "RECEIVED";
+
 export type PaymentStatus = "FAILED" | "OVERDUE" | "PAID" | "PENDING";
+
+export type PaymentUnappliedReason = "AMOUNT_MISMATCH" | "DUPLICATE" | "LATE" | "OVER_CAP";
+
+export type PayoutBlockReason = "AKAHU_REPORTED_ACCOUNT_PROBLEM" | "FUNDS_RETURNED" | "OTHER" | "TEAM_REQUESTED";
 
 export type PricingType = "BY_SEX" | "BY_SKILL_LEVEL" | "FLAT";
 
@@ -85,6 +95,13 @@ export interface AuthThrottle {
   updated_at: Timestamp;
 }
 
+export interface BillingSessionBlocks {
+  blocked_at: Generated<Timestamp>;
+  notified_at: Timestamp | null;
+  session_id: string;
+  team_id: string;
+}
+
 export interface CreditTransactions {
   akahu_payment_id: string | null;
   amount: MoneyString;
@@ -95,6 +112,7 @@ export interface CreditTransactions {
   team_id: string;
   transaction_type: CreditTransactionType;
   user_id: string;
+  wallet_top_up_id: string | null;
 }
 
 export interface GameSessions {
@@ -170,6 +188,30 @@ export interface PasswordResetTokens {
   user_id: string;
 }
 
+export interface PaymentAttempts {
+  akahu_payment_id: string | null;
+  akahu_status: string | null;
+  akahu_status_reason: string | null;
+  amount: MoneyString;
+  authorisation_url_enc: string | null;
+  close_reason: string | null;
+  closed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp | null;
+  held_at: Timestamp | null;
+  hold_reason: PaymentHoldReason | null;
+  id: Generated<string>;
+  idempotency_key: string;
+  last_synced_at: Timestamp | null;
+  observed_amount: MoneyString | null;
+  payment_id: string;
+  resolution_reason: PaymentResolutionReason | null;
+  resolved_at: Timestamp | null;
+  resolved_by: string | null;
+  status: Generated<PaymentIntentStatus>;
+  unapplied_reason: PaymentUnappliedReason | null;
+}
+
 export interface PaymentLineItems {
   applied_basis: FeeBasis;
   created_at: Generated<Timestamp>;
@@ -183,6 +225,15 @@ export interface PaymentLineItems {
   unit_fee: MoneyString;
 }
 
+export interface PaymentReminders {
+  actor_user_id: string;
+  change_key: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: Generated<string>;
+  payment_id: string;
+}
+
 export interface Payments {
   akahu_payment_id: string | null;
   amount: MoneyString;
@@ -190,6 +241,7 @@ export interface Payments {
   created_at: Generated<Timestamp>;
   due_date: Timestamp;
   gst_amount: ColumnType<MoneyString, never, never>;
+  gst_number: string | null;
   gst_rate_bps: number;
   gst_registered: boolean;
   id: Generated<string>;
@@ -197,13 +249,23 @@ export interface Payments {
   invoice_number: number | null;
   is_tax_invoice_issued: Generated<boolean>;
   paid_at: Timestamp | null;
-  payment_link_token: string;
+  payment_reference: string;
   pricing_structure: PricingType;
   registration_id: string | null;
   status: Generated<PaymentStatus>;
   subtotal_amount: ColumnType<MoneyString, never, never>;
   team_id: string;
   user_id: string;
+}
+
+export interface PayoutBlockEvents {
+  actor_user_id: string | null;
+  akahu_payment_id: string | null;
+  change_key: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  reason: PayoutBlockReason;
+  team_id: string;
 }
 
 export interface PayoutNoticeClaims {
@@ -364,17 +426,47 @@ export interface Users {
   sex: UserSex;
 }
 
+export interface WalletTopUps {
+  akahu_payment_id: string | null;
+  akahu_status: string | null;
+  akahu_status_reason: string | null;
+  amount: MoneyString;
+  authorisation_url_enc: string | null;
+  close_reason: string | null;
+  closed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp | null;
+  held_at: Timestamp | null;
+  hold_reason: PaymentHoldReason | null;
+  id: Generated<string>;
+  idempotency_key: string;
+  last_synced_at: Timestamp | null;
+  observed_amount: MoneyString | null;
+  reference: string;
+  resolution_reason: PaymentResolutionReason | null;
+  resolved_at: Timestamp | null;
+  resolved_by: string | null;
+  status: Generated<PaymentIntentStatus>;
+  team_id: string;
+  unapplied_reason: PaymentUnappliedReason | null;
+  user_id: string;
+}
+
 export interface DB {
   auth_identities: AuthIdentities;
   auth_sessions: AuthSessions;
   auth_throttle: AuthThrottle;
+  billing_session_blocks: BillingSessionBlocks;
   credit_transactions: CreditTransactions;
   game_sessions: GameSessions;
   oauth_pending_signups: OauthPendingSignups;
   oauth_states: OauthStates;
   password_reset_tokens: PasswordResetTokens;
+  payment_attempts: PaymentAttempts;
   payment_line_items: PaymentLineItems;
+  payment_reminders: PaymentReminders;
   payments: Payments;
+  payout_block_events: PayoutBlockEvents;
   payout_notice_claims: PayoutNoticeClaims;
   player_credits: PlayerCredits;
   recurring_rule_courts: RecurringRuleCourts;
@@ -386,4 +478,5 @@ export interface DB {
   team_members: TeamMembers;
   teams: Teams;
   users: Users;
+  wallet_top_ups: WalletTopUps;
 }
