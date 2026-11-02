@@ -725,14 +725,18 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: RUNNING (auto-build; Phase 3 of 6 complete; Phases 2-3 scope done, halt before Phase 4)
+**Build Status**: HALTED (auto-build; Phase 3 of 6 complete; scoped stop before Phase 4)
+**Halt Trigger**: Human scope (2026-11-03): Phase 4 gated on Akahu MVE-001 written answer, MVE-002 sandbox credentials, MVE-005 signed webhook fixture (A1/A7). Not a failure.
+**Halted At Phase**: Phase 4: Akahu flows (not started)
+**Resumption Point**: Phase 4 Step 0.5, once the Akahu gate clears (H2 already ruled)
+**Halt Timestamp**: 2026-11-03
 **Auto-Build Mode**: YES
 **Auto-Build Scope**: Phases 2-3 only. Halt before Phase 4: Akahu MVE-001 answer, MVE-002 credentials and MVE-005 fixture not yet received (human, 2026-11-03).
 **Current Build**: none
 **Last Completed**: Phase 3 of 6: Overdue job, admin payments list and reminders (2026-11-03)
 **Current Phase**: BUILD (between phases)
 **Current Step**: Phase 3 committed; Phase 4 gated on Akahu (human)
-**Can Resume**: NO
+**Can Resume**: YES
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
 ### Active Sub-Agents
@@ -766,7 +770,7 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Phase 3 | modules/billing/overdue.ts minimal apply | No applyAkahuResult exists yet, so a fresh SENT with matching amount is applied minimally (attempt APPLIED, payment PAID, no email); amount mismatch sets attempt HELD(AMOUNT_MISMATCH). Phase 4's apply function must replace this (and add the payment-received email).
 - Phase 3 | modules/billing/overdue.ts NOT_CHARGED | A fresh NOT_CHARGED is skipped this run only when the stored mirror was AUTHORISED/SUBMITTED/SETTLEMENT_IN_PROGRESS (Phase 4 owns the 24 h grace write); otherwise the payment is flipped. INDETERMINATE skipped untouched. The port has no 429 signal, so any GatewayUnavailableError defers that payment (no run-wide stop).
 - Phase 3 | packages/shared/src/api/billing.ts | AdminPaymentsQuery.status gains 'ALL' (AC-ENTRY-3 "All" filter) and TeamPaymentParams was added.
-- Phase 3 | billing/service.ts sendReminder | Codex P1 deferred: the actor's team role is checked by the route policy (onRequest), not re-checked inside the reminder transaction, the same pattern as the other team routes. Window is one request; revisit if a demotion race matters.
+- Phase 3 | billing/service.ts sendReminder | Codex P1 deferred (phase reviewer: acceptable, consistent with all team routes; revisit across team routes together): the actor's team role is checked by the route policy (onRequest), not re-checked inside the reminder transaction, the same pattern as the other team routes. Window is one request; revisit if a demotion race matters.
 - Phase 3 | worker.ts / jobs/bootstrap.ts | registerJobs now requires paymentsGateway (fake outside production; production still cannot boot until Phase 4, see Phase 1 Notes).
 
 ### Phase 1 Notes for later phases
