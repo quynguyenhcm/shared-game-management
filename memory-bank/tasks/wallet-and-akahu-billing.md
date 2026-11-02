@@ -758,6 +758,9 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ### Deviations
 <!-- Auto-build ledger: - Phase <N> | <file:line/artifact> | <rationale> -->
+- Phase 2 | apps/api/test/integration/team-banking-gate.int.test.ts | AC-VERIFY-3 "removal commits first, billing inserts nothing" is proven via a committed payout block (B8 hold), because the publish gate refuses banking removal (409 banking_in_use) while a paid PUBLISHED session exists, so the literal ordering is unreachable. Accepted by phase reviewer.
+- Phase 2 | apps/api/src/modules/billing/boundaries.test.ts:77 | "OVERDUE only by daily-overdue" grep test is a placeholder until Phase 3 adds the job. Phase 3 must make it real.
+- Phase 2 | AC-VERIFY-6 | Only the billing half covered (ends_at boundary, 72 h across DST end); the due_date overdue boundary is Phase 3.
 
 ### Phase 1 Notes for later phases
 - Production cannot boot until Phase 4: `PAYMENTS_ADAPTER=fake` is refused in production and `akahu` refuses boot (CR-12/A6 read literally). `apps/api/Dockerfile` sets NODE_ENV=production and `cli.ts` loads config, so a production image fails until the live adapter ships; compose/dev/CI/E2E are unaffected. `cli-guards.test.ts` accepts either refusal for the NODE_ENV=production case. Revisit if a deploy is needed before Phase 4.
