@@ -720,6 +720,7 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - **A8 Open items for creative/ops** (no change to scope): the Akahu fee model (U8, outside B1-B10; human ruling after the quote); an open top-up holds no `payments` row, so it does not hold the `team_banking_in_use` guard (algorithm Q3 and the D-87+ migration decide); SENT received for a locally closed attempt or top-up routes to B3.
 
 **Action for the human (outside the code):** send the MVE-001/MVE-002 email to hello@akahu.nz (the handoff has the question list).
+**Sent 2026-11-04** by Quy Nguyen: one email covering U1 (third-party payees, payee-verification liability, first-payment holds, distinct-payee caps, facilitator terms), U3 (destination-rejected signal), U4 (BANK_ERROR_INDETERMINATE), U2/MVE-002 (sandbox access, review lead time). Awaiting reply.
 
 ---
 
