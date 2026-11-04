@@ -27,6 +27,9 @@ export const QUEUE_NAMES = {
   sessionAutoEnrol: 'session-auto-enrol',
   recurrenceRule: 'recurrence-rule',
   registrationBanReconcile: 'registration-ban-reconcile',
+  akahuSync: 'akahu-sync',
+  akahuCancel: 'akahu-cancel',
+  akahuReconcile: 'akahu-reconcile',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -71,6 +74,16 @@ export const QUEUES: readonly QueueDefinition[] = [
   // Daily ban reconciliation (registration-and-waitlist, architecture Q4, O4): one run at a time. The sweep only enqueues
   // `member-banned` jobs (singleton per membership), so overlap would at worst enqueue nothing twice.
   { ...DEFAULTS, name: QUEUE_NAMES.registrationBanReconcile, policy: 'exclusive' },
+  // The single Akahu apply funnel (wallet-and-akahu-billing CR-3): one job per provider payment
+  // (`singletonKey = akahu-sync:<akahuPaymentId>`), enqueued by the webhook, the return pages and the start paths. `stately` keeps
+  // one queued plus one active job per id, so a webhook that arrives during a run queues exactly one trailing re-read. The
+  // guarded intent transitions under the CR-4 row locks, not this policy, make a replay a no-op.
+  { ...DEFAULTS, name: QUEUE_NAMES.akahuSync, policy: 'stately' },
+  // Best-effort cancel of a provider payment still in READY (`singletonKey = akahu-cancel:<akahuPaymentId>`): a superseded
+  // attempt, a payout block (CR-14) or an orphan created at Akahu whose local intent was already closed.
+  { ...DEFAULTS, name: QUEUE_NAMES.akahuCancel, policy: 'exclusive' },
+  // The 15-minute reconcile sweep (CR-12, CR-25): one run at a time; also queued at every worker boot.
+  { ...DEFAULTS, name: QUEUE_NAMES.akahuReconcile, policy: 'exclusive' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

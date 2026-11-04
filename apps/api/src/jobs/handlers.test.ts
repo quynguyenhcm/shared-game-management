@@ -3,7 +3,11 @@ import type { JobContext, JobRunner } from '../lib/jobs/jobs.ts';
 import { NonRetryableJobError } from '../lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../lib/notifications/adapters/in-memory.ts';
 import type { EmailMessage } from '../lib/notifications/notifier.ts';
-import { testCrypto, testPaymentsGateway } from '../../test/helpers/app-deps.ts';
+import {
+  testCrypto,
+  testPaymentsConfig,
+  testPaymentsGateway,
+} from '../../test/helpers/app-deps.ts';
 import { noopSessionAllocator } from '../modules/sessions/allocator-port.ts';
 import { registerJobs } from './bootstrap.ts';
 import { heartbeatHandler } from './heartbeat.ts';
@@ -178,6 +182,7 @@ describe('registerJobs', () => {
     } as unknown as JobRunner;
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -190,6 +195,7 @@ describe('registerJobs', () => {
     expect(worked.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
     expect(scheduled.sort()).toEqual(
       [
+        'akahu-reconcile',
         'auth-cleanup',
         'daily-overdue',
         'post-game-billing',
@@ -223,6 +229,7 @@ describe('registerJobs', () => {
     await expect(
       registerJobs({
         paymentsGateway: testPaymentsGateway(),
+        payments: testPaymentsConfig(),
         ...options,
         webBaseUrl: '',
       }),
@@ -243,6 +250,7 @@ describe('registerJobs', () => {
     } as unknown as JobRunner;
     const base = {
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -282,6 +290,7 @@ describe('skill-progression wiring', () => {
     } as never;
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -323,6 +332,7 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
     } as never;
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -343,6 +353,7 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
     const { handlers, runner } = wired();
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -382,6 +393,7 @@ describe('billing wiring (wallet-and-akahu-billing Phases 2-3)', () => {
     } as never;
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -403,6 +415,7 @@ describe('billing wiring (wallet-and-akahu-billing Phases 2-3)', () => {
     } as never;
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -422,6 +435,7 @@ describe('billing wiring (wallet-and-akahu-billing Phases 2-3)', () => {
     const { handlers, runner } = wired();
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -433,5 +447,55 @@ describe('billing wiring (wallet-and-akahu-billing Phases 2-3)', () => {
     await expect(handlers.get('bill-session')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(
       NonRetryableJobError,
     );
+  });
+
+  it('works the akahu-sync and akahu-cancel queues with handlers that reject a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    for (const queue of ['akahu-sync', 'akahu-cancel']) {
+      for (const payload of [{}, { akahuPaymentId: 'has spaces', source: 'webhook' }]) {
+        await expect(handlers.get(queue)?.(payload, ctx), queue).rejects.toBeInstanceOf(
+          NonRetryableJobError,
+        );
+      }
+    }
+  });
+
+  it('works the akahu-reconcile slot with the real sweep, not the placeholder, and never rethrows the driver error', async () => {
+    const { handlers, runner } = wired();
+    const db = {
+      updateTable: () => {
+        throw new Error('db down: secret-value');
+      },
+      selectFrom: () => {
+        throw new Error('db down: secret-value');
+      },
+    } as never;
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx, logs } = context();
+    const failure = handlers.get('akahu-reconcile')?.({}, ctx);
+    await expect(failure).rejects.toThrow(/akahu-reconcile failed \(Error\)/);
+    await expect(failure).rejects.not.toThrow(/secret-value/);
+    expect(logs.some((entry) => entry.fields.event === 'akahu.reconcile.failed')).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('secret-value');
   });
 });

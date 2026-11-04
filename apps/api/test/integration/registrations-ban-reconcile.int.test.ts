@@ -15,7 +15,7 @@ import { createRegistrationsBanHandler } from '../../src/modules/registrations/b
 import { reconcileBannedMembers } from '../../src/modules/registrations/reconcile.ts';
 import { MemberBannedPayload } from '../../src/modules/teams/ban-hook.ts';
 import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
-import { testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME } from '../helpers/auth-app.ts';
 import {
   insertPublishedSession,
@@ -49,6 +49,7 @@ beforeAll(async () => {
   const db = createKysely(database.pool);
   await registerJobs({
     paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

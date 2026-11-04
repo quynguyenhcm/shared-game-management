@@ -4,10 +4,15 @@ import type {
   DstOptionsEntry,
   ErrorCode,
   ErrorResponse,
+  IntentErrorResponse,
+  ProviderRefusalReason,
   SeriesResponse,
   SessionErrorResponse,
   SessionResponse,
 } from '@sgm/shared';
+
+/** Start routes: the open intent on a 409 `payment_in_progress` / `top_up_in_progress` (CR-6). */
+export type IntentResume = NonNullable<IntentErrorResponse['error']['resume']>;
 
 interface ErrorDefault {
   readonly status: number;
@@ -197,6 +202,10 @@ export interface AppErrorOptions {
   readonly raisedFields?: readonly string[];
   /** Session routes: the latest row on a stale save (409 `session_stale` / `series_stale`). */
   readonly current?: SessionResponse | SeriesResponse;
+  /** Start routes: the open intent on an in-progress 409. */
+  readonly resume?: IntentResume;
+  /** Start routes: why the provider refused (422 `payment_provider_refused`). */
+  readonly reason?: ProviderRefusalReason;
   readonly cause?: unknown;
 }
 
@@ -210,6 +219,8 @@ export class AppError extends Error {
   readonly dstOptions: readonly DstOptionsEntry[] | undefined;
   readonly raisedFields: readonly string[] | undefined;
   readonly current: SessionResponse | SeriesResponse | undefined;
+  readonly resume: IntentResume | undefined;
+  readonly reason: ProviderRefusalReason | undefined;
 
   constructor(code: ErrorCode, options: AppErrorOptions = {}) {
     super(options.message ?? ERROR_DEFAULTS[code].message, { cause: options.cause });
@@ -222,6 +233,8 @@ export class AppError extends Error {
     this.dstOptions = options.dstOptions;
     this.raisedFields = options.raisedFields;
     this.current = options.current;
+    this.resume = options.resume;
+    this.reason = options.reason;
   }
 }
 
@@ -287,11 +300,13 @@ function send(
     dstOptions?: readonly DstOptionsEntry[];
     raisedFields?: readonly string[];
     current?: SessionResponse | SeriesResponse;
+    resume?: IntentResume;
+    reason?: ProviderRefusalReason;
   } = {},
   retryAfterSeconds?: number,
   status: number = ERROR_DEFAULTS[code].status,
 ): FastifyReply {
-  const body: ErrorResponse | SessionErrorResponse = {
+  const body: ErrorResponse | SessionErrorResponse | IntentErrorResponse = {
     error: {
       code,
       message: options.message ?? ERROR_DEFAULTS[code].message,
@@ -302,6 +317,8 @@ function send(
       ...(options.dstOptions === undefined ? {} : { dstOptions: [...options.dstOptions] }),
       ...(options.raisedFields === undefined ? {} : { raisedFields: [...options.raisedFields] }),
       ...(options.current === undefined ? {} : { current: options.current }),
+      ...(options.resume === undefined ? {} : { resume: options.resume }),
+      ...(options.reason === undefined ? {} : { reason: options.reason }),
     },
   };
   if (retryAfterSeconds !== undefined) void reply.header('retry-after', String(retryAfterSeconds));
@@ -330,6 +347,8 @@ function handleError(
         ...(error.dstOptions === undefined ? {} : { dstOptions: error.dstOptions }),
         ...(error.raisedFields === undefined ? {} : { raisedFields: error.raisedFields }),
         ...(error.current === undefined ? {} : { current: error.current }),
+        ...(error.resume === undefined ? {} : { resume: error.resume }),
+        ...(error.reason === undefined ? {} : { reason: error.reason }),
       },
       error.retryAfterSeconds,
     );

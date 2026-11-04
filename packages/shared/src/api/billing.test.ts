@@ -5,7 +5,9 @@ import {
   AttemptResponse,
   BILLING_FIELD_MESSAGES,
   HoldResolutionRequest,
+  IntentErrorResponse,
   MyPaymentsResponse,
+  PaymentIdParams,
   PaymentResponse,
   PayoutBlockRequest,
   ReminderResponse,
@@ -14,9 +16,12 @@ import {
   TopUpRequest,
   TopUpResponse,
   UnpaidPaymentsResponse,
+  WalletQuery,
   WalletResponse,
+  topUpHeadroomMessage,
 } from './billing.ts';
 import { ErrorCode } from './errors.ts';
+import { parseMoney } from '../money/money.ts';
 
 const KEY = '3b241101-e2bb-4255-8caf-4136c566a962';
 const ID = '0b5f1c3e-9d3a-4f7b-8a55-6f2f4d5e6a7b';
@@ -64,6 +69,51 @@ describe('TopUpRequest (AC-ERROR-1, B1, AC-VERIFY-1)', () => {
     ]);
     expect(failure(TopUpRequest, { amount: '30.00' })[0]?.path).toEqual(['idempotencyKey']);
     expect(failure(TopUpRequest, { amount: 30, idempotencyKey: KEY })[0]?.path).toEqual(['amount']);
+  });
+});
+
+describe('top-up headroom copy and the start-path contracts (Phase 4a)', () => {
+  it('states the most a member can top up, or that the wallet is full', () => {
+    expect(topUpHeadroomMessage(parseMoney('10.00'))).toBe('You can top up at most $10.00.');
+    expect(topUpHeadroomMessage(parseMoney('0.00'))).toBe('Your wallet is full.');
+  });
+
+  it('WalletQuery takes the return-page topUp id (a uuid) next to the cursor, and nothing else', () => {
+    expect(WalletQuery.parse({ topUp: ID })).toEqual({ topUp: ID });
+    expect(failure(WalletQuery, { topUp: 'nope' })[0]?.path).toEqual(['topUp']);
+    expect(failure(WalletQuery, { other: '1' })[0]?.code).toBe('unrecognized_keys');
+  });
+
+  it('PaymentIdParams needs a uuid payment id', () => {
+    expect(PaymentIdParams.parse({ paymentId: ID })).toEqual({ paymentId: ID });
+    expect(failure(PaymentIdParams, { paymentId: 'x' })[0]?.path).toEqual(['paymentId']);
+  });
+
+  it('IntentErrorResponse carries the resume block of an in-progress 409 and the reason of a refused start', () => {
+    const inProgress = {
+      error: {
+        code: 'top_up_in_progress',
+        message: 'm',
+        resume: {
+          redirectUrl: 'https://pay.example/consent',
+          topUp: { id: ID, amount: '20.00', status: 'OPEN' },
+        },
+      },
+    };
+    expect(IntentErrorResponse.parse(inProgress)).toEqual(inProgress);
+    const refused = {
+      error: { code: 'payment_provider_refused', message: 'm', reason: 'payee_unusable' },
+    };
+    expect(IntentErrorResponse.parse(refused)).toEqual(refused);
+    expect(
+      IntentErrorResponse.parse({
+        error: {
+          code: 'payment_in_progress',
+          message: 'm',
+          resume: { redirectUrl: null, topUp: null },
+        },
+      }).error.resume,
+    ).toEqual({ redirectUrl: null, topUp: null });
   });
 });
 

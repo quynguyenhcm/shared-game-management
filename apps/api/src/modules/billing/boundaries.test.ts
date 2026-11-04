@@ -3,8 +3,11 @@
  * counterpart of `registrations/boundaries.test.ts` for the money tables:
  *
  * - `payment_line_items` and `billing_session_blocks` are written only from `modules/billing/engine-repo.ts`; `payments` only from
- *   there and from `modules/billing/overdue.ts` (the daily job's OVERDUE flip and its minimal PAID apply, until Phase 4's
- *   `applyAkahuResult` takes over the latter); `payment_reminders` only from `modules/billing/reminders.ts`.
+ *   there, from `modules/billing/overdue.ts` (the daily job's OVERDUE flip) and from the single Akahu apply funnel
+ *   `modules/billing/apply-akahu-result.ts` (PAID and the CR-27 grace; CR-3: no second apply path), which is also the only file
+ *   that moves a payment to PAID; `payment_reminders` only from `modules/billing/reminders.ts`.
+ * - The intent tables `payment_attempts` and `wallet_top_ups` are written only from the funnel and the reconcile sweep
+ *   `modules/billing/reconcile.ts` (stale CREATING); Phase 4a part 2 adds the start paths.
  * - `player_credits` and `credit_transactions` are written only from `modules/wallet/ledger.ts`.
  * - `game_sessions.status = 'COMPLETED'` is written only by the billing engine; `payments.status = 'OVERDUE'` only by
  *   `modules/billing/overdue.ts` (C-BIL-2: only billing's daily-overdue job writes OVERDUE; the job file is a thin handler).
@@ -55,19 +58,97 @@ const ENGINE = 'modules/billing/engine-repo.ts';
 const LEDGER = 'modules/wallet/ledger.ts';
 const OVERDUE = 'modules/billing/overdue.ts';
 const REMINDERS = 'modules/billing/reminders.ts';
+const APPLY = 'modules/billing/apply-akahu-result.ts';
+const RECONCILE = 'modules/billing/reconcile.ts';
+const ATTEMPTS_REPO = 'modules/billing/attempts-repo.ts';
+const TOP_UP_REPO = 'modules/wallet/top-up-repo.ts';
+const PAYOUT_BLOCK = 'modules/billing/payout-block.ts';
+const HOLD_RESOLUTION = 'modules/billing/hold-resolution.ts';
+const sorted = (files: readonly string[]): string[] => [...files].sort();
 
 describe('single writers of money state', () => {
   it('has the writer files to guard', () => {
     const files = all.map(({ rel }) => rel);
-    expect(files).toEqual(expect.arrayContaining([ENGINE, LEDGER, OVERDUE, REMINDERS]));
+    expect(files).toEqual(
+      expect.arrayContaining([
+        ENGINE,
+        LEDGER,
+        OVERDUE,
+        REMINDERS,
+        APPLY,
+        RECONCILE,
+        ATTEMPTS_REPO,
+        TOP_UP_REPO,
+        PAYOUT_BLOCK,
+        HOLD_RESOLUTION,
+      ]),
+    );
   });
 
   it('payment_line_items and billing_session_blocks are written only from billing/engine-repo.ts', () => {
     expect(writers(writeTo(['payment_line_items', 'billing_session_blocks']))).toEqual([ENGINE]);
   });
 
-  it('payments are written only from billing/engine-repo.ts (insert) and billing/overdue.ts (OVERDUE flip, minimal PAID apply)', () => {
-    expect(writers(writeTo(['payments']))).toEqual([ENGINE, OVERDUE]);
+  it('payments are written only from billing/engine-repo.ts (insert), billing/overdue.ts (OVERDUE flip) and the Akahu apply funnel', () => {
+    expect(sorted(writers(writeTo(['payments'])))).toEqual(sorted([ENGINE, OVERDUE, APPLY]));
+  });
+
+  it('a payment is moved to PAID only by the Akahu apply funnel (CR-3: no second apply path)', () => {
+    const paid = /\.set\(\s*\{\s*status:\s*'PAID'|SET\s+status\s*=\s*'PAID'/i;
+    expect(paid.test(`trx.updateTable('payments').set({ status: 'PAID', paid_at: now })`)).toBe(
+      true,
+    );
+    expect(writers(paid)).toEqual([APPLY]);
+  });
+
+  it('payment_attempts and wallet_top_ups are written only from the apply funnel, the reconcile sweep and one start-path repo each', () => {
+    expect(sorted(writers(writeTo(['payment_attempts', 'wallet_top_ups'])))).toEqual(
+      sorted([APPLY, RECONCILE, ATTEMPTS_REPO, TOP_UP_REPO]),
+    );
+    // Each start path writes only its own intent table.
+    expect(writers(writeTo(['payment_attempts']))).not.toContain(TOP_UP_REPO);
+    expect(writers(writeTo(['wallet_top_ups']))).not.toContain(ATTEMPTS_REPO);
+  });
+
+  it('a start path never moves an intent past OPEN: APPLIED, UNAPPLIED and HELD are written only by the apply funnel', () => {
+    const settles =
+      /status:\s*'(?:APPLIED|UNAPPLIED|HELD)'|SET\s+status\s*=\s*'(?:APPLIED|UNAPPLIED|HELD)'/;
+    for (const rel of [ATTEMPTS_REPO, TOP_UP_REPO, RECONCILE]) {
+      const file = all.find((entry) => entry.rel === rel);
+      expect(file?.code, rel).not.toMatch(settles);
+    }
+  });
+
+  it('the payments gateway is called (create, read, cancel) only from the shared start step, the apply funnel, the cancel job, daily-overdue (CR-27 re-read) and the hold resolution (CR-26 re-read)', () => {
+    const calls = /\.(?:createPayment|getPayment|cancelPayment)\(/;
+    expect(sorted(writers(calls))).toEqual(
+      sorted(['lib/akahu/start.ts', APPLY, 'modules/billing/cancel.ts', OVERDUE, HOLD_RESOLUTION]),
+    );
+  });
+
+  it('a hold is resolved only through the apply funnel: the hold-resolution file re-reads Akahu but writes nothing (CR-15)', () => {
+    const file = all.find((entry) => entry.rel === HOLD_RESOLUTION);
+    expect(file?.code).not.toMatch(
+      writeTo(['payments', 'payment_attempts', 'wallet_top_ups', 'player_credits']),
+    );
+  });
+
+  it('payout_block_events and a payout block (teams.payout_blocked_at set) are written only from billing/payout-block.ts (A3, CR-14)', () => {
+    expect(writers(writeTo(['payout_block_events']))).toEqual([PAYOUT_BLOCK]);
+    // Setting the block (anything but null) outside team-banking, whose banking save clears it (R3).
+    const sets = /payout_blocked_at:(?!\s*null\b)|SET\s+payout_blocked_at\s*=(?!\s*NULL\b)/i;
+    expect(sets.test(`.set({ payout_blocked_at: now })`)).toBe(true);
+    expect(sets.test(`.set({ payout_blocked_at: null })`)).toBe(false);
+    expect(writers(sets).filter((rel) => !rel.startsWith('modules/team-banking/'))).toEqual([
+      PAYOUT_BLOCK,
+    ]);
+    // Billing writes the teams row only to set the block, and never a banking column.
+    const billing = all.filter(({ rel }) => rel.startsWith('modules/billing/'));
+    expect(
+      billing.filter(({ code }) => writeTo(['teams']).test(code)).map(({ rel }) => rel),
+    ).toEqual([PAYOUT_BLOCK]);
+    const block = all.find((entry) => entry.rel === PAYOUT_BLOCK);
+    expect(block?.code).not.toMatch(/bank_account_\w+\s*:/);
   });
 
   it('payment_reminders is written only from billing/reminders.ts', () => {
@@ -141,7 +222,8 @@ describe('imports of billing and wallet', () => {
       rel.startsWith('modules/wallet/') ||
       rel === 'jobs/bill-session.ts' ||
       rel === 'jobs/post-game-billing.ts' ||
-      rel === 'jobs/daily-overdue.ts',
+      rel === 'jobs/daily-overdue.ts' ||
+      rel === 'jobs/akahu-jobs.ts',
   );
   const PUBLIC = new Set([
     '../registrations/billing-handoff.ts',
@@ -186,7 +268,8 @@ describe('exact money and observability in billing and wallet code (AC-VERIFY-4,
       rel.startsWith('modules/wallet/') ||
       rel === 'jobs/bill-session.ts' ||
       rel === 'jobs/post-game-billing.ts' ||
-      rel === 'jobs/daily-overdue.ts',
+      rel === 'jobs/daily-overdue.ts' ||
+      rel === 'jobs/akahu-jobs.ts',
   );
 
   it('uses no floating-point arithmetic or parsing for money', () => {

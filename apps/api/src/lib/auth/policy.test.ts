@@ -153,9 +153,10 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 39 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
-    // + four registration routes + two billing routes, both asserted below), none public.
-    expect(byRoute.size).toBe(39);
+    // Exactly the 44 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
+    // + four registration routes + two admin billing routes + three member wallet/payment routes + the payout block and the
+    // top-up hold resolution, all asserted below), none public.
+    expect(byRoute.size).toBe(44);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });
@@ -200,6 +201,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
     for (const route of [
       'GET /teams/:teamId/payments',
       'POST /teams/:teamId/payments/:paymentId/reminders',
+      // H2: a top-up hold is resolved by an admin of the payee team or a GLOBAL_ADMIN.
+      'POST /teams/:teamId/wallet/top-ups/:topUpId/hold-resolution',
     ]) {
       expect(byRoute.get(route), route).toEqual({
         kind: 'teamRole',
@@ -208,6 +211,56 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: true,
       });
     }
+    await app.close();
+  });
+
+  it('declares MEMBER (no global-admin bypass) on the member wallet routes and authenticated() on the payer routes (billing AC-VERIFY-1)', async () => {
+    const app = await buildApp(inertAppDeps(logger));
+    const byRoute = new Map(
+      listRoutePolicies(app)
+        .filter((entry) => entry.method !== 'HEAD')
+        .map((entry) => [`${entry.method} ${entry.url}`, entry.policy]),
+    );
+    for (const route of [
+      'GET /teams/:teamId/wallet',
+      'POST /teams/:teamId/wallet/top-ups',
+      'GET /teams/:teamId/payments/me',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({
+        kind: 'teamRole',
+        role: 'MEMBER',
+        teamIdParam: 'teamId',
+        allowGlobalAdmin: false,
+      });
+    }
+    // Payer-scoped: the payment is resolved by its id AND the caller, never by a team role.
+    for (const route of [
+      'GET /payments/me',
+      'GET /payments/:paymentId',
+      'POST /payments/:paymentId/attempts',
+    ]) {
+      expect(byRoute.get(route), route).toEqual({ kind: 'authenticated' });
+    }
+    expect(byRoute.get('POST /webhooks/akahu')).toEqual({ kind: 'public' });
+    await app.close();
+  });
+
+  it('declares GLOBAL_ADMIN on the payout block and an in-service payee-team check on the payment hold resolution (A3, CR-14, H2)', async () => {
+    const app = await buildApp(inertAppDeps(logger));
+    const byRoute = new Map(
+      listRoutePolicies(app)
+        .filter((entry) => entry.method !== 'HEAD')
+        .map((entry) => [`${entry.method} ${entry.url}`, entry.policy]),
+    );
+    // Ops only: a TEAM_ADMIN must not be able to block their own payouts as a way to stop collections.
+    expect(byRoute.get('POST /teams/:teamId/payout-block')).toEqual({
+      kind: 'globalRole',
+      roles: ['GLOBAL_ADMIN'],
+    });
+    // The payment's team is not in the path: the service checks the payee team (uniform 404 for everyone else).
+    expect(byRoute.get('POST /payments/:paymentId/hold-resolution')).toEqual({
+      kind: 'authenticated',
+    });
     await app.close();
   });
 

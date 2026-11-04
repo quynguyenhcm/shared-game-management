@@ -496,24 +496,24 @@ describe('daily-overdue re-reads Akahu before deciding (ruling H1, CR-27)', () =
     expect(gatewayReads).toContain(c.akahuPaymentId);
   });
 
-  it('marks a payment Akahu reports SENT (right amount) as PAID with paid_at = now, never OVERDUE, and sends no overdue email', async () => {
+  it('marks a payment Akahu reports SENT (right amount) as PAID through the apply funnel: paid_at = now, never OVERDUE, payment-received email only', async () => {
     const c = await withAttempt({ script: { providerStatus: 'SENT' } });
     await runOverdue();
     const payment = await paymentOf(c.paymentId);
     expect(payment.status).toBe('PAID');
     expect(payment.paid_at?.toISOString()).toBe(BASE.toISOString());
     expect((await attemptOf(c.attemptId)).status).toBe('APPLIED');
-    expect(emails()).toHaveLength(0);
+    expect(emailKeys()).toEqual([`payment-received:${c.paymentId}`]);
   });
 
-  it('holds an attempt Akahu reports SENT for a different amount (AMOUNT_MISMATCH) and leaves the payment untouched', async () => {
+  it('holds an attempt Akahu reports SENT for a different amount (AMOUNT_MISMATCH) through the funnel, leaves the payment untouched and sends the held notice', async () => {
     const c = await withAttempt({ cents: 1600, script: { providerStatus: 'SENT' } });
     await runOverdue();
     expect(await statusOf(c.paymentId)).toBe('PENDING');
     const attempt = await attemptOf(c.attemptId);
     expect(attempt.status).toBe('HELD');
     expect(attempt.hold_reason).toBe('AMOUNT_MISMATCH');
-    expect(emails()).toHaveLength(0);
+    expect(emailKeys()).toEqual([`payment-held:${c.attemptId}`]);
   });
 
   it('leaves the payment untouched and logs billing.overdue.deferred (ids and reason only) when the re-read fails', async () => {
@@ -593,7 +593,7 @@ describe('daily-overdue re-reads Akahu before deciding (ruling H1, CR-27)', () =
     ['SETTLEMENT_IN_PROGRESS', 'CANCELLED', 'USER_CANCELLED', 'PENDING'],
     ['READY', 'CANCELLED', 'USER_CANCELLED', 'OVERDUE'],
   ])(
-    'a NOT_CHARGED re-read with stored mirror %s (%s/%s) leaves the payment %s',
+    'a NOT_CHARGED re-read with stored mirror %s (%s/%s) closes the attempt and leaves the payment %s',
     async (mirror, providerStatus, reason, expected) => {
       const c = await withAttempt({
         mirror,
@@ -601,16 +601,34 @@ describe('daily-overdue re-reads Akahu before deciding (ruling H1, CR-27)', () =
       });
       await runOverdue();
       expect(await statusOf(c.paymentId)).toBe(expected);
+      expect((await attemptOf(c.attemptId)).status).toBe('CLOSED');
+      if (expected === 'PENDING') {
+        // CR-27: the funnel's grace write moved the due date to now + 24 h, so the guarded flip leaves it.
+        expect((await paymentOf(c.paymentId)).due_date.toISOString()).toBe(
+          new Date(BASE.getTime() + DAY).toISOString(),
+        );
+        expect(emailKeys()).toEqual([`payment-not-completed:${c.attemptId}`]);
+      } else {
+        expect(emailKeys()).toEqual([`payment-overdue:${c.paymentId}`]);
+      }
     },
   );
 
-  it('skips an INDETERMINATE re-read, untouched', async () => {
+  it('holds an INDETERMINATE re-read through the funnel and skips the payment', async () => {
     const c = await withAttempt({
       script: { providerStatus: 'FAILED', providerStatusReason: 'BANK_ERROR_INDETERMINATE' },
     });
     await runOverdue();
     expect(await statusOf(c.paymentId)).toBe('PENDING');
-    expect((await attemptOf(c.attemptId)).status).toBe('OPEN');
+    expect((await attemptOf(c.attemptId)).status).toBe('HELD');
+    expect(emailKeys()).toEqual([`payment-held:${c.attemptId}`]);
+  });
+
+  it('records the fresh in-flight status on the attempt (forward-only mirror) while skipping the payment', async () => {
+    const c = await withAttempt({ script: { providerStatus: 'AUTHORISED' } });
+    await runOverdue();
+    expect(await statusOf(c.paymentId)).toBe('PENDING');
+    expect((await attemptOf(c.attemptId)).akahu_status).toBe('AUTHORISED');
   });
 
   it('never calls Akahu inside a database transaction, and the probe can tell (positive control)', async () => {

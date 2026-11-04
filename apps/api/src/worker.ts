@@ -75,6 +75,7 @@ try {
       nodeEnv: config.nodeEnv,
       clock: systemClock,
     }),
+    payments: config.payments,
     runner,
     notifier,
     // Opens the sealed reset emails; the keyring is validated here at boot, as in the API.

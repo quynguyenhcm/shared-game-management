@@ -9,6 +9,8 @@ export const KEY_FETCH_CAP_PER_MINUTE = 6;
 export const KEY_CACHE_POSITIVE_MAX = 32;
 export const KEY_CACHE_NEGATIVE_MAX = 256;
 export const SYNC_THROTTLE_MS = 5_000;
+/** An open intent's consent URL is handed out again only while its link has at least this long left (RF-6, CR-6). */
+export const RESUME_MIN_REMAINING_MS = 120_000;
 export const READ_429_MAX_RETRIES = 2;
 
 /** Webhook request body cap (`POST /webhooks/akahu`). */

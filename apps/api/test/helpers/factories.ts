@@ -4,7 +4,7 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
-import { createCrypto } from '../../src/lib/crypto/crypto.ts';
+import { createCrypto, type FieldCrypto } from '../../src/lib/crypto/crypto.ts';
 import { createKeyProvider } from '../../src/lib/crypto/keyring.ts';
 import { inTransaction, type Queryable } from './test-db.ts';
 
@@ -160,14 +160,15 @@ export const testFieldCrypto = createCrypto(
 export function payoutBlockFor(
   teamId: string,
   block: { accountName?: string; accountNumber?: string; last4?: string } = {},
+  sealWith: FieldCrypto = testFieldCrypto,
 ): { name: string; number: string; last4: string } {
   return {
-    name: testFieldCrypto.encrypt(block.accountName ?? 'Test Club Account', {
+    name: sealWith.encrypt(block.accountName ?? 'Test Club Account', {
       table: 'teams',
       column: 'bank_account_name',
       rowId: teamId,
     }),
-    number: testFieldCrypto.encrypt(block.accountNumber ?? '01-0902-0068389-000', {
+    number: sealWith.encrypt(block.accountNumber ?? '01-0902-0068389-000', {
       table: 'teams',
       column: 'bank_account_number',
       rowId: teamId,
@@ -186,12 +187,18 @@ export interface TeamOptions {
   readonly payoutBlockedAt?: Date;
   readonly gstRegistered?: boolean;
   readonly gstNumber?: string;
+  /**
+   * Seals the payout block with this crypto instead of the throwaway test keyring: pass the app's keyring (`testCrypto()`) when
+   * the API itself must open the payee (top-up and attempt starts, B10).
+   */
+  readonly sealWith?: FieldCrypto;
 }
 
 /** A team with a 256-bit base64url invite code (matches the `teams_invite_code_format` CHECK). */
 export async function insertTeam(db: Queryable, options: TeamOptions = {}): Promise<string> {
   const id = randomUUID();
-  const block = options.payoutConfigured === true ? payoutBlockFor(id) : undefined;
+  const block =
+    options.payoutConfigured === true ? payoutBlockFor(id, {}, options.sealWith) : undefined;
   return insertId(
     db,
     `INSERT INTO teams (id, name, visibility, invite_code, bank_account_name, bank_account_number,
@@ -730,40 +737,96 @@ export interface AttemptInput {
   readonly paymentId: string;
   /** The payment's amount (an attempt pays the stored amount). */
   readonly amount: string;
-  /** A blocking state; OPEN and HELD walk the legal path (CREATING -> OPEN -> HELD) one UPDATE per step. */
-  readonly status: 'CREATING' | 'OPEN' | 'HELD';
+  /**
+   * OPEN, HELD and CLOSED walk the legal path (CREATING -> OPEN -> HELD | CLOSED) one UPDATE per step, so the transition
+   * guard accepts every row this factory makes.
+   */
+  readonly status: 'CREATING' | 'OPEN' | 'HELD' | 'CLOSED';
   /** Required from OPEN on; the fake adapter reads `fake_<scenario>_<cents>_<createdAtMs>_<rand>`. */
   readonly akahuPaymentId?: string;
   /** The stored mirror of Akahu's status (`READY`, `AUTHORISED`, ...); default READY for OPEN. */
   readonly akahuStatus?: string;
+  readonly holdReason?: 'INDETERMINATE' | 'AMOUNT_MISMATCH';
+  /** Default `now()` (database clock); set for age-based reconcile tests. */
+  readonly createdAt?: Date;
+  /** HELD: `held_at`; CLOSED: `closed_at`. Default `now()`. */
+  readonly settledAt?: Date;
+  readonly lastSyncedAt?: Date | null;
 }
 
 /** A syntactically valid sealed authorisation URL (the column CHECK checks the envelope format only). */
 const FAKE_AUTHORISATION_ENVELOPE = 'v1.dev1.AAAAAAAAAAAAAAAA.AAAA.AAAAAAAAAAAAAAAAAAAAAA';
 
-/** A blocking payment attempt (at most one per payment). Returns its id. */
-export async function insertPaymentAttempt(db: Queryable, input: AttemptInput): Promise<string> {
-  const id = await insertId(
-    db,
-    `INSERT INTO payment_attempts (payment_id, idempotency_key, amount) VALUES ($1, $2, $3) RETURNING id`,
-    [input.paymentId, randomUUID(), input.amount],
-  );
-  if (input.status === 'CREATING') return id;
-  if (input.akahuPaymentId === undefined)
-    throw new Error('insertPaymentAttempt: akahuPaymentId required');
+/** Walks an intent row of `table` from CREATING to the requested state, one legal transition per UPDATE. */
+async function walkIntent(
+  db: Queryable,
+  table: 'payment_attempts' | 'wallet_top_ups',
+  id: string,
+  input: Omit<AttemptInput, 'paymentId' | 'amount' | 'createdAt'>,
+): Promise<void> {
+  if (input.status === 'CREATING') return;
+  if (input.akahuPaymentId === undefined) throw new Error(`${table}: akahuPaymentId required`);
   await db.query(
-    `UPDATE payment_attempts
+    `UPDATE ${table}
         SET status = 'OPEN', akahu_payment_id = $2, akahu_status = $3, authorisation_url_enc = $4,
-            expires_at = now() + interval '30 minutes'
+            expires_at = now() + interval '30 minutes', last_synced_at = $5
       WHERE id = $1`,
-    [id, input.akahuPaymentId, input.akahuStatus ?? 'READY', FAKE_AUTHORISATION_ENVELOPE],
+    [
+      id,
+      input.akahuPaymentId,
+      input.akahuStatus ?? 'READY',
+      FAKE_AUTHORISATION_ENVELOPE,
+      input.lastSyncedAt ?? null,
+    ],
   );
   if (input.status === 'HELD') {
     await db.query(
-      `UPDATE payment_attempts SET status = 'HELD', hold_reason = 'INDETERMINATE', held_at = now() WHERE id = $1`,
-      [id],
+      `UPDATE ${table} SET status = 'HELD', hold_reason = $2, held_at = coalesce($3, now()) WHERE id = $1`,
+      [id, input.holdReason ?? 'INDETERMINATE', input.settledAt ?? null],
     );
   }
+  if (input.status === 'CLOSED') {
+    await db.query(
+      `UPDATE ${table} SET status = 'CLOSED', close_reason = 'akahu:CANCELLED', closed_at = coalesce($2, now())
+        WHERE id = $1`,
+      [id, input.settledAt ?? null],
+    );
+  }
+}
+
+/** A payment attempt (at most one blocking attempt per payment). Returns its id. */
+export async function insertPaymentAttempt(db: Queryable, input: AttemptInput): Promise<string> {
+  const id = await insertId(
+    db,
+    `INSERT INTO payment_attempts (payment_id, idempotency_key, amount, created_at)
+     VALUES ($1, $2, $3, coalesce($4, now())) RETURNING id`,
+    [input.paymentId, randomUUID(), input.amount, input.createdAt ?? null],
+  );
+  await walkIntent(db, 'payment_attempts', id, input);
+  return id;
+}
+
+export interface TopUpInput extends Omit<AttemptInput, 'paymentId'> {
+  readonly userId: string;
+  readonly teamId: string;
+}
+
+/** A wallet top-up intent (at most one blocking top-up per wallet). Returns its id. */
+export async function insertWalletTopUp(db: Queryable, input: TopUpInput): Promise<string> {
+  const id = await insertId(
+    db,
+    `INSERT INTO wallet_top_ups (user_id, team_id, reference, idempotency_key, amount, created_at)
+     VALUES ($1, $2, $3, $4, $5, coalesce($6, now())) RETURNING id`,
+    [
+      input.userId,
+      input.teamId,
+      paymentReference(),
+      randomUUID(),
+      input.amount,
+      input.createdAt ?? null,
+    ],
+  );
+  await walkIntent(db, 'wallet_top_ups', id, input);
   return id;
 }
 

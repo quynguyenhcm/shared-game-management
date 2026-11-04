@@ -16,7 +16,7 @@ import { createNotifier } from '../../src/lib/notifications/notifier.ts';
 import { TransientDeliveryError } from '../../src/lib/notifications/errors.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
 import { freePort, spawnNode } from '../helpers/spawn-node.ts';
-import { testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { sleep, waitFor } from '../helpers/wait-for.ts';
 import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
@@ -63,6 +63,7 @@ beforeAll(async () => {
   // The production wiring, with a short retry policy on send-email so AC-ERROR-6 runs in seconds.
   await registerJobs({
     paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,
@@ -383,13 +384,14 @@ describe('schedules (AC-ASYNC-2)', () => {
     expect(next('2027-04-02T15:00:01Z')).toBe('2027-04-03T16:00:00.000Z');
   });
 
-  it('lists all six slots, and the recurrence sweep, every placeholder and heartbeat can be triggered manually and observed', async () => {
+  it('lists all seven slots, and the recurrence sweep, every placeholder and heartbeat can be triggered manually and observed', async () => {
     const schedules = await worker.listSchedules();
     expect(
       schedules
         .map(({ name, cron, tz }) => ({ name, cron, tz }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     ).toEqual([
+      { name: 'akahu-reconcile', cron: '*/15 * * * *', tz: 'Pacific/Auckland' },
       { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
@@ -431,6 +433,16 @@ describe('schedules (AC-ASYNC-2)', () => {
         .find((line) => line.event === 'billing.overdue.marked' && line.jobId === overdueId),
       'daily-overdue',
     ).toMatchObject({ count: expect.any(Number) as number });
+    // The akahu-reconcile slot has its real sweep (wallet-and-akahu-billing Phase 4a): it logs its counts.
+    const reconcileId = await worker.trigger('akahu-reconcile', { source: 'integration-test' });
+    expect(reconcileId, 'akahu-reconcile').toEqual(expect.any(String));
+    await waitForState('akahu-reconcile', reconcileId as string, 'completed');
+    expect(
+      workerLogs
+        .lines()
+        .find((line) => line.event === 'akahu.reconcile.completed' && line.jobId === reconcileId),
+      'akahu-reconcile',
+    ).toMatchObject({ checked: expect.any(Number) as number, stoppedEarly: false });
     const heartbeat = await worker.trigger('heartbeat', { source: 'integration-test' });
     await waitForState('heartbeat', heartbeat as string, 'completed');
   });

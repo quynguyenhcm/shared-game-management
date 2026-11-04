@@ -1,6 +1,7 @@
 /**
  * Billing's READ queries for the payment routes and the daily job's emails (wallet-and-akahu-billing Phase 3). Nothing here writes:
- * `payments` is written only by `engine-repo.ts` and `overdue.ts`, `payment_reminders` only by `reminders.ts` (boundaries.test).
+ * `payments` is written only by `engine-repo.ts`, `overdue.ts` and `apply-akahu-result.ts`, `payment_reminders` only by
+ * `reminders.ts` (boundaries.test).
  * Every function takes a Kysely handle or the caller's transaction and reads no clock.
  *
  * The admin list never selects an email address, a bank column or an Akahu field: a payer is a name and a user id.
@@ -196,4 +197,37 @@ export async function countOverdueByUsers(
     .execute();
   for (const row of rows) counts.set(row.user_id, parseInt(row.overdue, 10));
   return counts;
+}
+
+export interface TopUpEmailFacts {
+  readonly topUpId: string;
+  readonly userId: string;
+  readonly email: string;
+  readonly fullName: string;
+  readonly teamId: string;
+  readonly teamName: string;
+}
+
+/** What a top-up email needs: the payer's address and name and the team (a plain read; nothing here is locked). */
+export async function readTopUpEmailFacts(
+  db: Kysely<DB>,
+  topUpId: string,
+): Promise<TopUpEmailFacts | undefined> {
+  const row = await db
+    .selectFrom('wallet_top_ups as w')
+    .innerJoin('users as u', 'u.id', 'w.user_id')
+    .innerJoin('teams as t', 't.id', 'w.team_id')
+    .select(['w.id', 'w.user_id', 'u.email', 'u.full_name', 'w.team_id', 't.name as team_name'])
+    .where('w.id', '=', topUpId)
+    .executeTakeFirst();
+  return row === undefined
+    ? undefined
+    : {
+        topUpId: row.id,
+        userId: row.user_id,
+        email: row.email,
+        fullName: row.full_name,
+        teamId: row.team_id,
+        teamName: row.team_name,
+      };
 }

@@ -19,7 +19,7 @@ import { createJobRunner, type EnqueueOptions, type JobRunner } from '../../src/
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 import { createRegistrationsBanHandler } from '../../src/modules/registrations/ban-handler.ts';
 import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
-import { testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
@@ -74,6 +74,7 @@ beforeAll(async () => {
   };
   await registerJobs({
     paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

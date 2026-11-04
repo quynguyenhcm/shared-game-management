@@ -17,7 +17,7 @@ import { runPostGameBillingSweep } from '../../src/modules/billing/sweep.ts';
 import { createAllocator, type GuestInput } from '../../src/modules/registrations/allocator.ts';
 import { HTTP_POLICY, runAllocatorTransaction } from '../../src/modules/registrations/tx.ts';
 import { noopSessionAllocator } from '../../src/modules/sessions/allocator-port.ts';
-import { testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import {
   advanceSessionTo,
   insertRegistration,
@@ -990,6 +990,7 @@ describe('AC-INTEGRATION-2: the worker bills registrations produced by the real 
     await flowWorker.start();
     await registerJobs({
       paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner: flowWorker,
       notifier,
       crypto,

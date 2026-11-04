@@ -29,7 +29,7 @@ import {
   type MemberBannedOutcome,
 } from '../../src/modules/teams/ban-hook.ts';
 import { assertApprovedMember } from '../../src/modules/teams/membership.ts';
-import { testCrypto, testPaymentsGateway } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
@@ -106,6 +106,7 @@ beforeAll(async () => {
   });
   await registerJobs({
     paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

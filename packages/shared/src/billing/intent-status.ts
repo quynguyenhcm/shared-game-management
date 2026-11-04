@@ -37,6 +37,39 @@ export function isBlockingIntent(status: PaymentIntentStatus): boolean {
   return BLOCKING_INTENT_STATUSES.includes(status);
 }
 
+/** What a page says about the latest attempt or top-up (CR-17); the same enum as the `IntentOutcome` contract. */
+export type IntentOutcomeValue = 'processing' | 'cancelled' | 'failed' | 'held' | 'none';
+
+/**
+ * The read-model outcome of an intent. CREATING and OPEN are in progress; HELD is under review; APPLIED and UNAPPLIED say
+ * nothing here (the payment status or the B3 notice does). A CLOSED intent is `failed` when the bank declined it or the
+ * provider could not start it (`akahu:FAILED...`, `create_unavailable`, `create_refused:...`), otherwise `cancelled` (the payer
+ * cancelled, the link expired, or the create was abandoned before anyone saw a link).
+ */
+export function intentOutcome(
+  intent: { readonly status: PaymentIntentStatus; readonly closeReason: string | null } | null,
+): IntentOutcomeValue {
+  if (intent === null) return 'none';
+  switch (intent.status) {
+    case 'CREATING':
+    case 'OPEN':
+      return 'processing';
+    case 'HELD':
+      return 'held';
+    case 'APPLIED':
+    case 'UNAPPLIED':
+      return 'none';
+    case 'CLOSED': {
+      const reason = intent.closeReason ?? '';
+      return reason.startsWith('akahu:FAILED') ||
+        reason === 'create_unavailable' ||
+        reason.startsWith('create_refused')
+        ? 'failed'
+        : 'cancelled';
+    }
+  }
+}
+
 /** True for a legal move; a same-status write (a mirror refresh) is not a transition and is always accepted. */
 export function canTransitionIntent(
   from: PaymentIntentStatus,

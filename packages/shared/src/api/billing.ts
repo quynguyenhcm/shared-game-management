@@ -10,9 +10,10 @@
  * Validation messages are the copy deck of the UI/UX document and never echo input.
  */
 import { z } from 'zod';
-import { lt, isNegative, isZero, parseMoney, type Money } from '../money/money.ts';
+import { formatNZD, lt, isNegative, isZero, parseMoney, type Money } from '../money/money.ts';
 import { moneyStringSchema } from '../money/zod.ts';
 import { TOP_UP_MINIMUM } from '../billing/wallet-limits.ts';
+import { ErrorResponse } from './errors.ts';
 import {
   BillingType,
   CreditTransactionType,
@@ -34,6 +35,16 @@ export const BILLING_FIELD_MESSAGES = {
 } as const;
 
 const M = BILLING_FIELD_MESSAGES;
+
+/**
+ * The 422 field message for a top-up the wallet cannot take (AC-ERROR-1, B1): the most the member can still add, or that the
+ * wallet is full. Checked by the server against the balance it reads after claiming the top-up slot (CR-24).
+ */
+export function topUpHeadroomMessage(headroom: Money): string {
+  return isZero(headroom)
+    ? 'Your wallet is full.'
+    : `You can top up at most ${formatNZD(headroom)}.`;
+}
 
 const isoInstant = z.iso.datetime();
 const key = z.uuidv4({ error: M.keyInvalid });
@@ -91,8 +102,8 @@ export type SendReminderRequest = z.infer<typeof SendReminderRequest>;
 
 /**
  * `POST /payments/:paymentId/hold-resolution` and `POST /teams/:teamId/wallet/top-ups/:topUpId/hold-resolution`
- * (GLOBAL_ADMIN only; CR-15, CR-26). `observedAmount` accompanies RECEIVED: for an AMOUNT_MISMATCH hold the server
- * applies it only when it equals the intent amount.
+ * (team admins of the payee team or GLOBAL_ADMIN, ruling H2; CR-15, CR-26). `observedAmount` accompanies RECEIVED: it is
+ * required for an AMOUNT_MISMATCH hold, and the server applies the payment only when it equals the intent amount.
  */
 export const HoldResolutionRequest = z
   .strictObject({
@@ -121,6 +132,10 @@ export type PayoutBlockRequest = z.infer<typeof PayoutBlockRequest>;
 export const TeamPaymentParams = z.object({ teamId: z.uuid(), paymentId: z.uuid() });
 export type TeamPaymentParams = z.infer<typeof TeamPaymentParams>;
 
+/** `:teamId` and `:topUpId` of the top-up hold resolution: a top-up is always resolved together with its team. */
+export const TeamTopUpParams = z.object({ teamId: z.uuid(), topUpId: z.uuid() });
+export type TeamTopUpParams = z.infer<typeof TeamTopUpParams>;
+
 const cursor = z.string().min(1).max(512);
 
 /**
@@ -140,9 +155,19 @@ export const MyPaymentsQuery = z.strictObject({
 });
 export type MyPaymentsQuery = z.infer<typeof MyPaymentsQuery>;
 
-/** `GET /teams/:teamId/wallet?cursor=`: the ledger is cursor-paginated. */
-export const WalletQuery = z.strictObject({ cursor: cursor.optional() });
+/**
+ * `GET /teams/:teamId/wallet?cursor=&topUp=`: the ledger is cursor-paginated; `topUp` is the id Akahu's return lands on, which
+ * asks for one throttled re-read of that open top-up (CR-3).
+ */
+export const WalletQuery = z.strictObject({
+  cursor: cursor.optional(),
+  topUp: z.uuid().optional(),
+});
 export type WalletQuery = z.infer<typeof WalletQuery>;
+
+/** `:paymentId` of the payer routes (`/payments/:paymentId...`). */
+export const PaymentIdParams = z.object({ paymentId: z.uuid() });
+export type PaymentIdParams = z.infer<typeof PaymentIdParams>;
 
 // ---------------------------------------------------------------------------------------------
 // Responses (strict)
@@ -216,6 +241,38 @@ export type TopUpResponse = z.infer<typeof TopUpResponse>;
 /** 201 from `POST /payments/:paymentId/attempts`. */
 export const AttemptResponse = z.strictObject({ redirectUrl: z.url() });
 export type AttemptResponse = z.infer<typeof AttemptResponse>;
+
+/** Why the provider would not start a payment (422 `payment_provider_refused`): a stable enum, never the provider's text. */
+export const ProviderRefusalReason = z.enum([
+  'payee_unusable',
+  'amount_over_bank_limit',
+  'payer_bank_unavailable',
+]);
+export type ProviderRefusalReason = z.infer<typeof ProviderRefusalReason>;
+
+/**
+ * The error body of the two start routes: the shared shape plus `resume` on a 409 `payment_in_progress` /
+ * `top_up_in_progress` (CR-6: the open intent's consent URL while its link has time left, else null; the open top-up itself)
+ * and `reason` on a 422 `payment_provider_refused`.
+ */
+export const IntentErrorResponse = z.object({
+  error: ErrorResponse.shape.error.extend({
+    resume: z
+      .strictObject({
+        redirectUrl: z.url().nullable(),
+        topUp: z
+          .strictObject({
+            id: z.uuid(),
+            amount: moneyStringSchema,
+            status: z.enum(PaymentIntentStatus),
+          })
+          .nullable(),
+      })
+      .optional(),
+    reason: ProviderRefusalReason.optional(),
+  }),
+});
+export type IntentErrorResponse = z.infer<typeof IntentErrorResponse>;
 
 /** One payment of the caller, in a per-team list (`GET /teams/:teamId/payments/me`) or the cross-team unpaid list. */
 export const MyPaymentRow = z.strictObject({
@@ -331,3 +388,10 @@ export const PayoutBlockResponse = z.strictObject({
   alreadyBlocked: z.boolean(),
 });
 export type PayoutBlockResponse = z.infer<typeof PayoutBlockResponse>;
+
+/**
+ * 200 from `POST /webhooks/akahu` for every verified event, whether or not it matched an intent or changed anything (Akahu must
+ * not retry a signed event; the event is only a signal and the `akahu-sync` re-read is the truth, A4).
+ */
+export const AkahuWebhookAck = z.strictObject({ received: z.literal(true) });
+export type AkahuWebhookAck = z.infer<typeof AkahuWebhookAck>;

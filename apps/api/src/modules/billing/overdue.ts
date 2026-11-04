@@ -6,27 +6,28 @@
  * each joined to the payment's blocking attempt (CREATING, OPEN or HELD). The stored `due_date` is respected as it is, and a
  * payment of a payout-blocked team is not skipped (CR-27). The decision is made on FRESH state, not on the stored mirror:
  *
- *   no attempt, CREATING, or OPEN with Akahu still READY ... flip to OVERDUE (a link opened at 03:59 does not defer the debt)
+ *   no attempt, or CREATING .................................. flip to OVERDUE
  *   HELD ..................................................... skip, no re-read
- *   OPEN: re-read from Akahu OUTSIDE any transaction (4 at a time):
- *     AUTHORISED / SUBMITTED / SETTLEMENT_IN_PROGRESS ........ skip (the money is on its way)
- *     SENT, same amount ...................................... minimal apply: attempt APPLIED, payment PAID (no wallet, no email)
- *     SENT, other amount ..................................... attempt HELD (AMOUNT_MISMATCH), payment untouched
- *     INDETERMINATE .......................................... skip, untouched (the hold is Phase 4's)
- *     NOT_CHARGED ............................................ skip when the payer had authorised it (Phase 4's apply owns the
- *                                                              24 h grace), otherwise flip
- *     UNRECOGNISED, not found, unreachable, any throw ........ defer: untouched and logged, never flipped on stale data
- *
- * Phase 4's `applyAkahuResult` replaces the minimal PAID apply and adds the payment-received email.
+ *   OPEN: re-read from Akahu OUTSIDE any transaction (4 at a time), then the result is APPLIED through the single funnel
+ *   (`apply-akahu-result.ts`, CR-3) before deciding (CR-27 step 2):
+ *     READY (still awaiting the payer) ....................... flip (a link opened at 03:59 does not defer the debt)
+ *     AUTHORISED / SUBMITTED / SETTLEMENT_IN_PROGRESS ........ skip (the money is on its way; the mirror moves forward)
+ *     SENT ................................................... skip: the funnel marked it PAID (payment-received email) or HELD
+ *     INDETERMINATE .......................................... skip: the funnel held it
+ *     NOT_CHARGED ............................................ the funnel closed the attempt; after authorisation it also wrote the
+ *                                                              24 h grace (due date now later than now), so the payment is
+ *                                                              skipped; otherwise it is flipped
+ *     UNRECOGNISED, not found, unreachable, apply failed ..... defer: untouched and logged, never flipped on stale data
  *
  * Writes. A flip batch is ONE transaction: the candidate rows are locked `FOR UPDATE SKIP LOCKED` (a payment someone else is
  * working on, for example a payer's result being applied, is left for the next run instead of waiting), then a guarded UPDATE
  * (`status = 'PENDING' AND due_date <= now AND` no HELD attempt) flips them, and one sealed overdue email per flipped payment is
  * enqueued in the same transaction (key `payment-overdue:<paymentId>`), so a re-run the same day changes and sends nothing. Lock
- * order is payments -> payment_attempts and never a wallet. Logs are written after COMMIT and carry counts and ids only.
+ * order is payments -> payment_attempts and never a wallet. Logs are written after COMMIT and carry counts and ids only. This file
+ * writes `payments` (the OVERDUE flip) and nothing else: every attempt or PAID change is the funnel's.
  */
 import { sql } from 'kysely';
-import { eq, parseMoney, type Money } from '@sgm/shared';
+import { parseMoney, type Money } from '@sgm/shared';
 import type { PaymentsGateway, ProviderPayment } from '../../lib/akahu/gateway.ts';
 import type { Clock } from '../../lib/clock.ts';
 import type { FieldCrypto } from '../../lib/crypto/crypto.ts';
@@ -34,6 +35,7 @@ import type { Database } from '../../lib/db/kysely.ts';
 import type { JobRunner } from '../../lib/jobs/jobs.ts';
 import type { Logger } from '../../lib/logger/logger.ts';
 import { enqueueEmail } from '../../jobs/send-email.ts';
+import { applyAkahuResult, type ApplyResult } from './apply-akahu-result.ts';
 import { buildOverdueEmail } from './emails.ts';
 import { countOverdueByUsers, readPaymentEmailFacts } from './repo.ts';
 
@@ -41,9 +43,6 @@ export const OVERDUE_PAGE_SIZE = 200;
 /** How many payments are re-read from Akahu at a time (the same bound as the reconcile sweep). */
 export const OVERDUE_READ_PARALLELISM = 4;
 const LOCK_TIMEOUT_MS = 5000;
-
-/** The Akahu statuses that mean the payer has authorised the payment at the bank. */
-const AUTHORISED_MIRROR = new Set(['AUTHORISED', 'SUBMITTED', 'SETTLEMENT_IN_PROGRESS']);
 
 /** The payment's blocking attempt as stored locally. */
 export interface LocalAttempt {
@@ -58,38 +57,36 @@ export type OverdueRead = ProviderPayment | 'not_found' | 'unavailable';
 
 export type OverdueDecision =
   | { readonly kind: 'flip' }
-  | { readonly kind: 'apply_paid' }
-  | { readonly kind: 'hold_mismatch' }
+  | { readonly kind: 'skip'; readonly reason: 'held' }
+  | { readonly kind: 'defer'; readonly reason: 'unrecognised' | 'not_found' | 'unavailable' }
+  /** Apply the fresh read through the funnel first, then act on the fresh state. */
   | {
-      readonly kind: 'skip';
-      readonly reason: 'held' | 'in_flight' | 'indeterminate' | 'post_authorisation_failure';
-    }
-  | { readonly kind: 'defer'; readonly reason: 'unrecognised' | 'not_found' | 'unavailable' };
+      readonly kind: 'apply';
+      readonly then:
+        'flip' | 'skip_in_flight' | 'skip_settled' | 'skip_indeterminate' | 'flip_unless_grace';
+    };
 
 /** The pure decision table (algorithm T6, CR-27). `read` is only consulted for an OPEN attempt. */
 export function decideOverdue(
   attempt: LocalAttempt | null,
   read: OverdueRead | null,
-  paymentAmount: Money,
 ): OverdueDecision {
   if (attempt === null || attempt.status === 'CREATING') return { kind: 'flip' };
   if (attempt.status === 'HELD') return { kind: 'skip', reason: 'held' };
   if (read === null || read === 'unavailable') return { kind: 'defer', reason: 'unavailable' };
   if (read === 'not_found') return { kind: 'defer', reason: 'not_found' };
-  const { outcome } = read;
-  switch (outcome.kind) {
+  switch (read.outcome.kind) {
     case 'OPEN':
-      return outcome.phase === 'AWAITING_PAYER'
-        ? { kind: 'flip' }
-        : { kind: 'skip', reason: 'in_flight' };
+      return {
+        kind: 'apply',
+        then: read.outcome.phase === 'AWAITING_PAYER' ? 'flip' : 'skip_in_flight',
+      };
     case 'SUCCEEDED':
-      return eq(read.amount, paymentAmount) ? { kind: 'apply_paid' } : { kind: 'hold_mismatch' };
+      return { kind: 'apply', then: 'skip_settled' };
     case 'INDETERMINATE':
-      return { kind: 'skip', reason: 'indeterminate' };
+      return { kind: 'apply', then: 'skip_indeterminate' };
     case 'NOT_CHARGED':
-      return attempt.akahuStatus !== null && AUTHORISED_MIRROR.has(attempt.akahuStatus)
-        ? { kind: 'skip', reason: 'post_authorisation_failure' }
-        : { kind: 'flip' };
+      return { kind: 'apply', then: 'flip_unless_grace' };
     case 'UNRECOGNISED':
       return { kind: 'defer', reason: 'unrecognised' };
   }
@@ -211,7 +208,12 @@ export async function runDailyOverdue(deps: DailyOverdueDeps): Promise<DailyOver
     postAuthorisationFailure: 0,
     contended: 0,
   };
-  const deferrals: { paymentId: string; attemptId: string | null; reason: string }[] = [];
+  const deferrals: {
+    paymentId: string;
+    attemptId: string | null;
+    reason: string;
+    errorClass?: string;
+  }[] = [];
 
   /** The flip batch: lock what is free, flip what is still due and unheld, enqueue one email per flip. All in one transaction. */
   const flip = async (batch: readonly Candidate[]): Promise<number> => {
@@ -288,76 +290,24 @@ export async function runDailyOverdue(deps: DailyOverdueDeps): Promise<DailyOver
     return flipped.length;
   };
 
-  /** Akahu says SENT for the exact amount: PAID in one transaction (payment, then its attempt). */
-  const applyPaid = async (candidate: Candidate, read: ProviderPayment): Promise<boolean> =>
-    deps.db.transaction().execute(async (trx) => {
-      await sql.raw(`SET LOCAL lock_timeout = ${LOCK_TIMEOUT_MS}`).execute(trx);
-      const payment = await trx
-        .selectFrom('payments')
-        .select('id')
-        .where('id', '=', candidate.paymentId)
-        .where('status', '=', 'PENDING')
-        .forUpdate()
-        .skipLocked()
-        .executeTakeFirst();
-      if (payment === undefined || candidate.attemptId === null) {
-        skips.contended += 1;
-        return false;
-      }
-      const attempt = await trx
-        .updateTable('payment_attempts')
-        .set({
-          status: 'APPLIED',
-          akahu_status: read.providerStatus,
-          akahu_status_reason: read.providerStatusReason,
-          last_synced_at: now,
-        })
-        .where('id', '=', candidate.attemptId)
-        .where('status', '=', 'OPEN')
-        .returning('id')
-        .executeTakeFirst();
-      if (attempt === undefined) return false;
-      await trx
-        .updateTable('payments')
-        .set({ status: 'PAID', paid_at: now })
-        .where('id', '=', candidate.paymentId)
-        .where('status', '=', 'PENDING')
-        .execute();
-      return true;
-    });
-
-  /** Akahu says SENT for another amount: the attempt is HELD for a human; the payment is not touched. */
-  const holdMismatch = async (candidate: Candidate, read: ProviderPayment): Promise<boolean> =>
-    deps.db.transaction().execute(async (trx) => {
-      await sql.raw(`SET LOCAL lock_timeout = ${LOCK_TIMEOUT_MS}`).execute(trx);
-      const payment = await trx
-        .selectFrom('payments')
-        .select('id')
-        .where('id', '=', candidate.paymentId)
-        .where('status', '=', 'PENDING')
-        .forUpdate()
-        .skipLocked()
-        .executeTakeFirst();
-      if (payment === undefined || candidate.attemptId === null) {
-        skips.contended += 1;
-        return false;
-      }
-      const attempt = await trx
-        .updateTable('payment_attempts')
-        .set({
-          status: 'HELD',
-          hold_reason: 'AMOUNT_MISMATCH',
-          held_at: now,
-          akahu_status: read.providerStatus,
-          akahu_status_reason: read.providerStatusReason,
-          last_synced_at: now,
-        })
-        .where('id', '=', candidate.attemptId)
-        .where('status', '=', 'OPEN')
-        .returning('id')
-        .executeTakeFirst();
-      return attempt !== undefined;
-    });
+  /** Applies one fresh read through the funnel; a failure (lock timeout, ...) defers the payment instead of failing the run. */
+  const apply = async (
+    candidate: Candidate,
+    read: ProviderPayment,
+  ): Promise<ApplyResult | null> => {
+    try {
+      return await applyAkahuResult(deps, read, 'overdue');
+    } catch (error) {
+      deferrals.push({
+        paymentId: candidate.paymentId,
+        attemptId: candidate.attemptId,
+        reason: 'apply_failed',
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      totals.deferred += 1;
+      return null;
+    }
+  };
 
   let after: string | undefined;
   for (;;) {
@@ -375,34 +325,45 @@ export async function runDailyOverdue(deps: DailyOverdueDeps): Promise<DailyOver
     const toFlip: Candidate[] = [];
     for (const [index, candidate] of page.entries()) {
       const read = reads[index] ?? null;
-      const decision = decideOverdue(candidate.attempt, read, candidate.amount);
-      switch (decision.kind) {
+      const decision = decideOverdue(candidate.attempt, read);
+      if (decision.kind === 'flip') {
+        toFlip.push(candidate);
+        continue;
+      }
+      if (decision.kind === 'skip') {
+        skips.held += 1;
+        continue;
+      }
+      if (decision.kind === 'defer') {
+        totals.deferred += 1;
+        deferrals.push({
+          paymentId: candidate.paymentId,
+          attemptId: candidate.attemptId,
+          reason: decision.reason,
+        });
+        continue;
+      }
+      if (read === null || typeof read !== 'object') continue;
+      const applied = await apply(candidate, read);
+      if (applied === null) continue;
+      const appliedKind = applied.outcome === 'applied' ? applied.decision.kind : null;
+      switch (decision.then) {
         case 'flip':
           toFlip.push(candidate);
           break;
-        case 'apply_paid':
-          if (read !== null && typeof read === 'object' && (await applyPaid(candidate, read))) {
-            totals.paid += 1;
-          }
+        case 'skip_in_flight':
+          skips.inFlight += 1;
           break;
-        case 'hold_mismatch':
-          if (read !== null && typeof read === 'object' && (await holdMismatch(candidate, read))) {
-            totals.heldMismatch += 1;
-          }
+        case 'skip_indeterminate':
+          skips.indeterminate += 1;
           break;
-        case 'skip':
-          if (decision.reason === 'held') skips.held += 1;
-          else if (decision.reason === 'in_flight') skips.inFlight += 1;
-          else if (decision.reason === 'indeterminate') skips.indeterminate += 1;
-          else skips.postAuthorisationFailure += 1;
+        case 'skip_settled':
+          if (appliedKind === 'APPLY') totals.paid += 1;
+          else if (appliedKind === 'HOLD') totals.heldMismatch += 1;
           break;
-        case 'defer':
-          totals.deferred += 1;
-          deferrals.push({
-            paymentId: candidate.paymentId,
-            attemptId: candidate.attemptId,
-            reason: decision.reason,
-          });
+        case 'flip_unless_grace':
+          if (applied.outcome === 'applied' && applied.graced) skips.postAuthorisationFailure += 1;
+          else toFlip.push(candidate);
           break;
       }
     }
