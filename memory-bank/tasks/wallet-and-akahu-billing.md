@@ -728,7 +728,11 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: RUNNING (auto-build; Phases 4a and 5 complete; Phase 4b gated on Akahu)
+**Build Status**: HALTED (auto-build; Phases 1-3, 4a, 5 complete; scoped stop before Phase 4b)
+**Halt Trigger**: Human scope (A9, 2026-11-04): Phase 4b gated on Akahu MVE-001 answer, MVE-002 credentials, MVE-005 fixture. Not a failure. Phase 5 review PROCEED after 1 remediation (AC-ENTRY-1, 29bd320).
+**Halted At Phase**: Phase 4b: Live Akahu adapter and sandbox fixtures (not started)
+**Resumption Point**: Phase 4b Step 0.5 once the Akahu gate clears; then Phase 6
+**Halt Timestamp**: 2026-11-04
 **Auto-Build Mode**: YES
 **Auto-Build Scope**: Phases 4a and 5 (human, 2026-11-04, A9). Halt before Phase 4b: Akahu MVE-001 answer, MVE-002 credentials and MVE-005 fixture not yet received.
 **Current Build**: none
