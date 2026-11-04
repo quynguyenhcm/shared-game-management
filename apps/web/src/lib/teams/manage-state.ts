@@ -46,6 +46,7 @@ const empty = <T>(value: T): Record<SectionId, T> => ({
   sessions: value,
   session: value,
   series: value,
+  payments: value,
 });
 
 export function initialManageState(): ManageState {

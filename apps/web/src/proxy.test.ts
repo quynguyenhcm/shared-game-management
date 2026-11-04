@@ -214,6 +214,43 @@ describe('proxy.ts (Next 16 file convention; runs before every page)', () => {
     });
   });
 
+  describe('wallet and payment pages (wallet-and-akahu-billing AC-ENTRY-1, AC-ENTRY-2, AC-ENTRY-4)', () => {
+    const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
+    const PAYMENT_ID = '22222222-2222-4222-8222-222222222222';
+    const withCookie = { headers: { cookie: 'sgm_session=x' } };
+
+    it.each([
+      `/teams/${TEAM_ID}/wallet`,
+      `/teams/${TEAM_ID}/wallet?topUp=${PAYMENT_ID}`,
+      `/teams/${TEAM_ID}/wallet?cursor=abc`,
+      '/payments',
+      `/payments/${PAYMENT_ID}`,
+      `/payments/${PAYMENT_ID}?return=1`,
+      `/teams/${TEAM_ID}/manage/payments?status=PAID`,
+    ])('sends an anonymous caller of %s to /login with the full path as returnTo', (path) => {
+      const response = proxy(request(path));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        `http://localhost:3000/login?returnTo=${encodeURIComponent(path)}`,
+      );
+    });
+
+    it('lets a caller with a session cookie through and marks these per-user pages no-store', () => {
+      for (const path of [`/teams/${TEAM_ID}/wallet`, '/payments', `/payments/${PAYMENT_ID}`]) {
+        const response = proxy(request(path, withCookie));
+        expect(response.headers.get('location'), path).toBeNull();
+        expect(response.headers.get('cache-control'), path).toContain('no-store');
+      }
+    });
+
+    it('does not protect look-alikes: a non-UUID team, /paymentsX, or a longer wallet segment', () => {
+      for (const path of ['/teams/x/wallet', '/paymentsX', `/teams/${TEAM_ID}/walletX`]) {
+        const response = proxy(request(path));
+        expect(response.headers.get('location'), path).toBeNull();
+      }
+    });
+  });
+
   it('matches pages but not static assets', () => {
     expect(config.matcher).toEqual(['/((?!_next/static|_next/image|favicon.ico).*)']);
   });

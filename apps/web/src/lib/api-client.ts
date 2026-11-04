@@ -1,7 +1,25 @@
 import { context, propagation } from '@opentelemetry/api';
 import {
+  AdminPaymentsResponse,
+  AttemptResponse,
   AuthSuccessResponse,
   BankingResponse,
+  type HoldResolutionRequest,
+  HoldResolutionResponse,
+  IntentErrorResponse,
+  MyPaymentsResponse,
+  PayoutBlockResponse,
+  PaymentResponse,
+  ReminderResponse,
+  type TopUpRequest,
+  TopUpResponse,
+  UnpaidPaymentsResponse,
+  WalletResponse,
+  type AdminPaymentsQuery,
+  type PayoutBlockRequest,
+  type ProviderRefusalReason,
+  type SendReminderRequest,
+  type StartAttemptRequest,
   CancelSessionResponse,
   CreateTeamResponse,
   DstOptionsEntry,
@@ -77,6 +95,9 @@ export type UpdateSessionBody = z.input<typeof UpdateSessionRequest>;
 export type CreateSeriesBody = z.input<typeof CreateSeriesRequest>;
 export type UpdateSeriesBody = z.input<typeof UpdateSeriesRequest>;
 export type EndSeriesBody = z.input<typeof EndSeriesRequest>;
+/** The wire form of the two billing bodies that carry money: amounts are 2-dp strings, never `Money`. */
+export type TopUpBody = z.input<typeof TopUpRequest>;
+export type HoldResolutionBody = z.input<typeof HoldResolutionRequest>;
 
 const REQUEST_TIMEOUT_MS = 2000;
 const AUTH_TIMEOUT_MS = 5000;
@@ -140,6 +161,10 @@ export type ApiResult<T> =
       dstOptions?: DstOptionsEntry[];
       /** Session routes only (409 `session_fee_locked`): the snake_case fee columns the edit would have raised. */
       raisedFields?: string[];
+      /** The two intent start routes only (409 `payment_in_progress` / `top_up_in_progress`): where to resume (CR-6). */
+      resume?: NonNullable<IntentErrorResponse['error']['resume']>;
+      /** The two intent start routes only (422 `payment_provider_refused`): a stable reason, never provider text. */
+      refusalReason?: ProviderRefusalReason;
     };
 
 export interface ApiCallOptions {
@@ -174,6 +199,34 @@ function sessionErrorExtras(raw: unknown): {
     ...(dst.success ? { dstOptions: dst.data } : {}),
     ...(raised.success ? { raisedFields: raised.data } : {}),
   };
+}
+
+/**
+ * What only the intent start routes add to an error body: `resume` and `reason`. Read on its own with the shared schema, so
+ * a malformed extra is dropped and can never hide the error code (the same rule as `sessionErrorExtras`).
+ */
+function intentErrorExtras(raw: unknown): {
+  resume?: NonNullable<IntentErrorResponse['error']['resume']>;
+  refusalReason?: ProviderRefusalReason;
+} {
+  const error = (raw as { error?: Record<string, unknown> } | null)?.error;
+  if (error === null || typeof error !== 'object') return {};
+  const resume = IntentErrorResponse.shape.error.shape.resume.safeParse(error.resume);
+  const reason = IntentErrorResponse.shape.error.shape.reason.safeParse(error.reason);
+  return {
+    ...(resume.success && resume.data !== undefined ? { resume: resume.data } : {}),
+    ...(reason.success && reason.data !== undefined ? { refusalReason: reason.data } : {}),
+  };
+}
+
+/** `?a=1&b=2` from the defined values, or an empty string. */
+function queryString(params: Record<string, string | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [name, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') search.set(name, value);
+  }
+  const text = search.toString();
+  return text === '' ? '' : `?${text}`;
 }
 
 /** The lower-case path spelling of an OAuth provider (`/auth/oauth/:provider/*`). */
@@ -244,6 +297,7 @@ export async function apiFetch<T>(request: ApiRequest<T>): Promise<ApiResult<T>>
       error,
       ...(Number.isFinite(retryAfter) && retryAfter > 0 ? { retryAfterSeconds: retryAfter } : {}),
       ...sessionErrorExtras(raw),
+      ...intentErrorExtras(raw),
     };
   } catch {
     return failure(0, 'service_unavailable', 'The API could not be reached.');
@@ -785,5 +839,121 @@ export const apiClient = {
       method: 'POST',
       body,
       schema: SessionWithdrawResponse,
+    }),
+
+  // -------------------------------------------------------------------------------------------
+  // Wallet and Akahu billing (wallet-and-akahu-billing). Ids are encoded, so a hostile id can never change the path. The
+  // payer routes need only a session; the admin list and the reminder need a team admin (or GLOBAL_ADMIN for the list).
+  // -------------------------------------------------------------------------------------------
+
+  /** The caller's wallet in one team and a page of its ledger. `topUp` is the id Akahu's return lands on (CR-3). */
+  wallet: (
+    teamId: string,
+    query: { cursor?: string; topUp?: string },
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/wallet${queryString(query)}`,
+      method: 'GET',
+      schema: WalletResponse,
+    }),
+
+  /** One payment of the caller (payer only; every other caller and an unknown id get the same 404). */
+  payment: (paymentId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/payments/${encodeURIComponent(paymentId)}`,
+      method: 'GET',
+      schema: PaymentResponse,
+    }),
+
+  /** The caller's unpaid and held payments across every team, grouped by team (the debt-block target, CR-16). */
+  myUnpaidPayments: (query: { cursor?: string }, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/payments/me${queryString({ status: 'UNPAID', cursor: query.cursor })}`,
+      method: 'GET',
+      schema: UnpaidPaymentsResponse,
+    }),
+
+  /** The caller's payments in one team (the wallet page's Payments section). */
+  teamMyPayments: (
+    teamId: string,
+    query: { cursor?: string; status?: 'UNPAID' },
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/payments/me${queryString(query)}`,
+      method: 'GET',
+      schema: MyPaymentsResponse,
+    }),
+
+  /** The team's payments, names only (team admin or GLOBAL_ADMIN). */
+  adminPayments: (
+    teamId: string,
+    query: { status?: AdminPaymentsQuery['status']; cursor?: string },
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/payments${queryString(query)}`,
+      method: 'GET',
+      schema: AdminPaymentsResponse,
+    }),
+
+  /** Start a top-up: 201 with the Akahu URL to follow. A repeat with the same key returns the same top-up. */
+  startTopUp: (teamId: string, body: TopUpBody, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/wallet/top-ups`,
+      method: 'POST',
+      body,
+      schema: TopUpResponse,
+    }),
+
+  /** Start (or resume, on a 409 with `resume`) an Akahu payment attempt for the stored amount. */
+  startAttempt: (paymentId: string, body: StartAttemptRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/payments/${encodeURIComponent(paymentId)}/attempts`,
+      method: 'POST',
+      body,
+      schema: AttemptResponse,
+    }),
+
+  sendReminder: (
+    teamId: string,
+    paymentId: string,
+    body: SendReminderRequest,
+    options: ApiCallOptions = {},
+  ) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/payments/${encodeURIComponent(paymentId)}/reminders`,
+      method: 'POST',
+      body,
+      schema: ReminderResponse,
+    }),
+
+  /** Record what happened to a held payment (team admins of the payee team or GLOBAL_ADMIN, ruling H2). */
+  resolveHold: (paymentId: string, body: HoldResolutionBody, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/payments/${encodeURIComponent(paymentId)}/hold-resolution`,
+      method: 'POST',
+      body,
+      schema: HoldResolutionResponse,
+    }),
+
+  /** GLOBAL_ADMIN only (A3, CR-14). */
+  blockPayout: (teamId: string, body: PayoutBlockRequest, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/payout-block`,
+      method: 'POST',
+      body,
+      schema: PayoutBlockResponse,
     }),
 };

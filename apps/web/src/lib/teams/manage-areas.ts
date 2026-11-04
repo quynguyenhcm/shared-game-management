@@ -14,7 +14,11 @@ export const MANAGE_AREAS: readonly ManageArea[] = [
   { id: 'people', label: 'People', segment: '' },
   { id: 'banking', label: 'Banking and GST', segment: 'banking' },
   { id: 'sessions', label: 'Sessions', segment: 'sessions' },
+  { id: 'payments', label: 'Payments', segment: 'payments' },
 ];
+
+/** The one area a GLOBAL_ADMIN who is not a team admin may open (CR-21): support reads Payments, nothing else. */
+export const GLOBAL_ADMIN_AREA_ID = 'payments';
 
 export interface ManageAreaLink {
   id: string;
@@ -28,14 +32,22 @@ function manageAreaHref(teamId: string, area: ManageArea): string {
   return area.segment === '' ? root : `${root}/${area.segment}`;
 }
 
-/** The area nav links, or an empty list while there is a single area (a one-link nav is noise). */
+/**
+ * The area nav links, or an empty list while there is a single area (a one-link nav is noise). A global admin who is not a
+ * team admin (`globalAdminOnly`, CR-21) gets just the Payments link: with no other area to tell it from, it is kept.
+ */
 export function manageAreaLinks(
   teamId: string,
   areas: readonly ManageArea[] = MANAGE_AREAS,
   currentId = 'people',
+  options: { globalAdminOnly?: boolean } = {},
 ): ManageAreaLink[] {
-  if (areas.length < 2) return [];
-  return areas.map((area) => ({
+  const shown =
+    options.globalAdminOnly === true
+      ? areas.filter((area) => area.id === GLOBAL_ADMIN_AREA_ID)
+      : areas;
+  if (shown.length < 2 && options.globalAdminOnly !== true) return [];
+  return shown.map((area) => ({
     id: area.id,
     label: area.label,
     href: manageAreaHref(teamId, area),

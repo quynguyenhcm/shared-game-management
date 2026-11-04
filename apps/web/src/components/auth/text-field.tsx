@@ -10,9 +10,11 @@ export interface TextFieldProps {
   defaultValue?: string;
   autoComplete?: string;
   autoCapitalize?: 'none' | 'words';
-  /** Virtual keyboard for the field (the banking and GST numbers ask for the numeric one). */
-  inputMode?: 'numeric' | 'text';
+  /** Virtual keyboard for the field (the banking and GST numbers ask for the numeric one, an amount the decimal one). */
+  inputMode?: 'numeric' | 'decimal' | 'text';
   spellCheck?: boolean;
+  /** The virtual keyboard's action key (an amount field that submits says "go"). */
+  enterKeyHint?: 'go' | 'done' | 'next';
 }
 
 /** A labelled input whose hint and error are tied to it with `aria-describedby`; id is `field-<name>`. */
@@ -27,6 +29,7 @@ export function TextField({
   autoCapitalize,
   inputMode,
   spellCheck,
+  enterKeyHint,
 }: TextFieldProps) {
   const id = `field-${name}`;
   const isEmail = type === 'email';
@@ -51,6 +54,7 @@ export function TextField({
         autoCorrect={isEmail ? 'off' : undefined}
         spellCheck={spellCheck ?? (isEmail ? false : undefined)}
         inputMode={inputMode ?? (isEmail ? 'email' : undefined)}
+        enterKeyHint={enterKeyHint}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(id, { hint, error })}
         className={INPUT_CLASS}

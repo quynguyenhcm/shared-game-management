@@ -15,7 +15,9 @@ import {
   waitlistHeadline,
   withdrawnText,
 } from '../../lib/registrations/labels.ts';
+import { UNPAID_PAYMENTS_PATH } from '../../lib/billing/paths.ts';
 import type { PanelView } from '../../lib/registrations/view.ts';
+import { LINK_CLASS } from '../auth/styles.ts';
 
 const CARD = 'flex flex-col gap-1 rounded-md border-2 border-slate-900 p-4 text-base';
 
@@ -74,6 +76,9 @@ export function OutcomeCard({ view, data }: { view: PanelView; data: Registratio
         <div className={CARD}>
           {withdrawn === null ? null : <p>{withdrawn}</p>}
           <p className="font-semibold">{debtMessage(me.overdueCount)}</p>
+          <a href={UNPAID_PAYMENTS_PATH} className={`${LINK_CLASS} self-start`}>
+            Pay your overdue payments
+          </a>
         </div>
       );
     case 'withdrawn':

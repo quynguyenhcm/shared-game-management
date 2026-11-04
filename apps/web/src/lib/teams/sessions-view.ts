@@ -22,6 +22,7 @@ import {
   SAVE_FAILED_MESSAGE,
   UNCONFIRMED_MESSAGE,
 } from './labels.ts';
+import { DEFAULT_REFRESH_DELAYS_MS, waitingView, type PendingView } from './pending-view.ts';
 
 /**
  * Pure view rules and copy of the Sessions area (UI/UX "Copy deck (final)", as amended by the binding
@@ -938,23 +939,21 @@ export function splitSeriesInstances<T extends Pick<SeriesInstanceResponse, 'sta
 // ---------------------------------------------------------------------------------------------
 
 /** Absolute delays, from mount, of the three bounded refreshes (UI/UX "Waiting state"). */
-export const REFRESH_DELAYS_MS: readonly number[] = [2000, 5000, 10000];
+export const REFRESH_DELAYS_MS: readonly number[] = DEFAULT_REFRESH_DELAYS_MS;
 
-export type PendingView =
-  { kind: 'waiting'; text: string } | { kind: 'slow'; text: string } | { kind: 'done'; text: '' };
+/** The series page's words for `RefreshWhilePending` (the component takes its copy as props, CR-22). */
+export const SERIES_PENDING_TEXT = "We're adding the sessions in this series. Refresh in a moment.";
+export const SERIES_SLOW_TEXT =
+  'This is taking longer than usual. Your series is saved and its sessions will appear here. Refresh in a minute.';
+
+export type { PendingView } from './pending-view.ts';
 
 export function pendingView(input: { pending: boolean; refreshesDone: number }): PendingView {
-  if (!input.pending) return { kind: 'done', text: '' };
-  if (input.refreshesDone < REFRESH_DELAYS_MS.length) {
-    return {
-      kind: 'waiting',
-      text: "We're adding the sessions in this series. Refresh in a moment.",
-    };
-  }
-  return {
-    kind: 'slow',
-    text: 'This is taking longer than usual. Your series is saved and its sessions will appear here. Refresh in a minute.',
-  };
+  return waitingView({
+    ...input,
+    pendingText: SERIES_PENDING_TEXT,
+    slowText: SERIES_SLOW_TEXT,
+  });
 }
 
 export function sessionsAddedLine(count: number): string {
