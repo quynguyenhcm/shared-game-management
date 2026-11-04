@@ -245,21 +245,45 @@ describe('wallet page: payments and ledger', () => {
 
 describe('wallet page: access and errors', () => {
   it.each([
-    ['a non-member (403)', { wallet: fail(403, 'forbidden') }],
     ['an unknown team (404)', { wallet: fail(404, 'not_found') }],
     ['a malformed query (422)', { wallet: fail(422, 'validation_failed') }],
-    [
-      'a PENDING member',
-      {
-        detail: ok({
-          team: { id: TEAM_ID, name: 'Rosedale Badminton', memberCount: 12 },
-          myStatus: 'PENDING',
-          myRole: null,
-        }),
-      },
-    ],
   ])('%s gets the uniform not-found', async (_name, results) => {
     await expect(render({}, results)).rejects.toThrow('NOT_FOUND');
+  });
+
+  it('an unknown team is not-found even though the protected reads answer 403 (mixed 404/403)', async () => {
+    await expect(
+      render(
+        {},
+        {
+          detail: fail(404, 'not_found'),
+          wallet: fail(403, 'forbidden'),
+          payments: fail(403, 'forbidden'),
+        },
+      ),
+    ).rejects.toThrow('NOT_FOUND');
+  });
+
+  const MEMBER_ONLY = 'You need to be a member of this team to use its wallet.';
+  const member = (myStatus: string) =>
+    ok({
+      team: { id: TEAM_ID, name: 'Rosedale Badminton', memberCount: 12 },
+      myStatus,
+      myRole: null,
+    });
+  it.each([
+    ['a non-member (403)', { wallet: fail(403, 'forbidden'), detail: fail(403, 'forbidden') }],
+    ['a non-member (403 on the wallet only)', { wallet: fail(403, 'forbidden') }],
+    ['a PENDING member', { detail: member('PENDING') }],
+    ['a REJECTED member', { detail: member('REJECTED') }],
+    ['a BANNED member', { detail: member('BANNED') }],
+  ])('%s sees the member-only sentence and no wallet data (AC-ENTRY-1)', async (_name, results) => {
+    const html = await render({}, results);
+    expect(html).toContain(MEMBER_ONLY);
+    expect(html).toContain(`href="/teams/${TEAM_ID}"`);
+    expect(html).not.toContain('Balance:');
+    expect(html).not.toContain('Top up with Akahu');
+    expect(html).not.toContain('id="payments"');
   });
 
   it('a malformed team id is not found without calling the API', async () => {

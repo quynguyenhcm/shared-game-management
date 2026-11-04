@@ -14,7 +14,12 @@ import { readCookie } from '../../../../lib/auth/cookies.ts';
 import { loginUrl } from '../../../../lib/auth/landing.ts';
 import { firstParam, type SearchParams } from '../../../../lib/auth/page-params.ts';
 import { requireUser } from '../../../../lib/auth/session.ts';
-import { PAYMENTS_LOAD_FAILED, backToTeam, walletHeading } from '../../../../lib/billing/labels.ts';
+import {
+  PAYMENTS_LOAD_FAILED,
+  backToTeam,
+  billingErrorLines,
+  walletHeading,
+} from '../../../../lib/billing/labels.ts';
 import { walletPath } from '../../../../lib/billing/paths.ts';
 import { groupPayments } from '../../../../lib/billing/wallet-view.ts';
 import { guardResults } from '../../../../lib/teams/sessions-guard.ts';
@@ -25,8 +30,8 @@ export const dynamic = 'force-dynamic';
 /**
  * The player's wallet in one team (AC-ENTRY-1): balance and the one allowed next step (top up, continue, wait, or "full"), what
  * the player owes and has paid in this team, and the wallet activity. One parallel load (team, wallet, payments); the wallet
- * and the team are required, the payments list degrades to a line. Only an APPROVED member has a wallet here: every other
- * caller (not a member, pending, banned, unknown team, malformed id) gets the one uniform not-found. `?topUp=<id>` is where
+ * and the team are required, the payments list degrades to a line. Only an APPROVED member has a wallet here: a non-member, pending,
+ * rejected or banned caller sees the member-only sentence (AC-ENTRY-1); an unknown team or malformed id gets the uniform not-found. `?topUp=<id>` is where
  * Akahu's return lands and `?cursor=` pages the activity; both are passed to the API, which is the authority.
  */
 export default async function WalletPage({
@@ -61,14 +66,29 @@ export default async function WalletPage({
     ),
     apiClient.teamMyPayments(teamId, {}, options),
   ]);
-  if (
-    guardResults([detail, wallet], { here, action: 'wallet_load', optional: [payments] }) ===
-    'no_access'
-  ) {
-    notFound();
+  const guard = guardResults([detail, wallet], {
+    here,
+    action: 'wallet_load',
+    optional: [payments],
+  });
+  // An unknown team: the team read says 404 while the membership-gated reads say 403; the 404 wins.
+  if (!detail.ok && (detail.status === 404 || detail.status === 422)) notFound();
+  const notApproved = detail.ok && detail.data.myStatus !== 'APPROVED';
+  if (guard === 'no_access' || notApproved) {
+    // AC-ENTRY-1: a non-member, pending, rejected or banned caller is told what the wallet needs; no wallet data is shown.
+    return (
+      <TeamShell>
+        <title>{`Wallet and payments – Shared Game Management`}</title>
+        <p role="status" className="text-base">
+          {billingErrorLines('forbidden')[0]}
+        </p>
+        <a href={`/teams/${teamId}`} className={`${LINK_CLASS} self-start`}>
+          {detail.ok ? backToTeam(detail.data.team.name) : 'Back to the team'}
+        </a>
+      </TeamShell>
+    );
   }
   if (!detail.ok || !wallet.ok) throw new Error('unavailable');
-  if (detail.data.myStatus !== 'APPROVED') notFound();
 
   const { team } = detail.data;
   const groups = payments.ok ? groupPayments(payments.data.payments) : null;
