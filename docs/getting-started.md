@@ -276,7 +276,7 @@ by `PAYMENTS_ADAPTER`, like `NOTIFIER_ADAPTER` and `AUTH_FAKE_OAUTH`.
 
 - **`fake` (default).** A stateless fake that works across the api and the worker: `$17.00` succeeds, `$5.15` is declined,
   `$5.20` stays processing. It is refused when `NODE_ENV=production`.
-- **`akahu`.** The live adapter is not available until Phase 4: selecting it stops boot with
+- **`akahu`.** The live adapter is not available until Phase 4b (it is gated on Akahu's written answer and sandbox access): selecting it stops boot with
   `PAYMENTS_ADAPTER=akahu is not available in this build`. Until then a production boot is refused outright.
 - **Webhook path.** Akahu will call `POST /webhooks/akahu` (set `AKAHU_WEBHOOK_URL` to its absolute public URL). The
   signature headers `x-akahu-payments-signature` and `x-akahu-payments-signing-key` are redacted from logs.
@@ -285,7 +285,7 @@ Every malformed value stops boot with an error that names the variable and never
 
 | Variable                              | Default                         | Allowed               | Meaning                                                                                |
 | ------------------------------------- | ------------------------------- | --------------------- | -------------------------------------------------------------------------------------- |
-| `PAYMENTS_ADAPTER`                    | `fake`                          | `akahu` or `fake`     | Which gateway to build. `fake` is refused in production; `akahu` is Phase 4.           |
+| `PAYMENTS_ADAPTER`                    | `fake`                          | `akahu` or `fake`     | Which gateway to build. `fake` is refused in production; `akahu` is Phase 4b.          |
 | `AKAHU_APP_TOKEN`                     | unset                           | non-empty             | Akahu app token. Required with `akahu`.                                                |
 | `AKAHU_APP_SECRET`                    | unset                           | non-empty             | Akahu app secret. Required with `akahu`.                                               |
 | `AKAHU_PAYMENTS_API_URL`              | `https://api.payments.akahu.io` | URL                   | Payments API base. In production: https and a host ending in `.akahu.io`.              |
@@ -295,6 +295,187 @@ Every malformed value stops boot with an error that names the variable and never
 | `AKAHU_RECONCILE_MIN_AGE_SECONDS`     | `300`                           | 60 to 3600            | Age after which reconcile re-reads an `OPEN` intent.                                   |
 | `AKAHU_RECONCILE_STUCK_AFTER_SECONDS` | `21600`                         | 3600 to 604800        | Age after which an open intent is logged as stuck.                                     |
 | `AKAHU_FINALITY_HORIZON_HOURS`        | `168`                           | 1 to 720              | How long after close or hold reconcile keeps re-reading for a late success.            |
+
+## Wallet, billing and Akahu operations
+
+This section is for whoever runs the platform. It covers the Akahu setup that is still to be done, the environment, re-running
+billing jobs, reading the reconciliation check, what an admin does after a payout block or for a held payment, and the sandbox
+smoke test. Business rules are in [ADR 0020](adr/0020-wallet-and-akahu-billing.md).
+
+### Akahu app and webhook (to be done, pending Phase 4b)
+
+**Status: not done.** Creating the Akahu app and registering the webhook waits for three gates: Akahu's written answer to
+MVE-001 (go or no-go on third-party team payees), sandbox credentials (MVE-002), and a verified signed sandbox webhook stored as a
+fixture (MVE-005). The steps will be written in Phase 4b, once those gates clear. Do not create a production app or webhook
+before then.
+
+What the app will need, so the inputs are ready:
+
+- An app token and an app secret, set as `AKAHU_APP_TOKEN` and `AKAHU_APP_SECRET`. Keep them in the platform secret store and
+  never commit them (ADR 0007).
+- A public, absolute `https` URL for `POST /webhooks/akahu`, set as `AKAHU_WEBHOOK_URL`. It must have no query string.
+- The payments API base, `AKAHU_PAYMENTS_API_URL` (defaults to `https://api.payments.akahu.io`). In production it must be `https`
+  on a `.akahu.io` host.
+
+Until Phase 4b the code runs only with `PAYMENTS_ADAPTER=fake`. Setting `PAYMENTS_ADAPTER=akahu` stops boot, so no webhook
+receives Akahu traffic yet.
+
+### Environment variables (wallet, billing and Akahu)
+
+Every variable below is listed in `.env.example` and validated at boot in `apps/api/src/lib/config/config.ts`. A malformed value
+stops boot and names the variable without printing its value. The full table with defaults and allowed values is in
+[Payments and Akahu configuration](#payments-and-akahu-configuration) above.
+
+- `PAYMENTS_ADAPTER` (`fake` by default; `akahu` is not bootable until Phase 4b)
+- `AKAHU_APP_TOKEN`, `AKAHU_APP_SECRET` (required only with `akahu`)
+- `AKAHU_PAYMENTS_API_URL`
+- `AKAHU_WEBHOOK_URL` (required only with `akahu`)
+- `AKAHU_PAYMENT_EXPIRY_MINUTES` (default 30)
+- `AKAHU_RECONCILE_ORPHAN_AGE_SECONDS` (default 120)
+- `AKAHU_RECONCILE_MIN_AGE_SECONDS` (default 300)
+- `AKAHU_RECONCILE_STUCK_AFTER_SECONDS` (default 21600)
+- `AKAHU_FINALITY_HORIZON_HOURS` (default 168)
+
+There are no wallet or billing environment variables. The business limits are code constants, so they cannot be set per
+deployment: the wallet cap is $100.00, the top-up minimum is $1.00, the low-credit alert is below $20.00, and an unpaid charge
+becomes overdue 72 hours after billing. The schedules are fixed too: `post-game-billing` every 5 minutes, `akahu-reconcile`
+every 15 minutes, and `daily-overdue` at 04:00 Pacific/Auckland.
+
+### Re-running a failed billing job
+
+Both jobs run in the worker, so start the worker first (`pnpm run dev`, or the Compose `worker` service). Then:
+
+1. Find the failure. Failed jobs stay in `pgboss.job` with state `failed`. Filter by the job name (`bill-session`,
+   `daily-overdue`) and read the session id from the job's data. The worker log line `billing.session.failed` carries the
+   session id, the error class and the SQLSTATE. It never carries the message.
+2. Re-run one session's billing:
+
+   ```sh
+   pnpm run jobs:trigger bill-session '{"sessionId":"<session-uuid>","trigger":"manual"}'
+   ```
+
+   `trigger` is `sweep` or `manual`. Use `manual` for an operator run.
+
+3. Re-run the overdue job (safe to repeat; a second run the same day changes nothing and sends nothing):
+
+   ```sh
+   pnpm run jobs:trigger daily-overdue
+   ```
+
+4. Re-run the sweep if many sessions were missed. It re-enqueues every due PUBLISHED session, oldest first:
+
+   ```sh
+   pnpm run jobs:trigger post-game-billing
+   ```
+
+A session whose failure is a data-integrity error (SQLSTATE class 23) will not succeed on retry. The job ends failed at once,
+and the next 5-minute sweep re-enqueues it, so it fails again until the data is fixed. Read the logged SQLSTATE and fix the cause
+before re-running. Do not hand-edit payment, ledger or session rows. The triggers refuse most of those edits (append-only ledger,
+guarded status), and an edit that gets past them would hide a real problem.
+
+A session whose team cannot take payments is held, not failed (B8). Its log line is `billing.session.blocked`, and it bills on
+the first sweep after banking is saved again (see the payout block section below).
+
+### Reading `cli billing reconcile`
+
+**Status: built in Phase 6.** The command
+checks that the money tables agree with each other (AC-VERIFY-12). It is run the same way as the other operator commands:
+
+```sh
+pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts billing reconcile
+```
+
+What it checks:
+
+- For every wallet, the balance equals the sum of its ledger amounts, and equals the latest `resulting_balance`.
+- Every `AUTO_DEDUCTION` has a matching PAID `PREPAID_CREDIT` payment for the same registration and amount.
+- Every PAID `PER_GAME` payment, and every `TOPUP`, has an Akahu payment id.
+- Informational, not a discrepancy: top-ups currently on hold are listed, because a hold needs an admin decision (see below).
+
+Each discrepancy is printed with the id of the row that disagrees. Exit codes:
+
+- `0`: no discrepancies.
+- `1`: at least one discrepancy. Note that the CLI's generic error handler also exits `1` when the command itself fails (for
+  example, the database is unreachable), so read the message as well as the code.
+- `2`: a usage error (wrong arguments).
+
+Investigate each discrepancy by its id. The ledger and payment rows are protected by triggers, so a discrepancy is corrected by
+a reviewed fix (usually a forward migration or an explicit admin procedure), not by editing rows in place.
+
+### Payout blocked: what an admin does
+
+A payout block means Akahu cannot pay the team's bank account (ADR 0016, ADR 0020 section 13). It is set manually by a
+GLOBAL_ADMIN from the team's Payments area, with a reason from a fixed list and no free text. It is never set automatically in
+this version. The effects:
+
+- Every approved admin of the team is emailed. The email names no account name or digits.
+- The Banking and GST page shows the blocked notice, and publishing a new paid session is refused.
+- Players cannot start a top-up or pay a charge. They see "This team can't receive payments right now."
+- Sessions that ended while blocked are held, not billed. They bill on the first sweep after the account is fixed.
+- Pending charges are not skipped by the overdue job while the team is blocked, so they can go overdue.
+
+What the team admins do, in order:
+
+1. Check the bank account name and number on the Banking and GST page against the team's bank records.
+2. Re-save the banking details. A save clears the block (there is no separate unblock action). If the account number is the
+   problem, enter it again. Leaving the number blank keeps the saved number.
+3. Confirm the blocked notice has gone and that a paid session can be published.
+4. Wait for the next sweep (within 5 minutes) to bill held sessions. Their players then receive their charges as usual.
+5. Check the Payments area for any hold or "money received but not applied" items, and resolve them (below).
+
+Note that a payment is paid to the team's account as it is when the player pays (B10). A charge created before the block is
+payable again once the account is saved, and its money goes to the saved account.
+
+### Held payments and top-ups
+
+A hold means the outcome at the bank could not be confirmed. The payment shows "Under review". It has no pay button and no
+reminder button, and the player is told it is under review. Only the team's admins or a GLOBAL_ADMIN can resolve a hold (ruling
+H2).
+
+Before resolving, establish what the bank actually did, from the provider's own record. The app re-reads the provider before
+it applies a manual outcome. If the provider now reports a definite status, the manual outcome is refused with
+`hold_resolved_by_provider`, and the refresh shows the provider's result.
+
+To resolve a held payment, open the team's Payments area and use the hold action on that payment:
+
+- `RECEIVED`: the money arrived. The payment is marked PAID.
+- `NOT_RECEIVED`: the money did not arrive. The payment is payable again. If the player had already authorised it at the bank, its
+  due date moves to at least 24 hours from now.
+- For a hold with an amount mismatch, `RECEIVED` needs the amount the bank actually received. The payment is applied only if it
+  equals the charge. Otherwise the money is recorded as "not applied". The team refunds it outside the app, and no wallet credit
+  is given.
+
+Held top-ups have no web screen in this version. Resolve them through the API with a bearer token of an eligible account:
+
+```sh
+curl -X POST "$API_URL/teams/<teamId>/wallet/top-ups/<topUpId>/hold-resolution" \
+  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"outcome":"RECEIVED","changeKey":"<new-uuid>"}'
+```
+
+Use `NOT_RECEIVED` for an outcome that did not arrive, and add `"observedAmount":"<amount>"` for a `RECEIVED` mismatch. Use a new
+`changeKey` for each decision. Find held top-ups with `cli billing reconcile`.
+
+A hold that is resolved `RECEIVED` may still come back as "recorded, not applied" (the cap or a duplicate). That is expected:
+the money is recorded, the player and the team admins are told, and the team refunds it outside the app.
+
+### Sandbox smoke test (DEFERRED to Phase 4b)
+
+> **DEFERRED to Phase 4b. Not executed. Requires the live adapter and sandbox credentials.** This checklist cannot run until
+> the Akahu gates clear (MVE-001, MVE-002, MVE-005). No result has been recorded. Record each run with its date and tester in the
+> release notes, not here.
+
+Run against a test team with payout configured, in Akahu's sandbox, with the worker running:
+
+- [ ] **Top-up.** Start a $30.00 top-up from the team's wallet page and complete the Akahu step. Expect one credit of $30.00, one
+      `TOPUP` ledger row with an Akahu payment id, and the balance shown. Replay the same completion event and expect no change.
+- [ ] **Pay.** For a PENDING charge, start a payment from `/payments/<id>` and complete the Akahu step. Expect the payment PAID once,
+      "Paid on {date}." shown, and the wallet balance unchanged. Replay the completion and expect no second PAID transition.
+- [ ] **Decline.** Start a payment and decline or cancel it in the sandbox. Expect the payment to stay payable, the copy
+      "Your payment didn't go through. You haven't been charged." to appear, and no PAID transition and no wallet movement.
+- [ ] **Webhook.** Confirm a sandbox webhook is accepted, and a forged or unsigned request is refused with no state change.
+
+Keep the fixtures recorded from these runs with their provenance (sandbox-real), as ADR 0020 requires.
 
 ## Money and time rules
 

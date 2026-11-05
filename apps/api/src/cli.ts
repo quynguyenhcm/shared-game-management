@@ -1,6 +1,8 @@
 // Console output is allowed here (see eslint.config.mjs): the CLI talks to a terminal, not the logger.
 import {
   parseBillSessionTrigger,
+  parseBillingReconcileArgs,
+  parseBlockPayoutArgs,
   parseMemberBannedTrigger,
   parseRecurrenceRuleTrigger,
   parseSessionAutoEnrolTrigger,
@@ -16,12 +18,23 @@ import { migrateToLatest, resetDatabase, rollbackMigrations } from './lib/db/mig
 import { createPool } from './lib/db/pool.ts';
 import { setUserRole } from './modules/auth/repo.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
+import { systemClock } from './lib/clock.ts';
+import { createCrypto } from './lib/crypto/crypto.ts';
+import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
+import {
+  formatReconcileReport,
+  reconcileExitCode,
+  runBillingReconcile,
+} from './modules/billing/reconcile-cli.ts';
+import { blockPayout } from './modules/billing/payout-block.ts';
+import { randomUUID } from 'node:crypto';
 import { createLogger, loggerOptionsFromConfig } from './lib/logger/logger.ts';
 
 const COMMANDS: Record<string, { subcommands: readonly string[] }> = {
   db: { subcommands: ['migrate', 'rollback', 'reset'] },
   jobs: { subcommands: ['trigger', 'schedules'] },
   users: { subcommands: ['set-role'] },
+  billing: { subcommands: ['reconcile', 'block-payout'] },
 };
 
 function usage(): string {
@@ -37,6 +50,8 @@ function usage(): string {
     "  jobs trigger session-auto-enrol '<json>' (re-offer one session's auto-enrol: sessionId, teamId, trigger)",
     "  jobs trigger bill-session '<json>'      (re-run one session's billing: sessionId, trigger)",
     '  jobs schedules                         (list registered cron schedules)',
+    '  billing reconcile                      (read-only ledger/payments check; exit 1 on any discrepancy, ids only)',
+    '  billing block-payout <teamId> <reason> [akahuPaymentId]   (mark a team payout as failing, CR-14; no actor recorded)',
     '  users set-role <email> <GLOBAL_ADMIN|PLAYER>   (grant or revoke the global admin role)',
   ].join('\n');
 }
@@ -187,6 +202,63 @@ async function runUsers(args: readonly string[], config: Config): Promise<void> 
   }
 }
 
+/** `billing reconcile` (read-only; exit 1 on any discrepancy) and `billing block-payout` (CR-14 convenience, no user session). */
+async function runBilling(
+  subcommand: string,
+  args: readonly string[],
+  config: Config,
+): Promise<void> {
+  if (subcommand === 'reconcile') {
+    const bad = parseBillingReconcileArgs(args);
+    if (bad) fail(bad.error);
+    const pool = createPool({ connectionString: config.databaseUrl, max: 1 });
+    try {
+      const report = await runBillingReconcile(pool);
+      for (const line of formatReconcileReport(report)) console.log(line);
+      process.exitCode = reconcileExitCode(report);
+    } finally {
+      await pool.end();
+    }
+    return;
+  }
+  const parsed = parseBlockPayoutArgs(args);
+  if ('error' in parsed) fail(parsed.error);
+  const logger = createLogger({ ...loggerOptionsFromConfig(config, 'worker'), level: 'silent' });
+  const runner = createJobRunner({
+    databaseUrl: config.databaseUrl,
+    logger,
+    role: 'producer',
+    poolMax: 2,
+  });
+  const pool = createPool({ connectionString: config.databaseUrl, max: 2 });
+  await runner.start();
+  try {
+    const result = await blockPayout(
+      {
+        db: createKysely(pool),
+        jobs: runner,
+        clock: systemClock,
+        crypto: createCrypto(keyProviderFromConfig(config)),
+        webBaseUrl: config.auth.webBaseUrl,
+      },
+      {
+        teamId: parsed.teamId,
+        actorUserId: null,
+        reason: parsed.reason,
+        akahuPaymentId: parsed.akahuPaymentId,
+        changeKey: randomUUID(),
+      },
+      logger,
+    );
+    console.log(
+      `team ${parsed.teamId} payout ${result.alreadyBlocked ? 'was already blocked' : 'is now blocked'} (event ${result.eventId})`,
+    );
+  } finally {
+    await runner.stop();
+    await pool.end();
+  }
+}
+
 // `pnpm run db:rollback -- --all` may forward a literal `--`.
 const [group, subcommand, ...flags] = process.argv.slice(2).filter((arg) => arg !== '--');
 const entry = group === undefined ? undefined : COMMANDS[group];
@@ -201,6 +273,8 @@ try {
     await runJobs(subcommand, flags, config);
   } else if (group === 'users') {
     await runUsers(flags, config);
+  } else if (group === 'billing') {
+    await runBilling(subcommand, flags, config);
   } else {
     await runDb(subcommand, flags, config);
   }

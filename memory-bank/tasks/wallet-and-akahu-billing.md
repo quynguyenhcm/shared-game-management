@@ -635,7 +635,7 @@ Provisional (pending creative): the defaults above. The creative architecture, a
 - [x] **Phase 4a: Akahu flows on the fake adapter (provider-neutral)** (A9, 2026-11-04): top-up and attempt routes, `GET /payments/:id`, `GET .../wallet`, `GET /payments/me`, `POST /webhooks/akahu` with raw-body signature verification (synthetic keys and payloads), `applyAkahuResult` via the `akahu-sync` single apply funnel (absorbs Phase 3's minimal SENT apply in overdue.ts and adds the payment-received email), payout block (R3, CR-14), hold resolution per CR-15/CR-26 and ruling H2 (payee-team admins or GLOBAL_ADMIN), B3 overflow and duplicates, B10 payee at payment time, C-BIL-PAY at attempt start (Phase 2 note), 24 h grace writes (CR-27), `akahu-reconcile` queue and slot incl. CR-25 finality polling, payment-received/top-up/held/not-completed emails. Everything runs against the gateway port and the scriptable fake adapter; fixtures are provenance `synthetic` or `vendor-doc-derived`. ACs: AC-HAPPY-1, 4, 9, 12 (API side), AC-ERROR-1, 2, 3, 4 (manual trigger per OV-3), 6, 7, 10, AC-ASYNC-3, AC-VERIFY-7, AC-INTEGRATION-3 (Akahu races).
 - [x] **Phase 5: Web wallet, payment page and Payments manage area** (follows the UI/UX and journey creative docs): team-page wallet line, `/teams/[teamId]/wallet`, `/payments/[paymentId]` with processing states (`RefreshWhilePending`), `/teams/[teamId]/manage/payments` with `ConfirmDisclosure` reminder, `MANAGE_AREAS`, proxy, api-client, Server Actions, debt-block link. ACs: AC-ENTRY-1 to 4, AC-ASYNC-2, web side of AC-HAPPY-1, 4, 9, 10, 12 and AC-ERROR-1, 3, 4, 7.
 - [ ] **Phase 4b: Live Akahu adapter and sandbox fixtures** (A9; gated by A1/A7: MVE-001 go, MVE-002 credentials, MVE-005 signed sandbox webhook): `lib/akahu/live-adapter.ts` (thin REST client, DR-002), `PAYMENTS_ADAPTER=akahu` allowed to boot (clears the Phase 1 production-boot note), byte-level re-read of auth header, signature padding and key rotation from the live Akahu pages, re-check of the AUTHORISED/SUBMITTED mapping, payee charset and `invalid_payee` meaning (MVE-003), BANK_ERROR_INDETERMINATE handling (MVE-004), cancel/timeout fixtures (MVE-006), sandbox-real fixtures replacing synthetic ones where they exist, and any changes Akahu's written answer requires. ACs: AC-INTEGRATION-1, plus re-running the Phase 4a suites against recorded sandbox fixtures.
-- [ ] **Phase 6: E2E, reconciliation CLI, accessibility and docs**: `apps/web/e2e/billing.spec.ts` on both viewports with axe, `cli billing reconcile`, coverage gate, ADR 0020 final, operations guide in `docs/getting-started.md`, `systemPatterns.md`/`techContext.md`/`productBrief.md` updates, sandbox smoke test checklist. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-9, 10, 12, AC-INTEGRATION-4.
+- [x] **Phase 6: E2E, reconciliation CLI, accessibility and docs**: `apps/web/e2e/billing.spec.ts` on both viewports with axe, `cli billing reconcile`, coverage gate, ADR 0020 final, operations guide in `docs/getting-started.md`, `systemPatterns.md`/`techContext.md`/`productBrief.md` updates, sandbox smoke test checklist. This phase delivers the complete entry-to-success flow. ACs: AC-VERIFY-9, 10, 12, AC-INTEGRATION-4.
 
 ## Creative Phases
 
@@ -728,17 +728,17 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 ## Execution State
 
-**Build Status**: HALTED (auto-build; Phases 1-3, 4a, 5 complete; scoped stop before Phase 4b)
+**Build Status**: HALTED (Phases 1-3, 4a, 5, 6 complete; Phase 4b open, Akahu-gated; NOT BUILD_COMPLETE)
 **Halt Trigger**: Human scope (A9, 2026-11-04): Phase 4b gated on Akahu MVE-001 answer, MVE-002 credentials, MVE-005 fixture. Not a failure. Phase 5 review PROCEED after 1 remediation (AC-ENTRY-1, 29bd320).
 **Halted At Phase**: Phase 4b: Live Akahu adapter and sandbox fixtures (not started)
-**Resumption Point**: Phase 4b Step 0.5 once the Akahu gate clears; then Phase 6
+**Resumption Point**: Phase 4b Step 0.5 once the Akahu gate clears (Phase 6 was built ahead of 4b by human decision 2026-11-05)
 **Halt Timestamp**: 2026-11-04
 **Auto-Build Mode**: YES
 **Auto-Build Scope**: Phases 4a and 5 (human, 2026-11-04, A9). Halt before Phase 4b: Akahu MVE-001 answer, MVE-002 credentials and MVE-005 fixture not yet received.
 **Current Build**: none
-**Last Completed**: Phase 5: Web wallet, payment page and Payments manage area (2026-11-04)
+**Last Completed**: Phase 6: E2E, reconciliation CLI, accessibility and docs (2026-11-05)
 **Current Phase**: BUILD (between phases)
-**Current Step**: Phase 5 committed; scope complete, halt before Phase 4b
+**Current Step**: Phase 6 committed; Phase 4b still halted
 **Can Resume**: YES
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
@@ -768,6 +768,8 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 
 - Phase 5 BUILD: COMPLETE (2026-11-04) - web wallet (/teams/[teamId]/wallet), /payments/[paymentId], /payments (CR-16), Payments manage area with reminders, hold resolution (H2) and payout block (GLOBAL_ADMIN), WalletLine on team page, debt-block link, proxy, MANAGE_AREAS, api-client, Server Actions, RefreshWhilePending generalised (CR-22). Web unit run 2920 passing (whole unit project); typecheck, lint, prettier, web build clean; API untouched. Code review: codex companion direct, 2 P2 fixed (RefreshWhilePending kept mounted so completion is announced; hold/payout focus returns to the persistent payments heading).
 
+- Phase 6 BUILD: COMPLETE (2026-11-05, built ahead of 4b by human decision) - `cli billing reconcile` (6 discrepancy kinds by id, holds informational, exit 0/1/2) and `cli billing block-payout`, billing-reconcile-cli int tests (12), webhook-enqueued akahu-sync vs reconcile races (2), coverage include + gate test, apps/web/e2e/billing.spec.ts (14 tests, 7 journeys x 2 viewports, axe/scroll/44px), ADR 0020 finalized for decided items, ops guide in docs/getting-started.md, systemPatterns/techContext/productBrief updated. Unit 2931, integration 1079, coverage run 4010 passing (96.2% stmts); lint, typecheck, build clean. Code review APPROVED (no blocking).
+
 ### Deviations
 <!-- Auto-build ledger: - Phase <N> | <file:line/artifact> | <rationale> -->
 - Phase 2 | apps/api/test/integration/team-banking-gate.int.test.ts | AC-VERIFY-3 "removal commits first, billing inserts nothing" is proven via a committed payout block (B8 hold), because the publish gate refuses banking removal (409 banking_in_use) while a paid PUBLISHED session exists, so the literal ordering is unreachable. Accepted by phase reviewer.
@@ -795,6 +797,11 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Phase 5 | top-up field copy | Uses the shared API strings, not the UI/UX copy table wording (minor drift; align BILLING_FIELD_MESSAGES or amend the table in Phase 6).
 - Phase 5 | apps/web/src/lib/billing/constants.ts | REMINDER_COOLDOWN_MS and OVERDUE_BLOCK_COUNT are mirrored from the API; cleanup: move to packages/shared.
 - Phase 5 | wallet page (AC-ENTRY-1) | FIXED in remediation: 403 and non-APPROVED myStatus render the member-only sentence in the TeamShell instead of notFound(); 404/422/malformed ids still not-found.
+
+- Phase 6 | DEFERRED to Phase 4b (Akahu-gated, A9) | live adapter; sandbox smoke test checklist is documentation only in docs/getting-started.md (not executed); byte-level re-read of auth header/signature padding/key rotation; AUTHORISED/SUBMITTED/FAILED mapping; payee charset and invalid_payee (MVE-003); BANK_ERROR_INDETERMINATE (MVE-004); cancel/timeout fixtures (MVE-006); sandbox-real fixtures; production boot (PAYMENTS_ADAPTER=akahu refuses); AC-INTEGRATION-1. ADR 0020 lists these under "Open pending Phase 4b", no outcomes asserted, no Akahu retrieval date recorded; ADR not Accepted until MVE-001 answer.
+- Phase 6 | apps/web/e2e/billing.spec.ts | WRITTEN, TYPECHECKED AND LINTED BUT NOT EXECUTED: the only compose stack is the user's 11-day-old dev stack (name sgm); rebuilding it would replace it and migrate its volume, and the worktree has no .env. Run: `AUTH_FAKE_OAUTH=true docker compose up -d --build --wait && pnpm run test:e2e apps/web/e2e/billing.spec.ts`. Expect first-run selector fixes. AC-VERIFY-9 and AC-INTEGRATION-4 are therefore unproven at runtime. Gaps: B3 overflow notice, akahu-reconcile journey, top-up hold resolution, late-withdrawal states, debt-block link, wallet payout-blocked state (no payoutBlocked on GET wallet). Fixtures not app-creatable: game_sessions.date back-dating, payments.due_date back-dating, docker exec of jobs trigger/set-role.
+- Phase 6 | cli billing reconcile | chain-break check can be satisfied by an unrelated row when a wallet has repeated balances (no sequence column); balance = SUM(amount) is checked separately. block-payout CLI records no actor.
+- Phase 6 | TDD (Part A) | reconcile-cli.ts written before its tests; no observed RED run.
 
 ### Phase 1 Notes for later phases
 - Production cannot boot until Phase 4: `PAYMENTS_ADAPTER=fake` is refused in production and `akahu` refuses boot (CR-12/A6 read literally). `apps/api/Dockerfile` sets NODE_ENV=production and `cli.ts` loads config, so a production image fails until the live adapter ships; compose/dev/CI/E2E are unaffected. `cli-guards.test.ts` accepts either refusal for the NODE_ENV=production case. Revisit if a deploy is needed before Phase 4.
@@ -837,4 +844,5 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 - Phase 2: earlier verifier attempt stopped (parallel suites caused timing failures); orchestrator re-ran suites sequentially. Commit guard result recorded in commit.
 - Phase 3: commit guard result recorded in commit. TDD agent was launched async rather than blocking; completion arrived by message, verification run by the orchestrator sequentially.
 - Phase 4a: TDD agent dispatches (3 parts) ran async despite run_in_background false; completion arrived by message. Verification run by the orchestrator sequentially. Commit guard result recorded in commit.
+- Phase 6: 3 workers (CLI TDD, E2E TDD, docs) ran async despite run_in_background false; completion by message. Verification run by workers and orchestrator sequentially (no verifier agent; openapi.yaml unchanged, checked). Commit guard result recorded in commit.
 - Phase 5: TDD agents (2 parts) ran async despite run_in_background false; completion arrived by message. Verification run by the orchestrator sequentially (no verifier agent). Commit guard result recorded in commit.

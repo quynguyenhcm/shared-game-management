@@ -11,10 +11,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { LightMyRequestResponse } from 'fastify';
 import { createFakeControl, createFakePaymentsGateway } from '../../src/lib/akahu/fake-adapter.ts';
 import { GatewayUnavailableError, type PaymentsGateway } from '../../src/lib/akahu/gateway.ts';
+import { createManualClock } from '../../src/lib/clock.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { syncAkahuPayment } from '../../src/modules/billing/apply-akahu-result.ts';
+import { runAkahuReconcile } from '../../src/modules/billing/reconcile.ts';
 import { buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig } from '../helpers/app-deps.ts';
 import {
   insertPayment,
   insertPaymentAttempt,
@@ -292,5 +294,90 @@ describe('POST /webhooks/akahu: transient failures answer 5xx so Akahu retries',
     } finally {
       await noQueue.close();
     }
+  });
+});
+
+describe('a webhook-enqueued akahu-sync racing the reconcile sweep for the same Akahu id (Phase 4a follow-up)', () => {
+  /**
+   * The literal race: the job the webhook route enqueued (its recorded payload) runs on one real connection while
+   * `runAkahuReconcile` re-reads the same OPEN intent on another. The reconcile clock is 2 h ahead so the fresh intent is past the
+   * minimum age; every other intent is parked out of the sweep's reach so only this id is a candidate.
+   */
+  async function raceFor(akahuPaymentId: string): Promise<{ emailKeys: string[] }> {
+    await database.pool.query(
+      `UPDATE payment_attempts SET last_synced_at = '2126-01-01T00:00:00Z' WHERE akahu_payment_id <> $1`,
+      [akahuPaymentId],
+    );
+    await database.pool.query(
+      `UPDATE wallet_top_ups SET last_synced_at = '2126-01-01T00:00:00Z' WHERE akahu_payment_id <> $1`,
+      [akahuPaymentId],
+    );
+    control.scriptGet(akahuPaymentId, [{ providerStatus: 'SENT', providerStatusReason: null }]);
+    const body = event(akahuPaymentId);
+    expect((await post(h.app, body, signed(body))).statusCode).toBe(200);
+    const [enqueued] = syncJobs();
+    expect(syncJobs()).toHaveLength(1);
+    const payload = enqueued?.data as { akahuPaymentId: string; source: 'webhook' };
+    jobs.reset();
+
+    const clock = createManualClock(new Date(Date.now() + 2 * 3_600_000));
+    const deps = {
+      db: createKysely(database.pool),
+      gateway: createFakePaymentsGateway({ clock, control }),
+      jobs,
+      clock,
+      crypto: testCrypto(),
+      webBaseUrl: 'https://games.example.nz',
+      log: captureLogs().logger,
+    };
+    await Promise.all([
+      syncAkahuPayment(deps, payload),
+      runAkahuReconcile({
+        ...deps,
+        settings: { ...testPaymentsConfig(), reconcileMinAgeSeconds: 0 },
+      }),
+    ]);
+    return { emailKeys: jobs.emails().map((email) => email.idempotencyKey) };
+  }
+
+  it('payment attempt: exactly one PAID payment and one payment-received email', async () => {
+    const c = await openAttempt();
+    const { emailKeys } = await raceFor(c.id);
+    expect(await statusOf(c.paymentId)).toBe('PAID');
+    expect(emailKeys.filter((key) => key.includes(c.paymentId))).toEqual([
+      `payment-received:${c.paymentId}`,
+    ]);
+    const { rows } = await database.pool.query(
+      `SELECT 1 FROM payments WHERE id = $1 AND akahu_payment_id = $2 AND status = 'PAID'`,
+      [c.paymentId, c.id],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('top-up: exactly one credit, the balance is credited once, one top-up email', async () => {
+    const teamId = await insertTeam(database.pool, { payoutConfigured: true });
+    const userId = await insertMember(database.pool, teamId, {
+      email: `topup-${randomUUID()}@example.test`,
+    });
+    const id = providerId(2000);
+    await insertWalletTopUp(database.pool, {
+      userId,
+      teamId,
+      amount: '20.00',
+      status: 'OPEN',
+      akahuPaymentId: id,
+    });
+    const { emailKeys } = await raceFor(id);
+    const credits = await database.pool.query(
+      `SELECT amount::text FROM credit_transactions WHERE akahu_payment_id = $1 AND transaction_type = 'TOPUP'`,
+      [id],
+    );
+    expect(credits.rows).toEqual([{ amount: '20.00' }]);
+    const wallet = await database.pool.query<{ balance: string }>(
+      `SELECT balance::text FROM player_credits WHERE user_id = $1 AND team_id = $2`,
+      [userId, teamId],
+    );
+    expect(wallet.rows[0]?.balance).toBe('20.00');
+    expect(emailKeys).toHaveLength(1);
   });
 });

@@ -4,6 +4,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  parseBillingReconcileArgs,
+  parseBlockPayoutArgs,
   parseMemberBannedTrigger,
   parseRecurrenceRuleTrigger,
   parseSessionAutoEnrolTrigger,
@@ -177,5 +179,40 @@ describe('jobs trigger recurrence-rule and session-auto-enrol payloads (session-
     expect(parseSessionAutoEnrolTrigger(JSON.stringify({ teamId: session.teamId }))).toHaveProperty(
       'error',
     );
+  });
+});
+
+describe('billing CLI argument parsing', () => {
+  const team = '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d';
+
+  it('billing reconcile takes no arguments', () => {
+    expect(parseBillingReconcileArgs([])).toBeNull();
+    expect(parseBillingReconcileArgs(['--force'])).toEqual({
+      error: 'Usage: billing reconcile (no arguments)',
+    });
+  });
+
+  it('billing block-payout accepts a team id, an enum reason and an optional Akahu id', () => {
+    expect(parseBlockPayoutArgs([team.toUpperCase(), 'TEAM_REQUESTED'])).toEqual({
+      teamId: team,
+      reason: 'TEAM_REQUESTED',
+      akahuPaymentId: null,
+    });
+    expect(parseBlockPayoutArgs([team, 'FUNDS_RETURNED', 'pay_abc-123'])).toMatchObject({
+      akahuPaymentId: 'pay_abc-123',
+    });
+  });
+
+  it('billing block-payout refuses a bad team id, free-text reason, bad Akahu id and extra arguments', () => {
+    for (const args of [
+      [],
+      [team],
+      ['not-a-uuid', 'OTHER'],
+      [team, 'because the bank said so'],
+      [team, 'OTHER', 'has spaces'],
+      [team, 'OTHER', 'ok', 'extra'],
+    ]) {
+      expect(parseBlockPayoutArgs(args)).toHaveProperty('error');
+    }
   });
 });

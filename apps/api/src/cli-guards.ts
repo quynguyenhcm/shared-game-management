@@ -1,4 +1,4 @@
-import { AssignableGlobalRole, normaliseEmail } from '@sgm/shared';
+import { AssignableGlobalRole, PayoutBlockReason, normaliseEmail } from '@sgm/shared';
 import type { Config } from './lib/config/config.ts';
 import { BillSessionPayload, billSessionKey } from './jobs/bill-session.ts';
 import { RecurrenceRulePayload, recurrenceRuleKey } from './jobs/recurrence-rule.ts';
@@ -169,4 +169,36 @@ export function parseBillSessionTrigger(
     'bill-session',
     'Usage: jobs trigger bill-session \'{"sessionId":…,"trigger":"manual"}\'',
   );
+}
+
+/** `billing reconcile` takes no arguments. */
+export function parseBillingReconcileArgs(
+  args: readonly string[],
+): { readonly error: string } | null {
+  return args.length === 0 ? null : { error: 'Usage: billing reconcile (no arguments)' };
+}
+
+export type BlockPayoutArgs =
+  | {
+      readonly teamId: string;
+      readonly reason: PayoutBlockReason;
+      readonly akahuPaymentId: string | null;
+    }
+  | { readonly error: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const AKAHU_PAYMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Validates `billing block-payout <teamId> <REASON> [akahuPaymentId]` before any database access (enum reason, no free text). */
+export function parseBlockPayoutArgs(args: readonly string[]): BlockPayoutArgs {
+  const [teamId, rawReason, akahuPaymentId, ...extra] = args;
+  const usage = `Usage: billing block-payout <teamId> <${PayoutBlockReason.join('|')}> [akahuPaymentId]`;
+  if (teamId === undefined || rawReason === undefined || extra.length > 0) return { error: usage };
+  if (!UUID.test(teamId)) return { error: `"${teamId}" is not a team id. ${usage}` };
+  const reason = PayoutBlockReason.find((candidate) => candidate === rawReason);
+  if (reason === undefined) return { error: `Unknown reason "${rawReason}". ${usage}` };
+  if (akahuPaymentId !== undefined && !AKAHU_PAYMENT_ID.test(akahuPaymentId)) {
+    return { error: `Not an Akahu payment id. ${usage}` };
+  }
+  return { teamId: teamId.toLowerCase(), reason, akahuPaymentId: akahuPaymentId ?? null };
 }
