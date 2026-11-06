@@ -831,7 +831,8 @@ test.describe('admin payments', () => {
     const admin = await signedIn(browser, scene.admin);
     await admin.goto(`/teams/${scene.teamId}/manage/payments`);
     await expect(admin.getByRole('heading', { level: 1, name: /Payments/ })).toBeVisible();
-    await expect(admin.getByRole('cell', { name: debtor.fullName })).toBeVisible();
+    // By text, not cell name: on the phone layout the cell's accessible name gains its "Player" column label.
+    await expect(main(admin).getByText(debtor.fullName, { exact: true })).toBeVisible();
     await expect(admin.getByText('No reminder yet')).toBeVisible();
     await scan(admin, 'admin payments, one owing');
 

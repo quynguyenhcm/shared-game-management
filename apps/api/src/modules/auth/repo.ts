@@ -158,6 +158,20 @@ export async function findUserByEmail(
   return row === undefined ? undefined : { id: row.id, email: row.email, fullName: row.full_name };
 }
 
+/** The id of the GLOBAL_ADMIN with this normalised email, or `undefined` (no such user, or not a global admin). */
+export async function findGlobalAdminIdByEmail(
+  db: Database,
+  email: string,
+): Promise<string | undefined> {
+  const row = await db
+    .selectFrom('users')
+    .select('id')
+    .where('email', '=', email)
+    .where('role', '=', 'GLOBAL_ADMIN')
+    .executeTakeFirst();
+  return row?.id;
+}
+
 /** Serialises concurrent forgot requests for one user. Run in a transaction. */
 export async function lockUserRow(db: Database, userId: string): Promise<void> {
   await db.selectFrom('users').select('id').where('id', '=', userId).forUpdate().execute();

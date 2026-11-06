@@ -16,7 +16,7 @@ import { SCHEDULES } from './jobs/schedules.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { migrateToLatest, resetDatabase, rollbackMigrations } from './lib/db/migrate.ts';
 import { createPool } from './lib/db/pool.ts';
-import { setUserRole } from './modules/auth/repo.ts';
+import { findGlobalAdminIdByEmail, setUserRole } from './modules/auth/repo.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
 import { systemClock } from './lib/clock.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
@@ -51,7 +51,7 @@ function usage(): string {
     "  jobs trigger bill-session '<json>'      (re-run one session's billing: sessionId, trigger)",
     '  jobs schedules                         (list registered cron schedules)',
     '  billing reconcile                      (read-only ledger/payments check; exit 1 on any discrepancy, ids only)',
-    '  billing block-payout <teamId> <reason> [akahuPaymentId]   (mark a team payout as failing, CR-14; no actor recorded)',
+    '  billing block-payout <teamId> <reason> [akahuPaymentId] --as <email>   (mark a team payout as failing, CR-14; --as names the GLOBAL_ADMIN actor)',
     '  users set-role <email> <GLOBAL_ADMIN|PLAYER>   (grant or revoke the global admin role)',
   ].join('\n');
 }
@@ -202,7 +202,7 @@ async function runUsers(args: readonly string[], config: Config): Promise<void> 
   }
 }
 
-/** `billing reconcile` (read-only; exit 1 on any discrepancy) and `billing block-payout` (CR-14 convenience, no user session). */
+/** `billing reconcile` (read-only; exit 1 on any discrepancy) and `billing block-payout` (CR-14 convenience, no user session; `--as` names the GLOBAL_ADMIN actor). */
 async function runBilling(
   subcommand: string,
   args: readonly string[],
@@ -231,11 +231,17 @@ async function runBilling(
     poolMax: 2,
   });
   const pool = createPool({ connectionString: config.databaseUrl, max: 2 });
+  const db = createKysely(pool);
+  const actorUserId = await findGlobalAdminIdByEmail(db, parsed.actorEmail);
+  if (actorUserId === undefined) {
+    await pool.end();
+    fail('billing block-payout: --as must name a GLOBAL_ADMIN; nothing changed', 1);
+  }
   await runner.start();
   try {
     const result = await blockPayout(
       {
-        db: createKysely(pool),
+        db,
         jobs: runner,
         clock: systemClock,
         crypto: createCrypto(keyProviderFromConfig(config)),
@@ -243,7 +249,7 @@ async function runBilling(
       },
       {
         teamId: parsed.teamId,
-        actorUserId: null,
+        actorUserId,
         reason: parsed.reason,
         akahuPaymentId: parsed.akahuPaymentId,
         changeKey: randomUUID(),

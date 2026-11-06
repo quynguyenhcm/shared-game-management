@@ -255,6 +255,68 @@ describe('each discrepancy kind is reported by id (AC-VERIFY-12)', () => {
     expect(find(report, 'LEDGER_CHAIN_BREAK')).toMatchObject({ id: rowId, detail: 'amount=5.00' });
   });
 
+  /**
+   * Raw steps on player C's wallet (one TOPUP row, 0.00 -> 20.00) with the chain trigger and the type-shape check off, so a
+   * step may be negative without a registration. `seeded` rolls the DDL back with the rows.
+   */
+  async function insertRawSteps(
+    client: pg.PoolClient,
+    steps: readonly (readonly [amount: string, resultingBalance: string])[],
+  ): Promise<string[]> {
+    await client.query(
+      'ALTER TABLE credit_transactions DISABLE TRIGGER credit_transactions_ledger_chain',
+    );
+    await client.query(
+      'ALTER TABLE credit_transactions DROP CONSTRAINT credit_transactions_type_shape',
+    );
+    const ids: string[] = [];
+    for (const [index, [amount, resultingBalance]] of steps.entries()) {
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO credit_transactions (user_id, team_id, amount, transaction_type, akahu_payment_id, resulting_balance)
+         VALUES ($1, $2, $3, 'TOPUP', $4, $5) RETURNING id`,
+        [scene.topUpUserId, scene.teamId, amount, providerId(600 + index), resultingBalance],
+      );
+      ids.push(inserted.rows[0]?.id ?? '');
+    }
+    return ids;
+  }
+
+  it('LEDGER_CHAIN_BREAK: a detached cycle whose steps each start at another step, and net to zero', async () => {
+    // 72.00 -> 77.00 -> 72.00: every start is some row's end, and the sum is unchanged, yet 72.00 is never reached from 0.00.
+    let ids: string[] = [];
+    const report = await seeded(async (client) => {
+      ids = await insertRawSteps(client, [
+        ['5.00', '77.00'],
+        ['-5.00', '72.00'],
+      ]);
+    });
+    expect(kinds(report)).toEqual(['LEDGER_CHAIN_BREAK', 'LEDGER_CHAIN_BREAK']);
+    expect(report.discrepancies.map((d) => d.id).sort()).toEqual([...ids].sort());
+  });
+
+  it('LEDGER_CHAIN_FORK: two steps leave the same balance (repeated balances, sum and tail intact)', async () => {
+    // From 20.00 both to 25.00 and to 15.00: each start is reachable and the sum stays 20.00, but no single sequence exists.
+    const report = await seeded(async (client) => {
+      await insertRawSteps(client, [
+        ['5.00', '25.00'],
+        ['-5.00', '15.00'],
+      ]);
+    });
+    const wallet = await database.pool.query<{ id: string }>(
+      'SELECT id FROM player_credits WHERE user_id = $1 AND team_id = $2',
+      [scene.topUpUserId, scene.teamId],
+    );
+    // Every unbalanced point of the wallet is listed: the start, the fork and both ends.
+    expect(report.discrepancies.map((d) => [d.kind, d.id, d.detail])).toEqual(
+      [
+        ['0.00', 'leaving=1 reaching=0'],
+        ['15.00', 'leaving=0 reaching=1'],
+        ['20.00', 'leaving=2 reaching=1'],
+        ['25.00', 'leaving=0 reaching=1'],
+      ].map(([at, counts]) => ['LEDGER_CHAIN_FORK', wallet.rows[0]?.id, `at=${at} ${counts}`]),
+    );
+  });
+
   it('DEDUCTION_UNPAID: an AUTO_DEDUCTION whose payment is no longer a PAID PREPAID_CREDIT payment', async () => {
     const deduction = await database.pool.query<{ id: string; payment_id: string }>(
       `SELECT c.id, p.id AS payment_id FROM credit_transactions c
@@ -351,7 +413,32 @@ describe('the process exit code and its output', () => {
 });
 
 describe('cli billing block-payout (CR-14 convenience wrapper over blockPayout)', () => {
-  it('blocks the team, records one event with no actor, and a second run reports it already blocked', async () => {
+  const runBlock = async (asEmail: string) => {
+    const child = spawnNode(
+      'src/cli.ts',
+      ['billing', 'block-payout', scene.teamId, 'TEAM_REQUESTED', '--as', asEmail],
+      { DATABASE_URL: database.url, NODE_ENV: 'test', LOG_LEVEL: 'silent' },
+    );
+    const { code } = await child.exited;
+    return { code, output: child.output() };
+  };
+
+  it('refuses an --as that is not a GLOBAL_ADMIN and changes nothing', async () => {
+    const email = `player-${randomUUID()}@example.test`;
+    await insertUser(database.pool, 'MALE', { email });
+    for (const asEmail of [email, `nobody-${randomUUID()}@example.test`]) {
+      const result = await runBlock(asEmail);
+      expect(result.code).toBe(1);
+      expect(result.output).toContain('--as must name a GLOBAL_ADMIN');
+    }
+    const events = await database.pool.query<{ n: string }>(
+      'SELECT count(*)::text AS n FROM payout_block_events WHERE team_id = $1',
+      [scene.teamId],
+    );
+    expect(events.rows[0]?.n).toBe('0');
+  });
+
+  it('blocks the team, records the --as GLOBAL_ADMIN as actor, and a second run reports it already blocked', async () => {
     // The queues exist once a worker has booted (it defines them); the CLI is a producer only.
     const worker = createJobRunner({
       databaseUrl: database.url,
@@ -361,15 +448,10 @@ describe('cli billing block-payout (CR-14 convenience wrapper over blockPayout)'
     await worker.start();
     for (const queue of QUEUES) await worker.defineQueue(queue);
     await worker.stop();
-    const run = async () => {
-      const child = spawnNode(
-        'src/cli.ts',
-        ['billing', 'block-payout', scene.teamId, 'TEAM_REQUESTED'],
-        { DATABASE_URL: database.url, NODE_ENV: 'test', LOG_LEVEL: 'silent' },
-      );
-      const { code } = await child.exited;
-      return { code, output: child.output() };
-    };
+    const operatorEmail = `ops-${randomUUID()}@example.test`;
+    const operatorId = await insertUser(database.pool, 'MALE', { email: operatorEmail });
+    await database.pool.query(`UPDATE users SET role = 'GLOBAL_ADMIN' WHERE id = $1`, [operatorId]);
+    const run = () => runBlock(operatorEmail);
     const first = await run();
     expect(first.output).toContain('is now blocked');
     expect(first.code).toBe(0);
@@ -377,12 +459,11 @@ describe('cli billing block-payout (CR-14 convenience wrapper over blockPayout)'
     const second = await run();
     expect(second.code).toBe(0);
     expect(second.output).toContain('was already blocked');
-    const events = await database.pool.query<{ n: string; actors: string }>(
-      `SELECT count(*)::text AS n, count(actor_user_id)::text AS actors
-         FROM payout_block_events WHERE team_id = $1`,
+    const events = await database.pool.query<{ actor_user_id: string | null }>(
+      'SELECT actor_user_id FROM payout_block_events WHERE team_id = $1',
       [scene.teamId],
     );
-    expect(events.rows[0]).toEqual({ n: '2', actors: '0' });
+    expect(events.rows).toEqual([{ actor_user_id: operatorId }, { actor_user_id: operatorId }]);
     const team = await database.pool.query<{ blocked: boolean }>(
       `SELECT payout_blocked_at IS NOT NULL AS blocked FROM teams WHERE id = $1`,
       [scene.teamId],

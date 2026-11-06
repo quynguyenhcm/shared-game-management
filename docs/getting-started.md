@@ -388,6 +388,9 @@ pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts billi
 What it checks:
 
 - For every wallet, the balance equals the sum of its ledger amounts, and equals the latest `resulting_balance`.
+- For every wallet, the ledger rows form one unbroken sequence from 0.00: no row starts at a balance the wallet never reached
+  (`LEDGER_CHAIN_BREAK`, by row id), and no balance is left by two rows or never left (`LEDGER_CHAIN_FORK`, by wallet id with
+  the balance). Repeated balances cannot hide either.
 - Every `AUTO_DEDUCTION` has a matching PAID `PREPAID_CREDIT` payment for the same registration and amount.
 - Every PAID `PER_GAME` payment, and every `TOPUP`, has an Akahu payment id.
 - Informational, not a discrepancy: top-ups currently on hold are listed, because a hold needs an admin decision (see below).

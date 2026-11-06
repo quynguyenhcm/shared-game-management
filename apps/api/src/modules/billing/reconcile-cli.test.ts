@@ -68,7 +68,8 @@ describe('runBillingReconcile', () => {
       { kind: 'WALLET_BALANCE_SUM', id: 'w', detail: 'balance=2.00 ledger_sum=1.00' },
     ]);
     expect(report.holds[0]).toMatchObject({ id: 'h', holdReason: 'unknown', heldAt: 'unknown' });
-    expect(statements.every((text) => /^\s*SELECT/i.test(text))).toBe(true);
+    // Plain SELECTs or read-only WITH queries (the chain checks); never a write.
+    expect(statements.every((text) => /^\s*(SELECT|WITH)\b/i.test(text))).toBe(true);
     expect(statements.some((text) => /\b(INSERT|UPDATE|DELETE)\b/i.test(text))).toBe(false);
     // The ledger tail is found by the balance chain, never by timestamp (created_at is the transaction start).
     expect(statements.some((text) => text.includes('created_at'))).toBe(false);

@@ -156,7 +156,7 @@ Log events: `billing.sweep.enqueued`, `billing.session.completed`, `billing.sess
 - **While blocked.** Top-up and attempt starts answer 409 `payout_not_configured` (C-BIL-PAY, both routes), and the admin "Send reminder" action is hidden. Publishing a paid session answers 409 `payout_not_configured` (ADR 0016).
 - **Clearing.** There is no unblock action. Re-saving the banking details clears `payout_blocked_at` (team-banking behaviour). Held sessions bill on the next sweep after that.
 - **Player copy.** "This team can't receive payments right now. We've told the team admins."
-- **CLI.** `cli billing block-payout <teamId> <REASON> [akahuPaymentId]` was built in Phase 6 beside the GLOBAL_ADMIN route; it records no actor.
+- **CLI.** `cli billing block-payout <teamId> <REASON> [akahuPaymentId] --as <email>` was built in Phase 6 beside the GLOBAL_ADMIN route. `--as` is required and must name a GLOBAL_ADMIN, who is recorded as `actor_user_id` like the route's caller; otherwise it exits 1 and writes nothing.
 
 ### 14. Configuration and adapter selection (P7, A6, CR-12)
 

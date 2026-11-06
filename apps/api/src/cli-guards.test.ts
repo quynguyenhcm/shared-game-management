@@ -192,25 +192,32 @@ describe('billing CLI argument parsing', () => {
     });
   });
 
-  it('billing block-payout accepts a team id, an enum reason and an optional Akahu id', () => {
-    expect(parseBlockPayoutArgs([team.toUpperCase(), 'TEAM_REQUESTED'])).toEqual({
+  it('billing block-payout accepts a team id, an enum reason, an optional Akahu id and the --as actor', () => {
+    expect(
+      parseBlockPayoutArgs([team.toUpperCase(), 'TEAM_REQUESTED', '--as', ' Ops@Example.TEST ']),
+    ).toEqual({
       teamId: team,
       reason: 'TEAM_REQUESTED',
       akahuPaymentId: null,
+      actorEmail: 'ops@example.test',
     });
-    expect(parseBlockPayoutArgs([team, 'FUNDS_RETURNED', 'pay_abc-123'])).toMatchObject({
-      akahuPaymentId: 'pay_abc-123',
-    });
+    expect(
+      parseBlockPayoutArgs(['--as', 'ops@example.test', team, 'FUNDS_RETURNED', 'pay_abc-123']),
+    ).toMatchObject({ akahuPaymentId: 'pay_abc-123', actorEmail: 'ops@example.test' });
   });
 
-  it('billing block-payout refuses a bad team id, free-text reason, bad Akahu id and extra arguments', () => {
+  it('billing block-payout refuses a missing or bad actor, bad team id, free-text reason, bad Akahu id and extra arguments', () => {
+    const as = ['--as', 'ops@example.test'];
     for (const args of [
       [],
-      [team],
-      ['not-a-uuid', 'OTHER'],
-      [team, 'because the bank said so'],
-      [team, 'OTHER', 'has spaces'],
-      [team, 'OTHER', 'ok', 'extra'],
+      [team, 'OTHER'],
+      [team, 'OTHER', '--as'],
+      [team, 'OTHER', '--as', 'not-an-email'],
+      [team, ...as],
+      ['not-a-uuid', 'OTHER', ...as],
+      [team, 'because the bank said so', ...as],
+      [team, 'OTHER', 'has spaces', ...as],
+      [team, 'OTHER', 'ok', 'extra', ...as],
     ]) {
       expect(parseBlockPayoutArgs(args)).toHaveProperty('error');
     }

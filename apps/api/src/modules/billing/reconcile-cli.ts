@@ -4,8 +4,11 @@
  *
  *   - WALLET_BALANCE_SUM:  a wallet's `balance` differs from the sum of its `credit_transactions.amount`;
  *   - WALLET_BALANCE_TAIL: no ledger row of the wallet carries `resulting_balance = balance` (the ledger's last row does);
- *   - LEDGER_CHAIN_BREAK:  a ledger row whose starting balance (`resulting_balance - amount`) is neither 0.00 nor the
- *                          `resulting_balance` of another row of the same wallet;
+ *   - LEDGER_CHAIN_BREAK:  a ledger row whose starting balance (`resulting_balance - amount`) cannot be reached from 0.00
+ *                          through the wallet's own rows (catches a detached row, and a detached cycle the sum check misses);
+ *   - LEDGER_CHAIN_FORK:   a wallet where some balance is left by more or fewer rows than arrive at it (beyond the chain's
+ *                          start at 0.00 and its one end), so the rows cannot form one sequence (repeated balances cannot
+ *                          hide this, there being no sequence column); one line per unbalanced point;
  *   - DEDUCTION_UNPAID:    an `AUTO_DEDUCTION` with no PAID `PREPAID_CREDIT` payment for the same registration and amount;
  *   - PER_GAME_NO_AKAHU:   a PAID `PER_GAME` payment without an Akahu payment id;
  *   - TOPUP_NO_AKAHU:      a `TOPUP` ledger row without an Akahu payment id.
@@ -23,6 +26,7 @@ export type DiscrepancyKind =
   | 'WALLET_BALANCE_SUM'
   | 'WALLET_BALANCE_TAIL'
   | 'LEDGER_CHAIN_BREAK'
+  | 'LEDGER_CHAIN_FORK'
   | 'DEDUCTION_UNPAID'
   | 'PER_GAME_NO_AKAHU'
   | 'TOPUP_NO_AKAHU';
@@ -58,6 +62,11 @@ interface BalanceRow extends IdRow {
 interface AmountRow extends IdRow {
   readonly amount: string;
 }
+interface ForkRow extends IdRow {
+  readonly at: string;
+  readonly leaving: string;
+  readonly reaching: string;
+}
 interface HoldRow extends IdRow {
   readonly team_id: string;
   readonly amount: string;
@@ -82,14 +91,48 @@ const SQL_BALANCE_TAIL = `
      AND NOT EXISTS (SELECT 1 FROM credit_transactions c WHERE ${SAME_WALLET} AND c.resulting_balance = w.balance)
    ORDER BY w.id`;
 
+// Each ledger row is a step from `resulting_balance - amount` to `resulting_balance`. The rows of a sound wallet form one
+// path from 0.00 to `balance` (an Eulerian path): every step's start is reachable from 0.00 (CHAIN_BREAK) and every balance
+// is left as often as it is reached, bar one extra leaving 0.00 and one extra reaching the end (CHAIN_FORK). With the tail
+// check (the end is `balance`) these are exact. `UNION` makes the walk terminate: balances are bounded (0.00 to 100.00).
 const SQL_CHAIN_BREAK = `
+  WITH RECURSIVE reach (user_id, team_id, at) AS (
+    SELECT DISTINCT user_id, team_id, 0.00::numeric(10,2) FROM credit_transactions
+    UNION
+    SELECT c.user_id, c.team_id, c.resulting_balance
+      FROM reach r
+      JOIN credit_transactions c
+        ON c.user_id = r.user_id AND c.team_id = r.team_id AND c.resulting_balance - c.amount = r.at)
   SELECT c.id, c.amount::text AS amount
     FROM credit_transactions c
-   WHERE c.resulting_balance - c.amount <> 0.00
-     AND NOT EXISTS (SELECT 1 FROM credit_transactions p
-                      WHERE p.user_id = c.user_id AND p.team_id = c.team_id AND p.id <> c.id
-                        AND p.resulting_balance = c.resulting_balance - c.amount)
+   WHERE NOT EXISTS (SELECT 1 FROM reach r
+                      WHERE r.user_id = c.user_id AND r.team_id = c.team_id
+                        AND r.at = c.resulting_balance - c.amount)
    ORDER BY c.id`;
+
+// Shape only: the one sound shape is no unbalanced point, or exactly +1 at 0.00 and -1 at one end. Whether that end equals
+// `balance` is the tail check's finding, so a drifted balance is not reported twice.
+const SQL_CHAIN_FORK = `
+  WITH steps AS (
+    SELECT w.id, c.resulting_balance - c.amount AS at, 1 AS leaving, 0 AS reaching
+      FROM player_credits w JOIN credit_transactions c ON ${SAME_WALLET}
+    UNION ALL
+    SELECT w.id, c.resulting_balance, 0, 1
+      FROM player_credits w JOIN credit_transactions c ON ${SAME_WALLET}),
+  unbalanced AS (
+    SELECT id, at, sum(leaving) AS leaving, sum(reaching) AS reaching
+      FROM steps
+     GROUP BY id, at
+    HAVING sum(leaving) <> sum(reaching))
+  SELECT u.id, u.at::text AS at, u.leaving::text AS leaving, u.reaching::text AS reaching
+    FROM unbalanced u
+   WHERE NOT EXISTS (SELECT 1 FROM unbalanced s
+                      WHERE s.id = u.id
+                     GROUP BY s.id
+                    HAVING count(*) = 2
+                       AND count(*) FILTER (WHERE s.at = 0.00 AND s.leaving - s.reaching = 1) = 1
+                       AND count(*) FILTER (WHERE s.at <> 0.00 AND s.leaving - s.reaching = -1) = 1)
+   ORDER BY u.id, u.at`;
 
 const SQL_DEDUCTION_UNPAID = `
   SELECT c.id, c.amount::text AS amount
@@ -137,6 +180,13 @@ export async function runBillingReconcile(db: SqlRunner): Promise<ReconcileRepor
       kind: 'WALLET_BALANCE_TAIL',
       id: row.id,
       detail: `balance=${row.balance}`,
+    });
+  }
+  for (const row of await rowsOf<ForkRow>(db, SQL_CHAIN_FORK)) {
+    discrepancies.push({
+      kind: 'LEDGER_CHAIN_FORK',
+      id: row.id,
+      detail: `at=${row.at} leaving=${row.leaving} reaching=${row.reaching}`,
     });
   }
   const amountChecks: readonly [DiscrepancyKind, string][] = [
