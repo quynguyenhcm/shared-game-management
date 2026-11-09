@@ -1,8 +1,13 @@
 /**
  * Lock prologue helpers for the sessions module (architecture SA-2). The canonical order, restated from ADR 0015,
- * ADR 0016 and C-ALL-1 and extended by ADR 0019, is
+ * ADR 0016 and C-ALL-1, extended by ADR 0019 and then by wallet-and-akahu-billing (CR-4, ADR 0020), is
  *
- *   teams -> recurring_session_rules -> team_members -> game_sessions -> registrations -> registration_guests -> payments
+ *   teams -> recurring_session_rules -> team_members -> game_sessions -> registrations -> registration_guests
+ *         -> wallet_top_ups -> player_credits -> payments -> payment_attempts
+ *
+ * The wallet and its top-up intents sit BEFORE `payments` because `payments.billing_type` is immutable and is decided by
+ * the wallet balance, so `bill-session` must read that balance under the wallet lock before it inserts the payment.
+ * Several wallets in one transaction are locked in ascending `user_id` order. Nothing in this module locks a billing table.
  *
  * - `teams` only as `KEY SHARE` (`lockTeamKeyShare`, and the publish gate), never `FOR UPDATE` / `NO KEY UPDATE`.
  * - `recurring_session_rules` only `FOR NO KEY UPDATE` (`lockRule`): series edit and end, the materialiser's
@@ -29,7 +34,10 @@ export const LOCK_ORDER = [
   'game_sessions',
   'registrations',
   'registration_guests',
+  'wallet_top_ups',
+  'player_credits',
   'payments',
+  'payment_attempts',
 ] as const;
 
 /**

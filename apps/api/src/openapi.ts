@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.ts';
+import { createFakePaymentsGateway } from './lib/akahu/fake-adapter.ts';
 import { systemClock } from './lib/clock.ts';
 import { loadConfig } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
@@ -51,6 +52,8 @@ async function withInertApp<T>(read: (app: FastifyInstance) => T): Promise<T> {
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
     sessionAllocator: noopSessionAllocator,
     recurrenceHorizonDays: config.recurrence.horizonDays,
+    paymentsGateway: createFakePaymentsGateway(),
+    payments: config.payments,
   });
   try {
     return read(app);

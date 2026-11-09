@@ -8,6 +8,9 @@ import { createManualClock } from '../../src/lib/clock.ts';
 import { loadConfig, type Config } from '../../src/lib/config/config.ts';
 import { createCrypto, type FieldCrypto } from '../../src/lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
+import { createFakePaymentsGateway } from '../../src/lib/akahu/fake-adapter.ts';
+import type { PaymentsConfig } from '../../src/lib/akahu/config.ts';
+import type { PaymentsGateway } from '../../src/lib/akahu/gateway.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
@@ -35,6 +38,16 @@ export function testCrypto(): FieldCrypto {
   return createCrypto(keyProviderFromConfig(testConfig()));
 }
 
+/** The stateless fake payments gateway (`registerJobs` requires one; most suites never reach it). */
+export function testPaymentsGateway(): PaymentsGateway {
+  return createFakePaymentsGateway();
+}
+
+/** `config.payments` as the test config loads it (the reconcile ages and the finality horizon at their defaults). */
+export function testPaymentsConfig(): PaymentsConfig {
+  return testConfig().payments;
+}
+
 export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): AppDeps {
   const config = testConfig();
   // Never queried: pg opens connections lazily on checkout.
@@ -59,6 +72,8 @@ export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): 
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
     sessionAllocator: noopSessionAllocator,
     recurrenceHorizonDays: config.recurrence.horizonDays,
+    paymentsGateway: testPaymentsGateway(),
+    payments: config.payments,
     ...overrides,
   };
 }

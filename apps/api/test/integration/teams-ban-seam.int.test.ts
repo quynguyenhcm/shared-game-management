@@ -2,7 +2,8 @@
  * THE CONTRACT TEST for the ban seam (Architecture 1B, ADR 0015, AC-ASYNC-1..3, AC-ERROR-12, AC-INTEGRATION-1).
  *
  * registration-and-waitlist's real `MemberBannedHandler` (`createRegistrationsBanHandler`, AC-INTEGRATION-2) runs inside the
- * recording wrapper below, installed through `registerJobs({ memberBannedHandler })` exactly as `worker.ts` does. The
+ * recording wrapper below, installed through `registerJobs({
+    paymentsGateway: testPaymentsGateway(), memberBannedHandler })` exactly as `worker.ts` does. The
  * assertions about the payload, the job commit, the retry, the idempotent redelivery and the `assertApprovedMember` race
  * therefore prove the real handler against the contract. The wrapper still records what the handler saw and returned. Two
  * cases keep their injected fault because the fault is the contract's subject: a transient error before the real handler
@@ -28,7 +29,7 @@ import {
   type MemberBannedOutcome,
 } from '../../src/modules/teams/ban-hook.ts';
 import { assertApprovedMember } from '../../src/modules/teams/membership.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
@@ -104,6 +105,8 @@ beforeAll(async () => {
     webBaseUrl: 'https://app.example.test',
   });
   await registerJobs({
+    paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

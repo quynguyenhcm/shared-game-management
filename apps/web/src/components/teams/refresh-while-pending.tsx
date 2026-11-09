@@ -2,29 +2,31 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import {
-  REFRESH_DELAYS_MS,
-  pendingView,
-  sessionsAddedLine,
-} from '../../lib/teams/sessions-view.ts';
+import { DEFAULT_REFRESH_DELAYS_MS, waitingView } from '../../lib/teams/pending-view.ts';
 import { LINK_CLASS } from '../auth/styles.ts';
 
 /**
- * The waiting state of a series ("We're adding the sessions in this series"). It refreshes the server-rendered
- * page three times, at about 2, 5 and 10 seconds after it mounts (skipping a refresh while the tab is hidden),
- * never moves focus, and then stops: if the series is still pending the text becomes the slow-path text. The
- * "Refresh" link is a plain link to the same URL, so it works without script and is always there. When the
- * pending state flips off it announces "{n} sessions added." politely.
+ * The waiting state of anything the server finishes in the background (a series being materialised, a top-up or a payment
+ * waiting for the bank). It refreshes the server-rendered page at about 2, 5 and 10 seconds after it mounts (skipping a
+ * refresh while the tab is hidden), never moves focus, and then stops: if the state is still pending the text becomes
+ * `slowText`. The "Refresh" link is a plain link to the same URL, so it works without script and is always there. When the
+ * pending state flips off it announces `doneText` politely (when given). The words come from the caller (CR-22).
  */
 export function RefreshWhilePending({
   pending,
   href,
-  sessionCount,
+  pendingText,
+  slowText,
+  doneText,
+  delaysMs = DEFAULT_REFRESH_DELAYS_MS,
 }: {
   pending: boolean;
   href: string;
-  /** How many sessions the series has once it is no longer pending (for the announcement). */
-  sessionCount?: number;
+  pendingText: string;
+  slowText: string;
+  /** Announced once when `pending` flips from true to false. */
+  doneText?: string;
+  delaysMs?: readonly number[];
 }) {
   const router = useRouter();
   const [refreshes, setRefreshes] = useState(0);
@@ -33,14 +35,12 @@ export function RefreshWhilePending({
 
   if (wasPending !== pending) {
     setWasPending(pending);
-    if (wasPending && !pending && sessionCount !== undefined) {
-      setAnnouncement(sessionsAddedLine(sessionCount));
-    }
+    if (wasPending && !pending && doneText !== undefined) setAnnouncement(doneText);
   }
 
   useEffect(() => {
     if (!pending) return;
-    const timers = REFRESH_DELAYS_MS.map((delay, index) =>
+    const timers = delaysMs.map((delay, index) =>
       setTimeout(() => {
         if (typeof document === 'undefined' || !document.hidden) router.refresh();
         setRefreshes(index + 1);
@@ -49,9 +49,9 @@ export function RefreshWhilePending({
     return () => {
       for (const timer of timers) clearTimeout(timer);
     };
-  }, [pending, router]);
+  }, [pending, router, delaysMs]);
 
-  const view = pendingView({ pending, refreshesDone: refreshes });
+  const view = waitingView({ pending, refreshesDone: refreshes, pendingText, slowText, delaysMs });
   return (
     <div role="status" aria-live="polite" className="flex flex-col gap-1 text-base">
       {view.kind === 'done' ? (

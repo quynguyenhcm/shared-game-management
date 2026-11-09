@@ -35,6 +35,7 @@ describe('schedule slots', () => {
     expect(SCHEDULES.map(({ name, cron, tz }) => ({ name, cron, tz }))).toEqual([
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
+      { name: 'akahu-reconcile', cron: '*/15 * * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
@@ -87,9 +88,10 @@ describe('schedule slots', () => {
     expect(next('2027-04-02T15:00:00Z')).toBe('2027-04-03T15:00:00.000Z');
   });
 
-  it('exempts only the flagged idempotent interval sweep', () => {
+  it('exempts only the flagged idempotent interval sweeps', () => {
     expect(SCHEDULES.filter((slot) => slot.intervalSweep).map((slot) => slot.name)).toEqual([
       'post-game-billing',
+      'akahu-reconcile',
     ]);
   });
 
@@ -120,6 +122,7 @@ describe('schedule slots', () => {
     expect(calls.map((call) => call.slice(0, 2))).toEqual([
       ['recurrence-materialisation', '0 3 * * *'],
       ['post-game-billing', '*/5 * * * *'],
+      ['akahu-reconcile', '*/15 * * * *'],
       ['daily-overdue', '0 4 * * *'],
       ['auth-cleanup', '0 5 * * *'],
       ['skill-progression', '30 5 * * *'],

@@ -6,11 +6,23 @@ import { MANAGE_AREAS, manageAreaLinks } from './manage-areas.ts';
 const TEAM_ID = '7f3c2b1a-1111-4222-8333-444455556666';
 
 describe('manage area registry (UI/UX Q2: the plug-in seam for later admin areas)', () => {
-  it('holds People at the manage root, Banking and GST under /banking and Sessions under /sessions (AC-ENTRY-1)', () => {
+  it('holds People at the manage root, Banking and GST under /banking, Sessions under /sessions and Payments under /payments (AC-ENTRY-3)', () => {
     expect(MANAGE_AREAS.map((area) => [area.id, area.label, area.segment])).toEqual([
       ['people', 'People', ''],
       ['banking', 'Banking and GST', 'banking'],
       ['sessions', 'Sessions', 'sessions'],
+      ['payments', 'Payments', 'payments'],
+    ]);
+  });
+
+  it('CR-21: a global admin who is not a team admin gets only the Payments link, even though it is a single area', () => {
+    expect(manageAreaLinks(TEAM_ID, undefined, 'payments', { globalAdminOnly: true })).toEqual([
+      {
+        id: 'payments',
+        label: 'Payments',
+        href: `/teams/${TEAM_ID}/manage/payments`,
+        current: true,
+      },
     ]);
   });
 
@@ -27,6 +39,12 @@ describe('manage area registry (UI/UX Q2: the plug-in seam for later admin areas
         id: 'sessions',
         label: 'Sessions',
         href: `/teams/${TEAM_ID}/manage/sessions`,
+        current: false,
+      },
+      {
+        id: 'payments',
+        label: 'Payments',
+        href: `/teams/${TEAM_ID}/manage/payments`,
         current: false,
       },
     ]);

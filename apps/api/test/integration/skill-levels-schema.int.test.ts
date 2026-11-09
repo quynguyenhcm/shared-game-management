@@ -316,14 +316,15 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
         latest.some((line) => line.startsWith('column team_members.skill_level_changed_at')),
       ).toBe(true);
 
-      // Newest first: the auto-enrol backlog flag, the registration lifecycle and the session scheduling schema sit on top of
-      // this feature's migration.
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 4 });
-      expect(reverted).toHaveLength(4);
-      expect(reverted[0]).toContain('auto_enrol_silent_backlog');
-      expect(reverted[1]).toContain('registration_lifecycle');
-      expect(reverted[2]).toContain('session_scheduling');
-      expect(reverted[3]).toContain('skill_levels_and_auto_enroll');
+      // Newest first: the wallet and billing schema, the auto-enrol backlog flag, the registration lifecycle and the session
+      // scheduling schema sit on top of this feature's migration.
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 5 });
+      expect(reverted).toHaveLength(5);
+      expect(reverted[0]).toContain('wallet_and_billing');
+      expect(reverted[1]).toContain('auto_enrol_silent_backlog');
+      expect(reverted[2]).toContain('registration_lifecycle');
+      expect(reverted[3]).toContain('session_scheduling');
+      expect(reverted[4]).toContain('skill_levels_and_auto_enroll');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'skill_level_changed_at',
@@ -353,7 +354,7 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
     const empty = await createTestDatabase({ empty: true });
     try {
       await migrateToLatest({ databaseUrl: empty.url });
-      await rollbackMigrations({ databaseUrl: empty.url, count: 4 });
+      await rollbackMigrations({ databaseUrl: empty.url, count: 5 });
       const teamId = await insertTeam(empty.pool);
       const [userId, actorId] = [await insertUser(empty.pool), await insertUser(empty.pool)];
       await insertTeamMember(empty.pool, { teamId, userId, actorId });
@@ -380,7 +381,7 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
         ],
       ];
       // A failed migration leaves the schema one step behind, so roll back once and keep trying from there.
-      await rollbackMigrations({ databaseUrl: empty.url, count: 4 });
+      await rollbackMigrations({ databaseUrl: empty.url, count: 5 });
       for (const [assignment, message] of broken) {
         await empty.pool.query(
           `UPDATE team_members SET skill_level_override_by = NULL, skill_level_override_at = NULL,
@@ -398,7 +399,7 @@ describe('ledger and reversibility (AC-VERIFY-1)', () => {
     const empty = await createTestDatabase({ empty: true });
     try {
       await migrateToLatest({ databaseUrl: empty.url });
-      await rollbackMigrations({ databaseUrl: empty.url, count: 4 });
+      await rollbackMigrations({ databaseUrl: empty.url, count: 5 });
       const teamId = await insertTeam(empty.pool);
       const userId = await insertUser(empty.pool);
       await empty.pool.query(

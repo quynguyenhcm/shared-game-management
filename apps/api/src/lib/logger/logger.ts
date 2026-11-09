@@ -32,6 +32,9 @@ const REDACT_PATHS = [
   'req.headers["x-sgm-internal-auth"]',
   'req.headers["x-pending-signup"]',
   'req.headers["set-cookie"]',
+  // Akahu webhook signature material (wallet-and-akahu-billing A4).
+  'req.headers["x-akahu-payments-signature"]',
+  'req.headers["x-akahu-payments-signing-key"]',
 ];
 
 /**
@@ -74,6 +77,10 @@ const BASE_KEY_PATTERNS: readonly RegExp[] = [
   /^(bank_?)?account_?(name|number)$/i,
   /^ird_number$/i,
   /^akahu_/i,
+  // Akahu payment link and payee details (wallet-and-akahu-billing): `payeeAccountLast4` stays readable.
+  /^authori[sz]ation_?url$/i,
+  /^payee_?(account_?number|name)$/i,
+  /^x-akahu-payments-(signature|signing-key)$/i,
   /^encryptionKeys$/i,
   // Connection strings: DATABASE_URL / smtpUrl / dsn / connection_string and the like.
   /(database|db|smtp|redis|amqp)_?url$/i,

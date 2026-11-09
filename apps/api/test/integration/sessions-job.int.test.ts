@@ -26,7 +26,7 @@ import {
   type MaterialiseDeps,
 } from '../../src/modules/sessions/materialise.ts';
 import type { RecurrenceRulePayload } from '../../src/modules/sessions/rule-jobs.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import {
   insertRule,
   insertSession,
@@ -955,6 +955,8 @@ describe('the worker, the boot sweep and pending reconciliation end to end (AC-A
     });
     await e2eWorker.start();
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner: e2eWorker,
       notifier,
       crypto: testCrypto(),

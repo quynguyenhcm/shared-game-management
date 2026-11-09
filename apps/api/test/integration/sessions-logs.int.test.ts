@@ -42,7 +42,7 @@ import {
 import { materialiseRule, type MaterialiseDeps } from '../../src/modules/sessions/materialise.ts';
 import { enqueueRuleMaterialisation } from '../../src/modules/sessions/rule-jobs.ts';
 import { HTTP_POLICY, runSessionTransaction } from '../../src/modules/sessions/tx.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
@@ -661,6 +661,8 @@ describe('recurrence and auto-enrol events from the jobs carry the job trace (AC
     });
     await worker.start();
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner: worker,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),

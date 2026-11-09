@@ -3,7 +3,11 @@ import type { JobContext, JobRunner } from '../lib/jobs/jobs.ts';
 import { NonRetryableJobError } from '../lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../lib/notifications/adapters/in-memory.ts';
 import type { EmailMessage } from '../lib/notifications/notifier.ts';
-import { testCrypto } from '../../test/helpers/app-deps.ts';
+import {
+  testCrypto,
+  testPaymentsConfig,
+  testPaymentsGateway,
+} from '../../test/helpers/app-deps.ts';
 import { noopSessionAllocator } from '../modules/sessions/allocator-port.ts';
 import { registerJobs } from './bootstrap.ts';
 import { heartbeatHandler } from './heartbeat.ts';
@@ -177,6 +181,8 @@ describe('registerJobs', () => {
       previewSchedule: () => [],
     } as unknown as JobRunner;
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -189,6 +195,7 @@ describe('registerJobs', () => {
     expect(worked.sort()).toEqual(QUEUES.map((queue) => queue.name).sort());
     expect(scheduled.sort()).toEqual(
       [
+        'akahu-reconcile',
         'auth-cleanup',
         'daily-overdue',
         'post-game-billing',
@@ -219,7 +226,14 @@ describe('registerJobs', () => {
     };
     // Cast: the option is required at compile time; this proves the runtime guard for a JS-shaped caller.
     await expect(registerJobs(options as never)).rejects.toThrow(/webBaseUrl/);
-    await expect(registerJobs({ ...options, webBaseUrl: '' })).rejects.toThrow(/webBaseUrl/);
+    await expect(
+      registerJobs({
+        paymentsGateway: testPaymentsGateway(),
+        payments: testPaymentsConfig(),
+        ...options,
+        webBaseUrl: '',
+      }),
+    ).rejects.toThrow(/webBaseUrl/);
     expect(defined).toEqual([]);
   });
 
@@ -235,6 +249,8 @@ describe('registerJobs', () => {
       previewSchedule: () => [],
     } as unknown as JobRunner;
     const base = {
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -273,6 +289,8 @@ describe('skill-progression wiring', () => {
       },
     } as never;
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -313,6 +331,8 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
       },
     } as never;
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -332,6 +352,8 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
   it('works the recurrence-rule queue with a handler that rejects a malformed payload without retries', async () => {
     const { handlers, runner } = wired();
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),
@@ -343,5 +365,137 @@ describe('recurrence wiring (session-scheduling-engine)', () => {
     await expect(handlers.get('recurrence-rule')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(
       NonRetryableJobError,
     );
+  });
+});
+
+describe('billing wiring (wallet-and-akahu-billing Phases 2-3)', () => {
+  function wired() {
+    const handlers = new Map<string, (data: object, ctx: JobContext) => Promise<void>>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: (data: object, ctx: JobContext) => Promise<void>) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    return { handlers, runner };
+  }
+
+  it('works the post-game-billing slot with the real sweep, not the placeholder', async () => {
+    const { handlers, runner } = wired();
+    // A database that is down: the placeholder would complete, the real sweep must fail.
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down');
+      },
+    } as never;
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    await expect(handlers.get('post-game-billing')?.({}, ctx)).rejects.toThrow(/db down/);
+  });
+
+  it('works the daily-overdue slot with the real job, not the placeholder, and never rethrows the driver error', async () => {
+    const { handlers, runner } = wired();
+    // A database that is down: the placeholder would complete, the real job must fail with a sanitised error.
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down: secret-value');
+      },
+    } as never;
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx, logs } = context();
+    const failure = handlers.get('daily-overdue')?.({}, ctx);
+    await expect(failure).rejects.toThrow(/daily-overdue failed \(Error\)/);
+    await expect(failure).rejects.not.toThrow(/secret-value/);
+    expect(logs.some((entry) => entry.fields.event === 'billing.overdue.failed')).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('secret-value');
+  });
+
+  it('works the bill-session queue with a handler that rejects a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    await expect(handlers.get('bill-session')?.({ nope: true }, ctx)).rejects.toBeInstanceOf(
+      NonRetryableJobError,
+    );
+  });
+
+  it('works the akahu-sync and akahu-cancel queues with handlers that reject a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db: {} as never,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx } = context();
+    for (const queue of ['akahu-sync', 'akahu-cancel']) {
+      for (const payload of [{}, { akahuPaymentId: 'has spaces', source: 'webhook' }]) {
+        await expect(handlers.get(queue)?.(payload, ctx), queue).rejects.toBeInstanceOf(
+          NonRetryableJobError,
+        );
+      }
+    }
+  });
+
+  it('works the akahu-reconcile slot with the real sweep, not the placeholder, and never rethrows the driver error', async () => {
+    const { handlers, runner } = wired();
+    const db = {
+      updateTable: () => {
+        throw new Error('db down: secret-value');
+      },
+      selectFrom: () => {
+        throw new Error('db down: secret-value');
+      },
+    } as never;
+    await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+    const { ctx, logs } = context();
+    const failure = handlers.get('akahu-reconcile')?.({}, ctx);
+    await expect(failure).rejects.toThrow(/akahu-reconcile failed \(Error\)/);
+    await expect(failure).rejects.not.toThrow(/secret-value/);
+    expect(logs.some((entry) => entry.fields.event === 'akahu.reconcile.failed')).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('secret-value');
   });
 });

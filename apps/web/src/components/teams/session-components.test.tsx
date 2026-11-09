@@ -1,7 +1,11 @@
 import type { DstOptionsEntry, SeriesResponse, SessionResponse } from '@sgm/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { cancelPrompt } from '../../lib/teams/sessions-view.ts';
+import {
+  SERIES_PENDING_TEXT,
+  SERIES_SLOW_TEXT,
+  cancelPrompt,
+} from '../../lib/teams/sessions-view.ts';
 
 vi.mock('next/headers', () => ({
   cookies: () => Promise.resolve({ get: () => undefined, set: () => undefined }),
@@ -819,8 +823,9 @@ describe('SeriesSummary, EndSeriesConfirm and RefreshWhilePending', () => {
   });
 
   it('refresh while pending: a status with a plain Refresh link while waiting; empty live region when done', () => {
+    const seriesCopy = { pendingText: SERIES_PENDING_TEXT, slowText: SERIES_SLOW_TEXT };
     const waiting = renderToStaticMarkup(
-      <RefreshWhilePending pending href="/teams/T/manage/sessions/series/R" />,
+      <RefreshWhilePending pending href="/teams/T/manage/sessions/series/R" {...seriesCopy} />,
     );
     expect(waiting).toContain(
       'We&#x27;re adding the sessions in this series. Refresh in a moment.',
@@ -828,7 +833,9 @@ describe('SeriesSummary, EndSeriesConfirm and RefreshWhilePending', () => {
     expect(waiting).toContain('href="/teams/T/manage/sessions/series/R"');
     expect(waiting).toContain('>Refresh<');
     expect(waiting).toContain('role="status"');
-    const done = renderToStaticMarkup(<RefreshWhilePending pending={false} href="/x" />);
+    const done = renderToStaticMarkup(
+      <RefreshWhilePending pending={false} href="/x" {...seriesCopy} />,
+    );
     expect(done).not.toContain('Refresh in a moment');
     expect(done).toContain('role="status"');
   });

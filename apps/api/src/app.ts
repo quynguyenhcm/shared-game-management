@@ -10,6 +10,9 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
+import type { PaymentsConfig } from './lib/akahu/config.ts';
+import type { PaymentsGateway } from './lib/akahu/gateway.ts';
+import { paymentStartSettings } from './lib/akahu/start.ts';
 import type { Clock } from './lib/clock.ts';
 import type { AuthConfig } from './lib/config/config.ts';
 import type { FieldCrypto } from './lib/crypto/crypto.ts';
@@ -32,6 +35,14 @@ import type { OAuthProviderRegistry } from './modules/auth/providers/provider.ts
 import { createAuthService } from './modules/auth/service.ts';
 import { createSessionService } from './modules/auth/sessions.ts';
 import type { LoginThrottle } from './modules/auth/throttle.ts';
+import { enqueueAkahuCancel, enqueueAkahuSync } from './modules/billing/apply-akahu-result.ts';
+import { opsRoutes } from './modules/billing/ops-routes.ts';
+import { createPlayerPaymentsService } from './modules/billing/player.ts';
+import { playerPaymentRoutes } from './modules/billing/player-routes.ts';
+import { billingRoutes } from './modules/billing/routes.ts';
+import { createBillingService } from './modules/billing/service.ts';
+import { walletRoutes } from './modules/wallet/routes.ts';
+import { akahuWebhookRoutes } from './modules/billing/webhook-routes.ts';
 import { registrationsRoutes } from './modules/registrations/routes.ts';
 import { createRegistrationsService } from './modules/registrations/service.ts';
 import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
@@ -76,6 +87,16 @@ export interface AppDeps extends HealthDeps {
    * so an entrypoint that forgets it does not compile (no silent default).
    */
   readonly recurrenceHorizonDays: number;
+  /**
+   * Akahu (or its fake outside production) through the payments port: the webhook verifies signatures with its key resolver.
+   * REQUIRED: `main.ts` builds it with `createPaymentsGateway(config.payments)`, so an entrypoint that forgets it does not compile.
+   */
+  readonly paymentsGateway: PaymentsGateway;
+  /**
+   * `config.payments`: the start paths read the link expiry (`AKAHU_PAYMENT_EXPIRY_MINUTES`) and the webhook URL from it.
+   * REQUIRED, like the gateway, so an entrypoint that forgets it does not compile.
+   */
+  readonly payments: PaymentsConfig;
   /** Test seam: extra plugins registered after the auth module (guard fixture routes). They need a policy too. */
   readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
@@ -208,6 +229,64 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       jobs: deps.jobs,
       webBaseUrl: deps.auth.webBaseUrl,
     }),
+  });
+  // wallet-and-akahu-billing: the team admin's payments list and the manual reminder (`/teams/:teamId/payments...`).
+  await app.register(billingRoutes, {
+    prefix: '/teams',
+    service: createBillingService({
+      db: deps.db,
+      clock: deps.clock,
+      crypto: deps.crypto,
+      jobs: deps.jobs,
+      webBaseUrl: deps.auth.webBaseUrl,
+    }),
+  });
+  // wallet-and-akahu-billing Phase 4a: the payer's start paths and reads. The provider call happens between two short
+  // transactions, never under a lock; results are applied only by the akahu-sync job (CR-3), which these routes only signal.
+  const startSettings = paymentStartSettings(deps.payments);
+  await app.register(walletRoutes, {
+    prefix: '/teams',
+    deps: {
+      db: deps.db,
+      clock: deps.clock,
+      crypto: deps.crypto,
+      gateway: deps.paymentsGateway,
+      settings: startSettings,
+      webBaseUrl: deps.auth.webBaseUrl,
+      // The wallet module never imports billing: the two job signals are handed in here.
+      cancelProviderPayment: (input) => enqueueAkahuCancel(deps.jobs, input),
+      requestSync: (input) => enqueueAkahuSync(deps.jobs, input),
+    },
+  });
+  await app.register(playerPaymentRoutes, {
+    service: createPlayerPaymentsService({
+      db: deps.db,
+      clock: deps.clock,
+      crypto: deps.crypto,
+      jobs: deps.jobs,
+      gateway: deps.paymentsGateway,
+      settings: startSettings,
+      webBaseUrl: deps.auth.webBaseUrl,
+    }),
+  });
+  // wallet-and-akahu-billing A4/CR-3: the signed Akahu webhook (public, raw body inside its own plugin; only enqueues a re-read).
+  await app.register(akahuWebhookRoutes, {
+    prefix: '/webhooks',
+    db: deps.db,
+    jobs: deps.jobs,
+    keys: deps.paymentsGateway.webhookKeys,
+  });
+  // wallet-and-akahu-billing A3/CR-14/CR-15/H2: the GLOBAL_ADMIN payout block and the hold resolutions (Akahu re-read inline,
+  // outside any lock; the verdict is written by the single apply funnel).
+  await app.register(opsRoutes, {
+    deps: {
+      db: deps.db,
+      jobs: deps.jobs,
+      clock: deps.clock,
+      crypto: deps.crypto,
+      gateway: deps.paymentsGateway,
+      webBaseUrl: deps.auth.webBaseUrl,
+    },
   });
   await app.register(sessionsRoutes, {
     prefix: '/teams',

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { DEFAULT_PAYMENTS_API_URL } from '../akahu/constants.ts';
+import type { PaymentsConfig } from '../akahu/config.ts';
 
 /** Thrown by `loadConfig` for any invalid configuration. Messages never contain the offending value. */
 export class ConfigError extends Error {
@@ -104,6 +106,17 @@ const envSchema = z.object({
     blankAsUnset,
     z.string().min(32, 'must be at least 32 characters').optional(),
   ),
+  // Payments (CR-12, A6, AC-VERIFY-8). Cross-variable rules are checked in `paymentsIssues`.
+  PAYMENTS_ADAPTER: z.enum(['akahu', 'fake']).default('fake'),
+  AKAHU_APP_TOKEN: optionalString,
+  AKAHU_APP_SECRET: optionalString,
+  AKAHU_PAYMENTS_API_URL: z.preprocess(blankAsUnset, urlString.default(DEFAULT_PAYMENTS_API_URL)),
+  AKAHU_WEBHOOK_URL: optionalString,
+  AKAHU_PAYMENT_EXPIRY_MINUTES: intInRange(15, 120, 30),
+  AKAHU_RECONCILE_ORPHAN_AGE_SECONDS: intInRange(30, 3600, 120),
+  AKAHU_RECONCILE_MIN_AGE_SECONDS: intInRange(60, 3600, 300),
+  AKAHU_RECONCILE_STUCK_AFTER_SECONDS: intInRange(3600, 604800, 21600),
+  AKAHU_FINALITY_HORIZON_HOURS: intInRange(1, 720, 168),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   LOG_FORMAT: z.enum(['json', 'text']).default('json'),
   LOG_OUTPUT: z.enum(['stdout', 'file', 'both']).default('stdout'),
@@ -210,6 +223,7 @@ export interface Config {
     readonly superviseIntervalSeconds: number;
     readonly pollIntervalSeconds: number;
   };
+  readonly payments: PaymentsConfig;
   readonly recurrence: {
     /** How many days ahead the materialiser creates series sessions (`RECURRENCE_HORIZON_DAYS`, 7-91, default 28). */
     readonly horizonDays: number;
@@ -306,6 +320,55 @@ function authIssues(data: EnvData): string[] {
   return issues;
 }
 
+/** Cross-variable payments rules (AC-VERIFY-8). Messages name variables, never values. */
+function paymentsIssues(data: EnvData): string[] {
+  const issues: string[] = [];
+  const production = data.NODE_ENV === 'production';
+  const adapter = data.PAYMENTS_ADAPTER;
+  if (adapter === 'fake' && production) {
+    issues.push(formatIssue('PAYMENTS_ADAPTER', 'fake is not allowed in production'));
+  }
+  if (adapter === 'akahu') {
+    issues.push(
+      formatIssue('PAYMENTS_ADAPTER', 'PAYMENTS_ADAPTER=akahu is not available in this build'),
+    );
+    const required = [
+      ['AKAHU_APP_TOKEN', data.AKAHU_APP_TOKEN],
+      ['AKAHU_APP_SECRET', data.AKAHU_APP_SECRET],
+      ['AKAHU_WEBHOOK_URL', data.AKAHU_WEBHOOK_URL],
+    ] as const;
+    for (const [name, value] of required) {
+      if (value === undefined) {
+        issues.push(formatIssue(name, 'is required when PAYMENTS_ADAPTER=akahu'));
+      }
+    }
+  }
+  const apiUrl = new URL(data.AKAHU_PAYMENTS_API_URL);
+  if (production && apiUrl.protocol !== 'https:') {
+    issues.push(formatIssue('AKAHU_PAYMENTS_API_URL', 'must use https in production'));
+  } else if (production && !apiUrl.hostname.endsWith('.akahu.io')) {
+    issues.push(formatIssue('AKAHU_PAYMENTS_API_URL', 'host must end in .akahu.io in production'));
+  }
+  if (data.AKAHU_WEBHOOK_URL !== undefined) {
+    const url = URL.canParse(data.AKAHU_WEBHOOK_URL) ? new URL(data.AKAHU_WEBHOOK_URL) : undefined;
+    if (
+      url === undefined ||
+      !/^https?:$/.test(url.protocol) ||
+      url.search !== '' ||
+      url.hash !== '' ||
+      url.username !== '' ||
+      url.password !== ''
+    ) {
+      issues.push(
+        formatIssue('AKAHU_WEBHOOK_URL', 'must be an http(s) URL with no query string or userinfo'),
+      );
+    } else if (production && url.protocol !== 'https:') {
+      issues.push(formatIssue('AKAHU_WEBHOOK_URL', 'must use https in production'));
+    }
+  }
+  return issues;
+}
+
 /**
  * Validates the environment and returns typed config, or throws `ConfigError`.
  * Issue messages name the variable and never include its value (AC-ERROR-1).
@@ -357,6 +420,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       );
     }
     issues.push(...authIssues(data));
+    issues.push(...paymentsIssues(data));
     if ((data.LOG_OUTPUT === 'file' || data.LOG_OUTPUT === 'both') && !data.LOG_FILE_PATH) {
       issues.push(formatIssue('LOG_FILE_PATH', 'is required when LOG_OUTPUT includes file'));
     }
@@ -428,6 +492,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       expireSecondsOverride: data.JOBS_EXPIRE_SECONDS_OVERRIDE,
       superviseIntervalSeconds: data.JOBS_SUPERVISE_INTERVAL_SECONDS,
       pollIntervalSeconds: data.JOBS_POLL_INTERVAL_SECONDS,
+    },
+    payments: {
+      adapter: data.PAYMENTS_ADAPTER,
+      akahu:
+        data.PAYMENTS_ADAPTER === 'akahu' &&
+        data.AKAHU_APP_TOKEN !== undefined &&
+        data.AKAHU_APP_SECRET !== undefined &&
+        data.AKAHU_WEBHOOK_URL !== undefined
+          ? {
+              appToken: data.AKAHU_APP_TOKEN,
+              appSecret: data.AKAHU_APP_SECRET,
+              paymentsApiUrl: data.AKAHU_PAYMENTS_API_URL,
+              webhookUrl: data.AKAHU_WEBHOOK_URL,
+            }
+          : null,
+      paymentExpiryMinutes: data.AKAHU_PAYMENT_EXPIRY_MINUTES,
+      reconcileOrphanAgeSeconds: data.AKAHU_RECONCILE_ORPHAN_AGE_SECONDS,
+      reconcileMinAgeSeconds: data.AKAHU_RECONCILE_MIN_AGE_SECONDS,
+      reconcileStuckAfterSeconds: data.AKAHU_RECONCILE_STUCK_AFTER_SECONDS,
+      finalityHorizonHours: data.AKAHU_FINALITY_HORIZON_HOURS,
     },
     recurrence: { horizonDays: data.RECURRENCE_HORIZON_DAYS },
   };

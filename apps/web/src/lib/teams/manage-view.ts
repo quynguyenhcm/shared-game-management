@@ -9,7 +9,8 @@ import { LAST_ADMIN_MESSAGE, adminBanBlockedHint } from './labels.ts';
 
 /**
  * Every status region and confirm slot of the manage area: People sections, the banking page's two, then
- * one per Sessions page (the list, the session editor and the series page each render one section).
+ * one per Sessions page (the list, the session editor and the series page each render one section), then the
+ * Payments page (reminders, hold resolution and payout block share its one section).
  */
 export type SectionId =
   | 'requests'
@@ -20,7 +21,8 @@ export type SectionId =
   | 'gst'
   | 'sessions'
   | 'session'
-  | 'series';
+  | 'series'
+  | 'payments';
 
 /** The People sections that page with a keyset cursor. */
 type PagedSection = 'requests' | 'members' | 'banned';

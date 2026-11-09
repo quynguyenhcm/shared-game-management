@@ -3,6 +3,7 @@ import { enqueueBootSweeps, registerJobs } from './jobs/bootstrap.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
+import { createPaymentsGateway } from './lib/akahu/config.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
@@ -69,6 +70,12 @@ try {
   await runner.start();
   const db = createKysely(pool);
   await registerJobs({
+    // Akahu (or its fake in dev and CI), through the port: `daily-overdue` re-reads open attempts before it flips a payment.
+    paymentsGateway: createPaymentsGateway(config.payments, {
+      nodeEnv: config.nodeEnv,
+      clock: systemClock,
+    }),
+    payments: config.payments,
     runner,
     notifier,
     // Opens the sealed reset emails; the keyring is validated here at boot, as in the API.

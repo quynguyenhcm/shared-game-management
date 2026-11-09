@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { FormBanner } from '../../../components/auth/form-banner.tsx';
 import { LINK_CLASS } from '../../../components/auth/styles.ts';
 import { StripAuthParams } from '../../../components/flash-notice.tsx';
+import { WalletLine } from '../../../components/billing/wallet-summary.tsx';
 import { UpcomingSessions } from '../../../components/registrations/upcoming-sessions.tsx';
 import { JoinTeamForm } from '../../../components/teams/join-team-form.tsx';
 import { Tag, TeamShell } from '../../../components/teams/team-shell.tsx';
@@ -80,6 +81,24 @@ export default async function TeamPage({
     upcoming = list.ok ? { ok: true, data: list.data } : { ok: false };
   }
 
+  // The wallet line (AC-ENTRY-1) is for APPROVED members too; with no balance it degrades to a plain link.
+  let walletBalance: string | null | undefined;
+  if (myStatus === 'APPROVED' && token !== null) {
+    const wallet = await apiClient.wallet(
+      team.id,
+      {},
+      { session: token, incoming: await headers() },
+    );
+    if (!wallet.ok) {
+      log.warn('web.billing.api_failure', {
+        action: 'team_page_wallet',
+        status: wallet.status,
+        code: wallet.error.code,
+      });
+    }
+    walletBalance = wallet.ok ? wallet.data.wallet.balance : null;
+  }
+
   return (
     <TeamShell>
       <title>{`${team.name} – Shared Game Management`}</title>
@@ -102,6 +121,7 @@ export default async function TeamPage({
         </p>
       )}
       {view.body === null ? null : <p className="text-base">{view.body}</p>}
+      {walletBalance === undefined ? null : <WalletLine teamId={team.id} balance={walletBalance} />}
       {upcoming === null ? null : <UpcomingSessions teamId={team.id} result={upcoming} />}
 
       {view.action === 'sign_in' ? (

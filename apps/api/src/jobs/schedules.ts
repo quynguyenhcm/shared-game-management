@@ -27,8 +27,12 @@ export const SCHEDULES: readonly ScheduleSlot[] = [
   // Sweep fan-out (session-scheduling-engine): one `recurrence-rule` job per active rule, one `session-auto-enrol` job per pending
   // session. Also queued once at every worker boot.
   { name: QUEUE_NAMES.recurrenceMaterialisation, cron: '0 3 * * *', tz: SCHEDULE_TZ },
-  // Sweep: a later feature enqueues one `bill-session:<session_id>` job per due session.
+  // Sweep (wallet-and-akahu-billing): enqueues one `bill-session:<session_id>` job per ended PUBLISHED session, oldest first. Also
+  // queued once at every worker boot.
   { name: QUEUE_NAMES.postGameBilling, cron: '*/5 * * * *', tz: SCHEDULE_TZ, intervalSweep: true },
+  // Akahu reconcile (wallet-and-akahu-billing CR-12, CR-25): re-reads open intents a webhook may have missed and polls held and
+  // closed ones for finality. Idempotent through the apply funnel; also queued once at every worker boot.
+  { name: QUEUE_NAMES.akahuReconcile, cron: '*/15 * * * *', tz: SCHEDULE_TZ, intervalSweep: true },
   { name: QUEUE_NAMES.dailyOverdue, cron: '0 4 * * *', tz: SCHEDULE_TZ },
   // 05:00 local: after the 02:00-02:59 DST window and after the 03:00/04:00 slots above.
   { name: QUEUE_NAMES.authCleanup, cron: '0 5 * * *', tz: SCHEDULE_TZ },
@@ -44,10 +48,34 @@ export type PreviewFn = (
   options: { tz: string; from: Date; count: number },
 ) => Date[];
 
-// Windows around the 2026 DST start (2026-09-27) and the 2027 DST end (2027-04-04), with the
-// maximum of 1000 occurrences so even a 5-minute cron covers both transition days.
-const CHECK_WINDOWS = [new Date('2026-09-25T00:00:00Z'), new Date('2027-04-02T00:00:00Z')];
-const CHECK_COUNT = 1000;
+// Windows around the 2026 DST start (2026-09-27) and the 2027 DST end (2027-04-04), bounded by date
+// so a daily cron costs a handful of occurrences. pg-boss gives each preview a 1000 ms budget and
+// throws past it, so a window is read in pages (a 5-minute cron needs ~1150 occurrences per window).
+const CHECK_WINDOWS = [
+  { from: new Date('2026-09-25T00:00:00Z'), to: new Date('2026-09-29T00:00:00Z') },
+  { from: new Date('2027-04-02T00:00:00Z'), to: new Date('2027-04-06T00:00:00Z') },
+];
+const CHECK_PAGE = 200;
+
+function occurrencesInWindow(
+  slot: ScheduleSlot,
+  preview: PreviewFn,
+  window: { from: Date; to: Date },
+): Date[] {
+  const found: Date[] = [];
+  let cursor = window.from;
+  for (;;) {
+    const page = preview(slot.cron, { tz: slot.tz, from: cursor, count: CHECK_PAGE });
+    for (const occurrence of page) {
+      if (occurrence >= window.to) return found;
+      found.push(occurrence);
+    }
+    const last = page.at(-1);
+    if (page.length < CHECK_PAGE || last === undefined) return found;
+    // Crons have minute resolution: one second past the last occurrence starts the next page after it.
+    cursor = new Date(last.getTime() + 1000);
+  }
+}
 
 const localHour = new Intl.DateTimeFormat('en-NZ', {
   timeZone: SCHEDULE_TZ,
@@ -57,8 +85,8 @@ const localHour = new Intl.DateTimeFormat('en-NZ', {
 
 /** Occurrences of the slot that land between 02:00 and 02:59 Pacific/Auckland around DST changes. */
 export function findDstHourFirings(slot: ScheduleSlot, preview: PreviewFn): Date[] {
-  return CHECK_WINDOWS.flatMap((from) =>
-    preview(slot.cron, { tz: slot.tz, from, count: CHECK_COUNT }).filter(
+  return CHECK_WINDOWS.flatMap((window) =>
+    occurrencesInWindow(slot, preview, window).filter(
       (occurrence) => Number(localHour.format(occurrence)) === 2,
     ),
   );

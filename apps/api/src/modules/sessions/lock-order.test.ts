@@ -12,6 +12,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { LOCK_ORDER } from './locks.ts';
 
 const SESSIONS_DIR = fileURLToPath(new URL('./', import.meta.url));
 
@@ -89,6 +90,23 @@ export function strongTeamsLocks(source: string): string[] {
     ),
   ];
 }
+
+describe('LOCK_ORDER constant (wallet-and-akahu-billing CR-4, ADR 0020)', () => {
+  it('is the extended canonical order, literally: the wallet and its intents sit before payments', () => {
+    expect([...LOCK_ORDER]).toEqual([
+      'teams',
+      'recurring_session_rules',
+      'team_members',
+      'game_sessions',
+      'registrations',
+      'registration_guests',
+      'wallet_top_ups',
+      'player_credits',
+      'payments',
+      'payment_attempts',
+    ]);
+  });
+});
 
 describe('lock order in modules/sessions (static)', () => {
   const files = sourceFiles(SESSIONS_DIR);

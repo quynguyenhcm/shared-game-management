@@ -95,6 +95,7 @@ describe('DST vector table (Pacific/Auckland)', () => {
     expect(resolveLocal(parseLocalDate('2026-07-01'), parseLocalTime('19:00')).kind).toBe('unique');
   });
 
+  // ~105k slots: over 4 s on CI under the full parallel suite, so not held to the 5 s default.
   it('wall-clock to instant to wall-clock round trips every 15-minute slot 2026-2028 (12 gaps, 12 overlaps)', () => {
     let nonexistent = 0;
     let ambiguous = 0;
@@ -124,7 +125,7 @@ describe('DST vector table (Pacific/Auckland)', () => {
       ambiguous: 12,
       mismatches: 0,
     });
-  });
+  }, 30_000);
 });
 
 describe('absolute vs wall-clock arithmetic', () => {

@@ -1,10 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { walletBody } from '../../../lib/billing/fixtures.ts';
 import { TEAM_ID, upcomingFixture } from '../../../lib/registrations/fixtures.ts';
 
 const mocks = vi.hoisted(() => ({
   teamDetail: vi.fn(),
   upcomingSessions: vi.fn(),
+  wallet: vi.fn(),
   token: vi.fn(),
   warn: vi.fn(),
 }));
@@ -31,7 +33,11 @@ vi.mock('../../../lib/log.ts', () => ({
   log: { info: vi.fn(), warn: mocks.warn, error: vi.fn() },
 }));
 vi.mock('../../../lib/api-client.ts', () => ({
-  apiClient: { teamDetail: mocks.teamDetail, upcomingSessions: mocks.upcomingSessions },
+  apiClient: {
+    teamDetail: mocks.teamDetail,
+    upcomingSessions: mocks.upcomingSessions,
+    wallet: mocks.wallet,
+  },
 }));
 
 const { default: TeamPage } = await import('./page.tsx');
@@ -66,6 +72,7 @@ async function render(): Promise<string> {
 beforeEach(() => {
   mocks.teamDetail.mockReset();
   mocks.upcomingSessions.mockReset();
+  mocks.wallet.mockReset().mockResolvedValue(ok(walletBody()));
   mocks.token.mockReset().mockResolvedValue('session-token');
   mocks.warn.mockClear();
 });
@@ -115,5 +122,46 @@ describe('team page: "Upcoming sessions" for APPROVED members only (R8, AC-ENTRY
       status: 503,
       code: 'internal_error',
     });
+  });
+});
+
+describe('team page: the wallet line for APPROVED members only (AC-ENTRY-1)', () => {
+  it.each([
+    ['a MEMBER', 'MEMBER'],
+    ['a TEAM_ADMIN', 'TEAM_ADMIN'],
+  ])('%s sees "Wallet: $12.50 · Top up or pay" above Upcoming sessions', async (_name, role) => {
+    mocks.teamDetail.mockResolvedValue(detail('APPROVED', role));
+    mocks.upcomingSessions.mockResolvedValue(ok(upcomingFixture([])));
+    const html = await render();
+    expect(mocks.wallet).toHaveBeenCalledWith(
+      TEAM_ID,
+      {},
+      expect.objectContaining({ session: 'session-token' }),
+    );
+    expect(html).toContain(`href="/teams/${TEAM_ID}/wallet"`);
+    expect(html).toContain('Wallet: $12.50 · Top up or pay');
+    expect(html.indexOf('Wallet: $12.50')).toBeLessThan(html.indexOf('Upcoming sessions'));
+  });
+
+  it.each([
+    ['PENDING', 'PENDING'],
+    ['BANNED', 'BANNED'],
+    ['a non-member', null],
+  ])('%s sees no wallet line and the wallet is not asked for', async (_name, status) => {
+    mocks.teamDetail.mockResolvedValue(detail(status));
+    const html = await render();
+    expect(mocks.wallet).not.toHaveBeenCalled();
+    expect(html).not.toContain('/wallet');
+    expect(html).not.toContain('Wallet');
+  });
+
+  it('a failed wallet call degrades to "Wallet and payments" and never takes the page down', async () => {
+    mocks.teamDetail.mockResolvedValue(detail('APPROVED', 'MEMBER'));
+    mocks.upcomingSessions.mockResolvedValue(ok(upcomingFixture([])));
+    mocks.wallet.mockResolvedValue(fail(503));
+    const html = await render();
+    expect(html).toContain('Wallet and payments');
+    expect(html).not.toContain('Wallet: $');
+    expect(html).toContain('Rosedale Badminton');
   });
 });

@@ -30,6 +30,7 @@
   - Visibility: job state in SQL (`pgboss.job`, `pgboss.archive`); visible failure tracking
   - **`member-banned` queue** (team-management): policy `exclusive`, `singletonKey = member-banned:<membershipId>`, id-only payload, 7-day retention. Its handler is a no-op until registration-and-waitlist injects the real one via `registerJobs({ memberBannedHandler })`; a permanent failure is logged as `team.member.banned.hook_failed` and re-run with `cli jobs trigger member-banned` (ADR 0015)
   - **Session queues** (session-scheduling-engine, ADR 0019): `recurrence-materialisation` (slot `0 3 * * *` Pacific/Auckland, `exclusive`, also enqueued at every worker boot), `recurrence-rule` (policy `stately`, `singletonKey = recurrence-rule:<ruleId>`, one queued and one active run per series), and `session-auto-enrol` (`exclusive`, `singletonKey = session-auto-enrol:<sessionId>`). Manual runs: `cli jobs trigger recurrence-rule '<json>'` and `cli jobs trigger session-auto-enrol '<json>'`
+  - **Billing and payment queues** (wallet-and-akahu-billing, ADR 0020 section 6): `post-game-billing` (slot `*/5 * * * *`, interval sweep, one `bill-session` per ended PUBLISHED session), `bill-session` (`exclusive`, local concurrency 1, `singletonKey = bill-session:<sessionId>`, oldest first), `daily-overdue` (slot `0 4 * * *` Pacific/Auckland), `akahu-sync` (`stately`, `singletonKey = akahu-sync:<akahuPaymentId>`, the single apply funnel), `akahu-cancel` (`exclusive`) and `akahu-reconcile` (`exclusive`, slot `*/15 * * * *`, interval sweep). Manual runs: `pnpm run jobs:trigger post-game-billing`, `pnpm run jobs:trigger daily-overdue`, `pnpm run jobs:trigger bill-session '{"sessionId":"<uuid>","trigger":"manual"}'`. Every handler is idempotent.
 
 ### API & Communication
 - **REST API**: Fastify 5 with zod type provider
@@ -70,7 +71,7 @@
   - **Provider contract**: idempotency keys, low-cardinality tags, typed error semantics (transient vs permanent)
   - No integration built in foundation; adapter contract stable for downstream billing features
 - **Google OAuth 2.0 / OpenID Connect** and **Facebook Login** (Graph API, pinned `v26.0`, refresh within two years): sign-in providers; credentials in env, setup steps in `docs/getting-started.md`. A manual real-credentials smoke test is a pre-release item (CI uses recorded fixtures and the fake provider).
-- **Akahu** (Open Banking, NZ): arrives in wallet-and-akahu-billing phase; crypto and job primitives already in place. Platform Akahu credentials are owned by wallet-and-akahu-billing (server configuration). team-banking stores no Akahu credentials per team: `teams.akahu_merchant_id` and `teams.akahu_app_token` are reserved and never read or written by this feature, and no Akahu client exists yet. "Configured" means the bank account is present and passes the NZ checks; no Akahu call is made at save time.
+- **Akahu** (Open Banking, NZ, One-Off Payments): the provider-neutral gateway port (`apps/api/src/lib/akahu/gateway.ts`), the fake adapter (dev, CI and E2E; selected by `PAYMENTS_ADAPTER=fake`), the status mapping, the webhook signature check and the key cache are built. **The live adapter is not built**: it is Phase 4b, gated on Akahu's written answer to MVE-001, sandbox credentials (MVE-002) and a signed sandbox webhook fixture (MVE-005). `PAYMENTS_ADAPTER=akahu` refuses to boot until then, so production cannot boot with Akahu. Platform Akahu credentials are environment-only (`AKAHU_APP_TOKEN`, `AKAHU_APP_SECRET`, `AKAHU_PAYMENTS_API_URL`, `AKAHU_WEBHOOK_URL`); the webhook is `POST /webhooks/akahu` (raw body, signature verified). The reconcile, expiry and finality settings are `AKAHU_RECONCILE_*`, `AKAHU_PAYMENT_EXPIRY_MINUTES` and `AKAHU_FINALITY_HORIZON_HOURS` (see `docs/getting-started.md`). Crypto and job primitives are in place. team-banking stores no Akahu credentials per team: `teams.akahu_merchant_id` and `teams.akahu_app_token` are reserved and never read or written by this feature, and no Akahu client exists yet. "Configured" means the bank account is present and passes the NZ checks; no Akahu call is made at save time.
 - **NZ validators** (`packages/shared/src/nz/`): `bank-account.ts` (bank ID table and weighted modulus, no branch ranges), `ird-number.ts` (range 10,000,000 to 200,000,000 inclusive; secondary weights only when the primary result is 10), `gst.ts` (`GST_RATE_BPS = 1500`, the single GST rate constant). Source: IRD *Payroll Calculations & Business Rules Specification 2026-27* (s7). Tables are reviewed every April, when IRD republishes the specification (ADR 0016).
 
 ### Development Tools
@@ -87,6 +88,7 @@
     3. Run `E2E_DATABASE_URL=<that database> pnpm run test:e2e apps/web/e2e/team-banking.spec.ts`.
     4. Re-run it after any change to the banking or GST page.
   - **Registration journeys** (`apps/web/e2e/registrations.spec.ts`, 4 journeys per project, 8/8 passing against the rebuilt Compose stack): the full entry-to-success flow on desktop and 360 x 740 with axe, no horizontal scroll and 44 px targets. The team, members and published sessions are created through the session-scheduling-engine admin API (`E2E_API_URL`, default `http://localhost:4000`; bearer tokens, no seed script). The worker must be running (promotion emails and the ban handler are worker jobs) and Mailpit reachable. The debt journey writes three OVERDUE `payments` rows to `E2E_DATABASE_URL` (default the Compose database) because no money row can be created through the app yet. Rebuild the stack from the checkout under test first (`AUTH_FAKE_OAUTH=true docker compose up -d --build --wait`), because the Compose images are not rebuilt automatically.
+  - **Billing journeys** (`apps/web/e2e/billing.spec.ts`, Phase 6 AC-INTEGRATION-4): top-up, a session ends and the fee is deducted, a second player pays through the Mailpit link, an overdue charge, and an admin reminder, on desktop and 360 x 740 with axe. The E2E must run against the fake Akahu adapter (`PAYMENTS_ADAPTER=fake`), with the worker running and Mailpit reachable. Sessions and registrations are created through the APIs; the overdue step uses the clock or `jobs:trigger daily-overdue` with a fixture date. Not part of `pnpm run ci`. Status: the spec is a Phase 6 deliverable and is verified when it lands; the live Akahu sandbox smoke test is DEFERRED to Phase 4b (`docs/getting-started.md`).
 - **Linting & Formatting**: ESLint 9.39.5 + TypeScript support, Prettier 3.9.9
   - **Type checking**: `tsc --noEmit` strict mode (no `any`, explicit return types)
   - **Code quality**: `no-console` error in `apps/api/src` (except `cli.ts`); bans on unsafe money operations (parseFloat, toFixed); host-TZ independence rules in `packages/shared/src/time/`
@@ -133,6 +135,19 @@ All commands are run from the repository root as `pnpm run <target>` (note: `pnp
 | `jobs:trigger` | `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts jobs trigger <slot>` | Manually trigger a scheduled job (e.g., `jobs:trigger recurrence-materialisation`) |
 | `test:e2e` | `playwright test -c apps/web/playwright.config.ts` | Run the Playwright journeys (requires the Compose stack: `AUTH_FAKE_OAUTH=true docker compose up -d --build --wait`); not part of `ci` |
 | `ci` | `pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run build` | Full CI pipeline: lint, type-check, unit + integration tests with the coverage gate, build; must all pass |
+
+### Billing and wallet commands (wallet-and-akahu-billing)
+
+These are operator commands, run from the repository root with a worker running (jobs are processed by the worker, not the CLI):
+
+| Command | Purpose |
+|---------|---------|
+| `pnpm run jobs:trigger post-game-billing` | Run the billing sweep now (safe to repeat) |
+| `pnpm run jobs:trigger daily-overdue` | Run the overdue job now (a second run the same day changes nothing) |
+| `pnpm run jobs:trigger bill-session '{"sessionId":"<uuid>","trigger":"manual"}'` | Re-run one session's billing |
+| `pnpm --filter @sgm/api exec tsx --env-file-if-exists=../../.env src/cli.ts billing reconcile` | Ledger and payments reconciliation (Phase 6; exit 0 clean, 1 discrepancies, 2 usage). Confirm the built command before relying on it |
+
+Payout-block and hold-resolution actions are HTTP routes, not CLI commands (a `cli billing block-payout` wrapper also exists). See ADR 0020 sections 11 and 13 and `docs/getting-started.md`.
 
 ## Test Strategy
 
@@ -214,11 +229,23 @@ Total time: ~5 min (varies with cache and Postgres startup). Each step must exit
 
 ## Recent Technology Changes
 
+### 2026-11-05 - Wallet, billing and Akahu port (wallet-and-akahu-billing, Phases 1-5 and docs)
+- **What Changed**: no new libraries. Modules `apps/api/src/modules/billing/` and `modules/wallet/`, the gateway port and fake adapter in `apps/api/src/lib/akahu/`, six pg-boss queues (`post-game-billing`, `bill-session`, `daily-overdue`, `akahu-sync`, `akahu-cancel`, `akahu-reconcile`), the `POST /webhooks/akahu` route, web pages for the wallet, payments and the team Payments area. Migration `20261102000100000` (ledger D-87 to D-98). Config: `PAYMENTS_ADAPTER` and the `AKAHU_*` variables, validated at boot.
+- **Reason**: charge each ended game exactly once and take the fee from a wallet when it covers it, otherwise through a pay-by-bank charge (`docs/adr/0020-wallet-and-akahu-billing.md`).
+- **Impact**: the live Akahu adapter is not built (Phase 4b, gated on Akahu's written answer and sandbox access). `PAYMENTS_ADAPTER=akahu` refuses to boot, and a production boot is refused until Phase 4b. The fake adapter serves dev, CI and E2E. Run unit and integration suites sequentially (concurrent runs cause timing failures). The `billing-schema` round trip can flake under full-suite load.
+- **Migration Notes**: none recorded in the task file. Confirm against the migration's history before merge; if the migration was amended after any environment applied it, that environment needs `pnpm run db:reset`.
+
 ### 2026-10-25 - Registration E2E, coverage and docs (registration-and-waitlist, Phase 6)
 - **What Changed**: no new libraries. `apps/web/e2e/registrations.spec.ts` (Playwright, desktop and 360 x 740, axe, no horizontal scroll, 44 px targets). The 80% aggregate coverage gate (already in `vitest.config.ts`) is re-confirmed over the registrations paths. Docs: Test Scope Preferences in `systemPatterns.md` now lists the real measured set.
 - **Watch items**: (1) the HTTP race tests in `registrations-http-races.int.test.ts` depend on the 2 s `lock_timeout` of `HTTP_POLICY`; on a very slow CI runner they could surface as `lock_retry`, so they are a flake watch item (ADR 0018 Consequences notes the same). (2) The worker database pool `max: 5` is a hardcoded literal in `apps/api/src/worker.ts`, not a config key; a `WORKER_DATABASE_POOL_MAX` key is a follow-up, not part of this feature (ADR 0018 section 11 explains why 5). (3) `memory-bank/ux-patterns.md` does not exist; run `/yay:ux-ingest` after this feature merges so `/yay:uat` has its component rules.
 - **Reason**: AC-INTEGRATION-4 (the journey in a real browser), AC-VERIFY-8 (accessibility on both viewports) and AC-VERIFY-9 (the coverage gate).
 - **Migration Notes**: none.
+
+### 2026-11-03 - Post-game billing engine and wallet ledger (wallet-and-akahu-billing, Phase 2)
+- **What Changed**: no new libraries. New modules `apps/api/src/modules/billing/` (sweep, per-session engine, fee computation, emails) and `apps/api/src/modules/wallet/` (`ledger.ts` is the only writer of `player_credits` and `credit_transactions`), jobs `post-game-billing` (sweep) and `bill-session` (per session, singleton key). The vitest coverage gate includes the new paths.
+- **Reason**: ended sessions must be billed exactly once, all-or-nothing against wallet credit (`docs/adr/0020-wallet-and-akahu-billing.md`).
+- **Impact**: `bill-session` rethrows a sanitized error so the job runner's generic logger never sees driver messages. Run unit and integration suites sequentially (concurrent runs cause timing failures).
+- **Migration Notes**: none; Phase 1 migration unchanged.
 
 ### 2026-10-25 - Registration allocator and billing hand-off (registration-and-waitlist, Phase 2)
 - **What Changed**: no new libraries or infrastructure. New module `apps/api/src/modules/registrations/` (pure allocation decision, allocator, repo, billing hand-off, port adapter) and `packages/shared/src/registrations/`. The vitest coverage gate now also covers both paths. The adapter is built but not yet wired: `createSessionAllocator` still returns the no-op.

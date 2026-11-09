@@ -1,5 +1,6 @@
-import { AssignableGlobalRole, normaliseEmail } from '@sgm/shared';
+import { AssignableGlobalRole, PayoutBlockReason, normaliseEmail } from '@sgm/shared';
 import type { Config } from './lib/config/config.ts';
+import { BillSessionPayload, billSessionKey } from './jobs/bill-session.ts';
 import { RecurrenceRulePayload, recurrenceRuleKey } from './jobs/recurrence-rule.ts';
 import { SessionAutoEnrolPayload, sessionAutoEnrolKey } from './jobs/session-auto-enrol.ts';
 import { MemberBannedPayload, memberBannedSingletonKey } from './modules/teams/ban-hook.ts';
@@ -155,4 +156,65 @@ export function parseSessionAutoEnrolTrigger(
     'session-auto-enrol',
     'Usage: jobs trigger session-auto-enrol \'{"sessionId":…,"teamId":…,"trigger":"manual"}\'',
   );
+}
+
+/** Validates `jobs trigger bill-session '<json>'` (re-run one session's billing), keyed like the sweep's job. */
+export function parseBillSessionTrigger(
+  raw: string | undefined,
+): SessionJobTrigger<BillSessionPayload> {
+  return parseKeyed(
+    raw,
+    BillSessionPayload,
+    (payload) => billSessionKey(payload.sessionId),
+    'bill-session',
+    'Usage: jobs trigger bill-session \'{"sessionId":…,"trigger":"manual"}\'',
+  );
+}
+
+/** `billing reconcile` takes no arguments. */
+export function parseBillingReconcileArgs(
+  args: readonly string[],
+): { readonly error: string } | null {
+  return args.length === 0 ? null : { error: 'Usage: billing reconcile (no arguments)' };
+}
+
+export type BlockPayoutArgs =
+  | {
+      readonly teamId: string;
+      readonly reason: PayoutBlockReason;
+      readonly akahuPaymentId: string | null;
+      /** The GLOBAL_ADMIN the audit row names (checked against the database by the caller). */
+      readonly actorEmail: string;
+    }
+  | { readonly error: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const AKAHU_PAYMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Validates `billing block-payout <teamId> <REASON> [akahuPaymentId] --as <email>` before any database access (enum reason,
+ * no free text). `--as` is required so the audit row always names the operator, as the HTTP route does.
+ */
+export function parseBlockPayoutArgs(args: readonly string[]): BlockPayoutArgs {
+  const usage = `Usage: billing block-payout <teamId> <${PayoutBlockReason.join('|')}> [akahuPaymentId] --as <email>`;
+  const asIndex = args.indexOf('--as');
+  const rawEmail = asIndex >= 0 ? args[asIndex + 1] : undefined;
+  if (rawEmail === undefined) return { error: usage };
+  const actorEmail = normaliseEmail(rawEmail);
+  if (actorEmail === null) return { error: `"${rawEmail}" is not a valid email address.` };
+  const positional = args.filter((_, index) => index !== asIndex && index !== asIndex + 1);
+  const [teamId, rawReason, akahuPaymentId, ...extra] = positional;
+  if (teamId === undefined || rawReason === undefined || extra.length > 0) return { error: usage };
+  if (!UUID.test(teamId)) return { error: `"${teamId}" is not a team id. ${usage}` };
+  const reason = PayoutBlockReason.find((candidate) => candidate === rawReason);
+  if (reason === undefined) return { error: `Unknown reason "${rawReason}". ${usage}` };
+  if (akahuPaymentId !== undefined && !AKAHU_PAYMENT_ID.test(akahuPaymentId)) {
+    return { error: `Not an Akahu payment id. ${usage}` };
+  }
+  return {
+    teamId: teamId.toLowerCase(),
+    reason,
+    akahuPaymentId: akahuPaymentId ?? null,
+    actorEmail,
+  };
 }

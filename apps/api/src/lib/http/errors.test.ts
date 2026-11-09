@@ -73,6 +73,15 @@ const AUTHORITATIVE_ERROR_CODES = [
   'party_exceeds_capacity',
   'late_withdrawal_fee_due',
   'cancellation_terms_changed',
+  // wallet-and-akahu-billing (architecture Q1c, CR-15)
+  'payment_settled',
+  'payment_in_progress',
+  'payment_on_hold',
+  'top_up_in_progress',
+  'payment_provider_unavailable',
+  'payment_provider_refused',
+  'reminder_too_soon',
+  'hold_resolved_by_provider',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -101,6 +110,14 @@ const TEAM_ERROR_STATUSES = [
   ['party_exceeds_capacity', 422],
   ['late_withdrawal_fee_due', 409],
   ['cancellation_terms_changed', 409],
+  ['payment_settled', 409],
+  ['payment_in_progress', 409],
+  ['payment_on_hold', 409],
+  ['top_up_in_progress', 409],
+  ['payment_provider_unavailable', 503],
+  ['payment_provider_refused', 422],
+  ['reminder_too_soon', 409],
+  ['hold_resolved_by_provider', 409],
 ] as const;
 
 const apps: FastifyInstance[] = [];
@@ -181,6 +198,24 @@ describe('ErrorCode list', () => {
     expect(ERROR_DEFAULTS.banking_in_use.message).toMatch(/published paid sessions/);
     expect(ERROR_DEFAULTS.banking_in_use.message).toMatch(/unpaid payments/);
     expect(ERROR_DEFAULTS.payout_not_configured.message).not.toMatch(/akahu/i);
+  });
+
+  it('billing codes carry safe text: no account digits and no amounts', () => {
+    for (const code of [
+      'payment_settled',
+      'payment_in_progress',
+      'payment_on_hold',
+      'top_up_in_progress',
+      'payment_provider_unavailable',
+      'payment_provider_refused',
+      'reminder_too_soon',
+      'hold_resolved_by_provider',
+    ] as const) {
+      expect(ERROR_DEFAULTS[code].message, code).not.toMatch(/\d{2}-\d{4}|\$\d/);
+    }
+    expect(ERROR_DEFAULTS.payment_provider_unavailable.message).toMatch(
+      /nothing has been charged/i,
+    );
   });
 
   it.each(TEAM_ERROR_STATUSES)(

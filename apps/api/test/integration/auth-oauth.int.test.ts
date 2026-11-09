@@ -30,7 +30,7 @@ import {
   type AuthTestApp,
 } from '../helpers/auth-app.ts';
 import { insertAuthSession, insertOAuthIdentity, insertUser } from '../helpers/factories.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.ts';
 import { waitFor } from '../helpers/wait-for.ts';
@@ -64,6 +64,8 @@ beforeAll(async () => {
   await producer.start();
   await worker.start();
   await registerJobs({
+    paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

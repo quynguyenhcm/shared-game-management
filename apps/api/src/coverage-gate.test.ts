@@ -19,6 +19,15 @@ describe('coverage gate (AC-VERIFY-9)', () => {
     expect(config).toContain("'apps/api/src/modules/registrations/**/*.ts'");
     expect(config).toContain("'packages/shared/src/registrations/**/*.ts'");
     expect(config).toContain("'apps/api/src/jobs/ban-reconcile.ts'");
+    // wallet-and-akahu-billing (AC-VERIFY-10): the billing and wallet modules, the billing and Akahu jobs, the Akahu port and its
+    // fake, and the shared billing rules are measured too.
+    expect(config).toContain("'apps/api/src/modules/{billing,wallet}/**/*.ts'");
+    expect(config).toContain(
+      "'apps/api/src/jobs/{bill-session,post-game-billing,daily-overdue,akahu-jobs}.ts'",
+    );
+    expect(config).toContain("'apps/api/src/lib/akahu/**/*.ts'");
+    expect(config).toContain("'packages/shared/src/billing/**/*.ts'");
+    expect(config).toContain("'packages/shared/src/api/billing.ts'");
     // The thresholds are aggregate over the measured set, not per file (`perFile` stays off).
     expect(config).not.toMatch(/perFile:\s*true/);
     expect(config).toMatch(

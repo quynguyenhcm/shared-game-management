@@ -460,6 +460,23 @@ describe('blocked and closed states render the read-model reason', () => {
     expect(text(html)).toContain('3 of 10 places left');
   });
 
+  it('overdue_payments: a 44 px link to the cross-team unpaid list, the message text untouched (AC-ENTRY-4)', () => {
+    const html = panel(
+      readFixture({
+        me: { overdueCount: 3 },
+        canRegister: false,
+        blockedReason: 'overdue_payments',
+      }),
+    );
+    expect(html).toMatch(/<a[^>]*href="\/payments"[^>]*>Pay your overdue payments<\/a>/);
+    expect(/<a[^>]*href="\/payments"[^>]*>/.exec(html)?.[0]).toContain('min-h-11');
+  });
+
+  it('no payments link outside the debt-blocked state', () => {
+    const html = panel(active(confirmed(), { me: { registration: confirmed(), overdueCount: 4 } }));
+    expect(html).not.toContain('href="/payments"');
+  });
+
   it('a registered player with overdue payments still sees their registration and Withdraw', () => {
     const html = panel(active(confirmed(), { me: { registration: confirmed(), overdueCount: 4 } }));
     expect(text(html)).toContain("You're in.");

@@ -77,7 +77,7 @@ import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createJobRunner, type JobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
 import { materialiseRule, type MaterialiseDeps } from '../../src/modules/sessions/materialise.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { START_TIME, bearer, buildAuthTestApp, type AuthTestApp } from '../helpers/auth-app.ts';
 import {
   insertAuthSession,
@@ -802,6 +802,8 @@ describe('the marker proof: pending until an enrols:true allocator and a sweep (
     });
     await worker.start();
     await registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
       runner: worker,
       notifier: createInMemoryNotifier(),
       crypto: testCrypto(),

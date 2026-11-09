@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import type pg from 'pg';
 import { buildApp, type AppDeps } from '../../src/app.ts';
+import { createFakePaymentsGateway } from '../../src/lib/akahu/fake-adapter.ts';
 import { createManualClock, type ManualClock } from '../../src/lib/clock.ts';
 import { createCrypto } from '../../src/lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
@@ -80,6 +81,8 @@ export interface AuthTestOptions {
   readonly db?: Database;
   /** `RECURRENCE_HORIZON_DAYS` as the API reports it on series reads; the config default when omitted. */
   readonly recurrenceHorizonDays?: number;
+  /** The payments gateway (webhook keys, starts); the stateless fake by default. */
+  readonly paymentsGateway?: AppDeps['paymentsGateway'];
 }
 
 export async function buildAuthTestApp(
@@ -110,6 +113,8 @@ export async function buildAuthTestApp(
     oauthProviders: buildOAuthProviders({ auth: config.auth }),
     sessionAllocator: options.sessionAllocator ?? noopSessionAllocator,
     recurrenceHorizonDays: options.recurrenceHorizonDays ?? config.recurrence.horizonDays,
+    paymentsGateway: options.paymentsGateway ?? createFakePaymentsGateway(),
+    payments: config.payments,
     ...(options.extraPlugins === undefined ? {} : { extraPlugins: options.extraPlugins }),
   };
   const app = await buildApp(deps);

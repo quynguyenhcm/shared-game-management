@@ -77,6 +77,13 @@ describe('migrations (AC-VERIFY-5)', () => {
         'column teams.banking_updated_at',
         'column teams.banking_updated_by',
         'column teams.banking_change_keys',
+        // wallet-and-akahu-billing (D-87..D-98).
+        'column payments.gst_number',
+        'column payments.payment_reference',
+        'column payment_attempts.authorisation_url_enc',
+        'column wallet_top_ups.akahu_payment_id',
+        'column credit_transactions.wallet_top_up_id',
+        'column billing_session_blocks.notified_at',
       ]) {
         expect(
           afterFirst.some((line) => line.startsWith(prefix)),
@@ -320,27 +327,61 @@ describe('auth identities (AC-VERIFY-6)', () => {
 });
 
 describe('wallet balance range (AC-VERIFY-10)', () => {
-  it('accepts 0.00 and 100.00', async () => {
-    const [userId, teamId] = [await insertUser(db.pool), await insertTeam(db.pool)];
-    const walletId = await insertWallet(db.pool, userId, teamId, '0.00');
-    await db.pool.query(`UPDATE player_credits SET balance = '100.00' WHERE id = $1`, [walletId]);
+  // The balance moves only through the ledger (wallet-and-akahu-billing CR-5), so the range is probed with movements.
+  async function balanceOf(walletId: string): Promise<string | undefined> {
     const { rows } = await db.pool.query<{ balance: string }>(
       `SELECT balance FROM player_credits WHERE id = $1`,
       [walletId],
     );
-    expect(rows[0]?.balance).toBe('100.00');
+    return rows[0]?.balance;
+  }
+
+  it('accepts 0.00 and 100.00', async () => {
+    const [userId, teamId] = [await insertUser(db.pool), await insertTeam(db.pool)];
+    const empty = await insertWallet(db.pool, userId, teamId, '0.00');
+    expect(await balanceOf(empty)).toBe('0.00');
+    const [otherUser, otherTeam] = [await insertUser(db.pool), await insertTeam(db.pool)];
+    const full = await insertWallet(db.pool, otherUser, otherTeam, '100.00');
+    expect(await balanceOf(full)).toBe('100.00');
   });
 
-  it('rejects -0.01 and 100.01 with 23514', async () => {
-    const [userId, teamId] = [await insertUser(db.pool), await insertTeam(db.pool)];
+  it('rejects -0.01 and 100.01 with 23514, and a direct write with 23000', async () => {
+    const teamId = await insertTeam(db.pool);
+    const userId = await insertUser(db.pool);
+    const sessionId = await insertSession(db.pool, teamId);
+    const registrationId = await insertRegistration(db.pool, { sessionId, teamId, userId });
     const walletId = await insertWallet(db.pool, userId, teamId, '50.00');
-    for (const balance of ['-0.01', '100.01']) {
-      await expectPgError(
-        db.pool.query(`UPDATE player_credits SET balance = $2 WHERE id = $1`, [walletId, balance]),
-        '23514',
-        'player_credits_balance_range',
-      );
-    }
+    const { rows } = await db.pool.query<{ id: string }>(
+      `INSERT INTO wallet_top_ups (user_id, team_id, reference, idempotency_key, amount, status, akahu_payment_id)
+       VALUES ($1, $2, 'SGM0000ABCD', gen_random_uuid(), '50.01', 'APPLIED', 'pmt_over_cap') RETURNING id`,
+      [userId, teamId],
+    );
+    await expectPgError(
+      db.pool.query(
+        `INSERT INTO credit_transactions (user_id, team_id, amount, transaction_type, akahu_payment_id,
+                                          wallet_top_up_id, resulting_balance)
+         VALUES ($1, $2, '50.01', 'TOPUP', 'pmt_over_cap', $3, '100.01')`,
+        [userId, teamId, rows[0]?.id],
+      ),
+      '23514',
+      'player_credits_balance_range',
+    );
+    await expectPgError(
+      db.pool.query(
+        `INSERT INTO credit_transactions (user_id, team_id, amount, transaction_type, registration_id,
+                                          resulting_balance)
+         VALUES ($1, $2, '-50.01', 'AUTO_DEDUCTION', $3, '-0.01')`,
+        [userId, teamId, registrationId],
+      ),
+      '23514',
+      'player_credits_balance_range',
+    );
+    await expectPgError(
+      db.pool.query(`UPDATE player_credits SET balance = '60.00' WHERE id = $1`, [walletId]),
+      '23000',
+      'player_credits_balance_ledger_only',
+    );
+    expect(await balanceOf(walletId)).toBe('50.00');
   });
 });
 
@@ -351,12 +392,7 @@ describe('financial retention (AC-VERIFY-11)', () => {
     const sessionId = await insertSession(db.pool, teamId);
     const registrationId = await insertRegistration(db.pool, { sessionId, teamId, userId });
     await insertPayment(db.pool, { userId, teamId, registrationId, amount: '17.00' });
-    await insertWallet(db.pool, userId, teamId, '10.00');
-    await db.pool.query(
-      `INSERT INTO credit_transactions (user_id, team_id, amount, transaction_type, resulting_balance)
-       VALUES ($1, $2, '10.00', 'TOPUP', '10.00')`,
-      [userId, teamId],
-    );
+    await insertWallet(db.pool, userId, teamId, '10.00'); // funds it through the ledger: one TOPUP row
     return { userId, teamId };
   }
 

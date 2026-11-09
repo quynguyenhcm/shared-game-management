@@ -1,5 +1,7 @@
 import { systemClock, type Clock } from '../lib/clock.ts';
 import type { FieldCrypto } from '../lib/crypto/crypto.ts';
+import type { PaymentsConfig } from '../lib/akahu/config.ts';
+import type { PaymentsGateway } from '../lib/akahu/gateway.ts';
 import type { Database } from '../lib/db/kysely.ts';
 import type { JobHandler, JobRunner, QueueDefinition } from '../lib/jobs/jobs.ts';
 import type { Notifier } from '../lib/notifications/notifier.ts';
@@ -7,10 +9,18 @@ import type { Logger } from '../lib/logger/logger.ts';
 import type { SessionAllocatorPort } from '../modules/sessions/allocator-port.ts';
 import { DEFAULT_RECURRENCE_HORIZON_DAYS } from '../modules/sessions/materialise.ts';
 import { noopMemberBannedHandler, type MemberBannedHandler } from '../modules/teams/ban-hook.ts';
+import {
+  createAkahuCancelHandler,
+  createAkahuReconcileHandler,
+  createAkahuSyncHandler,
+} from './akahu-jobs.ts';
 import { createAuthCleanupHandler } from './auth-cleanup.ts';
 import { createBanReconcileHandler } from './ban-reconcile.ts';
+import { createBillSessionHandler } from './bill-session.ts';
+import { createDailyOverdueHandler } from './daily-overdue.ts';
 import { heartbeatHandler } from './heartbeat.ts';
 import { createMemberBannedJobHandler } from './member-banned.ts';
+import { createPostGameBillingHandler } from './post-game-billing.ts';
 import { createRecurrenceMaterialisationHandler } from './recurrence-materialisation.ts';
 import { createRecurrenceRuleHandler } from './recurrence-rule.ts';
 import { QUEUES, QUEUE_NAMES, withExpireOverride } from './registry.ts';
@@ -47,6 +57,16 @@ export interface RegisterJobsOptions {
   readonly sessionAllocator: SessionAllocatorPort;
   /** `RECURRENCE_HORIZON_DAYS` (7-91): how far ahead the series materialiser creates sessions. Defaults to 28. */
   readonly recurrenceHorizonDays?: number;
+  /**
+   * The payments gateway `daily-overdue` re-reads open attempts through (ruling H1). REQUIRED: `worker.ts` builds it with
+   * `createPaymentsGateway`, so an entrypoint that forgets it does not compile.
+   */
+  readonly paymentsGateway: PaymentsGateway;
+  /**
+   * `config.payments`: the reconcile ages and the finality horizon `akahu-reconcile` uses (CR-12, CR-25). REQUIRED: `worker.ts`
+   * passes `config.payments`, so an entrypoint that forgets it does not compile (no silent default).
+   */
+  readonly payments: PaymentsConfig;
   /** `config.auth.webBaseUrl`: origin for the links in the series banking notice. REQUIRED (12-factor: no localhost fallback). */
   readonly webBaseUrl: string;
   /** Defaults to the registry; tests pass tuned copies. */
@@ -64,6 +84,15 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
   if (typeof options.webBaseUrl !== 'string' || options.webBaseUrl.length === 0) {
     throw new Error('registerJobs: webBaseUrl is required (set WEB_BASE_URL)');
   }
+  const akahu = {
+    db: options.db,
+    gateway: options.paymentsGateway,
+    jobs: runner,
+    clock: options.clock ?? systemClock,
+    crypto: options.crypto,
+    webBaseUrl: options.webBaseUrl,
+    payments: options.payments,
+  };
   const handlers: Record<string, JobHandler> = {
     // Placeholders first: a slot that has a real handler below overrides its placeholder.
     ...Object.fromEntries(SCHEDULES.map((slot) => [slot.name, placeholderHandler(slot.name)])),
@@ -85,6 +114,33 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
       db: options.db,
       jobs: runner,
       clock: options.clock ?? systemClock,
+    }),
+    // The real billing engine replaces the schedule placeholder (wallet-and-akahu-billing CR-13): the sweep enqueues one
+    // `bill-session` job per ended session, and that handler bills it.
+    [QUEUE_NAMES.postGameBilling]: createPostGameBillingHandler({
+      db: options.db,
+      jobs: runner,
+      clock: options.clock ?? systemClock,
+    }),
+    // The real overdue job replaces the 04:00 placeholder (CR-13, CR-27): it re-reads Akahu for open attempts before it flips.
+    [QUEUE_NAMES.dailyOverdue]: createDailyOverdueHandler({
+      db: options.db,
+      gateway: options.paymentsGateway,
+      jobs: runner,
+      clock: options.clock ?? systemClock,
+      crypto: options.crypto,
+      webBaseUrl: options.webBaseUrl,
+    }),
+    // The single Akahu apply funnel and its safety nets (CR-3, CR-12, CR-25): the reconcile sweep replaces its slot placeholder.
+    [QUEUE_NAMES.akahuSync]: createAkahuSyncHandler(akahu),
+    [QUEUE_NAMES.akahuCancel]: createAkahuCancelHandler(akahu),
+    [QUEUE_NAMES.akahuReconcile]: createAkahuReconcileHandler(akahu),
+    [QUEUE_NAMES.billSession]: createBillSessionHandler({
+      db: options.db,
+      jobs: runner,
+      clock: options.clock ?? systemClock,
+      crypto: options.crypto,
+      webBaseUrl: options.webBaseUrl,
     }),
     [QUEUE_NAMES.skillProgression]: createSkillProgressionHandler({
       db: options.db,
@@ -138,8 +194,12 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
  *    that wires a real allocator enrols the sessions that were waiting, and a worker that was down at 03:00 catches up;
  *  - the ban reconciliation re-enqueues `member-banned` for banned members who still hold active registrations, so the deploy
  *    window of the old no-op handler closes at the first boot instead of at 05:45.
- * Both queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
- * never stops the worker (the cron slots are still registered), and one failing sweep never prevents the other.
+ *  - the post-game billing sweep (wallet-and-akahu-billing CR-13) bills every ended PUBLISHED session at the first boot, oldest
+ *    first (B9), instead of waiting for the next 5-minute tick.
+ *  - `daily-overdue` (CR-13, RF-11) marks the payments that fell due while the worker was down, instead of waiting for 04:00.
+ *  - `akahu-reconcile` (CR-13, RF-11) applies the Akahu results whose webhooks were missed while the worker was down.
+ * All five queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
+ * never stops the worker (the cron slots are still registered), and one failing sweep never prevents the others.
  */
 export async function enqueueBootSweeps(
   runner: Pick<JobRunner, 'enqueue'>,
@@ -167,6 +227,42 @@ export async function enqueueBootSweeps(
     logger.warn(
       { event: 'registration.ban_reconcile.boot_sweep_failed', err: error },
       'ban reconciliation could not be queued',
+    );
+  }
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.postGameBilling, { source: 'boot' });
+    logger.info(
+      { event: 'billing.sweep.boot', enqueued: jobId !== null },
+      jobId === null ? 'post-game billing sweep already queued' : 'post-game billing sweep queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'billing.sweep.boot_failed', err: error },
+      'post-game billing sweep could not be queued',
+    );
+  }
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.dailyOverdue, { source: 'boot' });
+    logger.info(
+      { event: 'billing.overdue.boot', enqueued: jobId !== null },
+      jobId === null ? 'daily-overdue already queued' : 'daily-overdue queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'billing.overdue.boot_failed', err: error },
+      'daily-overdue could not be queued',
+    );
+  }
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.akahuReconcile, { source: 'boot' });
+    logger.info(
+      { event: 'akahu.reconcile.boot', enqueued: jobId !== null },
+      jobId === null ? 'akahu-reconcile already queued' : 'akahu-reconcile queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'akahu.reconcile.boot_failed', err: error },
+      'akahu-reconcile could not be queued',
     );
   }
 }

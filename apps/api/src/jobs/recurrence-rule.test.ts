@@ -89,10 +89,16 @@ describe('recurrence-rule handler (AC-ERROR-9)', () => {
 describe('boot sweep (AC-ASYNC-5)', () => {
   const logger = { info: vi.fn(), warn: vi.fn() };
 
-  it('queues the recurrence-materialisation sweep and the ban reconciliation once each', async () => {
+  it('queues the recurrence-materialisation sweep, the ban reconciliation, the post-game billing sweep, daily-overdue and akahu-reconcile once each', async () => {
     const enqueue = vi.fn().mockResolvedValue('job-1');
     await enqueueBootSweeps({ enqueue }, logger);
-    expect(enqueue).toHaveBeenCalledTimes(2);
+    expect(enqueue).toHaveBeenCalledTimes(5);
+    // wallet-and-akahu-billing CR-13 / RF-11: a worker that was down re-reads the Akahu intents it missed at once.
+    expect(enqueue).toHaveBeenCalledWith('akahu-reconcile', { source: 'boot' });
+    // wallet-and-akahu-billing CR-13 / RF-11: a worker that was down across 04:00 marks the overdue payments at once.
+    expect(enqueue).toHaveBeenCalledWith('daily-overdue', { source: 'boot' });
+    // wallet-and-akahu-billing CR-13: a worker that was down for days bills the backlog at the first boot (B9).
+    expect(enqueue).toHaveBeenCalledWith('post-game-billing', { source: 'boot' });
     expect(enqueue).toHaveBeenCalledWith('recurrence-materialisation', { source: 'boot' });
     // registration-and-waitlist AC-ASYNC-3 / Q4: closes the deploy window of the no-op handler without a runbook step.
     expect(enqueue).toHaveBeenCalledWith('registration-ban-reconcile', { source: 'boot' });
@@ -109,6 +115,18 @@ describe('boot sweep (AC-ASYNC-5)', () => {
       expect.objectContaining({ event: 'registration.ban_reconcile.boot_sweep_failed' }),
       expect.any(String),
     );
-    expect(enqueue).toHaveBeenCalledTimes(2);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'billing.sweep.boot_failed' }),
+      expect.any(String),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'billing.overdue.boot_failed' }),
+      expect.any(String),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'akahu.reconcile.boot_failed' }),
+      expect.any(String),
+    );
+    expect(enqueue).toHaveBeenCalledTimes(5);
   });
 });

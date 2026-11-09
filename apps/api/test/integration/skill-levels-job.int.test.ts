@@ -12,7 +12,7 @@ import { createKysely, type Database } from '../../src/lib/db/kysely.ts';
 import { createManualClock } from '../../src/lib/clock.ts';
 import { createJobRunner, type JobContext, type JobRunner } from '../../src/lib/jobs/jobs.ts';
 import { createInMemoryNotifier } from '../../src/lib/notifications/adapters/in-memory.ts';
-import { testCrypto } from '../helpers/app-deps.ts';
+import { testCrypto, testPaymentsConfig, testPaymentsGateway } from '../helpers/app-deps.ts';
 import { insertTeam } from '../helpers/factories.ts';
 import { captureLogs } from '../helpers/log-capture.ts';
 import {
@@ -46,6 +46,8 @@ beforeAll(async () => {
   });
   await worker.start();
   await registerJobs({
+    paymentsGateway: testPaymentsGateway(),
+    payments: testPaymentsConfig(),
     sessionAllocator: noopSessionAllocator,
     webBaseUrl: 'https://app.example.test',
     runner: worker,

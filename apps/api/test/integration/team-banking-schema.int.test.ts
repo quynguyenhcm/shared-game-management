@@ -23,6 +23,7 @@ import {
   insertTeam,
   insertUser,
   payoutBlockFor,
+  setPaymentStatusUnchecked,
 } from '../helpers/factories.ts';
 import { waitForLockWaiters } from '../helpers/lock-waiters.ts';
 import {
@@ -472,13 +473,8 @@ async function addPayment(
     registrationId: null,
     amount: '17.00',
   });
-  if (status !== 'PENDING') {
-    await db.pool.query(
-      `UPDATE payments SET status = $2::payment_status,
-            paid_at = CASE WHEN $2::text = 'PAID' THEN now() END WHERE id = $1`,
-      [paymentId, status],
-    );
-  }
+  // FAILED is unreachable through the status guard (B4); it is forced here only to prove the function ignores it.
+  if (status !== 'PENDING') await setPaymentStatusUnchecked(db.pool, paymentId, status);
 }
 
 describe('team_banking_in_use', () => {

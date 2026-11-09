@@ -16,6 +16,7 @@ import {
   insertPublishedSession,
   insertRegistration,
   insertSession,
+  setPaymentStatusUnchecked,
 } from '../helpers/factories.ts';
 import { waitForLockWaiters } from '../helpers/lock-waiters.ts';
 import {
@@ -127,12 +128,8 @@ async function owes(
     registrationId,
     amount: '17.00',
   });
-  if (status !== 'PENDING') {
-    await database.pool.query(
-      `UPDATE payments SET status = $2::payment_status, paid_at = CASE WHEN $3::boolean THEN now() END WHERE id = $1`,
-      [paymentId, status, status === 'PAID'],
-    );
-  }
+  // FAILED is unreachable through the status guard (B4); forced here only to prove the debt gate ignores it.
+  if (status !== 'PENDING') await setPaymentStatusUnchecked(database.pool, paymentId, status);
 }
 
 const rowCount = async (sessionId: string): Promise<number> =>

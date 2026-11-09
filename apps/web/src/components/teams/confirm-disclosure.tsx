@@ -111,6 +111,7 @@ export function ConfirmDisclosure({
   onOpenChange,
   triggerLabel,
   triggerAriaLabel,
+  triggerId,
   describedBy,
   prompt,
   confirmLabel,
@@ -126,6 +127,8 @@ export function ConfirmDisclosure({
   onOpenChange: (open: boolean) => void;
   triggerLabel: string;
   triggerAriaLabel?: string;
+  /** The trigger's DOM id, so a result can move focus back to it after the panel closes. */
+  triggerId?: string;
   describedBy?: string;
   prompt: string;
   confirmLabel: string;
@@ -142,6 +145,7 @@ export function ConfirmDisclosure({
     <div className="flex w-full flex-col gap-3 sm:w-auto">
       <button
         ref={triggerRef}
+        id={triggerId}
         type="button"
         aria-expanded={open}
         aria-controls={`${id}-panel`}

@@ -14,6 +14,7 @@ describe('manageReducer (per-section status regions and one open confirm per sec
       sessions: null,
       session: null,
       series: null,
+      payments: null,
     };
     expect(state.status).toEqual(none);
     expect(state.open).toEqual(none);

@@ -4,6 +4,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  parseBillingReconcileArgs,
+  parseBlockPayoutArgs,
   parseMemberBannedTrigger,
   parseRecurrenceRuleTrigger,
   parseSessionAutoEnrolTrigger,
@@ -46,7 +48,11 @@ describe('db rollback guard', () => {
       },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('db rollback is refused when NODE_ENV=production');
+    // Until the live Akahu adapter ships (Phase 4) a production config is refused at load (fake refused, akahu
+    // unavailable), before the rollback guard runs; either refusal is "exit 1 before touching the database".
+    expect(result.stderr).toMatch(
+      /db rollback is refused when NODE_ENV=production|PAYMENTS_ADAPTER — /,
+    );
     expect(result.stderr).not.toContain('failed:');
   });
 });
@@ -173,5 +179,47 @@ describe('jobs trigger recurrence-rule and session-auto-enrol payloads (session-
     expect(parseSessionAutoEnrolTrigger(JSON.stringify({ teamId: session.teamId }))).toHaveProperty(
       'error',
     );
+  });
+});
+
+describe('billing CLI argument parsing', () => {
+  const team = '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d';
+
+  it('billing reconcile takes no arguments', () => {
+    expect(parseBillingReconcileArgs([])).toBeNull();
+    expect(parseBillingReconcileArgs(['--force'])).toEqual({
+      error: 'Usage: billing reconcile (no arguments)',
+    });
+  });
+
+  it('billing block-payout accepts a team id, an enum reason, an optional Akahu id and the --as actor', () => {
+    expect(
+      parseBlockPayoutArgs([team.toUpperCase(), 'TEAM_REQUESTED', '--as', ' Ops@Example.TEST ']),
+    ).toEqual({
+      teamId: team,
+      reason: 'TEAM_REQUESTED',
+      akahuPaymentId: null,
+      actorEmail: 'ops@example.test',
+    });
+    expect(
+      parseBlockPayoutArgs(['--as', 'ops@example.test', team, 'FUNDS_RETURNED', 'pay_abc-123']),
+    ).toMatchObject({ akahuPaymentId: 'pay_abc-123', actorEmail: 'ops@example.test' });
+  });
+
+  it('billing block-payout refuses a missing or bad actor, bad team id, free-text reason, bad Akahu id and extra arguments', () => {
+    const as = ['--as', 'ops@example.test'];
+    for (const args of [
+      [],
+      [team, 'OTHER'],
+      [team, 'OTHER', '--as'],
+      [team, 'OTHER', '--as', 'not-an-email'],
+      [team, ...as],
+      ['not-a-uuid', 'OTHER', ...as],
+      [team, 'because the bank said so', ...as],
+      [team, 'OTHER', 'has spaces', ...as],
+      [team, 'OTHER', 'ok', 'extra', ...as],
+    ]) {
+      expect(parseBlockPayoutArgs(args)).toHaveProperty('error');
+    }
   });
 });

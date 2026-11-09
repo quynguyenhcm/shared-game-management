@@ -31,6 +31,8 @@ import {
 import {
   NOTICE_COUNT_KEYS,
   SERIES_COPY,
+  SERIES_PENDING_TEXT,
+  SERIES_SLOW_TEXT,
   defaultEndDate,
   editDateLink,
   formatDayShort,
@@ -43,6 +45,7 @@ import {
   seriesBankingNotice,
   sessionLabel,
   sessionWhen,
+  sessionsAddedLine,
   splitSeriesInstances,
 } from '../../../../../../../lib/teams/sessions-view.ts';
 
@@ -197,7 +200,9 @@ export default async function SeriesPage({
         <RefreshWhilePending
           pending={series.materialising}
           href={viewPath}
-          sessionCount={listed.length}
+          pendingText={SERIES_PENDING_TEXT}
+          slowText={SERIES_SLOW_TEXT}
+          doneText={sessionsAddedLine(listed.length)}
         />
         {listed.length === 0 ? null : (
           <ul className="flex flex-col gap-2">

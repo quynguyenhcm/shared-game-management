@@ -5,7 +5,11 @@ describe('queue registry', () => {
   it('declares every foundation queue once with the plan-level defaults', () => {
     expect(QUEUES.map((queue) => queue.name).sort()).toEqual(
       [
+        'akahu-cancel',
+        'akahu-reconcile',
+        'akahu-sync',
         'auth-cleanup',
+        'bill-session',
         'daily-overdue',
         'heartbeat',
         'member-banned',
@@ -31,6 +35,7 @@ describe('queue registry', () => {
       heartbeat: 'heartbeat',
       recurrenceMaterialisation: 'recurrence-materialisation',
       postGameBilling: 'post-game-billing',
+      billSession: 'bill-session',
       dailyOverdue: 'daily-overdue',
       sendEmail: 'send-email',
       authCleanup: 'auth-cleanup',
@@ -39,6 +44,9 @@ describe('queue registry', () => {
       sessionAutoEnrol: 'session-auto-enrol',
       recurrenceRule: 'recurrence-rule',
       registrationBanReconcile: 'registration-ban-reconcile',
+      akahuSync: 'akahu-sync',
+      akahuCancel: 'akahu-cancel',
+      akahuReconcile: 'akahu-reconcile',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -47,6 +55,9 @@ describe('queue registry', () => {
   it('uses exclusive policy where a singletonKey must suppress concurrent duplicates', () => {
     expect(getQueue('send-email').policy).toBe('exclusive');
     expect(getQueue('post-game-billing').policy).toBe('exclusive');
+    // One billing job per session (`singletonKey = bill-session:<sessionId>`, CR-13); the COMPLETED guard and
+    // `UNIQUE(registration_id)` are the durable once-only guards.
+    expect(getQueue('bill-session').policy).toBe('exclusive');
     // One cleanup run at a time: two overlapping runs would only fight over the same rows.
     expect(getQueue('auth-cleanup').policy).toBe('exclusive');
     // One ban job per membership (`singletonKey = member-banned:<membershipId>`), enqueued in the ban transaction.
@@ -65,6 +76,15 @@ describe('queue registry', () => {
     // queues exactly one trailing run that reads the latest rule. The sweep is exclusive: one sweep at a time.
     expect(getQueue('recurrence-rule').policy).toBe('stately');
     expect(getQueue('recurrence-materialisation').policy).toBe('exclusive');
+  });
+
+  it('serialises Akahu work per provider payment and runs one reconcile sweep at a time (CR-3, CR-13)', () => {
+    // `singletonKey = akahu-sync:<akahuPaymentId>`: one queued plus one active job per payment, so a webhook arriving during a
+    // run queues exactly one trailing re-read. The guarded intent transitions, not this policy, make a replay a no-op.
+    expect(getQueue('akahu-sync').policy).toBe('stately');
+    // `singletonKey = akahu-cancel:<akahuPaymentId>`: one cancel per provider payment at a time.
+    expect(getQueue('akahu-cancel').policy).toBe('exclusive');
+    expect(getQueue('akahu-reconcile').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {

@@ -1,4 +1,5 @@
 import { buildApp } from './app.ts';
+import { createPaymentsGateway } from './lib/akahu/config.ts';
 import { systemClock } from './lib/clock.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
@@ -63,6 +64,13 @@ const app = await buildApp({
   oauthProviders,
   sessionAllocator,
   recurrenceHorizonDays: config.recurrence.horizonDays,
+  // Akahu (or its fake in dev and CI), through the port: the webhook's signing keys come from it.
+  paymentsGateway: createPaymentsGateway(config.payments, {
+    nodeEnv: config.nodeEnv,
+    clock: systemClock,
+  }),
+  // The start paths' link expiry and webhook URL.
+  payments: config.payments,
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
