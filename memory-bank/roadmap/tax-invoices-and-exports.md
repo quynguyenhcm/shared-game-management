@@ -1,9 +1,9 @@
 ---
 version: v1.0.0
-status: planned
+status: in_progress
 priority: medium
 complexity: 3
-linked_tasks: []
+linked_tasks: [tax-invoices-and-exports]
 created: 2026-09-29
 ---
 
