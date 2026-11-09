@@ -1,13 +1,13 @@
 ---
 slug: tax-invoices-and-exports
 feature: tax-invoices-and-exports
-status: INITIALIZED
+status: PLANNING_COMPLETE
 ---
 
 # tax-invoices-and-exports: Tax Invoices and Exports
 
 **Complexity**: Level 3
-**Status**: INITIALIZED
+**Status**: PLANNING_COMPLETE
 **Roadmap**: tax-invoices-and-exports
 **Branch**: feature/tax-invoices-and-exports
 **Worktree**: /Users/admin/yay-wt/shared-game-management/feature-tax-invoices-and-exports
@@ -307,6 +307,8 @@ NZ GST compliance outputs (PRODUCT-OVERVIEW §8), from roadmap feature `tax-invo
 ### Creative Exploration Needed
 Yes. Questions for `/yay:creative`, in order of risk. The first group are **tax-rule and policy questions that need a human or an accountant, not a design**; do not invent answers in code. Each default is what the ACs above assume.
 
+**Human rulings at spec review (Quy Nguyen, 2026-11-10):** spec approved with the defaults for H3-H6 and H8-H12, which stay accountant-checked before ADR 0021 is accepted (AC-VERIFY-9). **H1 RULED:** the team is the supplier; the platform issues the document as the team's agent; no platform GST number. **H2 RULED:** a non-GST-registered team's player gets a numbered "Receipt" with no GST wording (counter sharing, prefix and the `is_tax_invoice_issued` naming are left to the architecture creative). **H7 RULED (PDF):** pdfkit with an embedded TTF font that covers macrons; the Excel writer and the CSV BOM are still for the creative phase.
+
 **Human rulings needed before build** (LOW confidence; none is decided by code or by the repo):
 - **H1 Who is the supplier (LOW).** Default: the **team** is the supplier (the fee is paid into the team's own bank account and the GST number is the team's), and the platform issues the document on the team's behalf, as the supplier's agent, with the team's name and GST number as supplier and no platform GST number. Open: whether IRD treats the platform as an agent or as a separate supplier for any part, whether the document may say "issued on behalf of" with the platform's name, and whether a buyer-created invoice (RCTI) or a supplier-issued invoice applies (this draft assumes supplier-issued; no RCTI agreement exists). Needs the accountant.
 - **H2 Documents for non-GST-registered teams (MEDIUM).** Default: a numbered "Receipt" with no GST wording. Only a GST-registered supplier may issue a tax invoice, so calling it a tax invoice would be wrong. Alternatives: issue nothing, or one document type with GST lines hidden. Also decide: one per-team counter shared by both kinds (the counter is gapless per team, ADR 0011, and a team can change registration status over time), a "R-" prefix, or numbers only for tax invoices. `payments.is_tax_invoice_issued` is named for tax invoices, so a receipt number may need a different flag or a rename.
@@ -335,25 +337,133 @@ Yes, for operations and for the accountant's sign-off, not for the code. Every a
 
 ## Test Strategy
 
-(filled at Step 5)
+### Approach
+- **Emphasis**: integration-heavy, as in wallet-and-akahu-billing. Gapless numbering, set-once issuance, snapshot immutability and the "PAID in range by `paid_at`" filter are proven against real PostgreSQL 17 and a real pg-boss queue; races (two issuers for one payment, two payments of one team issuing at once, issuance vs on-demand download) are ordered with `waitForLockWaiters`, never sleeps (P1, P5; `testing-integration-db-isolation`). Pure decisions (GST of an inclusive `Money`, financial-year and GST-period ranges, document kind, export row shaping, CSV cell neutralisation) are table-driven unit tests with an injected clock (`testing-injected-clock`). The PDF is parsed back to text in tests (no image snapshots); the XLSX is read back and compared with the CSV. Playwright covers pay → download → export on desktop and 360 px with axe.
+- **Target test count**: about 90 across 5 phases. Above the 20-test guideline because the spec has 34 ACs over three settlement routes, two document kinds, three period types and two export formats; the GST parity matrix and the DST period vectors are single table-driven files.
+- **Load-sensitive tests**: no wall-clock budget under 5 s for CPU-heavy tests (PDF render, period sweeps); give exhaustive sweeps an explicit timeout as in `packages/shared/src/time/time.test.ts` (PR #9 lesson). The 30-second availability target (Success Criteria) is proven with the injected clock and the job queue, not wall time.
+
+### File Organization
+- **New test files**:
+  - `packages/shared/src/tax/periods.test.ts`: financial year, both GST two-month alignments, custom range, leap years, DST vectors (AC-VERIFY-3, AC-HAPPY-7, 8).
+  - `packages/shared/src/api/invoices.test.ts`: strict query/response schemas for invoice and export endpoints (AC-ERROR-3).
+  - `apps/api/src/modules/invoices/document.test.ts`: document kind (tax invoice vs receipt), line descriptions incl. late-withdrawal and guests (AC-HAPPY-2, 3, AC-ERROR-6).
+  - `apps/api/src/modules/invoices/render-pdf.test.ts`: pdfkit output parsed to text: number, supplier, GST number, totals, macrons (AC-INTEGRATION-1, AC-VERIFY-1).
+  - `apps/api/src/modules/income-exports/csv.test.ts`: column order, formula-injection neutralisation, no sensitive columns (AC-VERIFY-5).
+  - `apps/api/test/integration/invoices-schema.int.test.ts`: snapshot migration, immutability guard, set-once, migrate/rollback round trip (AC-VERIFY-4).
+  - `apps/api/test/integration/invoice-issuance.int.test.ts`: job enqueued in the PAID transaction for each writer, on-demand fallback, idempotency and concurrency, backfill of pre-feature PAID payments, no number for unpaid or $0.00 (AC-ASYNC-1, 2, 3, AC-HAPPY-4, 5, AC-ERROR-1, 5).
+  - `apps/api/test/integration/invoices-api.int.test.ts`: payer and team-admin downloads, uniform 404/403, `no-store` (AC-ENTRY-1, 3, AC-HAPPY-1, AC-ERROR-2, AC-VERIFY-6).
+  - `apps/api/test/integration/income-exports.int.test.ts`: range filter, reconciliation, row cap refusal, XLSX equals CSV (AC-HAPPY-6..9, AC-ERROR-3, 4, AC-VERIFY-2, AC-INTEGRATION-3).
+  - `apps/web/src/lib/invoices/download.test.ts`: Next route-handler proxy (headers, filename, error mapping).
+  - `apps/web/e2e/invoices.spec.ts`: AC-INTEGRATION-2, AC-VERIFY-8.
+- **Extend existing**:
+  - `packages/shared/src/nz/gst.test.ts`: `gstOfInclusive` parity matrix against the generated-column formula (AC-HAPPY-10).
+  - `apps/api/test/integration/invoice-number.int.test.ts`: numbering under the new issuer and both document kinds.
+  - `apps/api/src/modules/registrations/boundaries.test.ts`: single-writer rule for the invoice columns and the snapshot table (AC-VERIFY-7).
+  - `apps/api/src/jobs/{registry,handlers}.test.ts`: the `issue-invoice` queue and handler.
+  - `apps/web/src/lib/teams/manage-areas.test.ts`: the "Income exports" area and its TEAM_ADMIN-only visibility (AC-ENTRY-2).
+  - `apps/api/test/integration/{schema,enum-parity}.int.test.ts`: new table/columns/enums.
+
+### What NOT to Test
+- pdfkit's own layout engine and fonts beyond what is printed — third-party; we assert extracted text, not pixels.
+- The Akahu adapter and billing transitions — covered by wallet-and-akahu-billing; here only "a PAID transition enqueues issuance" per writer.
+- IRD content rules — not machine-checkable; AC-VERIFY-9 is the accountant's sign-off on specimens.
+- Excel's rendering of the file — we read the XLSX back with the same library and compare cell values.
+
+### Per-Phase Test Guidance
+- Phase 1: ~22 tests — GST parity matrix, period helpers and DST vectors, API schemas, snapshot schema and immutability guard.
+- Phase 2: ~18 tests — issuance per PAID writer, on-demand fallback, idempotency/concurrency races, backfill, unpaid/$0.00 refusal, numbering.
+- Phase 3: ~20 tests — document kind and lines, PDF text extraction (incl. macrons), payer/admin download routes and authorization, Next proxy, UI buttons per status.
+- Phase 4: ~22 tests — export row filter and ordering, three period types, CSV safety, XLSX read-back equals CSV, row cap, manage area.
+- Phase 5: ~8 tests — Playwright journey desktop + 360 px with axe, docs/OpenAPI checks, coverage gate.
 
 ## Implementation Roadmap
 
-(filled at Step 5)
+### Overview
+Issue a numbered, immutable tax invoice (or receipt, H2) for every PAID payment above $0.00, render it to PDF with pdfkit on demand from a frozen snapshot, let players and team admins download it, and give team admins CSV/XLSX income exports by custom range, GST two-month period or NZ financial year. Builds on the stored GST split (D-19, D-88) and the dormant numbering machinery (D-22, ADR 0011); billing and Akahu code are not changed beyond enqueuing issuance on PAID. The phase split below is provisional: the Architecture and Algorithm creative phases may reshape Phases 1-2 (snapshot table vs stored bytes, job vs in-transaction issuance) and Phase 4 (streaming, row cap).
+
+### Requirements
+- **Functional**: per-payment PDF documents (tax invoice / receipt), sequential per-team numbering, automatic issuance with on-demand fallback and backfill, payer and team-admin downloads, three export period types in CSV and XLSX, an "Income exports" manage area.
+- **Non-functional**: integrity in Postgres (P1), `Money` only (P2), Pacific/Auckland period boundaries (P3), issuance via pg-boss (P5), payer-only/team-admin-only reads with `no-store`, CSV formula-injection safety, 7-year retention with no delete path, WCAG 2.2 AA at 360 px.
+
+### Component Analysis
+- **New**: `packages/shared/src/tax/` (period helpers), `packages/shared/src/api/invoices.ts` (contracts), `apps/api/src/modules/invoices/` (issuance, snapshot repo, document model, pdfkit renderer, routes), `apps/api/src/modules/income-exports/` (row query, CSV/XLSX writers, route), `apps/api/src/jobs/issue-invoice.ts`, a migration for the snapshot, Next download route handlers, the "Income exports" page, ADR 0021.
+- **Affected**: PAID writers (`modules/billing/apply-akahu-result.ts`, `jobs/bill-session.ts`, `modules/billing/hold-resolution.ts`) enqueue `issue-invoice` in the PAID transaction; `packages/shared/src/nz/gst.ts` gains `gstOfInclusive`; `MyPaymentRow`/`PaymentResponse` gain `invoiceNumber`/`invoiceAvailable` (shared contract with player-dashboard); `payment-detail.tsx`, `payments-list.tsx`, `AdminPaymentsTable`, `MANAGE_AREAS`; `apps/api/openapi.yaml`; `docs/getting-started.md`.
+
+### Dependencies & Risks
+- Risk: accountant rulings (H4, H5, H6, H10, H12) change document content after build → Mitigation: content lives in one document model and the PDF is rendered on demand from the snapshot, so wording changes do not touch stored records; ADR 0021 stays not Accepted until AC-VERIFY-9.
+- Risk: a team-wide counter lock inside billing transactions → Mitigation: default to a job enqueued in the PAID transaction (architecture creative confirms).
+- Risk: large exports exhaust memory → Mitigation: paged/streamed read and a row cap with a refusal, never truncation (AC-ERROR-4).
+- Risk: new third-party packages (pdfkit, an XLSX writer) → Mitigation: check licence, maintenance and advisories at selection; record in ADR 0021; font licence for the embedded TTF.
+- Risk: load-sensitive tests on CI (PR #9 lesson) → Mitigation: explicit timeouts for CPU-heavy tests, no tight wall-clock assertions.
+
+### Observability Requirements
+- **Applies**: Yes → load `${CLAUDE_PLUGIN_ROOT}/context/observability-requirements.md` during build.
+- **Logging**: `invoice.issued` (payment id, team id, invoice number, kind), `invoice.issue.skipped` (reason: not_paid, zero_amount, already_issued), `invoice.downloaded` (payment id, actor role), `income_export.generated` (team id, period type, format, row count). Ids, counts and kinds only — no names, amounts, GST numbers or emails (global redaction keys checked first).
+- **Tracing**: the `issue-invoice` job carries trace meta from the enqueuing transaction (existing `extractTraceMeta`); custom spans for PDF render and export generation.
+- **Metrics**: none new beyond standard HTTP and job metrics.
+- **Configuration**: none expected; the export row cap and range limit are env-configurable with defaults set in creative (e.g. `INCOME_EXPORT_MAX_ROWS`).
+
+### API Requirements - REST
+- **Involves REST API**: Yes
+- **OpenAPI Spec Location**: `apps/api/openapi.yaml`
+- **Endpoints Affected** (names provisional, architecture creative confirms): `GET /payments/:paymentId/invoice` (payer, `application/pdf`); `GET /teams/:teamId/payments/:paymentId/invoice` (team admin); `GET /teams/:teamId/exports/income?format=csv|xlsx&from=&to=` (team admin only); `PaymentResponse` and `MyPaymentRow` gain invoice fields.
+- **Build Phase**: load `${CLAUDE_PLUGIN_ROOT}/context/api-rest-requirements.md`.
+
+### New Source Files (pin path + extension)
+Extensions follow the repo convention (`.ts` for logic and route handlers, `.tsx` for React components/pages, `.sql` migrations under `db/migrations/` with the `YYYYMMDDHHMMSSmmm_name.sql` stamp).
+- [ ] `db/migrations/20261110000100000_tax_invoices.sql` — snapshot table/columns, immutability guard, document kind, numbering changes (exact shape from architecture creative)
+- [ ] `packages/shared/src/nz/gst.ts` — extend: `gstOfInclusive(Money, bps)`
+- [ ] `packages/shared/src/tax/periods.ts` — financial year, GST two-month periods (both alignments), custom range → `[from, to)` instants
+- [ ] `packages/shared/src/tax/index.ts` — barrel, like `packages/shared/src/nz/index.ts`
+- [ ] `packages/shared/src/api/invoices.ts` — invoice/export request and response schemas
+- [ ] `packages/shared/src/api/billing.ts` — extend: `invoiceNumber`, `invoiceAvailable` on `PaymentResponse`/`MyPaymentRow`
+- [ ] `apps/api/src/modules/invoices/repo.ts` — issue (calls `assign_invoice_number`), snapshot read
+- [ ] `apps/api/src/modules/invoices/issue.ts` — issuance service (idempotent, on-demand fallback)
+- [ ] `apps/api/src/modules/invoices/document.ts` — document model (kind, supplier, buyer, lines, totals) from the snapshot
+- [ ] `apps/api/src/modules/invoices/render-pdf.ts` — pdfkit renderer with embedded font
+- [ ] `apps/api/src/modules/invoices/routes.ts` — payer and team-admin invoice routes
+- [ ] `apps/api/src/modules/invoices/errors.ts` — `invoice_not_available` etc.
+- [ ] `apps/api/assets/fonts/<font>.ttf` — embedded font with macrons (licence recorded in ADR 0021; path confirmed in creative)
+- [ ] `apps/api/src/jobs/issue-invoice.ts` — job handler; plus `registry.ts`/`bootstrap.ts` extend
+- [ ] `apps/api/src/modules/income-exports/repo.ts` — "PAID in range by `paid_at`" paged query
+- [ ] `apps/api/src/modules/income-exports/csv.ts` — CSV writer with cell neutralisation
+- [ ] `apps/api/src/modules/income-exports/xlsx.ts` — XLSX writer (library from creative)
+- [ ] `apps/api/src/modules/income-exports/routes.ts` — export route (TEAM_ADMIN only)
+- [ ] `apps/web/src/app/payments/[paymentId]/invoice/route.ts` — Next download proxy (payer)
+- [ ] `apps/web/src/app/teams/[teamId]/manage/payments/[paymentId]/invoice/route.ts` — Next download proxy (team admin)
+- [ ] `apps/web/src/app/teams/[teamId]/manage/exports/page.tsx` — Income exports page
+- [ ] `apps/web/src/app/teams/[teamId]/manage/exports/income/route.ts` — Next export download proxy
+- [ ] `apps/web/src/components/invoices/download-invoice-link.tsx` — shared download action (reused by player-dashboard)
+- [ ] `apps/web/src/components/invoices/income-export-form.tsx` — period-type form
+- [ ] `apps/web/src/lib/invoices/download.ts` — shared proxy helper (bearer, headers, error mapping)
+- [ ] `apps/web/src/lib/teams/manage-areas.ts` — extend: "Income exports"
+- [ ] `apps/web/src/components/billing/{payment-detail,payments-list,admin-payments-table}.tsx` — extend: download actions
+- [ ] `docs/adr/0021-tax-invoices-and-exports.md` — ADR (not Accepted until AC-VERIFY-9)
+
+### Phases
+- [ ] **Phase 1: Shared tax helpers, contracts and the invoice snapshot schema.** `gstOfInclusive` with the parity matrix; financial-year and GST-period helpers with DST vectors; invoice/export API schemas and the payment invoice fields; the migration (snapshot, document kind, immutability guard, set-once) per the architecture creative; single-writer boundary rules; ADR 0021 draft and ledger rows (D-99+). ACs: AC-HAPPY-10, AC-VERIFY-3, AC-VERIFY-4, AC-VERIFY-7 (partial).
+- [ ] **Phase 2: Issuance.** `issue-invoice` queue and handler; each PAID writer enqueues it in the PAID transaction; idempotent issuance through `assign_invoice_number` with the snapshot; on-demand fallback; boot-time backfill of pre-feature PAID payments; no number for unpaid, held or $0.00. ACs: AC-ASYNC-1, 2, 3, AC-HAPPY-4, 5, AC-ERROR-1, 5.
+- [ ] **Phase 3: Documents and downloads.** Document model (tax invoice vs receipt, guests, late-withdrawal wording); pdfkit renderer with embedded font; payer and team-admin invoice routes; Next download proxies; "Download tax invoice"/"Download receipt" on the payment page and wallet list, "Invoice" row action in the admin Payments table; OpenAPI. ACs: AC-ENTRY-1, 3, AC-HAPPY-1, 2, 3, AC-ERROR-2, 6, AC-VERIFY-1, 6, AC-INTEGRATION-1.
+- [ ] **Phase 4: Income exports.** Paged "PAID in range by `paid_at`" query; CSV writer with neutralisation; XLSX writer with summary sheet; export route (TEAM_ADMIN only) with row cap refusal; "Income exports" manage area and form; OpenAPI. ACs: AC-ENTRY-2, AC-HAPPY-6, 7, 8, 9, AC-ERROR-3, 4, AC-VERIFY-2, 5, AC-INTEGRATION-3.
+- [ ] **Phase 5: End-to-end journey, accessibility, docs and accountant specimens.** `apps/web/e2e/invoices.spec.ts` (pay on the fake adapter → download invoice → export) on desktop and 360 px with axe; coverage gate; `docs/getting-started.md` export guide and re-run instructions; specimen PDFs/exports for the accountant and the AC-VERIFY-9 record; memory-bank updates. ACs: AC-INTEGRATION-2, AC-VERIFY-8, AC-VERIFY-9 (recorded; sign-off is human), AC-VERIFY-7 (complete). The final phase delivers the full entry-to-success flow: Player at `/payments/[paymentId]` → "Download tax invoice" → PDF; Team admin at `/teams/[teamId]/manage/exports` → "Download" → CSV/XLSX.
 
 ## Creative Phases
 
-(decided at Step 3.3)
+Level 3 with LOW-confidence fields → creative REQUIRED. Rulings already made: H1 (team is supplier, platform as agent), H2 (numbered Receipt for non-GST teams), H7 PDF (pdfkit). The remaining tax-rule defaults (H3-H6, H8-H12) are assumed by the ACs and go to the accountant (AC-VERIFY-9), not to creative.
+
+- [ ] Architecture Design → pending — invoice snapshot vs stored bytes vs columns; job vs in-transaction issuance and the counter lock; receipt numbering (shared counter, prefix, `is_tax_invoice_issued` naming, H2 follow-up); Next download mechanism; module split; player-dashboard reuse and the shared contract fields (design questions 1, 2, 7); XLSX library and CSV BOM (H7 remainder).
+- [ ] Algorithm Design → pending — period helpers API and DST handling; GST two-month alignment selection (H8); export row ordering, streaming/paging, row cap and range limit values (design questions 5, 6).
+- [ ] UI/UX Design → pending — PDF layout and typography (receipt variant, guest and late-withdrawal lines, "includes GST" wording); "Income exports" page form for three period types and the post-download state (design questions 3, 4).
 
 ---
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: PLAN
-**Current Step**: Step 3 - Spec Writer Agent - COMPLETE (taxonomy CLEAN); awaiting human review (Step 3.2)
-**Last Completed**: N/A
-**Can Resume**: YES
+**Build Status**: IDLE
+**Current Phase**: CREATIVE
+**Current Step**: Planning complete; next /yay:creative (Architecture, Algorithm, UI/UX)
+**Last Completed**: PLAN (2026-11-10)
+**Can Resume**: NO
 
 ### Active Sub-Agents
 (none)
@@ -361,3 +471,5 @@ Yes, for operations and for the accountant's sign-off, not for the code. Every a
 ### Completed Steps
 - Step 0.1: task provisioned from roadmap feature (2026-11-10)
 - Step 3.1: Spec Writer (sonnet) draft written, 34 ACs; Step 3.2a taxonomy lint CLEAN (2026-11-10)
+- Step 3.2: human review: approved; H1 team-as-supplier, H2 numbered Receipt, H7 pdfkit ruled (2026-11-10)
+- Steps 4-6: codebase analysis, Test Strategy (~90 tests), 5-phase roadmap, creative flagged: Architecture, Algorithm, UI/UX (2026-11-10)
