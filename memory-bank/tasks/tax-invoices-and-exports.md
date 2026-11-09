@@ -451,6 +451,7 @@ Extensions follow the repo convention (`.ts` for logic and route handlers, `.tsx
 
 Level 3 with LOW-confidence fields → creative REQUIRED. Rulings already made: H1 (team is supplier, platform as agent), H2 (numbered Receipt for non-GST teams), H7 PDF (pdfkit). The remaining tax-rule defaults (H3-H6, H8-H12) are assumed by the ACs and go to the accountant (AC-VERIFY-9), not to creative.
 
+- [ ] User Journey Design → pending — required for Level 3 (command rule): player pay → download and admin export journeys, unpaid/held/$0.00 states, download failure recovery.
 - [ ] Architecture Design → pending — invoice snapshot vs stored bytes vs columns; job vs in-transaction issuance and the counter lock; receipt numbering (shared counter, prefix, `is_tax_invoice_issued` naming, H2 follow-up); Next download mechanism; module split; player-dashboard reuse and the shared contract fields (design questions 1, 2, 7); XLSX library and CSV BOM (H7 remainder).
 - [ ] Algorithm Design → pending — period helpers API and DST handling; GST two-month alignment selection (H8); export row ordering, streaming/paging, row cap and range limit values (design questions 5, 6).
 - [ ] UI/UX Design → pending — PDF layout and typography (receipt variant, guest and late-withdrawal lines, "includes GST" wording); "Income exports" page form for three period types and the post-download state (design questions 3, 4).
@@ -459,14 +460,18 @@ Level 3 with LOW-confidence fields → creative REQUIRED. Rulings already made: 
 
 ## Execution State
 
-**Build Status**: IDLE
+**Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Current Step**: Planning complete; next /yay:creative (Architecture, Algorithm, UI/UX)
+**Current Step**: Step 3 - creative agents dispatched (User Journey, Architecture, Algorithm, UI/UX)
+**Step Started**: 2026-11-10
 **Last Completed**: PLAN (2026-11-10)
-**Can Resume**: NO
+**Can Resume**: YES
 
 ### Active Sub-Agents
-(none)
+- User Journey Design: DISPATCHED, Started: 2026-11-10
+- Architecture Design: DISPATCHED, Started: 2026-11-10
+- Algorithm Design: DISPATCHED, Started: 2026-11-10
+- UI/UX Design: DISPATCHED, Started: 2026-11-10
 
 ### Completed Steps
 - Step 0.1: task provisioned from roadmap feature (2026-11-10)
