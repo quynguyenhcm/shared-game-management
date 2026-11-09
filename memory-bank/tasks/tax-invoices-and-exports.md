@@ -133,7 +133,7 @@ NZ GST compliance outputs (PRODUCT-OVERVIEW §8), from roadmap feature `tax-invo
 **Priority**: MUST
 **Given** the admin chooses "Financial year" and "2026-27"
 **When** they download
-**Then** the range is 1 April 2026 to 31 March 2027 inclusive in Pacific/Auckland time; a payment paid at 31 March 2027 23:59 NZDT is in, one paid at 1 April 2027 00:00 NZST is out (it belongs to 2027-28), and the year selector lists the years that contain at least one PAID payment plus the current one
+**Then** the range is 1 April 2026 to 31 March 2027 inclusive in Pacific/Auckland time; a payment paid at 31 March 2027 23:59 NZDT is in, one paid at 1 April 2027 00:00 NZDT (`2027-03-31T11:00:00Z`; NZ daylight saving ends on the first Sunday in April, so 1 April midnight is always NZDT) is out (it belongs to 2027-28), and the year selector lists the years that contain at least one PAID payment plus the current one
 
 #### AC-HAPPY-9: Team admin exports Excel with a summary that reconciles
 **Priority**: MUST
@@ -215,7 +215,7 @@ NZ GST compliance outputs (PRODUCT-OVERVIEW §8), from roadmap feature `tax-invo
 
 #### AC-VERIFY-3: Period boundaries are right in Pacific/Auckland, including daylight-saving changes
 **Priority**: MUST
-**Given** payments paid at instants around: 31 March 2027 23:59:59 NZDT and 1 April 2027 00:00:00 NZST; the clock changes on the first Sunday in April and the last Sunday in September (NZ); 31 May and 1 June, and 30 November and 1 December in both bi-monthly alignments; 29 February in a leap year
+**Given** payments paid at instants around: 31 March 2027 23:59:59 NZDT and 1 April 2027 00:00:00 NZDT; the clock changes on the first Sunday in April and the last Sunday in September (NZ); 31 May and 1 June, and 30 November and 1 December in both bi-monthly alignments; 29 February in a leap year
 **When** the range helpers convert local dates to instants (`[start 00:00 NZ, end + 1 day 00:00 NZ)`) and the filter runs
 **Then** each instant lands in exactly one financial year and exactly one bi-monthly period of each alignment, with no payment counted twice or dropped, using the shared `localToInstant` (no host-timezone dependence, P3), and the financial-year and GST-period helpers live in `packages/shared` with their own test vectors
 
@@ -451,10 +451,21 @@ Extensions follow the repo convention (`.ts` for logic and route handlers, `.tsx
 
 Level 3 with LOW-confidence fields → creative REQUIRED. Rulings already made: H1 (team is supplier, platform as agent), H2 (numbered Receipt for non-GST teams), H7 PDF (pdfkit). The remaining tax-rule defaults (H3-H6, H8-H12) are assumed by the ACs and go to the accountant (AC-VERIFY-9), not to creative.
 
-- [ ] User Journey Design → pending — required for Level 3 (command rule): player pay → download and admin export journeys, unpaid/held/$0.00 states, download failure recovery.
-- [ ] Architecture Design → pending — invoice snapshot vs stored bytes vs columns; job vs in-transaction issuance and the counter lock; receipt numbering (shared counter, prefix, `is_tax_invoice_issued` naming, H2 follow-up); Next download mechanism; module split; player-dashboard reuse and the shared contract fields (design questions 1, 2, 7); XLSX library and CSV BOM (H7 remainder).
-- [ ] Algorithm Design → pending — period helpers API and DST handling; GST two-month alignment selection (H8); export row ordering, streaming/paging, row cap and range limit values (design questions 5, 6).
-- [ ] UI/UX Design → pending — PDF layout and typography (receipt variant, guest and late-withdrawal lines, "includes GST" wording); "Income exports" page form for three period types and the post-download state (design questions 3, 4).
+- [x] User Journey Design → complete — `creative/tax-invoices-and-exports-invoicing-user-journey.md`: issue-at-PAID job + on-demand on download + sweep (option 3 of 4); every refused/failed download lands on a fixed page with a notice; gap G1 (wallet shows only the latest 10 paid games).
+- [x] Architecture Design → complete — `creative/tax-invoices-and-exports-invoicing-architecture.md`: SQL `issue_payment_document` as sole issuer; append-only `payment_documents` facts snapshot, PDF rendered on demand by `layout_version`; per-team `issue-invoices` job (enqueued in `bill-session` and the apply funnel APPLY branch) + on-demand + `invoice-reconcile` sweep (boot + 15 min, also the pre-feature backfill); separate gapless series per kind (`INV-`, `RCT-`), `is_tax_invoice_issued` generated; number only on PAID > $0.00; `paid_at` frozen once set; Next GET route handlers streaming bytes, errors → 303 with `download_error`; in-house XLSX on `fflate`, CSV UTF-8 BOM + CRLF; Noto Sans (OFL) in `modules/invoices/fonts/`; ledger D-99..D-105, ADR 0021 outline.
+- [x] Algorithm Design → complete — `creative/tax-invoices-and-exports-invoicing-algorithm.md`: N-month cadence + financial-year helpers, one `toInstantRange`; `gstOfInclusive` via `multiplyByRatio` HALF_UP (parity proven on 30,603 values); export = count/sum preflight then SQL cursor in one REPEATABLE READ READ ONLY transaction, buffered with Content-Length; row cap 50,000, range limit 2,557 days (7 years); 11-column shared row builder, formula neutralisation in both formats.
+- [x] UI/UX Design → complete — `creative/tax-invoices-and-exports-invoicing-uiux.md`: single-column A4 (Noto Sans, 48 pt margins), tax invoice and receipt variants, "Issued by Shared Game Management on behalf of {team}."; all accountant-sensitive wording in `packages/shared/src/invoice/document-copy.ts`; Income exports radio-revealed form, Excel default; progressive download links with a status region.
+
+### Cross-lane reconciliation (orchestrator, 2026-11-10)
+Where the parallel docs disagree, the lane that owns the concern wins:
+- **Download transport and errors** (owner: Architecture): plain anchors and a GET form; the Next route handler streams the file or answers 303 to a validated `returnTo` with `?download_error=<code>`. UI/UX's status region renders that code's message on the landing page; a client-side fetch is an optional enhancement only, never required (supersedes UI/UX assumption of JSON errors to `fetch` and Journey's `?notice=` name).
+- **Payment contract field** (owner: Architecture): `document: { kind, available, number }` on `PaymentResponse`, `MyPaymentRow` and the admin payments row (supersedes UI/UX `documentKind`/`invoiceNumber` and Journey `invoice: {...} | null`). The button label comes from `document.kind`, never from `gstAmount` (UI/UX finding).
+- **XLSX money cells** (owner: Architecture, library choice): the in-house writer writes cells from `MoneyString`, so no P2 exemption is needed (supersedes the Algorithm doc's declared exemption).
+- **Export query** (Algorithm + Architecture agree): a discriminated `period=custom|gst|fy` query resolved on the server by the shared helpers; plus `GET /teams/:t/exports/income/periods` for the form's options (covers UI/UX and Journey R-A7).
+- **Backfill** (owner: Architecture): the `invoice-reconcile` sweep at boot covers Journey OQ-2's deploy-time backfill, in `paid_at` order; no migration-time backfill.
+- **AC-ASYNC-1 "refresh while pending"**: dropped (UI/UX and Journey agree; the link works before issuance). The rare lock-timeout case answers `invoice_pending` with a retry message.
+- **Spec fix applied**: AC-HAPPY-8 and AC-VERIFY-3 now say 1 April 00:00 is NZDT (`2027-03-31T11:00:00Z`).
+- **Pending human rulings** before build (see the creative summary): six-monthly option, 7-year range limit, `RCT-` series, wallet "older paid games" (G1), GLOBAL_ADMIN support download, Reference column.
 
 ---
 
@@ -462,19 +473,20 @@ Level 3 with LOW-confidence fields → creative REQUIRED. Rulings already made: 
 
 **Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Current Step**: Step 3 - creative agents dispatched (User Journey, Architecture, Algorithm, UI/UX)
+**Current Step**: Step 4.5 - design critique (Codex)
 **Step Started**: 2026-11-10
 **Last Completed**: PLAN (2026-11-10)
 **Can Resume**: YES
 
 ### Active Sub-Agents
-- User Journey Design: DISPATCHED, Started: 2026-11-10
-- Architecture Design: DISPATCHED, Started: 2026-11-10
-- Algorithm Design: DISPATCHED, Started: 2026-11-10
-- UI/UX Design: DISPATCHED, Started: 2026-11-10
+- User Journey Design: COMPLETE
+- Architecture Design: COMPLETE
+- Algorithm Design: COMPLETE
+- UI/UX Design: COMPLETE
 
 ### Completed Steps
 - Step 0.1: task provisioned from roadmap feature (2026-11-10)
 - Step 3.1: Spec Writer (sonnet) draft written, 34 ACs; Step 3.2a taxonomy lint CLEAN (2026-11-10)
 - Step 3.2: human review: approved; H1 team-as-supplier, H2 numbered Receipt, H7 pdfkit ruled (2026-11-10)
 - Steps 4-6: codebase analysis, Test Strategy (~90 tests), 5-phase roadmap, creative flagged: Architecture, Algorithm, UI/UX (2026-11-10)
+- Creative (2026-11-10): User Journey, Architecture, Algorithm, UI/UX complete; outputs memory-bank/creative/tax-invoices-and-exports-invoicing-{user-journey,architecture,algorithm,uiux}.md; cross-lane reconciliation recorded; NZDT spec fix
