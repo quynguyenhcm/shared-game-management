@@ -739,6 +739,7 @@ Source: `memory-bank/research/wallet-and-akahu-billing-akahu-payment-capability-
 **Last Completed**: Phase 6: E2E, reconciliation CLI, accessibility and docs (2026-11-05)
 **Current Phase**: BUILD (between phases)
 **Current Step**: Phase 6 committed; Phase 4b still halted
+**Partial PR**: #9 (Phases 1-6 to main, Akahu not live; human Option A, 2026-11-09). Not an archive: after #9 merges, Phase 4b resumes on this branch off the merged main and ships in its own PR; reflect and archive follow 4b.
 **Can Resume**: YES
 **Spike Phase**: 4 — complete (artifact `akahu-payment-capability` approved 2026-10-31, option A; OV-1..OV-3 accepted; run_id 20261030-ac067d8f6863)
 
