@@ -467,13 +467,21 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - **Spec fix applied**: AC-HAPPY-8 and AC-VERIFY-3 now say 1 April 00:00 is NZDT (`2027-03-31T11:00:00Z`).
 - **Pending human rulings** before build (see the creative summary): six-monthly option, 7-year range limit, `RCT-` series, wallet "older paid games" (G1), GLOBAL_ADMIN support download, Reference column.
 
+## Design Critique (advisory)
+**Backend**: codex (adversarial-review, 2026-11-10). **Verdict**: needs-attention. **Summary**: the migration strands legacy numbered rows, rollback can fail or destroy immutable tax records once documents exist, and export limits do not bound memory or concurrency.
+- [high] Migration leaves existing numbered payments permanently unissuable (architecture doc lines 483-511): no snapshot for rows numbered by the old `assign_invoice_number`, the sweep skips them, and clearing PENDING/zero-value numbers leaves gaps or reuses numbers.
+- [high] The down migration is unsafe immediately after first use (architecture doc line 500): restoring the old `(team_id, invoice_number)` uniqueness fails once both series share a number, and reverting drops 7-year records.
+- [medium] Export limits do not bound memory or concurrency (algorithm doc lines 651-655): full buffering in API and Next, a 200,000 configurable ceiling, no byte cap, no v1 semaphore.
+
+
 ---
 
 ## Execution State
 
 **Build Status**: RUNNING
 **Current Phase**: CREATIVE
-**Current Step**: Step 4.5 - design critique (Codex)
+**Current Step**: Step 4.5 complete (critique recorded); awaiting human rulings before CREATIVE_COMPLETE
+**Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
 **Step Started**: 2026-11-10
 **Last Completed**: PLAN (2026-11-10)
 **Can Resume**: YES
