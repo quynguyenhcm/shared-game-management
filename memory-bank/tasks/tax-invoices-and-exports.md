@@ -1,13 +1,13 @@
 ---
 slug: tax-invoices-and-exports
 feature: tax-invoices-and-exports
-status: PLANNING_COMPLETE
+status: CREATIVE_COMPLETE
 ---
 
 # tax-invoices-and-exports: Tax Invoices and Exports
 
 **Complexity**: Level 3
-**Status**: PLANNING_COMPLETE
+**Status**: CREATIVE_COMPLETE
 **Roadmap**: tax-invoices-and-exports
 **Branch**: feature/tax-invoices-and-exports
 **Worktree**: /Users/admin/yay-wt/shared-game-management/feature-tax-invoices-and-exports
@@ -465,7 +465,20 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - **Backfill** (owner: Architecture): the `invoice-reconcile` sweep at boot covers Journey OQ-2's deploy-time backfill, in `paid_at` order; no migration-time backfill.
 - **AC-ASYNC-1 "refresh while pending"**: dropped (UI/UX and Journey agree; the link works before issuance). The rare lock-timeout case answers `invoice_pending` with a retry message.
 - **Spec fix applied**: AC-HAPPY-8 and AC-VERIFY-3 now say 1 April 00:00 is NZDT (`2027-03-31T11:00:00Z`).
-- **Pending human rulings** before build (see the creative summary): six-monthly option, 7-year range limit, `RCT-` series, wallet "older paid games" (G1), GLOBAL_ADMIN support download, Reference column.
+- **Creative rulings (human, Quy Nguyen, 2026-11-12)**:
+  - **R1 Receipt numbering:** a separate gapless series per document kind per team, `INV-000001` and `RCT-000001` (accountant confirms the format, AC-VERIFY-9).
+  - **R2 Six-monthly GST:** the GST-period selector offers two-monthly (odd and even month-ends) and six-monthly ending March/September. Monthly is not offered (Custom range covers it).
+  - **R3 Range limit:** Custom range up to 2,557 days inclusive (7 years, matching retention); AC-ERROR-3's 5-year wording becomes 7 years at build.
+  - **R4 Reference column:** exports include `payments.payment_reference` (not secret, D-89).
+  - **R5 Gap G1:** "Show older paid games" pagination on the wallet page's paid list ships in this feature (Phase 3), so every invoice is reachable.
+  - **R6 Codex critique:** all three findings are folded into the design as binding build requirements (CR-1..CR-3 below).
+  - Kept as spec defaults (not reopened): no GLOBAL_ADMIN invoice or export access (H9); the per-row "Invoice" action is hidden from anyone who is not a team admin.
+
+### Plan amendments from creative (binding for build)
+- **CR-1 Migration converts, never clears (critique high #1).** Before adding the PAID-and-above-$0.00 CHECK, the migration preflights every payment that already has an `invoice_number`: each PAID > $0.00 row gets a `payment_documents` snapshot built in the migration with its existing number, kind and counter kept; if any numbered row is not PAID > $0.00, the migration raises and aborts the deploy with the offending ids (no silent clearing, no counter rewind). The deferred "numbered payment must have a document" trigger is validated against existing rows at migration time. Upgrade tests cover PAID, PENDING, $0.00 and interleaved numbered rows.
+- **CR-2 Forward-only document schema (critique high #2).** The down migration refuses (raises) once any `payment_documents` row exists; it never drops the snapshot table or the per-kind numbering. Recovery after first use is a forward remediation migration or an application rollback that is compatible with the new schema; ADR 0021 records this one-way door and that it was accepted with R1.
+- **CR-3 Bounded exports (critique medium).** A hard production ceiling on `INCOME_EXPORT_MAX_ROWS` (config cannot exceed the measured safe value; default 50,000), an encoded-byte cap checked while building (refuse with `export_too_large`, never truncate), request cancellation propagated from Next to the API and to the Postgres statement, and a bounded export semaphore in v1 (per team 1, global small N, configurable) answering 429 `export_busy` with a retry message. A load test drives concurrent worst-case-width CSV and XLSX exports through API and Next.
+- **CR-4 Phase changes (from the architecture doc).** Phase 1 adds the migration with D-99..D-105, CR-1 and CR-2, the per-kind counter key, the generated `is_tax_invoice_issued`, the `paid_at` freeze, `FOR NO KEY UPDATE` in `assign_invoice_number`, `idx_payments_unissued`, the boundary-test updates and the `invoice-number.int.test.ts` factory update. Phase 2 adds `jobs/issue-invoices.ts` (per team, singleton) and `jobs/invoice-reconcile.ts` (boot + 15 min, the backfill), with enqueue sites in `bill-session` and the apply funnel's APPLY branch only. Phase 3 adds `document: { kind, available, number }` on the billing DTOs, `packages/shared/src/invoice/document-copy.ts`, Noto Sans in `apps/api/src/modules/invoices/fonts/` copied by `tsup`, `lib/http/content-disposition.ts`, the web `lib/invoices/{download,paths}.ts`, and the R5 pagination. Phase 4 puts the CSV/XLSX writers in `apps/api/src/lib/tabular/` (in-house XLSX on `fflate`), adds the periods route and CR-3. New dependencies: `pdfkit`, `fflate`; dev `@types/pdfkit`, `unpdf`, `read-excel-file`. The New Source Files list above is superseded where it conflicts; the creative docs give the exact files.
 
 ## Design Critique (advisory)
 **Backend**: codex (adversarial-review, 2026-11-10). **Verdict**: needs-attention. **Summary**: the migration strands legacy numbered rows, rollback can fail or destroy immutable tax records once documents exist, and export limits do not bound memory or concurrency.
@@ -478,13 +491,13 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: CREATIVE
-**Current Step**: Step 4.5 complete (critique recorded); awaiting human rulings before CREATIVE_COMPLETE
+**Build Status**: IDLE
+**Current Phase**: CREATIVE → BUILD
+**Current Step**: Creative complete; next /yay:build (Phase 1)
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
 **Step Started**: 2026-11-10
-**Last Completed**: PLAN (2026-11-10)
-**Can Resume**: YES
+**Last Completed**: CREATIVE (2026-11-12)
+**Can Resume**: NO
 
 ### Active Sub-Agents
 - User Journey Design: COMPLETE
@@ -498,3 +511,4 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - Step 3.2: human review: approved; H1 team-as-supplier, H2 numbered Receipt, H7 pdfkit ruled (2026-11-10)
 - Steps 4-6: codebase analysis, Test Strategy (~90 tests), 5-phase roadmap, creative flagged: Architecture, Algorithm, UI/UX (2026-11-10)
 - Creative (2026-11-10): User Journey, Architecture, Algorithm, UI/UX complete; outputs memory-bank/creative/tax-invoices-and-exports-invoicing-{user-journey,architecture,algorithm,uiux}.md; cross-lane reconciliation recorded; NZDT spec fix
+- Creative rulings R1-R6 and plan amendments CR-1..CR-4 recorded; status CREATIVE_COMPLETE (2026-11-12)
