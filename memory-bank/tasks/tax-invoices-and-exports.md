@@ -491,13 +491,15 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: CREATIVE → BUILD
-**Current Step**: Creative complete; next /yay:build (Phase 1)
+**Build Status**: RUNNING
+**Current Phase**: 1 of 5
+**Auto-Build Mode**: YES
+**Current Step**: Auto-build started (2026-11-13); building Phase 1
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
 **Step Started**: 2026-11-10
 **Last Completed**: CREATIVE (2026-11-12)
-**Can Resume**: NO
+**Can Resume**: YES
+**Resume From**: Phase 1
 
 ### Active Sub-Agents
 - User Journey Design: COMPLETE
@@ -512,3 +514,9 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - Steps 4-6: codebase analysis, Test Strategy (~90 tests), 5-phase roadmap, creative flagged: Architecture, Algorithm, UI/UX (2026-11-10)
 - Creative (2026-11-10): User Journey, Architecture, Algorithm, UI/UX complete; outputs memory-bank/creative/tax-invoices-and-exports-invoicing-{user-journey,architecture,algorithm,uiux}.md; cross-lane reconciliation recorded; NZDT spec fix
 - Creative rulings R1-R6 and plan amendments CR-1..CR-4 recorded; status CREATIVE_COMPLETE (2026-11-12)
+
+### Halt State
+<!-- populated only on a halt trigger -->
+
+### Deviations
+<!-- Phase <N> | <file:line/artifact> | <rationale> -->
