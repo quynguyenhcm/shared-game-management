@@ -7,7 +7,8 @@ status: BUILD_COMPLETE
 # tax-invoices-and-exports: Tax Invoices and Exports
 
 **Complexity**: Level 3
-**Status**: BUILD_COMPLETE
+**Status**: REFLECTION_COMPLETE
+**Reflection**: memory-bank/reflection/tax-invoices-and-exports-reflection.md
 **Roadmap**: tax-invoices-and-exports
 **Branch**: feature/tax-invoices-and-exports
 **Worktree**: /Users/admin/yay-wt/shared-game-management/feature-tax-invoices-and-exports
@@ -491,8 +492,8 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 
 ## Execution State
 
-**Build Status**: COMPLETE
-**Current Phase**: 5 of 5 complete
+**Build Status**: IDLE
+**Current Phase**: REFLECT → ARCHIVE
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
 **Final Review Verdict**: Ready to merge with fixes — Important: (1) income-exports/service.ts:213-216 Summary GST-number fallback must apply only when rows=0; (2) record a human ruling that production payment enablement is gated on AC-VERIFY-9 accountant sign-off. Minor: pin layout-1 render output, class-23 on-demand → stable code, systemPatterns snapshot wording, deviation deferrals, pre-existing vulnerable deps (next, zod). Not addressed autonomously (2026-11-13).
 **Auto-Build Mode**: YES
@@ -510,6 +511,8 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - UI/UX Design: COMPLETE
 
 ### Completed Steps
+- Auto-build Phases 1-5 + final review: COMPLETE (2026-11-13)
+- Reflection Agent: COMPLETE (2026-11-13) - Output: memory-bank/reflection/tax-invoices-and-exports-reflection.md
 - Step 0.1: task provisioned from roadmap feature (2026-11-10)
 - Step 3.1: Spec Writer (sonnet) draft written, 34 ACs; Step 3.2a taxonomy lint CLEAN (2026-11-10)
 - Step 3.2: human review: approved; H1 team-as-supplier, H2 numbered Receipt, H7 pdfkit ruled (2026-11-10)
