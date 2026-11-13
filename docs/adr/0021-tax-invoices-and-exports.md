@@ -96,6 +96,8 @@ Boundary tests (`modules/invoices/boundaries.test.ts`, and `payment_documents` a
 
 ## Accountant review record (AC-VERIFY-9)
 
+**Release gate (human ruling, 2026-11-13).** Production payments (the live Akahu adapter, wallet-and-akahu-billing Phase 4b) must not be enabled until this record shows the accountant's approval, or until the required changes are built. The first real PAID payment issues a document whose number format and wording are then frozen (append-only snapshot, CR-2), so the review has to happen before go-live, not after.
+
 Status: **pending** as of 2026-11-13. Not yet reviewed: the numbering scheme and printed format (`INV-` and `RCT-`, six digits), the document content against IRD's taxable supply information rules (H6, H10), the kind following the charge-time registration (H12), the treatment of prepaid wallet credit and the export basis (H4), and the receipt for a non-registered team (H2). Until the outcome (approved, or the required changes), with the date and reviewer, is written here, the format is provisional in this ADR, in ADR 0011 and in product copy. Specimens were produced in Phase 5 and committed in `docs/specimens/` (2026-11-13): `tax-invoice-one-player.pdf`, `tax-invoice-with-guests.pdf`, `receipt-non-gst-team.pdf`, `tax-invoice-late-withdrawal-fee.pdf` (rendered by the real renderer from the document model, `apps/api/src/modules/invoices/specimens.test.ts`), and `e2e-*.pdf`, `e2e-*.csv`, `e2e-*.xlsx` (downloaded by the invoices E2E run against the fake Akahu adapter). Awaiting the accountant: this record stays **pending** and the ADR stays **Proposed** until a human writes the reviewer, date and outcome here.
 
 | Date    | Reviewer | Outcome (approved / changes required) | Required changes |

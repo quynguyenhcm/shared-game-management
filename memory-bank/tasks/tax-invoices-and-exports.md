@@ -7,7 +7,10 @@ status: BUILD_COMPLETE
 # tax-invoices-and-exports: Tax Invoices and Exports
 
 **Complexity**: Level 3
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
+**Archived**: memory-bank/archive/tax-invoices-and-exports-archive.md
+**Completed**: 2026-11-13
+**Release gate**: Production payments (Akahu live) stay off until the accountant signs off AC-VERIFY-9 (human ruling 2026-11-13; ADR 0021).
 **Reflection**: memory-bank/reflection/tax-invoices-and-exports-reflection.md
 **Roadmap**: tax-invoices-and-exports
 **Branch**: feature/tax-invoices-and-exports
@@ -493,9 +496,9 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 ## Execution State
 
 **Build Status**: IDLE
-**Current Phase**: REFLECT → ARCHIVE
+**Current Phase**: COMPLETE
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
-**Final Review Verdict**: Ready to merge with fixes — Important: (1) income-exports/service.ts:213-216 Summary GST-number fallback must apply only when rows=0; (2) record a human ruling that production payment enablement is gated on AC-VERIFY-9 accountant sign-off. Minor: pin layout-1 render output, class-23 on-demand → stable code, systemPatterns snapshot wording, deviation deferrals, pre-existing vulnerable deps (next, zod). Not addressed autonomously (2026-11-13).
+**Final Review Verdict**: Ready to merge with fixes — Important: (1) [FIXED at archive, test-first] income-exports/service.ts:213-216 Summary GST-number fallback must apply only when rows=0; (2) [RULED 2026-11-13: production payments gated on AC-VERIFY-9 sign-off] record a human ruling that production payment enablement is gated on AC-VERIFY-9 accountant sign-off. Minor: pin layout-1 render output, class-23 on-demand → stable code, systemPatterns snapshot wording, deviation deferrals, pre-existing vulnerable deps (next, zod). Not addressed autonomously (2026-11-13).
 **Auto-Build Mode**: YES
 **Current Step**: Phase 5 remediation 1 applied (AC-INTEGRATION-2 completed, e2e 4/4); Phase 5 (End-to-end journey, accessibility, docs and accountant specimens) built 2026-11-13: lint, typecheck, build, unit+integration+coverage (96.3% statements, 89.6% branches) and Playwright (invoices and income-exports, desktop and 360 px, 4/4) all exit 0
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
@@ -511,6 +514,7 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - UI/UX Design: COMPLETE
 
 ### Completed Steps
+- Archive: final-review Important #1 fixed test-first (export Summary GST fallback only for empty exports); release-gate ruling recorded; learnings consolidated; archive doc written (2026-11-13)
 - Auto-build Phases 1-5 + final review: COMPLETE (2026-11-13)
 - Reflection Agent: COMPLETE (2026-11-13) - Output: memory-bank/reflection/tax-invoices-and-exports-reflection.md
 - Step 0.1: task provisioned from roadmap feature (2026-11-10)
@@ -585,3 +589,4 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - Phase 5 | docs/adr/0021-tax-invoices-and-exports.md | AC-VERIFY-9: specimens listed and a review table left `pending` (sign-off is human). ADR 0021 stays Proposed; ADR 0011's pending note was already restated on 2026-11-13. AC-VERIFY-7 needed no new code: the issuance module is on the billing allow list (`issue-invoices.ts`), `invoices/**` and the jobs are in the coverage include list.
 - Phase 5 | test environment | Integration tests ran against the e2e Postgres (`DATABASE_URL=...:5532`) with a generated `ENCRYPTION_KEYS`, because the worktree has no `.env`. First full run: `invoices-schema.int.test.ts` round trip failed with node-pg-migrate "Not run migration ... preceding already run" (passes alone, passed in the clean re-run: load flake, same family as the billing-schema round trip). The registrations-sse "session PUT promotes first-fit" flake did not recur in the clean run.
 - Phase 5 remediation 1 | apps/web/e2e/invoices.spec.ts, docker-compose.e2e.yml, docs/getting-started.md, docs/specimens/ | AC-INTEGRATION-2 completed: a second player billed from a funded wallet downloads their own invoice; the two numbers are asserted consecutive; PDF text (unpdf) asserts team, buyer, number, GST number, GST $1.30 and total $10.00; CSV and XLSX for the current month (custom range) and the financial year each hold both payments, totals and GST equal the invoices', and the XLSX Payments sheet equals the CSV. The e2e overlay now hard-sets `WEB_BASE_URL=http://localhost:3100` for the web build arg and runtime (not only the shell). Specimens refreshed (two invoices, month and FY exports). Still departing: the payment page's invoice number appears on the next view after an on-demand download (logged follow-up; the journey reloads the page).
+- Archive | apps/api/src/modules/income-exports/service.ts | Final-review Important #1 fixed test-first: the Summary falls back to the team's current GST number only when the export has no rows (new integration test: a now-registered team's pre-registration period prints "Not registered"). Important #2 ruled by the human: production payments stay off until AC-VERIFY-9 sign-off (ADR 0021 release gate).

@@ -1,6 +1,6 @@
 ---
 version: v1.0.0
-status: in_progress
+status: completed
 priority: medium
 complexity: 3
 linked_tasks: [tax-invoices-and-exports]

@@ -1,6 +1,6 @@
 # Agent Rules Index
 
-Generated: 2026-10-30T12:00:00+13:00
+Generated: 2026-11-13T23:00:00+13:00
 Indexed: 10 rules (0 human-authored, 10 learned) | Rejected: 0 (unsafe) | Warnings: 0
 
 ## Validation Summary
@@ -31,7 +31,7 @@ None.
 | `apps/api/src/lib/jobs/**`, `apps/api/src/jobs/**` | [job-queues-pgboss.md](agent-rules/_learned/job-queues-pgboss.md) | low | 20 |
 | `apps/api/src/modules/auth/**` | [auth-session-issuance.md](agent-rules/_learned/auth-session-issuance.md) | low | 17 |
 | `apps/api/src/modules/**/service.ts`, `apps/api/src/modules/**/repo.ts`, `packages/shared/src/api/*.ts`, `apps/web/src/lib/**/*-actions.ts`, `apps/web/src/lib/**/actions.ts` | [api-write-idempotency.md](agent-rules/_learned/api-write-idempotency.md) | low | 20 |
-| `db/migrations/*.sql`, `apps/api/src/modules/**/*.ts`, `apps/api/test/integration/**` | [db-derived-flags-and-gates.md](agent-rules/_learned/db-derived-flags-and-gates.md) | low | 20 |
+| `db/migrations/*.sql`, `apps/api/src/modules/**/*.ts`, `apps/api/test/integration/**` | [db-derived-flags-and-gates.md](agent-rules/_learned/db-derived-flags-and-gates.md) | medium | 20 |
 | `apps/api/src/app.ts`, `apps/api/src/main.ts`, `apps/api/src/worker.ts`, `apps/api/src/jobs/bootstrap.ts`, `apps/web/src/lib/**/*.ts` | [config-composition-root.md](agent-rules/_learned/config-composition-root.md) | low | 16 |
 
 ## Rules by Path
@@ -46,7 +46,7 @@ None.
 | `apps/api/src/lib/jobs/`, `apps/api/src/jobs/` | [job-queues-pgboss.md](agent-rules/_learned/job-queues-pgboss.md) | low | 20 |
 | `apps/api/src/modules/auth/` | [auth-session-issuance.md](agent-rules/_learned/auth-session-issuance.md) | low | 17 |
 | `apps/api/src/modules/`, `packages/shared/src/api/`, `apps/web/src/lib/` | [api-write-idempotency.md](agent-rules/_learned/api-write-idempotency.md) | low | 20 |
-| `db/migrations/`, `apps/api/src/modules/`, `apps/api/test/integration/` | [db-derived-flags-and-gates.md](agent-rules/_learned/db-derived-flags-and-gates.md) | low | 20 |
+| `db/migrations/`, `apps/api/src/modules/`, `apps/api/test/integration/` | [db-derived-flags-and-gates.md](agent-rules/_learned/db-derived-flags-and-gates.md) | medium | 20 |
 | `apps/api/src/`, `apps/web/src/lib/` | [config-composition-root.md](agent-rules/_learned/config-composition-root.md) | low | 16 |
 
 ## Rules by Topic
@@ -61,7 +61,7 @@ None.
 | pg-boss, jobs, queue, retry, dedupe, worker, secrets, encryption | [job-queues-pgboss.md](agent-rules/_learned/job-queues-pgboss.md) | low |
 | auth, sessions, concurrency, race condition, password reset, oauth | [auth-session-issuance.md](agent-rules/_learned/auth-session-issuance.md) | low |
 | idempotency, replay, api design, server actions, contracts, optimistic concurrency, stale, concurrency | [api-write-idempotency.md](agent-rules/_learned/api-write-idempotency.md) | low |
-| postgres, generated columns, triggers, gates, locking, migrations, invariants, money, liability, property tests | [db-derived-flags-and-gates.md](agent-rules/_learned/db-derived-flags-and-gates.md) | low |
+| postgres, generated columns, triggers, gates, locking, migrations, invariants, money, liability, property tests | [db-derived-flags-and-gates.md](agent-rules/_learned/db-derived-flags-and-gates.md) | medium |
 | config, 12-factor, composition root, dependency injection, defaults, environment | [config-composition-root.md](agent-rules/_learned/config-composition-root.md) | low |
 
 ---

@@ -5,9 +5,9 @@ paths: ["apps/api/test/"]
 topics: ["integration tests", "postgres", "isolation", "concurrency", "vitest", "verification", "environment", "e2e", "coverage", "tdd", "re-run", "review fixes"]
 priority: medium
 auto_generated: true
-derived_from: [platform-foundation, team-banking-and-gst, skill-levels-and-auto-enroll, session-scheduling-engine]
-evidence_count: 4
-last_validated: 2026-10-24
+derived_from: [platform-foundation, team-banking-and-gst, skill-levels-and-auto-enroll, session-scheduling-engine, tax-invoices-and-exports]
+evidence_count: 5
+last_validated: 2026-11-13
 ---
 
 # Integration-test database isolation
@@ -19,3 +19,4 @@ last_validated: 2026-10-24
 - Deferred constraints: tests that expect a COMMIT-time failure but roll back must `SET CONSTRAINTS … IMMEDIATE`.
 - Pass every verification command's environment preconditions to the agent that runs it, and check them before running: `pnpm run test:coverage` includes the integration project and needs `DATABASE_URL`, `ENCRYPTION_ACTIVE_KEY_ID` and `ENCRYPTION_KEYS`; `pnpm run test:e2e` needs the Compose stack and a `.env`. Report a named missing precondition instead of FAIL. In skill-levels-and-auto-enroll the verifier reported a coverage FAIL that was only a missing `DATABASE_URL`, and the Phase 5 e2e ran on `next dev` because no `.env` existed, which left a regression check open.
 - After any review-driven fix, re-run the full unit and integration suites plus build, lint and typecheck, including after a Prettier-only touch-up. Record an observed RED for each bug fix before changing code; a RED "proven afterwards" on a clean copy is a ledger deviation, not an equivalent. In session-scheduling-engine, Phases 2 and 4 skipped full re-runs after fixes, and Phases 3A, 5A and 6 changed code with no observed RED.
+- Give every single-writer or boundary rule its own test, and prove the test fails on a deliberate violation (a fixture file that breaks the rule), not only that it passes on clean code.
