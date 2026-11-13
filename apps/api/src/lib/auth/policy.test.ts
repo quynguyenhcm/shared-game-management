@@ -130,6 +130,8 @@ describe('route policy registry (AC-VERIFY-3)', () => {
       // skill-levels-and-auto-enroll (AC-VERIFY-7): the override and Auto Enroll routes.
       'PUT /teams/:teamId/members/:userId/skill-level',
       'PUT /teams/:teamId/members/:userId/auto-enroll',
+      // tax-invoices-and-exports (AC-VERIFY-6): a team's invoice is for its admins only, with no GLOBAL_ADMIN bypass (H9).
+      'GET /teams/:teamId/payments/:paymentId/invoice',
       // session-scheduling-engine (AC-ERROR-8): the one-off session routes. The member routes
       // (`GET /teams/:teamId/sessions/upcoming`, registration) are reserved for registration-and-waitlist.
       'GET /teams/:teamId/sessions',
@@ -153,10 +155,10 @@ describe('route policy registry (AC-VERIFY-3)', () => {
         allowGlobalAdmin: false,
       });
     }
-    // Exactly the 44 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
+    // Exactly the 45 documented team routes exist (14 + five banking and GST + two skill-levels + six sessions + six series
     // + four registration routes + two admin billing routes + three member wallet/payment routes + the payout block and the
-    // top-up hold resolution, all asserted below), none public.
-    expect(byRoute.size).toBe(44);
+    // top-up hold resolution, all asserted below, + the team invoice download), none public.
+    expect(byRoute.size).toBe(45);
     for (const policy of byRoute.values()) expect(policy.kind).not.toBe('public');
     await app.close();
   });

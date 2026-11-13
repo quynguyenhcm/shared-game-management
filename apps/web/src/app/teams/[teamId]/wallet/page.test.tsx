@@ -306,3 +306,55 @@ describe('wallet page: access and errors', () => {
     });
   });
 });
+
+describe('wallet page: invoice downloads and older paid games (AC-ENTRY-1, R5)', () => {
+  const paidRow = (id: string, paidAt: string) =>
+    paymentRow({
+      id,
+      status: 'PAID',
+      paidAt,
+      document: { kind: 'TAX_INVOICE', available: true, number: null },
+    });
+  const twelvePaid = Array.from({ length: 12 }, (_, index) =>
+    paidRow(
+      `66666666-6666-4666-8666-${String(index).padStart(12, '0')}`,
+      `2026-10-${String(index + 1).padStart(2, '0')}T01:00:00.000Z`,
+    ),
+  );
+
+  it('links each available paid row to the payer route, returning to the wallet, and offers Show older paid games past ten', async () => {
+    const html = await render({}, { payments: payments(twelvePaid) });
+    expect(html.match(/\/invoice\?returnTo=/g)).toHaveLength(10);
+    expect(html).toContain(`returnTo=${encodeURIComponent(`/teams/${TEAM_ID}/wallet`)}`);
+    expect(html).toContain('Show older paid games');
+    expect(html).toContain(`href="/teams/${TEAM_ID}/wallet?payments=all#payments"`);
+  });
+
+  it('?payments=all shows every paid row of the page, so every invoice is reachable, and links the next page by cursor', async () => {
+    const html = await render({ payments: 'all' }, { payments: payments(twelvePaid, 'next-1') });
+    expect(html.match(/\/invoice\?returnTo=/g)).toHaveLength(12);
+    expect(html).toContain('payments=all&amp;pcursor=next-1#payments');
+    // An error from a link lands back on this same view.
+    expect(html).toContain(
+      `returnTo=${encodeURIComponent(`/teams/${TEAM_ID}/wallet?payments=all`)}`,
+    );
+  });
+
+  it('?pcursor= is passed to the API, and an unpaginated first page with older pages offers the cursor link', async () => {
+    await render({ payments: 'all', pcursor: 'abc' });
+    expect(mocks.teamMyPayments).toHaveBeenLastCalledWith(
+      TEAM_ID,
+      { cursor: 'abc' },
+      expect.anything(),
+    );
+    const html = await render({}, { payments: payments(twelvePaid.slice(0, 3), 'more') });
+    expect(html).toContain('payments=all&amp;pcursor=more#payments');
+  });
+
+  it('renders the sentence of a failed download from ?download_error=, and nothing for an unknown value', async () => {
+    expect(await render({ download_error: 'invoice_not_available' })).toContain(
+      'An invoice is available once the payment is paid.',
+    );
+    expect(await render({ download_error: 'nonsense' })).not.toContain('role="alert"');
+  });
+});

@@ -252,8 +252,15 @@ export interface PaymentGroups {
 
 const time = (instant: string | null): number => (instant === null ? 0 : Date.parse(instant));
 
-/** Overdue and pending oldest-due first, paid newest first and capped (UI/UX Payments section); empty groups stay empty. */
-export function groupPayments(rows: readonly MyPaymentRow[]): PaymentGroups {
+/**
+ * Overdue and pending oldest-due first, paid newest first and capped (UI/UX Payments section); empty groups stay empty.
+ * `paidLimit: null` shows every paid row loaded (the "Show older paid games" view, R5).
+ */
+export function groupPayments(
+  rows: readonly MyPaymentRow[],
+  options: { paidLimit?: number | null } = {},
+): PaymentGroups {
+  const paidLimit = options.paidLimit === undefined ? PAID_SHOWN : options.paidLimit;
   const byDue = (a: MyPaymentRow, b: MyPaymentRow): number => time(a.dueDate) - time(b.dueDate);
   const overdue = rows.filter((row) => row.status === 'OVERDUE').sort(byDue);
   const pending = rows
@@ -265,9 +272,30 @@ export function groupPayments(rows: readonly MyPaymentRow[]): PaymentGroups {
   return {
     overdue,
     pending,
-    paid: allPaid.slice(0, PAID_SHOWN),
-    paidTruncated: allPaid.length > PAID_SHOWN,
+    paid: paidLimit === null ? allPaid : allPaid.slice(0, paidLimit),
+    paidTruncated: paidLimit !== null && allPaid.length > paidLimit,
   };
+}
+
+/**
+ * R5: where "Show older paid games" leads, or null when every paid game is already shown. The first view caps the paid list at
+ * `PAID_SHOWN`; the link then shows every paid row of the loaded page (`?payments=all`) and, past that page, follows the API's
+ * opaque cursor (`pcursor`). `walletUrl` is the wallet page without a query.
+ */
+export function olderPaidHref(
+  walletUrl: string,
+  view: { showAll: boolean; truncated: boolean; nextCursor: string | null },
+): string | null {
+  if (!view.showAll && view.truncated) return `${walletUrl}?payments=all#payments`;
+  if (view.nextCursor !== null) {
+    return `${walletUrl}?${new URLSearchParams({ payments: 'all', pcursor: view.nextCursor }).toString()}#payments`;
+  }
+  return null;
+}
+
+/** The download action is offered exactly when the API says a document is available (PAID above $0.00); the UI never decides it. */
+export function canDownloadInvoice(row: { document: { available: boolean } }): boolean {
+  return row.document.available;
 }
 
 export interface TeamPaymentGroups {

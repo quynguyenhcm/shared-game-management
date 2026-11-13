@@ -20,6 +20,8 @@ import {
   adminFilterOf,
   type AdminFilter,
 } from '../../../../../lib/billing/wallet-view.ts';
+import { DownloadErrorNotice } from '../../../../../components/invoices/download-error-notice.tsx';
+import { DOWNLOAD_ERROR_PARAM } from '../../../../../lib/invoices/paths.ts';
 import { guardResults } from '../../../../../lib/teams/sessions-guard.ts';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -55,6 +57,7 @@ export default async function PaymentsPage({
   const query = await searchParams;
   const filter = adminFilterOf(firstParam(query, 'status'));
   const cursor = firstParam(query, 'cursor');
+  const downloadError = firstParam(query, DOWNLOAD_ERROR_PARAM);
   const here = pageUrl(teamId, filter);
   const user = await requireUser(here);
   const token = await readCookie('session');
@@ -119,12 +122,16 @@ export default async function PaymentsPage({
         </ul>
       </nav>
       <SectionStatus section="payments" />
+      <DownloadErrorNotice code={downloadError} admin />
       <AdminPaymentsTable
         teamId={teamId}
         payments={payments.data.payments}
         payoutBlocked={payoutBlocked}
         now={new Date().toISOString()}
         emptyText={filter.empty}
+        invoiceReturnTo={
+          isTeamAdmin ? pageUrl(teamId, filter, cursor === '' ? undefined : cursor) : undefined
+        }
       />
       {nextCursor === null ? null : (
         <a href={pageUrl(teamId, filter, nextCursor)} className={`${LINK_CLASS} self-start`}>

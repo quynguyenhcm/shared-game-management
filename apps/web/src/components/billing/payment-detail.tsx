@@ -12,6 +12,10 @@ import {
 } from '../../lib/billing/labels.ts';
 import { paymentPath } from '../../lib/billing/paths.ts';
 import { paymentState } from '../../lib/billing/wallet-view.ts';
+import { INVOICE_NUMBER_LABEL } from '../../lib/invoices/labels.ts';
+import { myDocumentPath } from '../../lib/invoices/paths.ts';
+import { DownloadErrorNotice } from '../invoices/download-error-notice.tsx';
+import { DownloadInvoiceLink } from '../invoices/download-invoice-link.tsx';
 import { RefreshWhilePending } from '../teams/refresh-while-pending.tsx';
 import { PayButton } from './pay-button.tsx';
 import { PaymentStatusTag } from './payment-status-tag.tsx';
@@ -27,6 +31,7 @@ export function PaymentDetail({
   search,
   idempotencyKey,
   overdueCount,
+  downloadError,
 }: {
   payment: PaymentResponse['payment'];
   /** `?return=1` is where Akahu's return lands. */
@@ -34,6 +39,8 @@ export function PaymentDetail({
   idempotencyKey: string;
   /** The caller's overdue count, for the register-for-more-games sentence (only shown from the debt limit). */
   overdueCount?: number | undefined;
+  /** `?download_error=<code>`: why the last invoice download did not happen (set by the route handler's 303). */
+  downloadError?: string | null | undefined;
 }) {
   const state = paymentState(payment, search, { overdueCount: overdueCount ?? 0 });
   const heading = `Payment for ${payment.session.location}, ${formatDay(payment.session.startsAt)}`;
@@ -60,6 +67,12 @@ export function PaymentDetail({
           <>
             <dt className="font-medium">Due</dt>
             <dd>{dueLine(payment.status, payment.dueDate)}</dd>
+          </>
+        )}
+        {payment.document.number === null ? null : (
+          <>
+            <dt className="font-medium">{INVOICE_NUMBER_LABEL[payment.document.kind]}</dt>
+            <dd className="break-words">{payment.document.number}</dd>
           </>
         )}
         <dt className="font-medium">Status</dt>
@@ -135,6 +148,19 @@ export function PaymentDetail({
             amount={payment.amount}
           />
         )}
+        <DownloadErrorNotice code={downloadError} kind={payment.document.kind} />
+        {payment.document.available ? (
+          <DownloadInvoiceLink
+            href={myDocumentPath(payment.id)}
+            kind={payment.document.kind}
+            context={{
+              location: payment.session.location,
+              day: formatDay(payment.session.startsAt),
+              amount: money(payment.amount),
+            }}
+            variant="primary"
+          />
+        ) : null}
       </section>
     </div>
   );

@@ -186,3 +186,25 @@ describe('payment page: payer only, access and errors (AC-ERROR-10 style uniform
     });
   });
 });
+
+describe('payment page: the invoice download (AC-ENTRY-1)', () => {
+  const paidDoc = (document: Record<string, unknown>) =>
+    payment({ status: 'PAID', paidAt: '2026-10-08T01:00:00.000Z', document });
+
+  it('shows the download link for a paid payment with its kind and number, and a failed download sentence from ?download_error=', async () => {
+    const html = await render(
+      ok({
+        payment: paidDoc({ kind: 'RECEIPT', available: true, number: 'RCT-000005' }),
+      }),
+      { download_error: 'invoice_pending' },
+    );
+    expect(html).toContain(`href="/payments/${PAYMENT_ID}/invoice"`);
+    expect(html).toContain('Download receipt');
+    expect(html).toContain('RCT-000005');
+    expect(html).toContain('Your receipt is being prepared. Try again in a moment.');
+  });
+
+  it('shows no link while the payment is not paid', async () => {
+    expect(await render(ok({ payment: payment() }))).not.toContain('/invoice');
+  });
+});

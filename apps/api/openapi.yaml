@@ -16688,6 +16688,25 @@ paths:
                             - type: "null"
                         onHold:
                           type: boolean
+                        document:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                              enum:
+                                - TAX_INVOICE
+                                - RECEIPT
+                            available:
+                              type: boolean
+                            number:
+                              type:
+                                - string
+                                - "null"
+                          required:
+                            - kind
+                            - available
+                            - number
+                          additionalProperties: false
                       required:
                         - id
                         - reference
@@ -16699,6 +16718,7 @@ paths:
                         - paidAt
                         - lastReminderAt
                         - onHold
+                        - document
                       additionalProperties: false
                   nextCursor:
                     type:
@@ -18750,6 +18770,25 @@ paths:
                                 type: boolean
                               payoutBlocked:
                                 type: boolean
+                              document:
+                                type: object
+                                properties:
+                                  kind:
+                                    type: string
+                                    enum:
+                                      - TAX_INVOICE
+                                      - RECEIPT
+                                  available:
+                                    type: boolean
+                                  number:
+                                    type:
+                                      - string
+                                      - "null"
+                                required:
+                                  - kind
+                                  - available
+                                  - number
+                                additionalProperties: false
                             required:
                               - id
                               - reference
@@ -18765,6 +18804,7 @@ paths:
                               - outcome
                               - onHold
                               - payoutBlocked
+                              - document
                             additionalProperties: false
                       required:
                         - teamId
@@ -19118,6 +19158,25 @@ paths:
                         type: boolean
                       payoutBlocked:
                         type: boolean
+                      document:
+                        type: object
+                        properties:
+                          kind:
+                            type: string
+                            enum:
+                              - TAX_INVOICE
+                              - RECEIPT
+                          available:
+                            type: boolean
+                          number:
+                            type:
+                              - string
+                              - "null"
+                        required:
+                          - kind
+                          - available
+                          - number
+                        additionalProperties: false
                     required:
                       - id
                       - reference
@@ -19134,6 +19193,7 @@ paths:
                       - attempt
                       - onHold
                       - payoutBlocked
+                      - document
                     additionalProperties: false
                 required:
                   - payment
@@ -20135,6 +20195,25 @@ paths:
                           type: boolean
                         payoutBlocked:
                           type: boolean
+                        document:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                              enum:
+                                - TAX_INVOICE
+                                - RECEIPT
+                            available:
+                              type: boolean
+                            number:
+                              type:
+                                - string
+                                - "null"
+                          required:
+                            - kind
+                            - available
+                            - number
+                          additionalProperties: false
                       required:
                         - id
                         - reference
@@ -20150,6 +20229,7 @@ paths:
                         - outcome
                         - onHold
                         - payoutBlocked
+                        - document
                       additionalProperties: false
                   nextCursor:
                     type:
@@ -20254,6 +20334,928 @@ paths:
                   - error
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /payments/{paymentId}/invoice:
+    get:
+      operationId: downloadMyPaymentDocument
+      summary: Download the tax invoice or receipt of a payment (payer only)
+      description: "The PDF tax invoice (a GST-registered team's payment) or receipt
+        (otherwise) of the caller's own payment. A PAID payment above $0.00
+        only: 409 `invoice_not_available` (\"An invoice is available once the
+        payment is paid.\") for a pending, overdue, held, processing or $0.00
+        payment, and no invoice number is consumed. If the document has not been
+        issued yet it is issued now (never twice); 409 `invoice_pending` if
+        another issuer holds the lock for longer than the lock wait: retry
+        shortly. Only the payer can download it: any other signed-in caller, a
+        team admin who is not the payer, and an unknown id all get the same 404
+        `not_found`."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: paymentId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: 'The tax invoice or receipt as a PDF attachment
+            (`content-disposition: attachment;
+            filename="tax-invoice-INV-000001.pdf"`, `cache-control: no-store`).'
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/payments/{paymentId}/invoice:
+    get:
+      operationId: downloadTeamPaymentDocument
+      summary: Download a team payment's tax invoice or receipt (team admin)
+      description: "The same PDF the payer gets, for any payment of the team. A PAID
+        payment above $0.00 only: 409 `invoice_not_available` (\"An invoice is
+        available once the payment is paid.\") for a pending, overdue, held,
+        processing or $0.00 payment, and no invoice number is consumed. If the
+        document has not been issued yet it is issued now (never twice); 409
+        `invoice_pending` if another issuer holds the lock for longer than the
+        lock wait: retry shortly. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off): a plain member and an admin of another team
+        get 403, and a payment that is not this team's (or an unknown id) gets
+        404 `not_found`. The document names the player (as the invoice buyer)
+        and never shows an email address."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: paymentId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: 'The tax invoice or receipt as a PDF attachment
+            (`content-disposition: attachment;
+            filename="tax-invoice-INV-000001.pdf"`, `cache-control: no-store`).'
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:

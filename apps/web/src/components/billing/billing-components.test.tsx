@@ -70,6 +70,7 @@ const payment = (change: Record<string, unknown> = {}): Payment =>
     attempt: null,
     onHold: false,
     payoutBlocked: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
     ...change,
   }) as unknown as Payment;
 const attempt = (outcome: 'processing' | 'cancelled' | 'failed' | 'held') => ({
@@ -237,6 +238,7 @@ const row = (change: Record<string, unknown>): MyPaymentRow =>
     outcome: 'none',
     onHold: false,
     payoutBlocked: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
     ...change,
   }) as MyPaymentRow;
 
@@ -527,6 +529,7 @@ const adminRow = (change: Record<string, unknown> = {}): AdminRow =>
     paidAt: null,
     lastReminderAt: null,
     onHold: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
     ...change,
   }) as AdminRow;
 const table = (rows: AdminRow[], payoutBlocked = false) =>

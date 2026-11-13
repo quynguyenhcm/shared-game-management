@@ -70,7 +70,9 @@ export default defineConfig({
         'packages/shared/src/api/billing.ts',
         // tax-invoices-and-exports (AC-VERIFY-7): the shared period helpers and the invoice and export contracts (the shared
         // document rules in `invoice/` are already measured), and (Phase 2) the invoices module and the two issuance jobs.
-        // Phases 3-4 add the income-exports module and the tabular writers to this list as they land.
+        // Phase 3 adds no new path: the document model, renderer, routes and font loader live under modules/invoices, the shared
+        // document copy and long date formats under `invoice/` and `time/`, the download headers under `lib/http` and the web proxy
+        // under `apps/web/src/lib`, all already measured. Phase 4 adds the income-exports module and the tabular writers here.
         'packages/shared/src/tax/**/*.ts',
         'packages/shared/src/api/invoices.ts',
         'apps/api/src/modules/invoices/**/*.ts',

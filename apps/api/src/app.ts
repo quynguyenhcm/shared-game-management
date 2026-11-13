@@ -41,6 +41,9 @@ import { createPlayerPaymentsService } from './modules/billing/player.ts';
 import { playerPaymentRoutes } from './modules/billing/player-routes.ts';
 import { billingRoutes } from './modules/billing/routes.ts';
 import { createBillingService } from './modules/billing/service.ts';
+import { invoiceRoutes } from './modules/invoices/routes.ts';
+import { loadInvoiceFonts } from './modules/invoices/render-pdf.ts';
+import { createInvoiceService } from './modules/invoices/service.ts';
 import { walletRoutes } from './modules/wallet/routes.ts';
 import { akahuWebhookRoutes } from './modules/billing/webhook-routes.ts';
 import { registrationsRoutes } from './modules/registrations/routes.ts';
@@ -268,6 +271,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       settings: startSettings,
       webBaseUrl: deps.auth.webBaseUrl,
     }),
+  });
+  // tax-invoices-and-exports Phase 3: the payer's and the team admin's invoice downloads. The two embedded fonts are read once
+  // here, so a missing font file stops the API at boot (P7) instead of failing a player's download.
+  await app.register(invoiceRoutes, {
+    service: createInvoiceService({ db: deps.db, fonts: await loadInvoiceFonts() }),
   });
   // wallet-and-akahu-billing A4/CR-3: the signed Akahu webhook (public, raw body inside its own plugin; only enqueues a re-read).
   await app.register(akahuWebhookRoutes, {

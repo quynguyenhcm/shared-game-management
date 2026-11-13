@@ -21,7 +21,9 @@ import {
   walletHeading,
 } from '../../../../lib/billing/labels.ts';
 import { walletPath } from '../../../../lib/billing/paths.ts';
-import { groupPayments } from '../../../../lib/billing/wallet-view.ts';
+import { groupPayments, olderPaidHref } from '../../../../lib/billing/wallet-view.ts';
+import { DownloadErrorNotice } from '../../../../components/invoices/download-error-notice.tsx';
+import { DOWNLOAD_ERROR_PARAM } from '../../../../lib/invoices/paths.ts';
 import { guardResults } from '../../../../lib/teams/sessions-guard.ts';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -48,6 +50,10 @@ export default async function WalletPage({
   const topUpParam = firstParam(query, 'topUp');
   const topUp = z.uuid().safeParse(topUpParam).success ? topUpParam : undefined;
   const cursor = firstParam(query, 'cursor');
+  const downloadError = firstParam(query, DOWNLOAD_ERROR_PARAM);
+  // R5: `?payments=all` shows every paid game of the loaded page; `?pcursor=` pages back through older payments.
+  const showAllPaid = firstParam(query, 'payments') === 'all';
+  const paymentsCursor = firstParam(query, 'pcursor');
   const here = topUp === undefined ? walletPath(teamId) : `${walletPath(teamId)}?topUp=${topUp}`;
   await requireUser(here);
   const token = await readCookie('session');
@@ -64,7 +70,11 @@ export default async function WalletPage({
       },
       options,
     ),
-    apiClient.teamMyPayments(teamId, {}, options),
+    apiClient.teamMyPayments(
+      teamId,
+      paymentsCursor === undefined || paymentsCursor === '' ? {} : { cursor: paymentsCursor },
+      options,
+    ),
   ]);
   const guard = guardResults([detail, wallet], {
     here,
@@ -91,8 +101,22 @@ export default async function WalletPage({
   if (!detail.ok || !wallet.ok) throw new Error('unavailable');
 
   const { team } = detail.data;
-  const groups = payments.ok ? groupPayments(payments.data.payments) : null;
   const walletUrl = walletPath(teamId);
+  const groups = payments.ok
+    ? groupPayments(payments.data.payments, showAllPaid ? { paidLimit: null } : {})
+    : null;
+  const olderHref =
+    payments.ok && groups !== null
+      ? olderPaidHref(walletUrl, {
+          showAll: showAllPaid,
+          truncated: groups.paidTruncated,
+          nextCursor: payments.data.nextCursor,
+        })
+      : null;
+  // Where an invoice link's error lands: the same payments view the player is looking at.
+  const paymentsView = showAllPaid
+    ? `${walletUrl}?${new URLSearchParams({ payments: 'all', ...(paymentsCursor === undefined || paymentsCursor === '' ? {} : { pcursor: paymentsCursor }) }).toString()}`
+    : walletUrl;
 
   return (
     <TeamShell>
@@ -112,12 +136,13 @@ export default async function WalletPage({
         idempotencyKey={randomUUID()}
       />
       <BillingSection id="payments" title="Payments">
+        <DownloadErrorNotice code={downloadError} />
         {groups === null ? (
           <p role="status" className="text-base">
             {PAYMENTS_LOAD_FAILED}
           </p>
         ) : (
-          <PaymentsList groups={groups} />
+          <PaymentsList groups={groups} returnTo={paymentsView} olderHref={olderHref} />
         )}
       </BillingSection>
       <LedgerList

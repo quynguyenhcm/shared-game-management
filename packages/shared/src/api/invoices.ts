@@ -136,7 +136,7 @@ export type IncomeExportPeriodsResponse = z.infer<typeof IncomeExportPeriodsResp
  * payments row; shared with the player-dashboard). `kind` picks the button label, `available` is true for a PAID payment
  * above $0.00 (on demand covers the gap before issuance), `number` is the frozen printed number once issued.
  */
-export const PaymentDocumentRef = z.object({
+export const PaymentDocumentRef = z.strictObject({
   kind: z.enum(PaymentDocumentKind),
   available: z.boolean(),
   number: z.string().nullable(),

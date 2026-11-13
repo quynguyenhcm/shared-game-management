@@ -14,6 +14,7 @@ import { formatNZD, lt, isNegative, isZero, parseMoney, type Money } from '../mo
 import { moneyStringSchema } from '../money/zod.ts';
 import { TOP_UP_MINIMUM } from '../billing/wallet-limits.ts';
 import { ErrorResponse } from './errors.ts';
+import { PaymentDocumentRef } from './invoices.ts';
 import {
   BillingType,
   CreditTransactionType,
@@ -290,6 +291,8 @@ export const MyPaymentRow = z.strictObject({
   outcome: IntentOutcome,
   onHold: z.boolean(),
   payoutBlocked: z.boolean(),
+  /** The tax invoice or receipt of this payment: its kind picks the button label (never `gstAmount`), see `PaymentDocumentRef`. */
+  document: PaymentDocumentRef,
 });
 export type MyPaymentRow = z.infer<typeof MyPaymentRow>;
 
@@ -342,6 +345,7 @@ export const PaymentResponse = z.strictObject({
       .nullable(),
     onHold: z.boolean(),
     payoutBlocked: z.boolean(),
+    document: PaymentDocumentRef,
   }),
 });
 export type PaymentResponse = z.infer<typeof PaymentResponse>;
@@ -360,6 +364,7 @@ export const AdminPaymentsResponse = z.strictObject({
       paidAt: isoInstant.nullable(),
       lastReminderAt: isoInstant.nullable(),
       onHold: z.boolean(),
+      document: PaymentDocumentRef,
     }),
   ),
   nextCursor: z.string().nullable(),

@@ -11,6 +11,8 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { sql } from 'kysely';
 import {
+  documentKindOf,
+  isDocumentAvailable,
   toMoneyString,
   type AdminPaymentsQuery,
   type AdminPaymentsResponse,
@@ -118,6 +120,11 @@ export function createBillingService(deps: BillingServiceDeps): BillingService {
           paidAt: row.paidAt === null ? null : row.paidAt.toISOString(),
           lastReminderAt: row.lastReminderAt === null ? null : row.lastReminderAt.toISOString(),
           onHold: row.onHold,
+          document: {
+            kind: documentKindOf(row.gstRegistered),
+            available: isDocumentAvailable(row.status, toMoneyString(row.amount)),
+            number: row.documentNumber,
+          },
         })),
         nextCursor:
           rows.length > ADMIN_PAYMENTS_PAGE_SIZE && last !== undefined

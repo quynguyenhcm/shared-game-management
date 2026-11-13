@@ -10,9 +10,11 @@ import {
   REMINDER_COOLDOWN_MS,
   adminFilterOf,
   adminRowAction,
+  canDownloadInvoice,
   canPayRow,
   groupPayments,
   groupPaymentsByTeam,
+  olderPaidHref,
   paymentState,
   reminderCooldown,
   validateTopUp,
@@ -426,5 +428,48 @@ describe('admin filter (?status=) and canPayRow', () => {
     expect(canPayRow({ status: 'PAID', onHold: false, payoutBlocked: false })).toBe(false);
     expect(canPayRow({ status: 'PENDING', onHold: true, payoutBlocked: false })).toBe(false);
     expect(canPayRow({ status: 'PENDING', onHold: false, payoutBlocked: true })).toBe(false);
+  });
+});
+
+describe('invoice download rules (AC-ENTRY-1, R5)', () => {
+  it('offers the download exactly when the API says a document is available, whatever the status or GST amount', () => {
+    expect(canDownloadInvoice({ document: { available: true } })).toBe(true);
+    expect(canDownloadInvoice({ document: { available: false } })).toBe(false);
+  });
+
+  const paidRows = (count: number): MyPaymentRow[] =>
+    Array.from(
+      { length: count },
+      (_, index) =>
+        ({
+          id: `id-${index}`,
+          status: 'PAID',
+          paidAt: `2026-10-${String(index + 1).padStart(2, '0')}T01:00:00.000Z`,
+          dueDate: '2026-10-01T00:00:00.000Z',
+        }) as MyPaymentRow,
+    );
+
+  it('caps the paid list at ten by default and shows every loaded paid row with paidLimit null, newest first', () => {
+    const capped = groupPayments(paidRows(12));
+    expect(capped.paid).toHaveLength(10);
+    expect(capped.paidTruncated).toBe(true);
+    const all = groupPayments(paidRows(12), { paidLimit: null });
+    expect(all.paid).toHaveLength(12);
+    expect(all.paidTruncated).toBe(false);
+    expect(all.paid[0]?.id).toBe('id-11');
+  });
+
+  it('leads Show older paid games to the full view, then through the API cursor, and to nothing at the end', () => {
+    const wallet = '/teams/t/wallet';
+    expect(olderPaidHref(wallet, { showAll: false, truncated: true, nextCursor: null })).toBe(
+      '/teams/t/wallet?payments=all#payments',
+    );
+    expect(olderPaidHref(wallet, { showAll: true, truncated: false, nextCursor: 'a b' })).toBe(
+      '/teams/t/wallet?payments=all&pcursor=a+b#payments',
+    );
+    expect(olderPaidHref(wallet, { showAll: false, truncated: false, nextCursor: 'c' })).toBe(
+      '/teams/t/wallet?payments=all&pcursor=c#payments',
+    );
+    expect(olderPaidHref(wallet, { showAll: true, truncated: false, nextCursor: null })).toBeNull();
   });
 });

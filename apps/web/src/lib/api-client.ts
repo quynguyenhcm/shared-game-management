@@ -241,6 +241,32 @@ function failure<T>(
 }
 
 /**
+ * The outgoing headers of every server-side API call, built from an allowlist and never copied from the incoming request:
+ * W3C trace context, `user-agent`, `x-sgm-internal-auth` (from config), `x-sgm-client-ip` (derived from `X-Forwarded-For` with
+ * the trusted hop count, or omitted) and the session bearer. Shared by `apiFetch` and the download proxy
+ * (`lib/invoices/download.ts`), so a binary download carries exactly what a JSON call does.
+ */
+export function buildApiHeaders(options: ApiCallOptions & { extra?: Record<string, string> }): {
+  headers: Record<string, string>;
+  apiInternalUrl: string;
+} {
+  const config = loadWebConfig();
+  const headers: Record<string, string> = { ...traceHeaders(options.incoming) };
+  const userAgent = readHeader(options.incoming, 'user-agent');
+  if (userAgent) headers['user-agent'] = userAgent;
+  if (config.internalAuthSecret !== null)
+    headers['x-sgm-internal-auth'] = config.internalAuthSecret;
+  const clientAddress = deriveClientAddress(
+    readHeader(options.incoming, 'x-forwarded-for'),
+    config.trustedProxyHops,
+  );
+  if (clientAddress !== null) headers['x-sgm-client-ip'] = clientAddress;
+  if (options.session) headers.authorization = `Bearer ${options.session}`;
+  Object.assign(headers, options.extra);
+  return { headers, apiInternalUrl: config.apiInternalUrl };
+}
+
+/**
  * The one way the web talks to the API. Outgoing headers are built from an allowlist and never copied
  * from the incoming request: `x-sgm-internal-auth` comes from config and `x-sgm-client-ip` is derived
  * from `X-Forwarded-For` with the trusted hop count (or omitted). Never throws on 4xx, 5xx, a network
@@ -248,22 +274,14 @@ function failure<T>(
  */
 export async function apiFetch<T>(request: ApiRequest<T>): Promise<ApiResult<T>> {
   try {
-    const config = loadWebConfig();
-    const headers: Record<string, string> = { ...traceHeaders(request.incoming) };
-    const userAgent = readHeader(request.incoming, 'user-agent');
-    if (userAgent) headers['user-agent'] = userAgent;
-    if (config.internalAuthSecret !== null)
-      headers['x-sgm-internal-auth'] = config.internalAuthSecret;
-    const clientAddress = deriveClientAddress(
-      readHeader(request.incoming, 'x-forwarded-for'),
-      config.trustedProxyHops,
-    );
-    if (clientAddress !== null) headers['x-sgm-client-ip'] = clientAddress;
-    if (request.session) headers.authorization = `Bearer ${request.session}`;
-    Object.assign(headers, request.extraHeaders);
+    const { headers, apiInternalUrl } = buildApiHeaders({
+      ...(request.session === undefined ? {} : { session: request.session }),
+      ...(request.incoming === undefined ? {} : { incoming: request.incoming }),
+      ...(request.extraHeaders === undefined ? {} : { extra: request.extraHeaders }),
+    });
     if (request.body !== undefined) headers['content-type'] = 'application/json';
 
-    const response = await fetch(`${config.apiInternalUrl}${request.path}`, {
+    const response = await fetch(`${apiInternalUrl}${request.path}`, {
       method: request.method,
       headers,
       body: request.body === undefined ? undefined : JSON.stringify(request.body),

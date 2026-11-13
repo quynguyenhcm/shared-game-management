@@ -206,3 +206,31 @@ describe('Payments manage area: access (CR-21, ruling H2)', () => {
     });
   });
 });
+
+describe('Payments manage area: the Invoice action (AC-ENTRY-3, H9)', () => {
+  const paidRow = adminRow({
+    status: 'PAID',
+    paidAt: '2026-10-08T01:00:00.000Z',
+    document: { kind: 'TAX_INVOICE', available: true, number: 'INV-000003' },
+  });
+
+  it('gives a team admin an Invoice action on a paid row that returns to the same filtered page, and shows a failed download', async () => {
+    const html = await render(
+      { status: 'paid', download_error: 'invoice_not_available' },
+      { payments: ok(adminBody([paidRow])) },
+    );
+    expect(html).toContain('aria-label="Invoice for Priya Shah, Wed 7 Oct, $17.00 (PDF)"');
+    expect(html).toContain(
+      `returnTo=${encodeURIComponent(`/teams/${TEAM_ID}/manage/payments?status=paid`)}`,
+    );
+    expect(html).toContain('An invoice is available once the payment is paid.');
+  });
+
+  it('hides the action from a GLOBAL_ADMIN who is not an approved team admin (no invoice access, H9)', async () => {
+    const html = await render(
+      { status: 'paid' },
+      { role: 'GLOBAL_ADMIN', detail: team(null, null), payments: ok(adminBody([paidRow])) },
+    );
+    expect(html).not.toContain('/invoice');
+  });
+});
