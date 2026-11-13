@@ -234,6 +234,9 @@ describe('imports of billing and wallet', () => {
     '../billing/sweep.ts',
     '../../jobs/send-email.ts',
     '../../jobs/registry.ts',
+    // tax-invoices-and-exports: billing only ENQUEUES `issue-invoices` inside its PAID transaction; it never imports the
+    // invoices module and never sets an invoice column (see modules/invoices/boundaries.test.ts).
+    '../../jobs/issue-invoices.ts',
   ]);
 
   it('reach other modules only through their public files', () => {

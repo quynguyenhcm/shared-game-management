@@ -57,7 +57,8 @@ describe('the invoice issuer is the only writer (ADR 0021)', () => {
 
   it('only modules/invoices/repo.ts calls issue_payment_document, and no source calls assign_invoice_number', () => {
     const issuers = all.filter(({ text }) => CALLS_ISSUER.test(text)).map(({ rel }) => rel);
-    expect(issuers.filter((rel) => !ISSUER_FILES.includes(rel))).toEqual([]);
+    // Phase 2: repo.ts exists and is the sole issuer (an exact match, so the rule cannot pass vacuously).
+    expect(issuers).toEqual(ISSUER_FILES);
     expect(all.filter(({ text }) => CALLS_ASSIGN.test(text)).map(({ rel }) => rel)).toEqual([]);
   });
 
@@ -93,5 +94,73 @@ describe('the invoice issuer is the only writer (ADR 0021)', () => {
     expect(SETS_INVOICE_COLUMNS.test(`db.selectFrom('payments').select('invoice_number')`)).toBe(
       false,
     );
+  });
+});
+
+/** The issuance code: the invoices module and the two jobs that drive it. */
+const ISSUANCE_JOBS = ['jobs/issue-invoices.ts', 'jobs/invoice-reconcile.ts'];
+const owned = all.filter(
+  ({ rel }) => rel.startsWith('modules/invoices/') || ISSUANCE_JOBS.includes(rel),
+);
+
+describe('exact money and observability in the issuance code (AC-VERIFY-7)', () => {
+  it('has the module and both jobs to scan', () => {
+    expect(owned.map(({ rel }) => rel)).toEqual(
+      expect.arrayContaining([
+        'modules/invoices/repo.ts',
+        'modules/invoices/issue.ts',
+        ...ISSUANCE_JOBS,
+      ]),
+    );
+  });
+
+  it('uses no floating-point arithmetic or parsing, and types no money field as a number', () => {
+    const moneyNumber =
+      /\b(?:amount|total|balance|fee|price|subtotal|gst\w*|unitFee|resulting\w*)\s*[?:]\s*number\b/i;
+    for (const { rel, text } of owned) {
+      expect(text, rel).not.toMatch(
+        /\bparseFloat\b|\.toFixed\(|\bNumber\(|\bMath\.|\bNumber\.parse/,
+      );
+      expect(text, rel).not.toMatch(moneyNumber);
+    }
+  });
+
+  it('logs through the injected logger, never console', () => {
+    for (const { rel, text } of owned) expect(text, rel).not.toMatch(/\bconsole\./);
+  });
+});
+
+describe('imports of the issuance code', () => {
+  /** The only files of other areas it may import (public files). */
+  const PUBLIC = new Set([
+    '../../jobs/registry.ts',
+    '../modules/invoices/issue.ts',
+    './registry.ts',
+  ]);
+
+  it('reach other modules only through public files: no billing, wallet or registrations import', () => {
+    for (const { rel, text } of owned) {
+      const specifiers = [
+        ...text.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s+'([^']+)'/gm),
+      ].map((match) => match[1] ?? '');
+      for (const specifier of specifiers) {
+        const external = !specifier.startsWith('.');
+        const sameDir = specifier.startsWith('./');
+        const platform = /^(?:\.\.\/)+lib\//.test(specifier);
+        expect(
+          external || sameDir || platform || PUBLIC.has(specifier),
+          `${rel} imports ${specifier}`,
+        ).toBe(true);
+        expect(specifier, rel).not.toMatch(/billing|wallet|registrations|team-banking/);
+      }
+    }
+  });
+
+  it('the invoices module never imports a job except the queue registry', () => {
+    for (const { rel, text } of owned.filter((file) => file.rel.startsWith('modules/invoices/'))) {
+      for (const match of text.matchAll(/from\s+'([^']*jobs\/[^']*)'/g)) {
+        expect(match[1], rel).toMatch(/jobs\/registry\.ts$/);
+      }
+    }
   });
 });

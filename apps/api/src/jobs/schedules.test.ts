@@ -36,11 +36,19 @@ describe('schedule slots', () => {
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
       { name: 'akahu-reconcile', cron: '*/15 * * * *', tz: 'Pacific/Auckland' },
+      { name: 'invoice-reconcile', cron: '*/15 * * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
       { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'skill-progression', cron: '30 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'registration-ban-reconcile', cron: '45 5 * * *', tz: 'Pacific/Auckland' },
     ]);
+  });
+
+  it('declares invoice-reconcile as an interval sweep every 15 minutes, exempt from the DST guard (tax-invoices-and-exports)', () => {
+    const slot = SCHEDULES.find((candidate) => candidate.name === 'invoice-reconcile');
+    expect(slot).toMatchObject({ cron: '*/15 * * * *', intervalSweep: true });
+    // Exempt, so the guard never pages 15-minute occurrences through previewSchedule's 1000 ms budget for it; the rest still pass.
+    expect(() => assertNoDstHourFirings(SCHEDULES, preview)).not.toThrow();
   });
 
   it('never fires a calendar-anchored slot between 02:00 and 02:59 local, DST days included', () => {
@@ -92,6 +100,7 @@ describe('schedule slots', () => {
     expect(SCHEDULES.filter((slot) => slot.intervalSweep).map((slot) => slot.name)).toEqual([
       'post-game-billing',
       'akahu-reconcile',
+      'invoice-reconcile',
     ]);
   });
 
@@ -123,6 +132,7 @@ describe('schedule slots', () => {
       ['recurrence-materialisation', '0 3 * * *'],
       ['post-game-billing', '*/5 * * * *'],
       ['akahu-reconcile', '*/15 * * * *'],
+      ['invoice-reconcile', '*/15 * * * *'],
       ['daily-overdue', '0 4 * * *'],
       ['auth-cleanup', '0 5 * * *'],
       ['skill-progression', '30 5 * * *'],

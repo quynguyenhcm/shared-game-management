@@ -89,10 +89,12 @@ describe('recurrence-rule handler (AC-ERROR-9)', () => {
 describe('boot sweep (AC-ASYNC-5)', () => {
   const logger = { info: vi.fn(), warn: vi.fn() };
 
-  it('queues the recurrence-materialisation sweep, the ban reconciliation, the post-game billing sweep, daily-overdue and akahu-reconcile once each', async () => {
+  it('queues the recurrence-materialisation sweep, the ban reconciliation, the post-game billing sweep, daily-overdue, akahu-reconcile and invoice-reconcile once each', async () => {
     const enqueue = vi.fn().mockResolvedValue('job-1');
     await enqueueBootSweeps({ enqueue }, logger);
-    expect(enqueue).toHaveBeenCalledTimes(5);
+    expect(enqueue).toHaveBeenCalledTimes(6);
+    // tax-invoices-and-exports: the backfill of payments PAID before the feature (or whose job was lost) starts at the first boot.
+    expect(enqueue).toHaveBeenCalledWith('invoice-reconcile', { source: 'boot' });
     // wallet-and-akahu-billing CR-13 / RF-11: a worker that was down re-reads the Akahu intents it missed at once.
     expect(enqueue).toHaveBeenCalledWith('akahu-reconcile', { source: 'boot' });
     // wallet-and-akahu-billing CR-13 / RF-11: a worker that was down across 04:00 marks the overdue payments at once.
@@ -127,6 +129,10 @@ describe('boot sweep (AC-ASYNC-5)', () => {
       expect.objectContaining({ event: 'akahu.reconcile.boot_failed' }),
       expect.any(String),
     );
-    expect(enqueue).toHaveBeenCalledTimes(5);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'invoice.reconcile.boot_failed' }),
+      expect.any(String),
+    );
+    expect(enqueue).toHaveBeenCalledTimes(6);
   });
 });

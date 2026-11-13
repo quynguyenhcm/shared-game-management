@@ -19,6 +19,8 @@ import { createBanReconcileHandler } from './ban-reconcile.ts';
 import { createBillSessionHandler } from './bill-session.ts';
 import { createDailyOverdueHandler } from './daily-overdue.ts';
 import { heartbeatHandler } from './heartbeat.ts';
+import { createInvoiceReconcileHandler } from './invoice-reconcile.ts';
+import { createIssueInvoicesHandler } from './issue-invoices.ts';
 import { createMemberBannedJobHandler } from './member-banned.ts';
 import { createPostGameBillingHandler } from './post-game-billing.ts';
 import { createRecurrenceMaterialisationHandler } from './recurrence-materialisation.ts';
@@ -135,6 +137,9 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
     [QUEUE_NAMES.akahuSync]: createAkahuSyncHandler(akahu),
     [QUEUE_NAMES.akahuCancel]: createAkahuCancelHandler(akahu),
     [QUEUE_NAMES.akahuReconcile]: createAkahuReconcileHandler(akahu),
+    // Invoice issuance (tax-invoices-and-exports Phase 2): the per-team job and the sweep that replaces its schedule placeholder.
+    [QUEUE_NAMES.issueInvoices]: createIssueInvoicesHandler({ db: options.db, jobs: runner }),
+    [QUEUE_NAMES.invoiceReconcile]: createInvoiceReconcileHandler({ db: options.db, jobs: runner }),
     [QUEUE_NAMES.billSession]: createBillSessionHandler({
       db: options.db,
       jobs: runner,
@@ -198,7 +203,9 @@ export async function registerJobs(options: RegisterJobsOptions): Promise<void> 
  *    first (B9), instead of waiting for the next 5-minute tick.
  *  - `daily-overdue` (CR-13, RF-11) marks the payments that fell due while the worker was down, instead of waiting for 04:00.
  *  - `akahu-reconcile` (CR-13, RF-11) applies the Akahu results whose webhooks were missed while the worker was down.
- * All five queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
+ *  - `invoice-reconcile` (tax-invoices-and-exports) queues invoice issuance for every team with a PAID payment still unnumbered:
+ *    the backfill of payments PAID before the feature and of any lost issuance job, at the first boot.
+ * All six queues are `exclusive`, so each is a no-op when a run is already queued or active. A failure to enqueue is logged and
  * never stops the worker (the cron slots are still registered), and one failing sweep never prevents the others.
  */
 export async function enqueueBootSweeps(
@@ -263,6 +270,18 @@ export async function enqueueBootSweeps(
     logger.warn(
       { event: 'akahu.reconcile.boot_failed', err: error },
       'akahu-reconcile could not be queued',
+    );
+  }
+  try {
+    const jobId = await runner.enqueue(QUEUE_NAMES.invoiceReconcile, { source: 'boot' });
+    logger.info(
+      { event: 'invoice.reconcile.boot', enqueued: jobId !== null },
+      jobId === null ? 'invoice-reconcile already queued' : 'invoice-reconcile queued',
+    );
+  } catch (error) {
+    logger.warn(
+      { event: 'invoice.reconcile.boot_failed', err: error },
+      'invoice-reconcile could not be queued',
     );
   }
 }

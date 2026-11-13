@@ -30,6 +30,8 @@ export const QUEUE_NAMES = {
   akahuSync: 'akahu-sync',
   akahuCancel: 'akahu-cancel',
   akahuReconcile: 'akahu-reconcile',
+  issueInvoices: 'issue-invoices',
+  invoiceReconcile: 'invoice-reconcile',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -84,6 +86,14 @@ export const QUEUES: readonly QueueDefinition[] = [
   { ...DEFAULTS, name: QUEUE_NAMES.akahuCancel, policy: 'exclusive' },
   // The 15-minute reconcile sweep (CR-12, CR-25): one run at a time; also queued at every worker boot.
   { ...DEFAULTS, name: QUEUE_NAMES.akahuReconcile, policy: 'exclusive' },
+  // The tax invoices and receipts of ONE team (tax-invoices-and-exports, ADR 0021 section 2): `singletonKey = issue-invoices:<teamId>`,
+  // enqueued by `bill-session` and the Akahu apply funnel inside their PAID transaction, and by the reconcile sweep. `stately`
+  // keeps one queued plus one active run per team, so a PAID that commits during a run queues exactly one trailing run. The SQL
+  // issuer's idempotence and the counter row lock, not this policy, keep the numbers unique and gapless.
+  { ...DEFAULTS, name: QUEUE_NAMES.issueInvoices, policy: 'stately' },
+  // The 15-minute sweep that queues `issue-invoices` for any team with a PAID payment still unnumbered (also the backfill of
+  // pre-feature payments): one run at a time; also queued at every worker boot.
+  { ...DEFAULTS, name: QUEUE_NAMES.invoiceReconcile, policy: 'exclusive' },
 ];
 
 export function getQueue(name: string): QueueDefinition {

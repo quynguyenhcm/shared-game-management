@@ -442,7 +442,7 @@ Extensions follow the repo convention (`.ts` for logic and route handlers, `.tsx
 
 ### Phases
 - [x] **Phase 1: Shared tax helpers, contracts and the invoice snapshot schema.** `gstOfInclusive` with the parity matrix; financial-year and GST-period helpers with DST vectors; invoice/export API schemas and the payment invoice fields; the migration (snapshot, document kind, immutability guard, set-once) per the architecture creative; single-writer boundary rules; ADR 0021 draft and ledger rows (D-99+). ACs: AC-HAPPY-10, AC-VERIFY-3, AC-VERIFY-4, AC-VERIFY-7 (partial).
-- [ ] **Phase 2: Issuance.** `issue-invoice` queue and handler; each PAID writer enqueues it in the PAID transaction; idempotent issuance through `assign_invoice_number` with the snapshot; on-demand fallback; boot-time backfill of pre-feature PAID payments; no number for unpaid, held or $0.00. ACs: AC-ASYNC-1, 2, 3, AC-HAPPY-4, 5, AC-ERROR-1, 5.
+- [x] **Phase 2: Issuance.** `issue-invoice` queue and handler; each PAID writer enqueues it in the PAID transaction; idempotent issuance through `assign_invoice_number` with the snapshot; on-demand fallback; boot-time backfill of pre-feature PAID payments; no number for unpaid, held or $0.00. ACs: AC-ASYNC-1, 2, 3, AC-HAPPY-4, 5, AC-ERROR-1, 5.
 - [ ] **Phase 3: Documents and downloads.** Document model (tax invoice vs receipt, guests, late-withdrawal wording); pdfkit renderer with embedded font; payer and team-admin invoice routes; Next download proxies; "Download tax invoice"/"Download receipt" on the payment page and wallet list, "Invoice" row action in the admin Payments table; OpenAPI. ACs: AC-ENTRY-1, 3, AC-HAPPY-1, 2, 3, AC-ERROR-2, 6, AC-VERIFY-1, 6, AC-INTEGRATION-1.
 - [ ] **Phase 4: Income exports.** Paged "PAID in range by `paid_at`" query; CSV writer with neutralisation; XLSX writer with summary sheet; export route (TEAM_ADMIN only) with row cap refusal; "Income exports" manage area and form; OpenAPI. ACs: AC-ENTRY-2, AC-HAPPY-6, 7, 8, 9, AC-ERROR-3, 4, AC-VERIFY-2, 5, AC-INTEGRATION-3.
 - [ ] **Phase 5: End-to-end journey, accessibility, docs and accountant specimens.** `apps/web/e2e/invoices.spec.ts` (pay on the fake adapter → download invoice → export) on desktop and 360 px with axe; coverage gate; `docs/getting-started.md` export guide and re-run instructions; specimen PDFs/exports for the accountant and the AC-VERIFY-9 record; memory-bank updates. ACs: AC-INTEGRATION-2, AC-VERIFY-8, AC-VERIFY-9 (recorded; sign-off is human), AC-VERIFY-7 (complete). The final phase delivers the full entry-to-success flow: Player at `/payments/[paymentId]` → "Download tax invoice" → PDF; Team admin at `/teams/[teamId]/manage/exports` → "Download" → CSV/XLSX.
@@ -492,14 +492,14 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 1 of 5 complete; next Phase 2
+**Current Phase**: 2 of 5 complete; next Phase 3
 **Auto-Build Mode**: YES
-**Current Step**: Phase 1 committed (2026-11-13): 4053 tests pass, lint/typecheck/build PASS, review APPROVED, coverage 96% statements
+**Current Step**: Phase 2 committed (2026-11-13): 4095 tests pass, lint/typecheck/build PASS, review APPROVED, coverage 96% statements
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
 **Step Started**: 2026-11-10
 **Last Completed**: CREATIVE (2026-11-12)
 **Can Resume**: YES
-**Resume From**: Phase 2
+**Resume From**: Phase 3
 
 ### Active Sub-Agents
 - User Journey Design: COMPLETE
@@ -528,3 +528,10 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - Phase 1 | apps/api/test/integration/invoice-number.int.test.ts | Numbers are now allocated only through `issue_payment_document`, so the race test asserts the idempotent outcome (the loser gets the winner's document back with `issued = false`) instead of the old 23000 set-once error, which now only a direct `assign_invoice_number` call raises. The sleep-based ordering became `waitForLockWaiters`.
 - Phase 1 | apps/api/.kysely-codegenrc.json | `payments.is_tax_invoice_issued` is overridden to `ColumnType<boolean, never, never>` (generated column, like `gst_amount`), so no TypeScript can write it.
 - Phase 1 | db/migrations/20261110000100000_tax_invoices.sql:147-150,207-208 | Deferred Minor (code review): comment wording on D-104 trigger order and the FK description; NOT VALID/VALIDATE could be a plain ADD CONSTRAINT; consider revoking EXECUTE on assign_invoice_number from the app role; ADR 0021 should say production never called assign_invoice_number before. Phase review: PROCEED (all 7 deviations above accepted).
+- Phase 2 | apps/api/src/modules/invoices/issue.ts, apps/api/src/jobs/issue-invoices.ts | The `invoice.issue.failed` / `invoice.run.failed` logs name the SQLSTATE field `sqlState` (as `billing.session.failed` and the Akahu jobs do) instead of the architecture doc's `sqlstate`, so one log query covers every job. Ids, error class and SQLSTATE only, never the message.
+- Phase 2 | apps/api/src/modules/invoices/issue.ts | The drain loop, per-run limit and class-23 skip set live in the service (`issueTeamBacklog`), and the job handler is a thin adapter (payload check, follow-up enqueue, NonRetryableJobError, sanitised rethrow), so the drain is testable on real PostgreSQL with injected failures. The sweep reaches the repo through `listTeamsNeedingIssuance` in `issue.ts`, so the jobs import one public file (`modules/invoices/issue.ts`) and `repo.ts` stays internal; no separate barrel was needed.
+- Phase 2 | apps/api/src/jobs/schedules.ts, apps/api/src/jobs/bootstrap.ts | `invoice-reconcile` is slot 4 (right after `akahu-reconcile`, an `intervalSweep`), and its boot enqueue logs `invoice.reconcile.boot` / `invoice.reconcile.boot_failed`. Because it is an interval sweep the DST guard skips it, so `schedules.ts` needed no extra paging; the guard test stays well inside pg-boss's 1000 ms preview budget.
+- Phase 2 | apps/api/src/modules/billing/apply-akahu-result.ts | The enqueue sits inside the APPLY branch and is gated on the guarded PAID `UPDATE ... RETURNING id` actually moving a row (and on the amount being above $0.00), so a replay or an already-PAID payment never enqueues. The select of the locked payment row gained `team_id`.
+- Phase 2 | apps/api/src/modules/invoices/boundaries.test.ts | Extended with the issuance code's money/observability scan (the module plus `jobs/issue-invoices.ts` and `jobs/invoice-reconcile.ts`), an import rule (no billing, wallet or registrations import; the module reaches no job except the registry) and an exact match that `repo.ts` is the sole caller of the SQL issuer.
+- Phase 2 | apps/api/test/integration/jobs.int.test.ts | The scheduled-slot list now has eight entries and `invoice-reconcile` is triggered like the other real sweeps.
+- Phase 2 | test run | `registrations-sse-integration.int.test.ts` "(2) the session PUT promotes first-fit" failed once in a full parallel integration run with `could not obtain lock on row in relation "game_sessions"` raised by a test factory insert, and passed on re-run alone (4.6 s); not touched by this phase.

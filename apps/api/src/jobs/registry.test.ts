@@ -12,6 +12,8 @@ describe('queue registry', () => {
         'bill-session',
         'daily-overdue',
         'heartbeat',
+        'invoice-reconcile',
+        'issue-invoices',
         'member-banned',
         'post-game-billing',
         'recurrence-materialisation',
@@ -47,6 +49,8 @@ describe('queue registry', () => {
       akahuSync: 'akahu-sync',
       akahuCancel: 'akahu-cancel',
       akahuReconcile: 'akahu-reconcile',
+      issueInvoices: 'issue-invoices',
+      invoiceReconcile: 'invoice-reconcile',
     });
     expect(getQueue('heartbeat').name).toBe('heartbeat');
     expect(() => getQueue('nope')).toThrow(/not registered/);
@@ -85,6 +89,13 @@ describe('queue registry', () => {
     // `singletonKey = akahu-cancel:<akahuPaymentId>`: one cancel per provider payment at a time.
     expect(getQueue('akahu-cancel').policy).toBe('exclusive');
     expect(getQueue('akahu-reconcile').policy).toBe('exclusive');
+  });
+
+  it('issues invoices one team at a time on a stately queue and sweeps for leftovers one run at a time (tax-invoices-and-exports)', () => {
+    // `singletonKey = issue-invoices:<teamId>`: one queued and one active job per team, so a PAID transaction that commits during
+    // a run queues exactly one trailing run. Gapless numbers come from the counter row lock, not from this policy.
+    expect(getQueue('issue-invoices').policy).toBe('stately');
+    expect(getQueue('invoice-reconcile').policy).toBe('exclusive');
   });
 
   it('applies a test-only expiry override to every queue without mutating the registry', () => {
