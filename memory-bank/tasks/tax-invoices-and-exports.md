@@ -493,6 +493,8 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 
 **Build Status**: COMPLETE
 **Current Phase**: 5 of 5 complete
+**Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
+**Final Review Verdict**: Ready to merge with fixes — Important: (1) income-exports/service.ts:213-216 Summary GST-number fallback must apply only when rows=0; (2) record a human ruling that production payment enablement is gated on AC-VERIFY-9 accountant sign-off. Minor: pin layout-1 render output, class-23 on-demand → stable code, systemPatterns snapshot wording, deviation deferrals, pre-existing vulnerable deps (next, zod). Not addressed autonomously (2026-11-13).
 **Auto-Build Mode**: YES
 **Current Step**: Phase 5 remediation 1 applied (AC-INTEGRATION-2 completed, e2e 4/4); Phase 5 (End-to-end journey, accessibility, docs and accountant specimens) built 2026-11-13: lint, typecheck, build, unit+integration+coverage (96.3% statements, 89.6% branches) and Playwright (invoices and income-exports, desktop and 360 px, 4/4) all exit 0
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
