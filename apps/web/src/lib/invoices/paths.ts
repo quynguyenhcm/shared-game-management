@@ -15,6 +15,10 @@ export const DOWNLOAD_ERROR_CODES = [
   'not_found',
   'forbidden',
   'service_unavailable',
+  // income exports (Phase 4): the row/byte cap (AC-ERROR-4), the export semaphore (CR-3) and a 422 field error (AC-ERROR-3)
+  'export_too_large',
+  'export_busy',
+  'validation_failed',
 ] as const;
 export type DownloadErrorCode = (typeof DOWNLOAD_ERROR_CODES)[number];
 

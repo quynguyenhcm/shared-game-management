@@ -14,8 +14,9 @@ import type { PaymentsConfig } from './lib/akahu/config.ts';
 import type { PaymentsGateway } from './lib/akahu/gateway.ts';
 import { paymentStartSettings } from './lib/akahu/start.ts';
 import type { Clock } from './lib/clock.ts';
-import type { AuthConfig } from './lib/config/config.ts';
+import type { AuthConfig, IncomeExportsConfig } from './lib/config/config.ts';
 import type { FieldCrypto } from './lib/crypto/crypto.ts';
+import type { BackendCanceller } from './lib/db/cancel.ts';
 import type { Database } from './lib/db/kysely.ts';
 import { registerAuthPlatform } from './lib/auth/policy.ts';
 import { registerTeamRefusalLogging } from './lib/auth/team-refusals.ts';
@@ -41,6 +42,9 @@ import { createPlayerPaymentsService } from './modules/billing/player.ts';
 import { playerPaymentRoutes } from './modules/billing/player-routes.ts';
 import { billingRoutes } from './modules/billing/routes.ts';
 import { createBillingService } from './modules/billing/service.ts';
+import { incomeExportRoutes } from './modules/income-exports/routes.ts';
+import { createExportSemaphore } from './modules/income-exports/semaphore.ts';
+import { createIncomeExportService } from './modules/income-exports/service.ts';
 import { invoiceRoutes } from './modules/invoices/routes.ts';
 import { loadInvoiceFonts } from './modules/invoices/render-pdf.ts';
 import { createInvoiceService } from './modules/invoices/service.ts';
@@ -100,6 +104,17 @@ export interface AppDeps extends HealthDeps {
    * REQUIRED, like the gateway, so an entrypoint that forgets it does not compile.
    */
   readonly payments: PaymentsConfig;
+  /**
+   * `config.incomeExports` (CR-3): the row cap, the encoded-byte cap and the concurrent-export bound. REQUIRED, so an
+   * entrypoint that forgets it does not compile (no silent default).
+   */
+  readonly incomeExports: IncomeExportsConfig;
+  /**
+   * Cancels an income export's statement when its client goes away (CR-3), on a short-lived connection of its own, so it
+   * still works when every pool connection is held by an export. REQUIRED: `main.ts` builds it with
+   * `createBackendCanceller({ connectionString: config.databaseUrl })`.
+   */
+  readonly cancelBackend: BackendCanceller;
   /** Test seam: extra plugins registered after the auth module (guard fixture routes). They need a policy too. */
   readonly extraPlugins?: readonly FastifyPluginAsync[];
 }
@@ -276,6 +291,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // here, so a missing font file stops the API at boot (P7) instead of failing a player's download.
   await app.register(invoiceRoutes, {
     service: createInvoiceService({ db: deps.db, fonts: await loadInvoiceFonts() }),
+  });
+  // tax-invoices-and-exports Phase 4: the team admin's income export and its period options. One semaphore per app instance
+  // bounds concurrent exports (one per team, `INCOME_EXPORT_MAX_CONCURRENT` overall, CR-3).
+  await app.register(incomeExportRoutes, {
+    prefix: '/teams',
+    service: createIncomeExportService({
+      db: deps.db,
+      clock: deps.clock,
+      limits: deps.incomeExports,
+      semaphore: createExportSemaphore({ maxConcurrent: deps.incomeExports.maxConcurrent }),
+      cancelBackend: deps.cancelBackend,
+    }),
   });
   // wallet-and-akahu-billing A4/CR-3: the signed Akahu webhook (public, raw body inside its own plugin; only enqueues a re-read).
   await app.register(akahuWebhookRoutes, {

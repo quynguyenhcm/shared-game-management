@@ -47,7 +47,16 @@ describe('financial year (1 April to 31 March)', () => {
     expect(formatFinancialYear(2099)).toBe('2099-00');
     expect(parseFinancialYear('2026-27')).toBe(2026);
     expect(parseFinancialYear('2099-00')).toBe(2099);
-    for (const bad of ['2026-28', '2026/27', '26-27', '1999-00', '2026-2027', '']) {
+    for (const bad of [
+      '2026-28',
+      '2026/27',
+      '26-27',
+      '1999-00',
+      '2026-2027',
+      '',
+      '2100-01',
+      '9999-00',
+    ]) {
       expect(() => parseFinancialYear(bad), bad).toThrow(/financial year/i);
     }
   });

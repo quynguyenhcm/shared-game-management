@@ -79,3 +79,27 @@ describe('invoice download copy (the words come from the shared document copy)',
     expect(downloadErrorMessage('forbidden')).toBe("You don't have access to this invoice.");
   });
 });
+
+describe('income export refusals (tax-invoices-and-exports Phase 4, AC-ERROR-4, CR-3)', () => {
+  it('accepts the export codes on a landing and words each one for the exports page', () => {
+    for (const code of ['export_too_large', 'export_busy', 'validation_failed']) {
+      expect(parseDownloadError(code)).toBe(code);
+    }
+    // Generic: the API refuses for the row cap OR the byte cap, so the sentence never names a row count.
+    expect(downloadErrorMessage('export_too_large', { export: true })).toBe(
+      'That export is too large to prepare. Choose a shorter range.',
+    );
+    expect(downloadErrorMessage('export_busy', { export: true })).toBe(
+      'Another export is being prepared. Try again in a moment.',
+    );
+    expect(downloadErrorMessage('forbidden', { export: true })).toBe(
+      "You no longer have access to this team's exports.",
+    );
+    expect(downloadErrorMessage('service_unavailable', { export: true })).toBe(
+      "We couldn't make your file. Try again in a minute.",
+    );
+    expect(downloadErrorMessage('validation_failed', { export: true })).toBe(
+      'Check the highlighted fields and try again.',
+    );
+  });
+});

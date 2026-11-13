@@ -4,6 +4,7 @@ import { systemClock } from './lib/clock.ts';
 import { loadConfigOrExit } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
+import { createBackendCanceller } from './lib/db/cancel.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { checkDatabase, createPool } from './lib/db/pool.ts';
 import { createJobRunner } from './lib/jobs/jobs.ts';
@@ -71,6 +72,10 @@ const app = await buildApp({
   }),
   // The start paths' link expiry and webhook URL.
   payments: config.payments,
+  // The income export limits (CR-3).
+  incomeExports: config.incomeExports,
+  // Its own short-lived connection per cancel, never the pool the export holds (CR-3).
+  cancelBackend: createBackendCanceller({ connectionString: config.databaseUrl }),
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

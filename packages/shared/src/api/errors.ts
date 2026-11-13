@@ -79,6 +79,8 @@ export const ErrorCode = [
   'invoice_not_available',
   'invoice_pending',
   'export_too_large',
+  // ...and the bounded export semaphore (tax-invoices-and-exports CR-3)
+  'export_busy',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

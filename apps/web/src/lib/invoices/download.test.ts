@@ -190,3 +190,105 @@ describe('proxyDownload: every failure is a 303 to the landing page with a code'
     );
   });
 });
+
+describe('proxyDownload: income export answers (tax-invoices-and-exports Phase 4, CR-3, AC-ERROR-3, 4)', () => {
+  const CSV = 'Invoice number,Paid date\r\n';
+  const csvResponse = () =>
+    new Response(CSV, {
+      status: 200,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="income_hokio_fy_2026-27.csv"',
+        'content-length': String(CSV.length),
+        'x-export-row-count': '0',
+      },
+    });
+
+  it('streams a CSV attachment with the API file name, no-store and nosniff', async () => {
+    stubApi(csvResponse());
+    const response = await run();
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(CSV);
+    expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(response.headers.get('content-disposition')).toBe(
+      'attachment; filename="income_hokio_fy_2026-27.csv"',
+    );
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('lands 429 export_busy and 422 export_too_large on their own codes', async () => {
+    stubApi(errorResponse(429, 'export_busy'));
+    expect((await run()).headers.get('location')).toBe(
+      `http://localhost:3000${PAGE}?download_error=export_busy`,
+    );
+    stubApi(errorResponse(422, 'export_too_large'));
+    expect((await run()).headers.get('location')).toBe(
+      `http://localhost:3000${PAGE}?download_error=export_too_large`,
+    );
+  });
+
+  it('hands every failure (with the 422 field names) to a custom landing builder when one is given', async () => {
+    const landing = vi.fn(() => '/custom?download_error=validation_failed');
+    stubApi(
+      Response.json(
+        {
+          error: {
+            code: 'validation_failed',
+            message: 'x',
+            fieldErrors: { to: ["The end date can't be before the start date"], from: ['y'] },
+          },
+        },
+        { status: 422 },
+      ),
+    );
+    const response = await proxyDownload({
+      apiPath: API_PATH,
+      request: request(),
+      fallbackReturnTo: PAGE,
+      landing,
+    });
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/custom?download_error=validation_failed',
+    );
+    expect(landing).toHaveBeenCalledWith(
+      { status: 422, apiCode: 'validation_failed', code: 'not_found', fields: ['to', 'from'] },
+      PAGE,
+    );
+
+    stubApi(new TypeError('fetch failed'));
+    await proxyDownload({ apiPath: API_PATH, request: request(), fallbackReturnTo: PAGE, landing });
+    expect(landing).toHaveBeenLastCalledWith(
+      { status: 0, apiCode: undefined, code: 'service_unavailable', fields: [] },
+      PAGE,
+    );
+  });
+
+  it('aborting the incoming request aborts the upstream API fetch (cancellation reaches the API and its statement)', async () => {
+    const controller = new AbortController();
+    let upstreamSignal: AbortSignal | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            upstreamSignal = init?.signal ?? undefined;
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('aborted', 'AbortError'));
+            });
+          }),
+      ),
+    );
+    const incoming = new NextRequest(new URL(`http://localhost:3000${API_PATH}`), {
+      headers: { cookie: 'sgm_session=live-token' },
+      signal: controller.signal,
+    });
+    const pending = proxyDownload({ apiPath: API_PATH, request: incoming, fallbackReturnTo: PAGE });
+    await vi.waitFor(() => {
+      expect(upstreamSignal).toBeDefined();
+    });
+    expect(upstreamSignal?.aborted).toBe(false);
+    controller.abort();
+    expect(upstreamSignal?.aborted).toBe(true);
+    expect((await pending).status).toBe(303);
+  });
+});

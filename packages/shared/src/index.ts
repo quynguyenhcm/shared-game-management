@@ -14,6 +14,7 @@ export * from './auth/return-to.ts';
 export * from './billing/index.ts';
 export * from './invoice/document-copy.ts';
 export * from './invoice/document.ts';
+export * from './invoice/export-columns.ts';
 export * from './invoice/invoice.ts';
 export * from './money/money.ts';
 export * from './money/zod.ts';

@@ -480,6 +480,25 @@ Run against a test team with payout configured, in Akahu's sandbox, with the wor
 
 Keep the fixtures recorded from these runs with their provenance (sandbox-real), as ADR 0020 requires.
 
+## Income export limits
+
+Team admins download their income (PAID payments) as CSV or Excel from `GET /teams/:teamId/exports/income` (ADR 0021). Each
+export is built completely in the api before it is sent, inside one read-only database snapshot, so it is bounded by three api
+environment variables. Each can be lowered; none can be raised past its ceiling (the api refuses to boot):
+
+| Variable                       | Default    | Allowed             | Meaning                                                                                                    |
+| ------------------------------ | ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `INCOME_EXPORT_MAX_ROWS`       | `50000`    | 1 to 50,000         | More PAID payments in the range is refused with 422 `export_too_large` ("Choose a shorter range.").        |
+| `INCOME_EXPORT_MAX_BYTES`      | `33554432` | 1,024 to 67,108,864 | The file (CSV bytes, or the zipped XLSX) may not grow past this while it is built: 422 `export_too_large`. |
+| `INCOME_EXPORT_MAX_CONCURRENT` | `2`        | 1 to 8              | Exports running at once in one api process, and never two for the same team: 429 `export_busy`.            |
+
+- **Never truncated.** A refused export returns a JSON error and no file. A client that disconnects cancels the export's
+  database statement and frees its slot (logged as `income_export.cancelled`).
+- **Logs.** `income_export.generated` carries the team id, the period type, the format and the row count only;
+  `income_export.refused` carries the team id and the reason (`rows`, `bytes`, `money_range` or `busy`).
+- **Measured.** `apps/api/test/integration/income-exports-load.int.test.ts` exports 50,000 rows in both formats and runs four
+  concurrent worst-case-width exports; it prints its timings and sizes (`--silent=false`).
+
 ## Money and time rules
 
 - Money in the database is `NUMERIC(10,2)`, on the wire a 2-decimal string (`MoneyString`), and in TypeScript branded `bigint`

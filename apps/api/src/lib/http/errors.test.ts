@@ -86,6 +86,8 @@ const AUTHORITATIVE_ERROR_CODES = [
   'invoice_not_available',
   'invoice_pending',
   'export_too_large',
+  // tax-invoices-and-exports CR-3: the bounded export semaphore
+  'export_busy',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -125,6 +127,7 @@ const TEAM_ERROR_STATUSES = [
   ['invoice_not_available', 409],
   ['invoice_pending', 409],
   ['export_too_large', 422],
+  ['export_busy', 429],
 ] as const;
 
 const apps: FastifyInstance[] = [];

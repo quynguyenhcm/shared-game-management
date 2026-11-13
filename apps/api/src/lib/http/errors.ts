@@ -195,6 +195,10 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     message: 'Your invoice is being prepared. Try again in a moment.',
   },
   export_too_large: { status: 422, message: 'Choose a shorter range.' },
+  export_busy: {
+    status: 429,
+    message: 'Another export is being prepared. Try again in a moment.',
+  },
 };
 
 export interface AppErrorOptions {

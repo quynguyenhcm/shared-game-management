@@ -33,7 +33,14 @@ const ALLOWED_CONTENT_TYPES: readonly string[] = [
 
 /** What an API error code becomes on the landing page. Anything unlisted is `service_unavailable`. */
 function landingCode(status: number, apiCode: string | undefined): DownloadErrorCode {
-  if (apiCode === 'invoice_not_available' || apiCode === 'invoice_pending') return apiCode;
+  if (
+    apiCode === 'invoice_not_available' ||
+    apiCode === 'invoice_pending' ||
+    apiCode === 'export_too_large' ||
+    apiCode === 'export_busy'
+  ) {
+    return apiCode;
+  }
   if (status === 404 || status === 422) return 'not_found';
   if (status === 403) return 'forbidden';
   return 'service_unavailable';
@@ -45,9 +52,32 @@ export interface ProxyDownloadInput {
   readonly request: NextRequest;
   /** Where an error lands when the request has no valid `returnTo` (the page the link lives on). */
   readonly fallbackReturnTo: string;
+  /** True when the route fixes the landing page: the request's `returnTo` is ignored and `fallbackReturnTo` always used. */
+  readonly ignoreReturnTo?: boolean;
+  /**
+   * Builds the landing path of a failed download from the failure and the validated landing page. Default: the page with
+   * `download_error=<code>`. The income export uses it to send the entered values and the 422 field names back to its form.
+   */
+  readonly landing?: (failure: DownloadFailure, target: string) => string;
 }
 
-const seeOther = (target: string): NextResponse =>
+/** Why a download failed, as the landing builder sees it. `fields` are the 422 `fieldErrors` keys (names only, no text). */
+export interface DownloadFailure {
+  /** The API status, or 0 when the API could not be reached. */
+  readonly status: number;
+  readonly apiCode: string | undefined;
+  /** The default landing code for this failure. */
+  readonly code: DownloadErrorCode;
+  readonly fields: readonly string[];
+}
+
+function fieldNamesOf(body: unknown): string[] {
+  const fieldErrors = (body as { error?: { fieldErrors?: unknown } } | null)?.error?.fieldErrors;
+  return typeof fieldErrors === 'object' && fieldErrors !== null ? Object.keys(fieldErrors) : [];
+}
+
+/** `303 See Other` to a same-origin path (built by the caller from validated parts). */
+export const seeOther = (target: string): NextResponse =>
   NextResponse.redirect(new URL(target, loadWebConfig().webBaseUrl), 303);
 
 /** The page an error lands on: the request's own `returnTo` when it is a safe same-origin path, else the fallback. */
@@ -68,7 +98,18 @@ export function refuseDownload(
 
 export async function proxyDownload(input: ProxyDownloadInput): Promise<NextResponse> {
   const { request, apiPath } = input;
-  const target = landingTarget(request, input.fallbackReturnTo);
+  const target =
+    input.ignoreReturnTo === true
+      ? input.fallbackReturnTo
+      : landingTarget(request, input.fallbackReturnTo);
+  const land = (failure: DownloadFailure): NextResponse =>
+    seeOther(
+      input.landing === undefined
+        ? withDownloadError(target, failure.code)
+        : input.landing(failure, target),
+    );
+  const unavailable = (status: number): NextResponse =>
+    land({ status, apiCode: undefined, code: 'service_unavailable', fields: [] });
   const config = loadWebConfig();
   const token = request.cookies.get(cookieName('session', config.webBaseUrl))?.value;
   if (token === undefined || token === '') return seeOther(loginUrl({ returnTo: target }));
@@ -89,7 +130,7 @@ export async function proxyDownload(input: ProxyDownloadInput): Promise<NextResp
     });
   } catch {
     log.warn('web.download.unreachable', { status: 0 });
-    return seeOther(withDownloadError(target, 'service_unavailable'));
+    return unavailable(0);
   }
 
   if (upstream.status === 401) {
@@ -118,13 +159,14 @@ export async function proxyDownload(input: ProxyDownloadInput): Promise<NextResp
     }
     log.warn('web.download.unexpected_response', { status: upstream.status });
     await upstream.body?.cancel();
-    return seeOther(withDownloadError(target, 'service_unavailable'));
+    return unavailable(upstream.status);
   }
 
   const body: unknown = await upstream.json().catch(() => null);
   const apiCode = (body as { error?: { code?: unknown } } | null)?.error?.code;
-  const code = landingCode(upstream.status, typeof apiCode === 'string' ? apiCode : undefined);
+  const knownCode = typeof apiCode === 'string' ? apiCode : undefined;
+  const code = landingCode(upstream.status, knownCode);
   if (code === 'service_unavailable')
     log.warn('web.download.api_failure', { status: upstream.status });
-  return seeOther(withDownloadError(target, code));
+  return land({ status: upstream.status, apiCode: knownCode, code, fields: fieldNamesOf(body) });
 }

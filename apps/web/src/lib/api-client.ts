@@ -28,6 +28,7 @@ import {
   FindTeamsResponse,
   ForgotPasswordResponse,
   GstResponse,
+  IncomeExportPeriodsResponse,
   HealthResponse,
   IdentitiesResponse,
   InviteCodeResponse,
@@ -646,6 +647,15 @@ export const apiClient = {
       path: `/teams/${encodeURIComponent(teamId)}/banking`,
       method: 'DELETE',
       schema: RemoveBankingResponse,
+    }),
+
+  /** What the Income exports form can offer (team admin only; a 403 for anyone else, H9). */
+  incomeExportPeriods: (teamId: string, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/teams/${encodeURIComponent(teamId)}/exports/income/periods`,
+      method: 'GET',
+      schema: IncomeExportPeriodsResponse,
     }),
 
   teamGst: (teamId: string, options: ApiCallOptions = {}) =>

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ErrorCode } from './errors.ts';
+import { parseLocalDate } from '../time/time.ts';
 import {
   GST_CADENCE_WIRE,
+  INCOME_EXPORT_ROW_COUNT_HEADER,
+  INVOICE_FIELD_MESSAGES,
   IncomeExportPeriodsResponse,
   IncomeExportQuery,
+  IncomeExportQueryString,
   PaymentDocumentRef,
+  futurePeriodIssue,
 } from './invoices.ts';
 
 function issues(schema: { safeParse(v: unknown): unknown }, value: unknown) {
@@ -76,6 +81,26 @@ describe('IncomeExportQuery (AC-ERROR-3: one range semantics, resolved on the se
     expect(badYear.path).toBe('year');
     expect(badYear.message).toMatch(/financial year/i);
   });
+
+  it('refuses a financial year or GST period end outside 2000..2099 on its field, never with a throw (a five-digit end date)', () => {
+    const fieldOf = (value: unknown): string[] =>
+      issues(IncomeExportQuery, value).map((issue) => issue.path);
+    // 9999-00 is a well-formed label, but 31 March 10000 is not a date: a 422 on `year`, not a 500.
+    expect(fieldOf({ format: 'csv', period: 'fy', year: '9999-00' })).toEqual(['year']);
+    expect(fieldOf({ format: 'csv', period: 'fy', year: '2100-01' })).toEqual(['year']);
+    expect(
+      IncomeExportQuery.parse({ format: 'csv', period: 'fy', year: '2099-00' }).period,
+    ).toEqual({ kind: 'fy', startYear: 2099 });
+    for (const end of ['9999-11', '2100-01', '1999-11']) {
+      expect(fieldOf({ format: 'csv', period: 'gst', cadence: '2m-odd', end }), end).toEqual([
+        'end',
+      ]);
+    }
+    expect(
+      IncomeExportQuery.parse({ format: 'csv', period: 'gst', cadence: '2m-odd', end: '2099-11' })
+        .period,
+    ).toMatchObject({ kind: 'gst', range: { from: '2099-10-01', to: '2099-11-30' } });
+  });
 });
 
 describe('invoice contracts shared with the billing and dashboard features', () => {
@@ -93,10 +118,74 @@ describe('invoice contracts shared with the billing and dashboard features', () 
         today: '2027-06-20',
         firstPaidDate: null,
         financialYearsWithPayments: [2026],
+        maxRows: 50000,
+        maxRangeDays: 2557,
       }),
-    ).toMatchObject({ today: '2027-06-20' });
+    ).toMatchObject({ today: '2027-06-20', maxRows: 50000, maxRangeDays: 2557 });
+    // The web reads the row cap from the API (it is env-configured), never from a copied constant.
+    expect(
+      issues(IncomeExportPeriodsResponse, {
+        today: '2027-06-20',
+        firstPaidDate: null,
+        financialYearsWithPayments: [2026],
+      }).map((i) => i.path),
+    ).toEqual(expect.arrayContaining(['maxRows', 'maxRangeDays']));
     expect(ErrorCode).toEqual(
-      expect.arrayContaining(['invoice_not_available', 'invoice_pending', 'export_too_large']),
+      expect.arrayContaining([
+        'invoice_not_available',
+        'invoice_pending',
+        'export_too_large',
+        'export_busy',
+      ]),
     );
+    expect(INCOME_EXPORT_ROW_COUNT_HEADER).toBe('x-export-row-count');
+  });
+});
+
+describe('IncomeExportQueryString (the route querystring: flat for OpenAPI, then the same union)', () => {
+  it('resolves exactly like IncomeExportQuery and refuses the same inputs on the same fields', () => {
+    const custom = { format: 'csv', period: 'custom', from: '2027-06-01', to: '2027-06-15' };
+    expect(IncomeExportQueryString.parse(custom)).toEqual(IncomeExportQuery.parse(custom));
+    const fy = { format: 'xlsx', period: 'fy', year: '2026-27' };
+    expect(IncomeExportQueryString.parse(fy)).toEqual(IncomeExportQuery.parse(fy));
+    expect(issues(IncomeExportQueryString, { ...custom, from: '2027-02-30' })).toEqual([
+      { path: 'from', message: INVOICE_FIELD_MESSAGES.startDateInvalid },
+    ]);
+    expect(
+      issues(IncomeExportQueryString, { ...custom, period: 'weekly' }).map((i) => i.path),
+    ).toEqual(['period']);
+    expect(issues(IncomeExportQueryString, { ...custom, x: '1' }).length).toBeGreaterThan(0);
+    // A key of another period type is refused too (the union members are strict).
+    expect(issues(IncomeExportQueryString, { ...fy, from: '2027-06-01' }).length).toBeGreaterThan(
+      0,
+    );
+  });
+});
+
+describe('export periods that have not started (AC-ERROR-3: future-only)', () => {
+  it('refuses a financial year or a GST period that starts after today, on its own field', () => {
+    const today = parseLocalDate('2027-06-20');
+    expect(futurePeriodIssue({ kind: 'fy', startYear: 2027 }, today)).toBeNull();
+    expect(futurePeriodIssue({ kind: 'fy', startYear: 2028 }, today)).toEqual({
+      field: 'year',
+      message: INVOICE_FIELD_MESSAGES.financialYearNotStarted,
+    });
+    const gst = (from: string, to: string) =>
+      ({
+        kind: 'gst',
+        cadence: 'TWO_MONTHLY_ODD',
+        range: { from: parseLocalDate(from), to: parseLocalDate(to) },
+      }) as const;
+    expect(futurePeriodIssue(gst('2027-06-01', '2027-07-31'), today)).toBeNull();
+    expect(futurePeriodIssue(gst('2027-08-01', '2027-09-30'), today)).toEqual({
+      field: 'end',
+      message: INVOICE_FIELD_MESSAGES.periodNotStarted,
+    });
+    // A custom range is checked by `validateExportRange` (it has its own start-date message).
+    const custom = {
+      kind: 'custom',
+      range: { from: parseLocalDate('2027-07-01'), to: parseLocalDate('2027-07-02') },
+    } as const;
+    expect(futurePeriodIssue(custom, today)).toBeNull();
   });
 });

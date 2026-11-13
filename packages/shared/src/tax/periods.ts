@@ -43,6 +43,11 @@ export class PeriodError extends Error {
 
 /** The longest custom range an export accepts: 7 years inclusive (R3), matching the 7-year retention. */
 export const MAX_RANGE_DAYS = 2557;
+/**
+ * The calendar years a preset export period may start or end in. Bounded well inside `LocalDate` (whose last day is
+ * 9999-12-31), so a financial year or GST period built from a well-formed label never needs a five-digit date.
+ */
+export const EXPORT_YEARS = { first: 2000, last: 2099 } as const;
 /** The most GST periods one selector lists (7 years of two-monthly periods). */
 const MAX_LISTED_PERIODS = 42;
 
@@ -110,14 +115,19 @@ export function formatFinancialYear(startYear: number): string {
 
 const FINANCIAL_YEAR_PATTERN = /^(\d{4})-(\d{2})$/;
 
-/** `2026-27` to 2026. Rejects a label whose second half is not the next year, and years before 2000. */
+/** `2026-27` to 2026. Rejects a label whose second half is not the next year, and a start outside `EXPORT_YEARS`. */
 export function parseFinancialYear(label: string): number {
   const match = FINANCIAL_YEAR_PATTERN.exec(label);
   const start = match === null ? Number.NaN : Number(match[1]);
-  if (match === null || start < 2000 || (start + 1) % 100 !== Number(match[2])) {
+  if (
+    match === null ||
+    start < EXPORT_YEARS.first ||
+    start > EXPORT_YEARS.last ||
+    (start + 1) % 100 !== Number(match[2])
+  ) {
     throw new PeriodError(
       'INVALID_FINANCIAL_YEAR',
-      'a financial year looks like 2026-27 (two consecutive years, from 2000)',
+      'a financial year looks like 2026-27 (two consecutive years, from 2000-01 to 2099-00)',
     );
   }
   return start;

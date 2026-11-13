@@ -529,3 +529,39 @@ describe('loadConfig payments (CR-12, A6, AC-VERIFY-8)', () => {
     ).toEqual([expect.stringContaining('AKAHU_PAYMENTS_API_URL — host must end in .akahu.io')]);
   });
 });
+
+describe('income export limits (tax-invoices-and-exports CR-3)', () => {
+  it('defaults to the 50,000-row cap, a 32 MiB encoded-byte cap and two concurrent exports', () => {
+    expect(loadConfig(validEnv()).incomeExports).toEqual({
+      maxRows: 50_000,
+      maxBytes: 33_554_432,
+      maxConcurrent: 2,
+    });
+    expect(
+      loadConfig(
+        validEnv({
+          INCOME_EXPORT_MAX_ROWS: '5',
+          INCOME_EXPORT_MAX_BYTES: '4096',
+          INCOME_EXPORT_MAX_CONCURRENT: '4',
+        }),
+      ).incomeExports,
+    ).toEqual({ maxRows: 5, maxBytes: 4096, maxConcurrent: 4 });
+  });
+
+  it('refuses a value above the measured safe ceiling (rows 50,000, bytes 64 MiB, 8 exports) or below 1, by name', () => {
+    const bad: [string, string][] = [
+      ['INCOME_EXPORT_MAX_ROWS', '50001'],
+      ['INCOME_EXPORT_MAX_ROWS', '0'],
+      ['INCOME_EXPORT_MAX_BYTES', '67108865'],
+      ['INCOME_EXPORT_MAX_BYTES', '1023'],
+      ['INCOME_EXPORT_MAX_CONCURRENT', '9'],
+      ['INCOME_EXPORT_MAX_CONCURRENT', '0'],
+      ['INCOME_EXPORT_MAX_CONCURRENT', 'many'],
+    ];
+    for (const [name, value] of bad) {
+      expect(issuesFor(validEnv({ [name]: value })), `${name}=${value}`).toEqual([
+        expect.stringContaining(`Invalid configuration: ${name} — `),
+      ]);
+    }
+  });
+});
