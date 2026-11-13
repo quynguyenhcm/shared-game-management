@@ -210,9 +210,9 @@ export function createIncomeExportService(deps: IncomeExportServiceDeps): Income
       );
       if (summary === undefined) throw new Error('The export preflight did not run.');
       reconciler.assertEquals(summary);
-      // A period with no payment names no GST number; fall back to the team's current registration.
-      const currentGst =
-        summary.gstNumbers.length === 0 ? await readTeamGstNumber(deps.db, teamId) : null;
+      // An empty period names no GST number; fall back to the team's current registration. A period
+      // with payments keeps what they recorded, so receipts from before registration print none.
+      const currentGst = summary.rows === 0 ? await readTeamGstNumber(deps.db, teamId) : null;
       if (currentGst !== null) summary = { ...summary, gstNumbers: [currentGst] };
       const bytes = file.finish(summaryRows({ teamName, period, summary, generatedAt }));
       return {

@@ -476,6 +476,22 @@ describe('GET /teams/:teamId/exports/income: rows, files and totals', () => {
     );
   });
 
+  it('a team registered now prints no GST number for a period it was not registered in, even with payments', async () => {
+    const t = await team({ gst: true });
+    await payment(t, { paidAt: nzNoon('2027-06-03'), gst: false });
+    const xlsx = await get(
+      t.admin,
+      exportUrl(t.teamId, custom('2027-06-01', '2027-06-30', 'xlsx')),
+    );
+    const summary = (await readXlsx(xlsx)).find((sheet) => sheet.sheet === 'Summary')?.data ?? [];
+    expect(summary).toEqual(
+      expect.arrayContaining([
+        ['GST number', 'Not registered'],
+        ['Payments', '1'],
+      ]),
+    );
+  });
+
   it('prints the issue-time snapshot name for an issued payment and the live name otherwise', async () => {
     const t = await team();
     const issued = await payment(t, { paidAt: nzNoon('2027-06-03'), payerName: 'Old Name' });
