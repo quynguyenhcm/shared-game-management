@@ -4,7 +4,7 @@
  * payments table and then exports the income as CSV and XLSX, on a desktop and a 360 x 740 project, with axe, no horizontal
  * scroll and 44 px targets. Nothing calls Akahu and no credentials are involved. Not part of `pnpm run ci`.
  *
- * It needs the worker running. The team is set up through the public API (banking, GST registration, a
+ * Two players are billed: one pays on the fake Akahu, one from a funded wallet. It needs the worker running. The team is set up through the public API (banking, GST registration, a
  * published session, a registration); the only fixtures are the named ones borrowed from `billing.spec.ts` (`endSession`, the
  * `post-game-billing` sweep trigger). Point it at a stack with the E2E_* variables (see docs/getting-started.md):
  *
@@ -15,6 +15,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Page } from '@playwright/test';
@@ -288,16 +289,158 @@ async function downloadFile(
   return file;
 }
 
-test('a player pays, downloads the tax invoice, and the team admin downloads it and exports the income (AC-INTEGRATION-2, AC-VERIFY-8)', async ({
+/** `fundWallet` as in billing.spec.ts: a top-up on the fake adapter, polled until the balance shows it. */
+async function fundWallet(scene: Scene, person: Person, amount: string): Promise<void> {
+  const started = await api<{ topUp: { id: string } }>(
+    'POST',
+    `/teams/${scene.teamId}/wallet/top-ups`,
+    person.token,
+    { amount, idempotencyKey: randomUUID() },
+  );
+  await expect
+    .poll(
+      async () =>
+        (
+          await api<{ wallet: { balance: string } }>(
+            'GET',
+            `/teams/${scene.teamId}/wallet?topUp=${started.topUp.id}`,
+            person.token,
+          )
+        ).wallet.balance,
+      { timeout: 45_000, intervals: [500, 1000, 1000], message: `wallet funded with ${amount}` },
+    )
+    .toBe(amount);
+}
+
+// The PDF and XLSX readers are the API package's own dependencies (unpdf, read-excel-file); the web package does not install them.
+const apiRequire = createRequire(new URL('../../api/package.json', import.meta.url));
+
+/** A PDF's text, whitespace collapsed to single spaces. */
+async function pdfText(bytes: Buffer): Promise<string> {
+  const lib = (await import(pathToFileURL(apiRequire.resolve('unpdf')).href)) as {
+    getDocumentProxy(data: Uint8Array): Promise<unknown>;
+    extractText(pdf: unknown, options: { mergePages: true }): Promise<{ text: string }>;
+  };
+  const pdf = await lib.getDocumentProxy(new Uint8Array(bytes));
+  return (await lib.extractText(pdf, { mergePages: true })).text.replace(/\s+/g, ' ').trim();
+}
+
+const compact = (text: string): string => text.replace(/\s+/g, '');
+const cents = (money: string): number => Number(money.replace(/[$,]/g, '').replace('.', ''));
+
+interface InvoiceRead {
+  readonly number: number;
+  readonly total: number;
+  readonly gst: number;
+}
+
+/** The invoice PDF shows the team, the buyer, the number, the GST number, GST and total (AC-INTEGRATION-2). */
+async function expectInvoicePdf(bytes: Buffer, scene: Scene, buyer: Person): Promise<InvoiceRead> {
+  expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  const text = await pdfText(bytes);
+  expect(text).toContain('Tax invoice');
+  expect(compact(text)).toContain(compact(scene.teamName));
+  expect(compact(text)).toContain(compact(buyer.fullName));
+  expect(text).toContain('GST number 49-091-850');
+  const number = /INV-(\d{6})/.exec(text);
+  expect(number, 'the invoice number is printed').not.toBeNull();
+  const gst = /GST \(15%\) \$([\d,.]+)/.exec(text);
+  const total = /Total \(including GST\) \$([\d,.]+)/.exec(text);
+  expect(gst?.[1], 'GST 10.00 x 3/23').toBe('1.30');
+  expect(total?.[1]).toBe('10.00');
+  expect(text).toContain('$8.70');
+  return {
+    number: Number(number?.[1]),
+    gst: cents(gst?.[1] ?? ''),
+    total: cents(total?.[1] ?? ''),
+  };
+}
+
+/** RFC 4180 reader for the export CSV (a BOM, CRLF line ends, quoted fields). */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  for (let at = 0; at < body.length; at += 1) {
+    const c = body[at] as string;
+    if (quoted) {
+      if (c === '"' && body[at + 1] === '"') {
+        field += '"';
+        at += 1;
+      } else if (c === '"') quoted = false;
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') {
+      row.push(field);
+      field = '';
+    } else if (c === '\r' || c === '\n') {
+      if (c === '\r' && body[at + 1] === '\n') at += 1;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else field += c;
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+async function readXlsx(bytes: Buffer): Promise<string[][]> {
+  const lib = apiRequire('read-excel-file/node') as {
+    default(
+      input: Buffer,
+      options: { parseNumber: (value: string) => string },
+    ): Promise<{ sheet: string; data: (string | null)[][] }[]>;
+  };
+  const sheets = await lib.default(bytes, { parseNumber: (value) => value });
+  expect(sheets.map((sheet) => sheet.sheet)).toEqual(['Payments', 'Summary']);
+  return (sheets[0]?.data ?? []).map((row) => row.map((cell) => cell ?? ''));
+}
+
+/** The Payments table holds exactly the two payments, and its totals equal the two invoices' totals. */
+function expectPaymentsTable(
+  table: string[][],
+  invoices: readonly InvoiceRead[],
+  label: string,
+): void {
+  const header = table[0] ?? [];
+  const col = (name: string): number => header.indexOf(name);
+  expect(header.slice(0, 1), label).toEqual(['Invoice number']);
+  const data = table.slice(1);
+  expect(data, `${label}: both payments and nothing else`).toHaveLength(2);
+  expect(data.map((row) => row[col('Invoice number')]).sort(), label).toEqual(
+    invoices.map((invoice) => `INV-${String(invoice.number).padStart(6, '0')}`).sort(),
+  );
+  const sum = (name: string): number =>
+    data.reduce((acc, row) => acc + cents(row[col(name)] ?? '0'), 0);
+  expect(sum('Total'), `${label}: export total equals the invoices' totals`).toBe(
+    invoices.reduce((acc, invoice) => acc + invoice.total, 0),
+  );
+  expect(sum('GST'), `${label}: export GST equals the invoices' GST`).toBe(
+    invoices.reduce((acc, invoice) => acc + invoice.gst, 0),
+  );
+  expect(data.map((row) => row[col('Paid by')]).sort(), label).toEqual(['Bank', 'Wallet']);
+}
+
+test('a player pays and another is billed from a wallet, both download their invoice, and the team admin exports the income (AC-INTEGRATION-2, AC-VERIFY-8)', async ({
   browser,
 }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(360_000);
   const scene = await newScene();
   const payer = await newMember(scene, 'payer');
+  const walletPayer = await newMember(scene, 'wallet');
+  await fundWallet(scene, walletPayer, '20.00');
   const session = await publishSession(scene, '10.00');
-  await api('POST', `/teams/${scene.teamId}/sessions/${session.id}/registrations`, payer.token, {
-    guests: [],
-  });
+  for (const person of [payer, walletPayer]) {
+    await api('POST', `/teams/${scene.teamId}/sessions/${session.id}/registrations`, person.token, {
+      guests: [],
+    });
+  }
   await endSession(session);
   await run('docker', [
     'exec',
@@ -309,8 +452,9 @@ test('a player pays, downloads the tax invoice, and the team admin downloads it 
     'post-game-billing',
   ]);
   const paymentId = await waitForPaymentId(scene, payer, session);
+  const walletPaymentId = await waitForPaymentId(scene, walletPayer, session);
 
-  // The player pays through the fake Akahu and lands back on a paid payment.
+  // The first player pays through the fake Akahu and lands back on a paid payment.
   const page = await signedIn(browser, payer);
   await page.goto(`/payments/${paymentId}`);
   await page.getByRole('button', { name: 'Pay $10.00 with Akahu' }).click();
@@ -322,8 +466,8 @@ test('a player pays, downloads the tax invoice, and the team admin downloads it 
   await scan(page, 'payment, paid, invoice available');
   const mine = await downloadFile(page, () => invoiceLink.click());
   expect(mine.name).toMatch(/\.pdf$/);
-  expect(mine.bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   expect(mine.bytes.length).toBeGreaterThan(2_000);
+  const myInvoice = await expectInvoicePdf(mine.bytes, scene, payer);
   await expect(page).toHaveURL(new RegExp(`/payments/${paymentId}(\\?return=1)?$`));
   await page.reload(); // the number is read on the next view of the page
   await expect(page.locator('main').getByText(/INV-\d{6}/)).toBeVisible();
@@ -335,7 +479,28 @@ test('a player pays, downloads the tax invoice, and the team admin downloads it 
   await scan(page, 'payments list with invoice action');
   await page.context().close();
 
-  // The team admin finds the same document in the payments table and the exports area.
+  // The second player was billed from their wallet and downloads their own invoice.
+  const walletPage = await signedIn(browser, walletPayer);
+  await walletPage.goto(`/payments/${walletPaymentId}`);
+  await expect(walletPage.locator('main').getByText('Paid from wallet')).toBeVisible({
+    timeout: 45_000,
+  });
+  const walletLink = walletPage.getByRole('link', { name: /^Download tax invoice/ });
+  await expect(walletLink).toBeVisible({ timeout: 45_000 });
+  await scan(walletPage, 'payment, paid from the wallet, invoice available');
+  const theirOwn = await downloadFile(walletPage, () => walletLink.click());
+  expect(theirOwn.name).toMatch(/\.pdf$/);
+  const walletInvoice = await expectInvoicePdf(theirOwn.bytes, scene, walletPayer);
+  await walletPage.context().close();
+
+  // Two payments, two numbers: consecutive, in the one series.
+  expect(
+    Math.abs(myInvoice.number - walletInvoice.number),
+    'the two invoice numbers are consecutive',
+  ).toBe(1);
+  const invoices = [myInvoice, walletInvoice];
+
+  // The team admin finds the same documents in the payments table and the exports area.
   const adminPage = await signedIn(browser, scene.admin);
   await adminPage.goto(`/teams/${scene.teamId}/manage/payments?status=paid`);
   const adminLink = adminPage.getByRole('link', { name: /^Invoice for / }).first();
@@ -347,22 +512,44 @@ test('a player pays, downloads the tax invoice, and the team admin downloads it 
 
   await adminPage.goto(`/teams/${scene.teamId}/manage/exports`);
   await scan(adminPage, 'income exports');
-  await adminPage.getByRole('radio', { name: 'Financial year' }).check();
-  await adminPage.getByRole('radio', { name: 'CSV (.csv)' }).check();
-  const csv = await downloadFile(adminPage, () =>
-    adminPage.getByRole('button', { name: 'Download' }).click(),
-  );
-  expect(csv.name).toMatch(/\.csv$/);
-  const csvText = csv.bytes.toString('utf8');
-  expect(csvText.charCodeAt(0)).toBe(0xfeff);
-  expect(csvText).toMatch(/INV-\d{6}/);
-  expect(csvText).toContain('10.00');
+  const today = nzToday();
+  const monthStart = `${today.slice(0, 8)}01`;
+  const periods = [
+    {
+      label: 'current month (custom range)',
+      choose: async (): Promise<void> => {
+        await adminPage.getByRole('radio', { name: 'Custom range' }).check();
+        await adminPage.getByLabel('Start date').fill(monthStart);
+        await adminPage.getByLabel('End date').fill(today);
+      },
+    },
+    {
+      label: 'financial year',
+      choose: async (): Promise<void> => {
+        await adminPage.getByRole('radio', { name: 'Financial year' }).check();
+      },
+    },
+  ];
+  for (const period of periods) {
+    await period.choose();
+    await adminPage.getByRole('radio', { name: 'CSV (.csv)' }).check();
+    const csv = await downloadFile(adminPage, () =>
+      adminPage.getByRole('button', { name: 'Download' }).click(),
+    );
+    expect(csv.name).toMatch(/\.csv$/);
+    expect(csv.bytes.toString('utf8').charCodeAt(0)).toBe(0xfeff);
+    const csvTable = parseCsv(csv.bytes.toString('utf8'));
+    expectPaymentsTable(csvTable, invoices, `CSV, ${period.label}`);
 
-  await adminPage.getByRole('radio', { name: /Excel/ }).check();
-  const xlsx = await downloadFile(adminPage, () =>
-    adminPage.getByRole('button', { name: 'Download' }).click(),
-  );
-  expect(xlsx.name).toMatch(/\.xlsx$/);
-  expect(xlsx.bytes.subarray(0, 2).toString('latin1')).toBe('PK');
+    await adminPage.getByRole('radio', { name: /Excel/ }).check();
+    const xlsx = await downloadFile(adminPage, () =>
+      adminPage.getByRole('button', { name: 'Download' }).click(),
+    );
+    expect(xlsx.name).toMatch(/\.xlsx$/);
+    expect(xlsx.bytes.subarray(0, 2).toString('latin1')).toBe('PK');
+    const xlsxTable = await readXlsx(xlsx.bytes);
+    expectPaymentsTable(xlsxTable, invoices, `XLSX, ${period.label}`);
+    expect(xlsxTable, `${period.label}: the Excel file equals the CSV`).toEqual(csvTable);
+  }
   await adminPage.context().close();
 });

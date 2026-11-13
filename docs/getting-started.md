@@ -541,10 +541,10 @@ refuse it). The down migration also refuses once any document exists (CR-2): rec
 desktop and a 360 x 740 project. They need a stack with `AUTH_FAKE_OAUTH=true` and the fake Akahu adapter. To keep your development
 stack (`sgm`) untouched, run them against a second Compose project (`docker-compose.e2e.yml` remaps the host ports to 3100, 4100,
 5532, 1125 and 8125, retags the images so `--build` cannot move the `sgm-*:dev` tags, and points the api, worker and web build at
-`WEB_BASE_URL=http://localhost:3100`; it needs the repository's `.env`):
+`WEB_BASE_URL=http://localhost:3100` (hard-set in the overlay, so an exported `WEB_BASE_URL` cannot send the run to the dev web on port 3000; the Playwright command still sets it for the test runner; it needs the repository's `.env`):
 
 ```sh
-WEB_BASE_URL=http://localhost:3100 docker compose -p sgm-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+docker compose -p sgm-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
 WEB_BASE_URL=http://localhost:3100 E2E_API_URL=http://localhost:4100 \
   E2E_DATABASE_URL=postgres://sgm:sgm@localhost:5532/sgm MAILPIT_API_URL=http://localhost:8125 \
   E2E_WORKER_CONTAINER=sgm-e2e-worker-1 E2E_API_CONTAINER=sgm-e2e-api-1 \
