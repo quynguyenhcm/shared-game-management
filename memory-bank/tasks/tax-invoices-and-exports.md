@@ -1,13 +1,13 @@
 ---
 slug: tax-invoices-and-exports
 feature: tax-invoices-and-exports
-status: CREATIVE_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # tax-invoices-and-exports: Tax Invoices and Exports
 
 **Complexity**: Level 3
-**Status**: CREATIVE_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: tax-invoices-and-exports
 **Branch**: feature/tax-invoices-and-exports
 **Worktree**: /Users/admin/yay-wt/shared-game-management/feature-tax-invoices-and-exports
@@ -445,7 +445,7 @@ Extensions follow the repo convention (`.ts` for logic and route handlers, `.tsx
 - [x] **Phase 2: Issuance.** `issue-invoice` queue and handler; each PAID writer enqueues it in the PAID transaction; idempotent issuance through `assign_invoice_number` with the snapshot; on-demand fallback; boot-time backfill of pre-feature PAID payments; no number for unpaid, held or $0.00. ACs: AC-ASYNC-1, 2, 3, AC-HAPPY-4, 5, AC-ERROR-1, 5.
 - [x] **Phase 3: Documents and downloads.** Document model (tax invoice vs receipt, guests, late-withdrawal wording); pdfkit renderer with embedded font; payer and team-admin invoice routes; Next download proxies; "Download tax invoice"/"Download receipt" on the payment page and wallet list, "Invoice" row action in the admin Payments table; OpenAPI. ACs: AC-ENTRY-1, 3, AC-HAPPY-1, 2, 3, AC-ERROR-2, 6, AC-VERIFY-1, 6, AC-INTEGRATION-1.
 - [x] **Phase 4: Income exports.** Paged "PAID in range by `paid_at`" query; CSV writer with neutralisation; XLSX writer with summary sheet; export route (TEAM_ADMIN only) with row cap refusal; "Income exports" manage area and form; OpenAPI. ACs: AC-ENTRY-2, AC-HAPPY-6, 7, 8, 9, AC-ERROR-3, 4, AC-VERIFY-2, 5, AC-INTEGRATION-3.
-- [ ] **Phase 5: End-to-end journey, accessibility, docs and accountant specimens.** `apps/web/e2e/invoices.spec.ts` (pay on the fake adapter → download invoice → export) on desktop and 360 px with axe; coverage gate; `docs/getting-started.md` export guide and re-run instructions; specimen PDFs/exports for the accountant and the AC-VERIFY-9 record; memory-bank updates. ACs: AC-INTEGRATION-2, AC-VERIFY-8, AC-VERIFY-9 (recorded; sign-off is human), AC-VERIFY-7 (complete). The final phase delivers the full entry-to-success flow: Player at `/payments/[paymentId]` → "Download tax invoice" → PDF; Team admin at `/teams/[teamId]/manage/exports` → "Download" → CSV/XLSX.
+- [x] **Phase 5: End-to-end journey, accessibility, docs and accountant specimens.** `apps/web/e2e/invoices.spec.ts` (pay on the fake adapter → download invoice → export) on desktop and 360 px with axe; coverage gate; `docs/getting-started.md` export guide and re-run instructions; specimen PDFs/exports for the accountant and the AC-VERIFY-9 record; memory-bank updates. ACs: AC-INTEGRATION-2, AC-VERIFY-8, AC-VERIFY-9 (recorded; sign-off is human), AC-VERIFY-7 (complete). The final phase delivers the full entry-to-success flow: Player at `/payments/[paymentId]` → "Download tax invoice" → PDF; Team admin at `/teams/[teamId]/manage/exports` → "Download" → CSV/XLSX.
 
 ## Creative Phases
 
@@ -491,15 +491,15 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: 4 of 5 complete; next Phase 5
+**Build Status**: COMPLETE
+**Current Phase**: 5 of 5 complete
 **Auto-Build Mode**: YES
-**Current Step**: Phase 4 (Income exports) built 2026-11-13: lint/typecheck/build PASS, unit+integration pass, coverage gate PASS; three Codex findings fixed test-first plus an empty-export GST finding; Playwright income-exports spec written, run deferred to Phase 5
+**Current Step**: Phase 5 (End-to-end journey, accessibility, docs and accountant specimens) built 2026-11-13: lint, typecheck, build, unit+integration+coverage (96.3% statements, 89.6% branches) and Playwright (invoices and income-exports, desktop and 360 px, 4/4) all exit 0
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
 **Step Started**: 2026-11-10
 **Last Completed**: CREATIVE (2026-11-12)
-**Can Resume**: YES
-**Resume From**: Phase 5
+**Can Resume**: NO
+**Resume From**: /yay:reflect
 
 ### Active Sub-Agents
 - User Journey Design: COMPLETE
@@ -515,6 +515,7 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - Creative (2026-11-10): User Journey, Architecture, Algorithm, UI/UX complete; outputs memory-bank/creative/tax-invoices-and-exports-invoicing-{user-journey,architecture,algorithm,uiux}.md; cross-lane reconciliation recorded; NZDT spec fix
 - Creative rulings R1-R6 and plan amendments CR-1..CR-4 recorded; status CREATIVE_COMPLETE (2026-11-12)
 - Phase 4 build complete (2026-11-13): backend exports, web manage area, ADR 0021 section 8 and OpenAPI updated
+- Phase 5 build complete (2026-11-13): invoices.spec.ts, income-exports.spec.ts executed and passing, getting-started guide, specimens in docs/specimens, memory-bank updates; AC-VERIFY-9 sign-off pending (human)
 
 ### Halt State
 <!-- populated only on a halt trigger -->
@@ -573,3 +574,8 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 - Phase 4 | apps/web/src/components/invoices/income-export-form.tsx, apps/web/src/lib/invoices/export-view.ts | Deferred UX polish (phase review accepted): no post-download status line / x-export-row-count use; GST period is one grouped select (no-JS) not the two-field pair; GST option not hidden/annotated for unregistered teams.
 - Phase 4 | apps/api/src/modules/income-exports/repo.ts | Deferred verification depth: algorithm doc's EXPLAIN index-plan test and both-order snapshot-consistency test not written (single-snapshot behaviour is tested; CR-3 caps bound cost).
 - Phase 4 | apps/web/e2e/income-exports.spec.ts | Written but not run; Phase 5 must execute it and fix failures. Registrations-sse "session PUT promotes first-fit" lock-timeout flake recurred (2nd time) — track as a flaky test. Phase review: PROCEED.
+- Phase 5 | docker-compose.e2e.yml | New overlay so the E2E runs on a second Compose project (`-p sgm-e2e`: ports 3100/4100/5532/1125/8125, retagged images, `WEB_BASE_URL` on api, worker and web build) and never touches the developer's `sgm` stack. The first run showed the fake Akahu return and emails use the api's `WEB_BASE_URL`, so the overlay sets it; Codex review caught that the docs referenced a missing override and omitted `-c apps/web/playwright.config.ts` (both fixed).
+- Phase 5 | apps/web/e2e/invoices.spec.ts | One journey per project (pay on the fake adapter, player download of a real PDF, reload shows `INV-` number, wallet and payments list scans, admin `?status=paid` Invoice action, CSV with BOM and `INV-` row, XLSX `PK`). The GST-registered team is set up through `PUT /teams/:id/gst` so the document is a tax invoice. The invoice number only shows on the payment page after the next view (on-demand issuance happens in the download route), so the spec reloads before asserting it. `income-exports.spec.ts` was executed unchanged and passes on both projects.
+- Phase 5 | apps/api/src/modules/invoices/specimens.test.ts, docs/specimens/ | The accountant's four PDF variants (one player, with guests, receipt for a non-registered team, late-withdrawal fee) are rendered from the real renderer by a test that also asserts one real page each; `E2E_SPECIMEN_DIR` keeps the PDF, CSV and XLSX the E2E run downloads. A late-withdrawal specimen could not come from the E2E (no way to create a cancellation fee in the browser journey).
+- Phase 5 | docs/adr/0021-tax-invoices-and-exports.md | AC-VERIFY-9: specimens listed and a review table left `pending` (sign-off is human). ADR 0021 stays Proposed; ADR 0011's pending note was already restated on 2026-11-13. AC-VERIFY-7 needed no new code: the issuance module is on the billing allow list (`issue-invoices.ts`), `invoices/**` and the jobs are in the coverage include list.
+- Phase 5 | test environment | Integration tests ran against the e2e Postgres (`DATABASE_URL=...:5532`) with a generated `ENCRYPTION_KEYS`, because the worktree has no `.env`. First full run: `invoices-schema.int.test.ts` round trip failed with node-pg-migrate "Not run migration ... preceding already run" (passes alone, passed in the clean re-run: load flake, same family as the billing-schema round trip). The registrations-sse "session PUT promotes first-fit" flake did not recur in the clean run.

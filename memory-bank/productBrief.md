@@ -38,6 +38,7 @@
 - Payment holds and payout blocks: a payment whose bank outcome is unclear is held for review rather than marked paid or unpaid; a team whose bank account Akahu cannot pay is blocked from new paid publishes until its account is fixed
 - Team banking and GST settings: a team admin sets the bank account that receives payouts and whether the team is GST-registered. Paid sessions cannot be published until banking is set up, and, once payouts are live (wallet-and-akahu-billing), a payout account that Akahu rejects blocks new paid publishes until it is fixed. The account name and number are encrypted and write-only after save, and every approved admin of the team, including the one who made the change, is emailed when they change. Akahu verification of the account is a future feature (wallet-and-akahu-billing).
 - NZ GST (15%, 3/23 split), PDF tax invoices, and IRD-ready CSV/Excel exports
+- Tax invoices and receipts (tax-invoices-and-exports): every paid payment above $0.00 gets a numbered, immutable PDF document (a tax invoice for a GST-registered team, a receipt otherwise), issued on behalf of the team and downloadable by the payer and by the team's admins. Team admins export income as CSV or Excel by custom range, GST return period (two-monthly or six-monthly) or NZ financial year from an "Income exports" area. The accountant has not yet confirmed the wording, numbering format or export basis (AC-VERIFY-9 pending); treat them as provisional.
 - Player dashboard (Currently Opening, My Registration, Payments & Wallet) and an admin master report
 
 ## Markets Serviced
@@ -111,7 +112,8 @@
 | 2026-09-29 | Claude (/yay:init) | Initial creation from spec documents |
 | 2026-10-16 | Claude (team-banking-and-gst, Phase 5) | Added team banking and GST capability, paid-session publish gate, change notification, write-only bank details |
 | 2026-11-05 | Claude (wallet-and-akahu-billing, Phase 6 docs) | Added the wallet, post-game billing, payments and payout-block capabilities and their user flows. Akahu is an integration point with the live adapter pending (Phase 4b); not live |
+| 2026-11-13 | Claude (tax-invoices-and-exports, Phase 5) | Added the tax invoice, receipt and income export capability; accountant sign-off pending |
 
 ## Last Refreshed
 
-2026-11-05
+2026-11-13
