@@ -167,6 +167,7 @@ export async function moneyRowCounts(pool: pg.Pool): Promise<Record<string, numb
     'credit_transactions',
     'player_credits',
     'team_invoice_counters',
+    'payment_documents',
   ]) {
     const { rows } = await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`);
     counts[table] = rows[0]?.n ?? 0;

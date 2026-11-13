@@ -470,16 +470,17 @@ describe('ledger and reversibility (AC-VERIFY-2)', () => {
       // Newest first: the wallet and billing schema, the auto-enrol backlog flag, the registration lifecycle, the session
       // scheduling schema, the skill-level invariants, the banking change keys, then the banking invariants sit on top of
       // the membership invariants.
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 8 });
-      expect(reverted).toHaveLength(8);
-      expect(reverted[0]).toContain('wallet_and_billing');
-      expect(reverted[1]).toContain('auto_enrol_silent_backlog');
-      expect(reverted[2]).toContain('registration_lifecycle');
-      expect(reverted[3]).toContain('session_scheduling');
-      expect(reverted[4]).toContain('skill_levels_and_auto_enroll');
-      expect(reverted[5]).toContain('team_banking_change_keys');
-      expect(reverted[6]).toContain('team_banking_and_gst_invariants');
-      expect(reverted[7]).toContain('team_membership_invariants');
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 9 });
+      expect(reverted).toHaveLength(9);
+      expect(reverted[0]).toContain('tax_invoices');
+      expect(reverted[1]).toContain('wallet_and_billing');
+      expect(reverted[2]).toContain('auto_enrol_silent_backlog');
+      expect(reverted[3]).toContain('registration_lifecycle');
+      expect(reverted[4]).toContain('session_scheduling');
+      expect(reverted[5]).toContain('skill_levels_and_auto_enroll');
+      expect(reverted[6]).toContain('team_banking_change_keys');
+      expect(reverted[7]).toContain('team_banking_and_gst_invariants');
+      expect(reverted[8]).toContain('team_membership_invariants');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'team_members_admin_approved',

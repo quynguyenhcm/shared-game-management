@@ -119,12 +119,13 @@ describe('migration round trip, trigger order and ledger (AC-VERIFY-1)', () => {
       // Registration's O8 backlog flag (D-86, which re-creates game_sessions_version_bump with one more bookkeeping column)
       // and its lifecycle migration (D-62..D-69, which owns the widened D-85 function) sit on top; SSE's migration is the
       // third one back, under the wallet and billing schema (D-87..D-98), which widens `team_banking_in_use` only.
-      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 4 });
-      expect(reverted).toHaveLength(4);
-      expect(reverted[0]).toContain('wallet_and_billing');
-      expect(reverted[1]).toContain('auto_enrol_silent_backlog');
-      expect(reverted[2]).toContain('registration_lifecycle');
-      expect(reverted[3]).toContain('session_scheduling');
+      const reverted = await rollbackMigrations({ databaseUrl: empty.url, count: 5 });
+      expect(reverted).toHaveLength(5);
+      expect(reverted[0]).toContain('tax_invoices');
+      expect(reverted[1]).toContain('wallet_and_billing');
+      expect(reverted[2]).toContain('auto_enrol_silent_backlog');
+      expect(reverted[3]).toContain('registration_lifecycle');
+      expect(reverted[4]).toContain('session_scheduling');
       const before = await catalogSnapshot(empty.pool);
       for (const gone of [
         'recurring_rule_courts',

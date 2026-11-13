@@ -330,6 +330,13 @@ export function addLocalDays(date: LocalDate, days: number): LocalDate {
   return `${pad(moved.getUTCFullYear(), 4)}-${pad(moved.getUTCMonth() + 1)}-${pad(moved.getUTCDate())}` as LocalDate;
 }
 
+/** Whole calendar days from `a` to `b` (negative when `b` is earlier); both are wall-clock dates, so no DST enters. */
+export function diffLocalDays(a: LocalDate, b: LocalDate): number {
+  const [ya, ma, da] = a.split('-').map(Number) as [number, number, number];
+  const [yb, mb, db] = b.split('-').map(Number) as [number, number, number];
+  return (utcMs(yb, mb, db) - utcMs(ya, ma, da)) / DAY_MS; // both are UTC midnights: an exact multiple of a day
+}
+
 /** The same Pacific/Auckland wall-clock time `days` calendar days earlier (may differ from `days * 24 h`). */
 export function sameWallClockDaysBefore(
   instant: Date,

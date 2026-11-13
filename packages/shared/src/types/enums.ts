@@ -125,6 +125,13 @@ export const PayoutBlockReason = [
 ] as const;
 export type PayoutBlockReason = (typeof PayoutBlockReason)[number];
 
+/**
+ * The numbered document issued for a PAID payment above $0.00 (tax-invoices-and-exports, ADR 0021): a tax invoice for a
+ * GST-registered charge, otherwise a receipt (H2). Each kind has its own gapless series per team.
+ */
+export const PaymentDocumentKind = ['TAX_INVOICE', 'RECEIPT'] as const;
+export type PaymentDocumentKind = (typeof PaymentDocumentKind)[number];
+
 /** Every public PostgreSQL enum type, keyed by its DB name. */
 export const DB_ENUMS = {
   user_sex: UserSex,
@@ -149,4 +156,5 @@ export const DB_ENUMS = {
   payment_unapplied_reason: PaymentUnappliedReason,
   payment_resolution_reason: PaymentResolutionReason,
   payout_block_reason: PayoutBlockReason,
+  payment_document_kind: PaymentDocumentKind,
 } as const satisfies Readonly<Record<string, readonly string[]>>;

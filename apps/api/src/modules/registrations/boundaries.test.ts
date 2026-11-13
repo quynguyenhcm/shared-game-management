@@ -80,18 +80,27 @@ describe('money tables (AC-VERIFY-10)', () => {
   // A reference in code: a table name as a query-builder argument or after a SQL keyword. Prose such as the "overdue payments"
   // in a user-facing message is not a reference.
   const TABLES =
-    'payments|payment_line_items|credit_transactions|player_credits|team_invoice_counters';
+    'payments|payment_line_items|credit_transactions|player_credits|team_invoice_counters|payment_documents';
   const MONEY = new RegExp(
     `(?:selectFrom|insertInto|updateTable|deleteFrom|innerJoin|leftJoin|rightJoin)\\(\\s*['"\`](?:${TABLES})\\b|\\b(?:FROM|JOIN|INTO|UPDATE)\\s+(?:${TABLES})\\b`,
     'i',
   );
 
+  // payment_documents (tax-invoices-and-exports, D-99) is a money table too: the registrations module never writes it.
+  const MONEY_WRITE =
+    /(?:insertInto|updateTable|deleteFrom)\(\s*['"`](?:payments|payment_line_items|credit_transactions|player_credits|team_invoice_counters|payment_documents)['"`]/;
+
   it('no source writes a money table', () => {
     for (const file of own) {
-      expect(read(file), path.basename(file)).not.toMatch(
-        /(?:insertInto|updateTable|deleteFrom)\(\s*['"`](?:payments|payment_line_items|credit_transactions|player_credits|team_invoice_counters)['"`]/,
-      );
+      expect(read(file), path.basename(file)).not.toMatch(MONEY_WRITE);
     }
+  });
+
+  it('proves the money-write rule detects a violation, including one against the document snapshot table', () => {
+    expect(MONEY_WRITE.test(`db.insertInto('payment_documents').values(row)`)).toBe(true);
+    expect(MONEY_WRITE.test(`trx.updateTable("team_invoice_counters").set(x)`)).toBe(true);
+    expect(MONEY_WRITE.test(`db.selectFrom('payment_documents').selectAll()`)).toBe(false);
+    expect(MONEY.test(`SELECT 1 FROM payment_documents d`)).toBe(true);
   });
 
   it('only repo.ts mentions one, and only to count OVERDUE payments', () => {
@@ -100,7 +109,7 @@ describe('money tables (AC-VERIFY-10)', () => {
     const repo = read(named('repo.ts'));
     expect(repo.match(/\bpayments\b/g)?.length).toBeGreaterThan(0);
     expect(repo).not.toMatch(
-      /\b(?:payment_line_items|credit_transactions|player_credits|team_invoice_counters)\b/,
+      /\b(?:payment_line_items|credit_transactions|player_credits|team_invoice_counters|payment_documents)\b/,
     );
     expect(repo).toMatch(/selectFrom\(\s*['"]payments['"]\s*\)/);
   });

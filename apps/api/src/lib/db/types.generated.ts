@@ -30,6 +30,8 @@ export type GlobalRole = "GLOBAL_ADMIN" | "PLAYER" | "TEAM_ADMIN";
 
 export type MembershipStatus = "APPROVED" | "BANNED" | "PENDING" | "REJECTED";
 
+export type PaymentDocumentKind = "RECEIPT" | "TAX_INVOICE";
+
 export type PaymentHoldReason = "AMOUNT_MISMATCH" | "INDETERMINATE";
 
 export type PaymentIntentStatus = "APPLIED" | "CLOSED" | "CREATING" | "HELD" | "OPEN" | "UNAPPLIED";
@@ -212,6 +214,20 @@ export interface PaymentAttempts {
   unapplied_reason: PaymentUnappliedReason | null;
 }
 
+export interface PaymentDocuments {
+  buyer_name: string;
+  charge_reason: string;
+  created_at: Generated<Timestamp>;
+  document_kind: PaymentDocumentKind;
+  issued_at: Timestamp;
+  layout_version: Generated<number>;
+  number_display: string;
+  payment_id: string;
+  session_location: string;
+  session_starts_at: Timestamp;
+  supplier_name: string;
+}
+
 export interface PaymentLineItems {
   applied_basis: FeeBasis;
   created_at: Generated<Timestamp>;
@@ -247,7 +263,7 @@ export interface Payments {
   id: Generated<string>;
   invoice_issued_at: Timestamp | null;
   invoice_number: number | null;
-  is_tax_invoice_issued: Generated<boolean>;
+  is_tax_invoice_issued: ColumnType<boolean, never, never>;
   paid_at: Timestamp | null;
   payment_reference: string;
   pricing_structure: PricingType;
@@ -366,6 +382,7 @@ export interface SessionCourts {
 }
 
 export interface TeamInvoiceCounters {
+  document_kind: Generated<PaymentDocumentKind>;
   last_number: number;
   team_id: string;
   updated_at: Generated<Timestamp>;
@@ -463,6 +480,7 @@ export interface DB {
   oauth_states: OauthStates;
   password_reset_tokens: PasswordResetTokens;
   payment_attempts: PaymentAttempts;
+  payment_documents: PaymentDocuments;
   payment_line_items: PaymentLineItems;
   payment_reminders: PaymentReminders;
   payments: Payments;

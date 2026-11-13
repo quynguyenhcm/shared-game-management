@@ -441,7 +441,7 @@ Extensions follow the repo convention (`.ts` for logic and route handlers, `.tsx
 - [ ] `docs/adr/0021-tax-invoices-and-exports.md` — ADR (not Accepted until AC-VERIFY-9)
 
 ### Phases
-- [ ] **Phase 1: Shared tax helpers, contracts and the invoice snapshot schema.** `gstOfInclusive` with the parity matrix; financial-year and GST-period helpers with DST vectors; invoice/export API schemas and the payment invoice fields; the migration (snapshot, document kind, immutability guard, set-once) per the architecture creative; single-writer boundary rules; ADR 0021 draft and ledger rows (D-99+). ACs: AC-HAPPY-10, AC-VERIFY-3, AC-VERIFY-4, AC-VERIFY-7 (partial).
+- [x] **Phase 1: Shared tax helpers, contracts and the invoice snapshot schema.** `gstOfInclusive` with the parity matrix; financial-year and GST-period helpers with DST vectors; invoice/export API schemas and the payment invoice fields; the migration (snapshot, document kind, immutability guard, set-once) per the architecture creative; single-writer boundary rules; ADR 0021 draft and ledger rows (D-99+). ACs: AC-HAPPY-10, AC-VERIFY-3, AC-VERIFY-4, AC-VERIFY-7 (partial).
 - [ ] **Phase 2: Issuance.** `issue-invoice` queue and handler; each PAID writer enqueues it in the PAID transaction; idempotent issuance through `assign_invoice_number` with the snapshot; on-demand fallback; boot-time backfill of pre-feature PAID payments; no number for unpaid, held or $0.00. ACs: AC-ASYNC-1, 2, 3, AC-HAPPY-4, 5, AC-ERROR-1, 5.
 - [ ] **Phase 3: Documents and downloads.** Document model (tax invoice vs receipt, guests, late-withdrawal wording); pdfkit renderer with embedded font; payer and team-admin invoice routes; Next download proxies; "Download tax invoice"/"Download receipt" on the payment page and wallet list, "Invoice" row action in the admin Payments table; OpenAPI. ACs: AC-ENTRY-1, 3, AC-HAPPY-1, 2, 3, AC-ERROR-2, 6, AC-VERIFY-1, 6, AC-INTEGRATION-1.
 - [ ] **Phase 4: Income exports.** Paged "PAID in range by `paid_at`" query; CSV writer with neutralisation; XLSX writer with summary sheet; export route (TEAM_ADMIN only) with row cap refusal; "Income exports" manage area and form; OpenAPI. ACs: AC-ENTRY-2, AC-HAPPY-6, 7, 8, 9, AC-ERROR-3, 4, AC-VERIFY-2, 5, AC-INTEGRATION-3.
@@ -492,14 +492,14 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 1 of 5
+**Current Phase**: 1 of 5 complete; next Phase 2
 **Auto-Build Mode**: YES
-**Current Step**: Auto-build started (2026-11-13); building Phase 1
+**Current Step**: Phase 1 committed (2026-11-13): 4053 tests pass, lint/typecheck/build PASS, review APPROVED, coverage 96% statements
 **Creative Critique**: CREATIVE CRITIQUE: codex — usable (verdict needs-attention, 3 findings)
 **Step Started**: 2026-11-10
 **Last Completed**: CREATIVE (2026-11-12)
 **Can Resume**: YES
-**Resume From**: Phase 1
+**Resume From**: Phase 2
 
 ### Active Sub-Agents
 - User Journey Design: COMPLETE
@@ -520,3 +520,10 @@ Where the parallel docs disagree, the lane that owns the concern wins:
 
 ### Deviations
 <!-- Phase <N> | <file:line/artifact> | <rationale> -->
+- Phase 1 | db/migrations/20261110000100000_tax_invoices.sql | CR-1 preflight also aborts (naming ids) on a numbered payment with no registration or no session start, because `payment_documents.session_*` are NOT NULL and cannot be snapshotted; the spec only named "not PAID above $0.00". Legacy numbered rows convert by `gst_registered`, so a team with both registered and unregistered legacy numbers keeps every number but each series may start with a hole (recorded in ADR 0021; no document was ever printed and no production payment exists before Akahu is live).
+- Phase 1 | db/schema-deviations.md | D-99..D-105 are in a second table ("Three-digit ids") because `D-100` widens the ID column and prettier would otherwise re-pad all 98 existing rows; the schema test reads rows by `^| D-\d+`, so both tables count.
+- Phase 1 | packages/shared/src/api/errors.ts, apps/api/src/lib/http/errors.ts | The three new error codes (`invoice_not_available`, `invoice_pending`, `export_too_large`) land in Phase 1 with their status and message (the `ERROR_DEFAULTS` record is exhaustive, so the shared list cannot grow alone). `export_busy` (CR-3) is left to Phase 4. `PaymentDocumentRef` is defined in `api/invoices.ts` but NOT yet on the billing DTOs (CR-4: Phase 3).
+- Phase 1 | apps/api/src/modules/invoices/boundaries.test.ts | The single-writer rules are a new `modules/invoices/boundaries.test.ts` (architecture section 6) plus `payment_documents` added to the registrations money-table rule, rather than only the registrations file named in the phase brief; the invoices file scans all of `apps/api/src`, so it guards billing and wallet too.
+- Phase 1 | apps/api/test/integration/{registrations,sessions,teams,skill-levels,team-banking-upgrade,billing}-schema.int.test.ts | The new migration sits on top, so every "roll back the newest N migrations" count moved up by one and `tax_invoices` heads each ordered list; `billing-schema` now rolls back twice to reach the wallet migration.
+- Phase 1 | apps/api/test/integration/invoice-number.int.test.ts | Numbers are now allocated only through `issue_payment_document`, so the race test asserts the idempotent outcome (the loser gets the winner's document back with `issued = false`) instead of the old 23000 set-once error, which now only a direct `assign_invoice_number` call raises. The sleep-based ordering became `waitForLockWaiters`.
+- Phase 1 | apps/api/.kysely-codegenrc.json | `payments.is_tax_invoice_issued` is overridden to `ColumnType<boolean, never, never>` (generated column, like `gst_amount`), so no TypeScript can write it.

@@ -82,6 +82,10 @@ const AUTHORITATIVE_ERROR_CODES = [
   'payment_provider_refused',
   'reminder_too_soon',
   'hold_resolved_by_provider',
+  // tax-invoices-and-exports (architecture Decision 4)
+  'invoice_not_available',
+  'invoice_pending',
+  'export_too_large',
 ] as const;
 
 const TEAM_ERROR_STATUSES = [
@@ -118,6 +122,9 @@ const TEAM_ERROR_STATUSES = [
   ['payment_provider_refused', 422],
   ['reminder_too_soon', 409],
   ['hold_resolved_by_provider', 409],
+  ['invoice_not_available', 409],
+  ['invoice_pending', 409],
+  ['export_too_large', 422],
 ] as const;
 
 const apps: FastifyInstance[] = [];
