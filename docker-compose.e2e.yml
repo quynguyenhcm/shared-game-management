@@ -1,0 +1,40 @@
+# Overlay for a SECOND, disposable stack used by the end-to-end journeys, so a running development stack (`sgm`) is never touched.
+# It remaps every host port, retags the images (so `--build` cannot move the `sgm-*:dev` tags) and points the api and worker at
+# the new web origin (the fake Akahu return and the emails use WEB_BASE_URL; the web image bakes its host at build time). The overlay hard-sets
+# WEB_BASE_URL=http://localhost:3100 for api, worker and web (build arg and runtime), whatever the shell exports.
+#
+#   docker compose -p sgm-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+#   docker compose -p sgm-e2e -f docker-compose.yml -f docker-compose.e2e.yml down -v     # its own volumes only
+#
+# Needs the repository's `.env` (run `pnpm run setup` once). Ports: web 3100, api 4100, Postgres 5532, Mailpit 1125 and 8125.
+services:
+  postgres:
+    ports: !override
+      - '127.0.0.1:5532:5432'
+  mailpit:
+    ports: !override
+      - '127.0.0.1:1125:1025'
+      - '127.0.0.1:8125:8025'
+  api:
+    image: sgm-e2e-api:dev
+    environment:
+      AUTH_FAKE_OAUTH: 'true'
+      PAYMENTS_ADAPTER: fake
+      WEB_BASE_URL: http://localhost:3100
+    ports: !override
+      - '127.0.0.1:4100:4000'
+  worker:
+    image: sgm-e2e-api:dev
+    environment:
+      PAYMENTS_ADAPTER: fake
+      WEB_BASE_URL: http://localhost:3100
+  web:
+    # Hard-set (not inherited from the shell): an e2e build can never bake, or redirect to, the dev web on localhost:3000.
+    build:
+      args:
+        WEB_BASE_URL: http://localhost:3100
+    image: sgm-e2e-web:dev
+    environment:
+      WEB_BASE_URL: http://localhost:3100
+    ports: !override
+      - '127.0.0.1:3100:3000'

@@ -7,12 +7,15 @@
  * most once per `SYNC_THROTTLE_MS` of the attempt's last real read. The page never calls Akahu and never applies a result.
  */
 import {
+  documentKindOf,
   intentOutcome,
+  isDocumentAvailable,
   toMoneyString,
   type AttemptResponse,
   type MyPaymentRow,
   type MyPaymentsQuery,
   type MyPaymentsResponse,
+  type PaymentDocumentRef,
   type PaymentReason,
   type PaymentResponse,
   type StartAttemptRequest,
@@ -54,6 +57,13 @@ export interface PlayerPaymentsService {
 const reasonOf = (row: PlayerPaymentRow): PaymentReason =>
   row.lateWithdrawal ? 'LATE_WITHDRAWAL' : 'CONFIRMED';
 
+/** The document reference of a payment: its kind from the charge-time snapshot, available while PAID above $0.00 (on demand covers the gap before issuance), its frozen number once issued. */
+const documentOf = (row: PlayerPaymentRow): PaymentDocumentRef => ({
+  kind: documentKindOf(row.gstRegistered),
+  available: isDocumentAvailable(row.status, toMoneyString(row.amount)),
+  number: row.documentNumber,
+});
+
 function toMyRow(row: PlayerPaymentRow): MyPaymentRow {
   return {
     id: row.id,
@@ -70,6 +80,7 @@ function toMyRow(row: PlayerPaymentRow): MyPaymentRow {
     outcome: intentOutcome(row.latestAttempt),
     onHold: row.onHold,
     payoutBlocked: !row.payoutConfigured,
+    document: documentOf(row),
   };
 }
 
@@ -145,6 +156,7 @@ export function createPlayerPaymentsService(deps: PlayerPaymentsDeps): PlayerPay
                 },
           onHold: row.onHold,
           payoutBlocked: !row.payoutConfigured,
+          document: documentOf(row),
         },
       };
     },

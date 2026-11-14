@@ -221,6 +221,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -312,6 +316,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -403,6 +411,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -494,6 +506,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -666,6 +682,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -757,6 +777,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -848,6 +872,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -939,6 +967,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1088,6 +1120,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1237,6 +1273,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1328,6 +1368,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1419,6 +1463,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1555,6 +1603,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1646,6 +1698,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1737,6 +1793,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1876,6 +1936,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -1967,6 +2031,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2219,6 +2287,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2310,6 +2382,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2401,6 +2477,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2492,6 +2572,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2583,6 +2667,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2674,6 +2762,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2765,6 +2857,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2902,6 +2998,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -2993,6 +3093,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3231,6 +3335,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3322,6 +3430,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3413,6 +3525,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3559,6 +3675,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3682,6 +3802,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3773,6 +3897,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3864,6 +3992,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -3975,6 +4107,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4066,6 +4202,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4157,6 +4297,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4248,6 +4392,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4508,6 +4656,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4599,6 +4751,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4770,6 +4926,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -4919,6 +5079,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5082,6 +5246,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5173,6 +5341,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5264,6 +5436,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5355,6 +5531,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5523,6 +5703,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5614,6 +5798,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5773,6 +5961,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5864,6 +6056,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -5955,6 +6151,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6046,6 +6246,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6137,6 +6341,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6258,6 +6466,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6349,6 +6561,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6440,6 +6656,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6561,6 +6781,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6652,6 +6876,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -6743,6 +6971,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7022,6 +7254,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7113,6 +7349,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7204,6 +7444,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7463,6 +7707,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7554,6 +7802,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7645,6 +7897,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7736,6 +7992,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -7827,6 +8087,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8085,6 +8349,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8176,6 +8444,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8267,6 +8539,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8358,6 +8634,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8449,6 +8729,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8706,6 +8990,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8797,6 +9085,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8888,6 +9180,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -8979,6 +9275,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9070,6 +9370,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9328,6 +9632,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9419,6 +9727,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9510,6 +9822,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9601,6 +9917,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9692,6 +10012,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -9964,6 +10288,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10055,6 +10383,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10146,6 +10478,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10237,6 +10573,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10328,6 +10668,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10500,6 +10844,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10591,6 +10939,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10682,6 +11034,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10773,6 +11129,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -10969,6 +11329,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11060,6 +11424,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11151,6 +11519,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11242,6 +11614,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11415,6 +11791,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11506,6 +11886,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11597,6 +11981,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11688,6 +12076,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11820,6 +12212,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -11911,6 +12307,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12002,6 +12402,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12093,6 +12497,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12251,6 +12659,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12342,6 +12754,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12433,6 +12849,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12524,6 +12944,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12826,6 +13250,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -12917,6 +13345,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13008,6 +13440,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13099,6 +13535,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13319,6 +13759,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13627,6 +14071,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13718,6 +14166,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13809,6 +14261,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -13900,6 +14356,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -14120,6 +14580,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -14309,6 +14773,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -14400,6 +14868,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -14804,6 +15276,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -14895,6 +15371,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -14986,6 +15466,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15264,6 +15748,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15355,6 +15843,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15446,6 +15938,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15537,6 +16033,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15628,6 +16128,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15804,6 +16308,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15895,6 +16403,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -15986,6 +16498,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16077,6 +16593,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16168,6 +16688,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16295,6 +16819,25 @@ paths:
                             - type: "null"
                         onHold:
                           type: boolean
+                        document:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                              enum:
+                                - TAX_INVOICE
+                                - RECEIPT
+                            available:
+                              type: boolean
+                            number:
+                              type:
+                                - string
+                                - "null"
+                          required:
+                            - kind
+                            - available
+                            - number
+                          additionalProperties: false
                       required:
                         - id
                         - reference
@@ -16306,6 +16849,7 @@ paths:
                         - paidAt
                         - lastReminderAt
                         - onHold
+                        - document
                       additionalProperties: false
                   nextCursor:
                     type:
@@ -16390,6 +16934,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16481,6 +17029,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16572,6 +17124,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16731,6 +17287,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16822,6 +17382,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -16913,6 +17477,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17004,6 +17572,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17095,6 +17667,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17379,6 +17955,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17470,6 +18050,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17561,6 +18145,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17734,6 +18322,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17825,6 +18417,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -17916,6 +18512,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18049,6 +18649,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18182,6 +18786,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18309,6 +18917,25 @@ paths:
                                 type: boolean
                               payoutBlocked:
                                 type: boolean
+                              document:
+                                type: object
+                                properties:
+                                  kind:
+                                    type: string
+                                    enum:
+                                      - TAX_INVOICE
+                                      - RECEIPT
+                                  available:
+                                    type: boolean
+                                  number:
+                                    type:
+                                      - string
+                                      - "null"
+                                required:
+                                  - kind
+                                  - available
+                                  - number
+                                additionalProperties: false
                             required:
                               - id
                               - reference
@@ -18324,6 +18951,7 @@ paths:
                               - outcome
                               - onHold
                               - payoutBlocked
+                              - document
                             additionalProperties: false
                       required:
                         - teamId
@@ -18410,6 +19038,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18501,6 +19133,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18671,6 +19307,25 @@ paths:
                         type: boolean
                       payoutBlocked:
                         type: boolean
+                      document:
+                        type: object
+                        properties:
+                          kind:
+                            type: string
+                            enum:
+                              - TAX_INVOICE
+                              - RECEIPT
+                          available:
+                            type: boolean
+                          number:
+                            type:
+                              - string
+                              - "null"
+                        required:
+                          - kind
+                          - available
+                          - number
+                        additionalProperties: false
                     required:
                       - id
                       - reference
@@ -18687,6 +19342,7 @@ paths:
                       - attempt
                       - onHold
                       - payoutBlocked
+                      - document
                     additionalProperties: false
                 required:
                   - payment
@@ -18763,6 +19419,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18854,6 +19514,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -18945,6 +19609,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19092,6 +19760,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19183,6 +19855,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19274,6 +19950,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19407,6 +20087,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19540,6 +20224,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19664,6 +20352,25 @@ paths:
                           type: boolean
                         payoutBlocked:
                           type: boolean
+                        document:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                              enum:
+                                - TAX_INVOICE
+                                - RECEIPT
+                            available:
+                              type: boolean
+                            number:
+                              type:
+                                - string
+                                - "null"
+                          required:
+                            - kind
+                            - available
+                            - number
+                          additionalProperties: false
                       required:
                         - id
                         - reference
@@ -19679,6 +20386,7 @@ paths:
                         - outcome
                         - onHold
                         - payoutBlocked
+                        - document
                       additionalProperties: false
                   nextCursor:
                     type:
@@ -19760,6 +20468,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19851,6 +20563,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -19942,6 +20658,1674 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /payments/{paymentId}/invoice:
+    get:
+      operationId: downloadMyPaymentDocument
+      summary: Download the tax invoice or receipt of a payment (payer only)
+      description: "The PDF tax invoice (a GST-registered team's payment) or receipt
+        (otherwise) of the caller's own payment. A PAID payment above $0.00
+        only: 409 `invoice_not_available` (\"An invoice is available once the
+        payment is paid.\") for a pending, overdue, held, processing or $0.00
+        payment, and no invoice number is consumed. If the document has not been
+        issued yet it is issued now (never twice); 409 `invoice_pending` if
+        another issuer holds the lock for longer than the lock wait: retry
+        shortly. Only the payer can download it: any other signed-in caller, a
+        team admin who is not the payer, and an unknown id all get the same 404
+        `not_found`."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: paymentId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: 'The tax invoice or receipt as a PDF attachment
+            (`content-disposition: attachment;
+            filename="tax-invoice-INV-000001.pdf"`, `cache-control: no-store`).'
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/payments/{paymentId}/invoice:
+    get:
+      operationId: downloadTeamPaymentDocument
+      summary: Download a team payment's tax invoice or receipt (team admin)
+      description: "The same PDF the payer gets, for any payment of the team. A PAID
+        payment above $0.00 only: 409 `invoice_not_available` (\"An invoice is
+        available once the payment is paid.\") for a pending, overdue, held,
+        processing or $0.00 payment, and no invoice number is consumed. If the
+        document has not been issued yet it is issued now (never twice); 409
+        `invoice_pending` if another issuer holds the lock for longer than the
+        lock wait: retry shortly. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off): a plain member and an admin of another team
+        get 403, and a payment that is not this team's (or an unknown id) gets
+        404 `not_found`. The document names the player (as the invoice buyer)
+        and never shows an email address."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: paymentId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: 'The tax invoice or receipt as a PDF attachment
+            (`content-disposition: attachment;
+            filename="tax-invoice-INV-000001.pdf"`, `cache-control: no-store`).'
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/exports/income:
+    get:
+      operationId: exportTeamIncome
+      summary: Export the team's income (PAID payments) as CSV or Excel (team admin)
+      description: "The team's PAID payments whose paid date (Pacific/Auckland) falls
+        in the period, both ends included, ordered by paid time, then invoice
+        number (blank last), then id.
+        `period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD`,
+        `period=gst&cadence=2m-odd|2m-even|6m-mar-sep&end=YYYY-MM` (the month
+        the GST period ends) or `period=fy&year=2026-27` (1 April to 31 March),
+        with `format=csv|xlsx`. Columns: invoice number, paid date, game date,
+        player, description, subtotal, GST, total, GST registered, paid by,
+        reference (stored amounts, never recomputed; no contact detail, bank
+        detail or payment-provider id). A $0.00 payment is listed with a blank
+        number. The Excel file adds a Summary sheet whose totals equal the rows.
+        422 `validation_failed` with `fieldErrors` for an end before the start,
+        an impossible date, a range over 2,557 days, a start in the future, a
+        period that has not started, an unknown format, cadence, period end or
+        financial year, or an unknown key; a valid range with nothing paid is a
+        file with only the header (and a zero Summary). 422 `export_too_large`
+        (\"Choose a shorter range.\") when the range holds more rows than
+        `INCOME_EXPORT_MAX_ROWS` or the file would pass
+        `INCOME_EXPORT_MAX_BYTES`: never a truncated file. 429 `export_busy`
+        (with `retry-after`) while this team already has an export running or
+        the server's export limit is reached. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off, H9): a plain member, an admin of another
+        team and a GLOBAL_ADMIN who is not an admin of this team get 403 before
+        the query is read."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - csv
+              - xlsx
+          in: query
+          name: format
+          required: true
+        - schema:
+            type: string
+            enum:
+              - custom
+              - gst
+              - fy
+          in: query
+          name: period
+          required: true
+        - schema:
+            type: string
+          in: query
+          name: from
+          required: false
+        - schema:
+            type: string
+          in: query
+          name: to
+          required: false
+        - schema:
+            type: string
+            enum:
+              - 2m-odd
+              - 2m-even
+              - 6m-mar-sep
+          in: query
+          name: cadence
+          required: false
+        - schema:
+            type: string
+          in: query
+          name: end
+          required: false
+        - schema:
+            type: string
+          in: query
+          name: year
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: 'The income export as an attachment: `text/csv; charset=utf-8`
+            (UTF-8 with a byte-order mark, CRLF, RFC 4180) or an `.xlsx`
+            workbook with a "Payments" sheet and a "Summary" sheet.
+            `content-disposition: attachment;
+            filename="income_<team>_<period>.<csv|xlsx>"`, an exact
+            `content-length`, `x-export-row-count` (data rows), `cache-control:
+            no-store`.'
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /teams/{teamId}/exports/income/periods:
+    get:
+      operationId: listIncomeExportPeriods
+      summary: What the income export form can offer (team admin)
+      description: "`today` (the API clock's New Zealand date), `firstPaidDate` (the
+        New Zealand date of the team's first PAID payment, or null),
+        `financialYearsWithPayments` (start years of the financial years holding
+        at least one PAID payment, oldest first; the form adds the current
+        year), `maxRows` (`INCOME_EXPORT_MAX_ROWS`) and `maxRangeDays` (2,557).
+        The GST period lists are built from these by the shared `tax/` helpers,
+        so the form and the API cannot disagree. TEAM_ADMIN of this team only
+        (`allowGlobalAdmin` is off, H9): a plain member, an admin of another
+        team and a GLOBAL_ADMIN who is not an admin of this team get 403 before
+        the query is read."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: teamId
+          required: true
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  today:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}$
+                  firstPaidDate:
+                    anyOf:
+                      - type: string
+                        pattern: ^\d{4}-\d{2}-\d{2}$
+                      - type: "null"
+                  financialYearsWithPayments:
+                    type: array
+                    items:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                  maxRows:
+                    type: integer
+                    exclusiveMinimum: 0
+                    maximum: 9007199254740991
+                  maxRangeDays:
+                    type: integer
+                    exclusiveMinimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - today
+                  - firstPaidDate
+                  - financialYearsWithPayments
+                  - maxRows
+                  - maxRangeDays
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20060,6 +22444,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20151,6 +22539,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20310,6 +22702,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20401,6 +22797,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20492,6 +22892,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20583,6 +22987,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20760,6 +23168,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20851,6 +23263,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -20942,6 +23358,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21033,6 +23453,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21124,6 +23548,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21215,6 +23643,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21398,6 +23830,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21489,6 +23925,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21580,6 +24020,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21671,6 +24115,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21762,6 +24210,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -21853,6 +24305,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -22216,6 +24672,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -22307,6 +24767,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -22398,6 +24862,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -22489,6 +24957,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -23060,6 +25532,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -24204,6 +26680,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -24295,6 +26775,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -24386,6 +26870,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -24477,6 +26965,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -25048,6 +27540,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -25854,6 +28350,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -25945,6 +28445,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -26036,6 +28540,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -26127,6 +28635,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -26698,6 +29210,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -27649,6 +30165,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -27740,6 +30260,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -27831,6 +30355,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -27922,6 +30450,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -28493,6 +31025,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -29324,6 +31860,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -29415,6 +31955,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -29506,6 +32050,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -29597,6 +32145,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -30168,6 +32720,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -30994,6 +33550,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -31085,6 +33645,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -31176,6 +33740,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -31267,6 +33835,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -31838,6 +34410,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -33067,6 +35643,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -33158,6 +35738,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -33249,6 +35833,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -33340,6 +35928,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -33911,6 +36503,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -34557,6 +37153,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -34648,6 +37248,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -34739,6 +37343,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -34830,6 +37438,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -35401,6 +38013,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -36251,6 +38867,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -36342,6 +38962,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -36433,6 +39057,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -36524,6 +39152,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -37095,6 +39727,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -38141,6 +40777,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -38232,6 +40872,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -38323,6 +40967,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -38414,6 +41062,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -38985,6 +41637,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -39898,6 +42554,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -39989,6 +42649,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -40080,6 +42744,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -40171,6 +42839,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -40742,6 +43414,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -41605,6 +44281,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -41696,6 +44376,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -41787,6 +44471,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -41878,6 +44566,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:
@@ -42449,6 +45141,10 @@ paths:
                           - payment_provider_refused
                           - reminder_too_soon
                           - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
                       message:
                         type: string
                       fieldErrors:

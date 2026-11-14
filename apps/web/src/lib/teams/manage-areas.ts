@@ -15,6 +15,9 @@ export const MANAGE_AREAS: readonly ManageArea[] = [
   { id: 'banking', label: 'Banking and GST', segment: 'banking' },
   { id: 'sessions', label: 'Sessions', segment: 'sessions' },
   { id: 'payments', label: 'Payments', segment: 'payments' },
+  // TEAM_ADMIN only (tax-invoices-and-exports AC-ENTRY-2, H9): not GLOBAL_ADMIN_AREA_ID, so a global admin who is not a
+  // team admin never gets the link, and the API answers them 403 like a plain member.
+  { id: 'exports', label: 'Income exports', segment: 'exports' },
 ];
 
 /** The one area a GLOBAL_ADMIN who is not a team admin may open (CR-21): support reads Payments, nothing else. */

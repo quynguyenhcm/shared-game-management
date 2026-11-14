@@ -68,6 +68,18 @@ export default defineConfig({
         'apps/api/src/lib/akahu/**/*.ts',
         'packages/shared/src/billing/**/*.ts',
         'packages/shared/src/api/billing.ts',
+        // tax-invoices-and-exports (AC-VERIFY-7): the shared period helpers and the invoice and export contracts (the shared
+        // document rules in `invoice/` are already measured), and (Phase 2) the invoices module and the two issuance jobs.
+        // Phase 3 adds no new path: the document model, renderer, routes and font loader live under modules/invoices, the shared
+        // document copy and long date formats under `invoice/` and `time/`, the download headers under `lib/http` and the web proxy
+        // under `apps/web/src/lib`, all already measured. Phase 4 adds the income-exports module and the tabular writers (the
+        // shared export columns sit under `invoice/`, already measured).
+        'packages/shared/src/tax/**/*.ts',
+        'packages/shared/src/api/invoices.ts',
+        'apps/api/src/modules/invoices/**/*.ts',
+        'apps/api/src/jobs/{issue-invoices,invoice-reconcile}.ts',
+        'apps/api/src/modules/income-exports/**/*.ts',
+        'apps/api/src/lib/tabular/**/*.ts',
         'apps/web/src/lib/**/*.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.int.test.ts'],

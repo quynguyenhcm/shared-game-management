@@ -183,4 +183,31 @@ describe('OpenAPI document', () => {
       expect(source).toContain("from '@sgm/shared'");
     }
   });
+
+  it('documents the two invoice downloads as bearer-protected PDF attachments with their 401, 403, 404 and 409 answers (invoices AC-VERIFY-6)', async () => {
+    const document = (await generateOpenApiDocument()) as unknown as OpenApiDocument;
+    for (const [path, extra] of [
+      ['/payments/{paymentId}/invoice', []],
+      ['/teams/{teamId}/payments/{paymentId}/invoice', ['403']],
+    ] as const) {
+      const operation = operationOf(document, path, 'get') as Operation & {
+        operationId?: string;
+        responses: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+      };
+      expect(operation.security?.some((entry) => 'sessionToken' in entry)).toBe(true);
+      expect(Object.keys(operation.responses)).toEqual(
+        expect.arrayContaining(['200', '401', '404', '409', '422', ...extra]),
+      );
+      expect(operation.responses['200']?.content?.['application/pdf']?.schema).toEqual({
+        type: 'string',
+        format: 'binary',
+      });
+    }
+    expect(operationOf(document, '/payments/{paymentId}/invoice', 'get')).toMatchObject({
+      operationId: 'downloadMyPaymentDocument',
+    });
+    expect(
+      operationOf(document, '/teams/{teamId}/payments/{paymentId}/invoice', 'get'),
+    ).toMatchObject({ operationId: 'downloadTeamPaymentDocument' });
+  });
 });

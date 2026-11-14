@@ -75,6 +75,12 @@ export const ErrorCode = [
   'payment_provider_refused',
   'reminder_too_soon',
   'hold_resolved_by_provider',
+  // tax invoices and income exports (tax-invoices-and-exports architecture Decision 4)
+  'invoice_not_available',
+  'invoice_pending',
+  'export_too_large',
+  // ...and the bounded export semaphore (tax-invoices-and-exports CR-3)
+  'export_busy',
 ] as const;
 export type ErrorCode = (typeof ErrorCode)[number];
 

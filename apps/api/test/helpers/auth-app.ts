@@ -10,6 +10,7 @@ import { buildApp, type AppDeps } from '../../src/app.ts';
 import { createFakePaymentsGateway } from '../../src/lib/akahu/fake-adapter.ts';
 import { createManualClock, type ManualClock } from '../../src/lib/clock.ts';
 import { createCrypto } from '../../src/lib/crypto/crypto.ts';
+import { createBackendCanceller } from '../../src/lib/db/cancel.ts';
 import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createKysely, type Database } from '../../src/lib/db/kysely.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
@@ -83,6 +84,8 @@ export interface AuthTestOptions {
   readonly recurrenceHorizonDays?: number;
   /** The payments gateway (webhook keys, starts); the stateless fake by default. */
   readonly paymentsGateway?: AppDeps['paymentsGateway'];
+  /** The income export limits (CR-3); the config defaults when omitted. */
+  readonly incomeExports?: AppDeps['incomeExports'];
 }
 
 export async function buildAuthTestApp(
@@ -115,6 +118,11 @@ export async function buildAuthTestApp(
     recurrenceHorizonDays: options.recurrenceHorizonDays ?? config.recurrence.horizonDays,
     paymentsGateway: options.paymentsGateway ?? createFakePaymentsGateway(),
     payments: config.payments,
+    incomeExports: options.incomeExports ?? config.incomeExports,
+    // The same database as `pool`, on a connection of its own (the pool may be exhausted by the exports it cancels).
+    cancelBackend: createBackendCanceller({
+      connectionString: pool.options.connectionString ?? config.databaseUrl,
+    }),
     ...(options.extraPlugins === undefined ? {} : { extraPlugins: options.extraPlugins }),
   };
   const app = await buildApp(deps);

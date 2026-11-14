@@ -480,6 +480,108 @@ Run against a test team with payout configured, in Akahu's sandbox, with the wor
 
 Keep the fixtures recorded from these runs with their provenance (sandbox-real), as ADR 0020 requires.
 
+## Tax invoices, receipts and income exports
+
+Every PAID payment above $0.00 gets one numbered document, issued by the platform as the team's agent (ADR 0021, ADR 0011).
+A team registered for GST at the time of the charge gets a **tax invoice** (`INV-000123`); any other team gets a **receipt**
+(`RCT-000123`, no GST wording). Each team has two gapless series, one per kind. The PDF is rendered on demand from a frozen
+snapshot (`payment_documents`), so the same payment always downloads the same content and a wording change never touches stored
+records. **The wording, the number format and the export basis are provisional until the accountant's review is recorded in
+ADR 0021** (see "Accountant review" below).
+
+### Players and team admins
+
+- A player opens `/payments/<id>` (or the wallet's paid list) and chooses **Download tax invoice** or **Download receipt**.
+- A team admin sees the same file as **Invoice** on a row of `/teams/<id>/manage/payments`. Global admins have no access (H9).
+- A refused or failed download lands back on the page you came from with a message, never a blank tab.
+
+### Exporting income for a GST return or the financial year
+
+A team admin opens **Income exports** in the team's admin areas (`/teams/<id>/manage/exports`) and chooses:
+
+1. **Period**: _Financial year_ (1 April to 31 March), _GST period_ (two-monthly with odd or even month-ends, or six-monthly ending
+   March or September), or _Custom range_ (up to 2,557 days, seven years). Boundaries are Pacific/Auckland midnights, so 1 April
+   00:00 NZDT is `2027-03-31T11:00:00Z`.
+2. **Format**: Excel (`.xlsx`, the default) or CSV (UTF-8 with a byte-order mark and CRLF line ends, so Excel opens macrons).
+3. **Download**. The page stays where it is. A bad range comes back with the message next to the field.
+
+What is in the file (the same list is on the page under "What's in the file"): one row per PAID payment in the period, by **paid
+date**, with these columns: Invoice number, Paid date, Game date, Player, Description, Subtotal, GST, Total, GST registered,
+Paid by (Wallet or Bank), Reference (the payment reference on the bank statement). The Excel file also has a **Summary** sheet
+(team, GST number, period, basis, counts of numbered, $0.00 and awaiting-number rows, and the Subtotal, GST and Total sums).
+Subtotal, GST and Total are the stored amounts of each payment, so the totals reconcile to the sum of the invoices: the GST in the
+file is the GST printed on the documents, never recomputed. Text that could start a formula (`=`, `+`, `-`, `@`) is neutralised in
+both formats. Row, byte and concurrency limits are under "Income export limits" below.
+
+### Re-running a failed issuance job
+
+Issuance runs in the worker (`issue-invoices` per team, enqueued in the PAID transaction; `invoice-reconcile` every 15 minutes
+and at boot, which also backfills payments paid before the feature). A download of an unissued payment also issues it on demand,
+so a stuck job never blocks a player; a rare lock timeout answers "invoice pending, try again".
+
+1. Find the failure. Failed jobs stay in `pgboss.job` with state `failed`; the worker log lines `invoice.issued` and
+   `invoice.issue.skipped` (reason `not_paid`, `zero_amount` or `already_issued`) carry ids, counts and kinds only.
+2. Re-run the sweep, which queues `issue-invoices` for every team with an unnumbered PAID payment (safe to repeat):
+
+   ```sh
+   pnpm run jobs:trigger invoice-reconcile
+   ```
+
+3. Or re-run one team: `pnpm run jobs:trigger issue-invoices '{"teamId":"<team-uuid>"}'`.
+
+### A player says the invoice has the wrong detail
+
+The stored snapshot is final (H5): a document is never edited, voided or deleted in v1, and numbers are never reused. Corrections,
+credit notes and refunds are made outside the app and are a follow-up feature. Do not hand-edit `payment_documents` (triggers
+refuse it). The down migration also refuses once any document exists (CR-2): recover with a forward migration.
+
+### Running the invoice and export E2E against a separate stack
+
+`apps/web/e2e/invoices.spec.ts` (pay on the fake adapter, download the invoice, export) and `income-exports.spec.ts` run on a
+desktop and a 360 x 740 project. They need a stack with `AUTH_FAKE_OAUTH=true` and the fake Akahu adapter. To keep your development
+stack (`sgm`) untouched, run them against a second Compose project (`docker-compose.e2e.yml` remaps the host ports to 3100, 4100,
+5532, 1125 and 8125, retags the images so `--build` cannot move the `sgm-*:dev` tags, and points the api, worker and web build at
+`WEB_BASE_URL=http://localhost:3100` (hard-set in the overlay, so an exported `WEB_BASE_URL` cannot send the run to the dev web on port 3000; the Playwright command still sets it for the test runner; it needs the repository's `.env`):
+
+```sh
+docker compose -p sgm-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait
+WEB_BASE_URL=http://localhost:3100 E2E_API_URL=http://localhost:4100 \
+  E2E_DATABASE_URL=postgres://sgm:sgm@localhost:5532/sgm MAILPIT_API_URL=http://localhost:8125 \
+  E2E_WORKER_CONTAINER=sgm-e2e-worker-1 E2E_API_CONTAINER=sgm-e2e-api-1 \
+  pnpm exec playwright test -c apps/web/playwright.config.ts apps/web/e2e/invoices.spec.ts apps/web/e2e/income-exports.spec.ts
+docker compose -p sgm-e2e down -v     # removes only the e2e project's containers and volumes
+```
+
+Set `E2E_SPECIMEN_DIR=<dir>` to keep the PDF, CSV and XLSX the invoices run downloads. The four PDF variants for the accountant
+are rendered from the real renderer by `SPECIMEN_DIR=<dir> pnpm exec vitest run apps/api/src/modules/invoices/specimens.test.ts`;
+the committed set is in `docs/specimens/`.
+
+### Accountant review (AC-VERIFY-9)
+
+Hand `docs/specimens/` to the accountant with ADR 0021's list of open rulings (H4, H5, H6, H10, H12, the numbering format and the
+receipt for a non-registered team). Record the outcome (approved, or the required changes), the date and the reviewer in the
+"Accountant review record" of ADR 0021 and set its status, then restate the "pending" note in ADR 0011. Wording changes are one
+edit in `packages/shared/src/invoice/document-copy.ts` and `export-columns.ts`.
+
+## Income export limits
+
+Team admins download their income (PAID payments) as CSV or Excel from `GET /teams/:teamId/exports/income` (ADR 0021). Each
+export is built completely in the api before it is sent, inside one read-only database snapshot, so it is bounded by three api
+environment variables. Each can be lowered; none can be raised past its ceiling (the api refuses to boot):
+
+| Variable                       | Default    | Allowed             | Meaning                                                                                                    |
+| ------------------------------ | ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `INCOME_EXPORT_MAX_ROWS`       | `50000`    | 1 to 50,000         | More PAID payments in the range is refused with 422 `export_too_large` ("Choose a shorter range.").        |
+| `INCOME_EXPORT_MAX_BYTES`      | `33554432` | 1,024 to 67,108,864 | The file (CSV bytes, or the zipped XLSX) may not grow past this while it is built: 422 `export_too_large`. |
+| `INCOME_EXPORT_MAX_CONCURRENT` | `2`        | 1 to 8              | Exports running at once in one api process, and never two for the same team: 429 `export_busy`.            |
+
+- **Never truncated.** A refused export returns a JSON error and no file. A client that disconnects cancels the export's
+  database statement and frees its slot (logged as `income_export.cancelled`).
+- **Logs.** `income_export.generated` carries the team id, the period type, the format and the row count only;
+  `income_export.refused` carries the team id and the reason (`rows`, `bytes`, `money_range` or `busy`).
+- **Measured.** `apps/api/test/integration/income-exports-load.int.test.ts` exports 50,000 rows in both formats and runs four
+  concurrent worst-case-width exports; it prints its timings and sizes (`--silent=false`).
+
 ## Money and time rules
 
 - Money in the database is `NUMERIC(10,2)`, on the wire a 2-decimal string (`MoneyString`), and in TypeScript branded `bigint`
@@ -489,7 +591,7 @@ Keep the fixtures recorded from these runs with their provenance (sandbox-real),
   and converted only with `@sgm/shared` time helpers (`localToInstant`, `instantToLocal`). User input uses `reject` for
   nonexistent and ambiguous local times; derived times use `compatible`. Display dates as `DD/MM/YYYY` (`formatNz*`).
   `game_sessions.starts_at` and `ends_at` are written only by database triggers.
-- Invoice numbers come from `assign_invoice_number(payment_id)` inside the issuing transaction (gapless per team, `INV-000123`).
+- Invoice numbers come only from the SQL function `issue_payment_document(payment_id)` (gapless per team and per kind: `INV-000123` tax invoices, `RCT-000123` receipts), never from application code (ADR 0021).
 
 ## Tracing
 

@@ -7,6 +7,7 @@ import { systemClock } from './lib/clock.ts';
 import { loadConfig } from './lib/config/config.ts';
 import { createCrypto } from './lib/crypto/crypto.ts';
 import { keyProviderFromConfig } from './lib/crypto/keyring.ts';
+import { createBackendCanceller } from './lib/db/cancel.ts';
 import { createKysely } from './lib/db/kysely.ts';
 import { createPool } from './lib/db/pool.ts';
 import { createLogger } from './lib/logger/logger.ts';
@@ -54,6 +55,8 @@ async function withInertApp<T>(read: (app: FastifyInstance) => T): Promise<T> {
     recurrenceHorizonDays: config.recurrence.horizonDays,
     paymentsGateway: createFakePaymentsGateway(),
     payments: config.payments,
+    incomeExports: config.incomeExports,
+    cancelBackend: createBackendCanceller({ connectionString: config.databaseUrl }),
   });
   try {
     return read(app);

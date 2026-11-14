@@ -186,6 +186,19 @@ export const ERROR_DEFAULTS: Readonly<Record<ErrorCode, ErrorDefault>> = {
     status: 409,
     message: 'The payment provider has since reported the outcome, so it cannot be set by hand.',
   },
+  invoice_not_available: {
+    status: 409,
+    message: 'An invoice is available once the payment is paid.',
+  },
+  invoice_pending: {
+    status: 409,
+    message: 'Your invoice is being prepared. Try again in a moment.',
+  },
+  export_too_large: { status: 422, message: 'Choose a shorter range.' },
+  export_busy: {
+    status: 429,
+    message: 'Another export is being prepared. Try again in a moment.',
+  },
 };
 
 export interface AppErrorOptions {

@@ -198,6 +198,7 @@ describe('registerJobs', () => {
         'akahu-reconcile',
         'auth-cleanup',
         'daily-overdue',
+        'invoice-reconcile',
         'post-game-billing',
         'recurrence-materialisation',
         'registration-ban-reconcile',
@@ -496,6 +497,60 @@ describe('billing wiring (wallet-and-akahu-billing Phases 2-3)', () => {
     await expect(failure).rejects.toThrow(/akahu-reconcile failed \(Error\)/);
     await expect(failure).rejects.not.toThrow(/secret-value/);
     expect(logs.some((entry) => entry.fields.event === 'akahu.reconcile.failed')).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('secret-value');
+  });
+});
+
+describe('invoice wiring (tax-invoices-and-exports Phase 2)', () => {
+  function wired() {
+    const handlers = new Map<string, (data: object, ctx: JobContext) => Promise<void>>();
+    const runner = {
+      defineQueue: () => Promise.resolve(),
+      work: (queue: string, handler: (data: object, ctx: JobContext) => Promise<void>) => {
+        handlers.set(queue, handler);
+        return Promise.resolve();
+      },
+      schedule: () => Promise.resolve(),
+      previewSchedule: () => [],
+    } as unknown as JobRunner;
+    return { handlers, runner };
+  }
+  const register = (runner: JobRunner, db: never) =>
+    registerJobs({
+      paymentsGateway: testPaymentsGateway(),
+      payments: testPaymentsConfig(),
+      runner,
+      notifier: createInMemoryNotifier(),
+      crypto: testCrypto(),
+      db,
+      sessionAllocator: noopSessionAllocator,
+      webBaseUrl: 'https://app.example.test',
+    });
+
+  it('works the issue-invoices queue with a handler that rejects a malformed payload without retries', async () => {
+    const { handlers, runner } = wired();
+    await register(runner, {} as never);
+    for (const payload of [{}, { teamId: 'not-a-uuid' }]) {
+      const { ctx } = context();
+      await expect(handlers.get('issue-invoices')?.(payload, ctx)).rejects.toBeInstanceOf(
+        NonRetryableJobError,
+      );
+    }
+  });
+
+  it('works the invoice-reconcile slot with the real sweep, not the placeholder, and never rethrows the driver error', async () => {
+    const { handlers, runner } = wired();
+    const db = {
+      selectFrom: () => {
+        throw new Error('db down: secret-value');
+      },
+    } as never;
+    await register(runner, db);
+    const { ctx, logs } = context();
+    const failure = handlers.get('invoice-reconcile')?.({}, ctx);
+    await expect(failure).rejects.toThrow(/invoice-reconcile failed \(Error\)/);
+    await expect(failure).rejects.not.toThrow(/secret-value/);
+    expect(logs.some((entry) => entry.fields.event === 'invoice.reconcile.failed')).toBe(true);
     expect(JSON.stringify(logs)).not.toContain('secret-value');
   });
 });

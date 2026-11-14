@@ -70,6 +70,23 @@ const intInRange = (min: number, max: number, fallback: number) =>
   z.coerce.number().int().min(min).max(max).default(fallback);
 const booleanFlag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
+/**
+ * Income export limits (tax-invoices-and-exports CR-3). The ceilings are HARD: configuration may lower a limit but never raise
+ * it past the value measured safe (`income-exports-load.int.test.ts`: 50,000 rows exported in both formats, and four
+ * concurrent worst-case-width exports, inside one request). An export over a limit is refused, never truncated.
+ */
+export const INCOME_EXPORT_ROWS_CEILING = 50_000;
+/** 64 MiB of encoded output per export. */
+export const INCOME_EXPORT_BYTES_CEILING = 67_108_864;
+export const INCOME_EXPORT_CONCURRENCY_CEILING = 8;
+const intUpTo = (min: number, ceiling: number, fallback: number, what: string) =>
+  z.coerce
+    .number()
+    .int()
+    .min(min)
+    .max(ceiling, `must be at most ${String(ceiling)} (${what})`)
+    .default(fallback);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   SERVICE_VERSION: z.string().min(1).default('0.0.0-dev'),
@@ -153,6 +170,25 @@ const envSchema = z.object({
   JOBS_POLL_INTERVAL_SECONDS: z.coerce.number().min(0.5).default(2),
   // Series materialisation horizon in days (session-scheduling-engine A2, T-4): the window is today..today+H inclusive.
   RECURRENCE_HORIZON_DAYS: intInRange(7, 91, 28),
+  // Income exports (tax-invoices-and-exports CR-3): row cap, encoded-byte cap and concurrent exports per API process.
+  INCOME_EXPORT_MAX_ROWS: intUpTo(
+    1,
+    INCOME_EXPORT_ROWS_CEILING,
+    50_000,
+    'the measured safe ceiling',
+  ),
+  INCOME_EXPORT_MAX_BYTES: intUpTo(
+    1024,
+    INCOME_EXPORT_BYTES_CEILING,
+    33_554_432,
+    'the measured safe ceiling',
+  ),
+  INCOME_EXPORT_MAX_CONCURRENT: intUpTo(
+    1,
+    INCOME_EXPORT_CONCURRENCY_CEILING,
+    2,
+    'the measured safe ceiling',
+  ),
 });
 
 export type OtelSampler = z.infer<typeof envSchema>['OTEL_TRACES_SAMPLER'];
@@ -175,6 +211,16 @@ export interface AuthConfig {
   readonly forgotMaxPerAddress: number;
   /** Registration attempts per client address per 60 minutes (own throttle scope, `register_address`). */
   readonly registerMaxPerAddress: number;
+}
+
+/** `config.incomeExports` (CR-3), injected into `buildApp` as one value. */
+export interface IncomeExportsConfig {
+  /** `INCOME_EXPORT_MAX_ROWS` (1 to 50,000, default 50,000): more PAID rows in the range is 422 `export_too_large`. */
+  readonly maxRows: number;
+  /** `INCOME_EXPORT_MAX_BYTES` (1 KiB to 64 MiB, default 32 MiB): the encoded file may not grow past it while built. */
+  readonly maxBytes: number;
+  /** `INCOME_EXPORT_MAX_CONCURRENT` (1 to 8, default 2): exports at once per API process (one per team). */
+  readonly maxConcurrent: number;
 }
 
 export interface Config {
@@ -228,6 +274,7 @@ export interface Config {
     /** How many days ahead the materialiser creates series sessions (`RECURRENCE_HORIZON_DAYS`, 7-91, default 28). */
     readonly horizonDays: number;
   };
+  readonly incomeExports: IncomeExportsConfig;
 }
 
 const formatIssue = (variable: string, issue: string): string =>
@@ -514,6 +561,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       finalityHorizonHours: data.AKAHU_FINALITY_HORIZON_HOURS,
     },
     recurrence: { horizonDays: data.RECURRENCE_HORIZON_DAYS },
+    incomeExports: {
+      maxRows: data.INCOME_EXPORT_MAX_ROWS,
+      maxBytes: data.INCOME_EXPORT_MAX_BYTES,
+      maxConcurrent: data.INCOME_EXPORT_MAX_CONCURRENT,
+    },
   };
 }
 

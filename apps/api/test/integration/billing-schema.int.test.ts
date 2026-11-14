@@ -88,7 +88,7 @@ async function paymentIn(status: 'PENDING' | 'OVERDUE' | 'PAID'): Promise<string
 function movePayment(paymentId: string, to: string): Promise<unknown> {
   return db.pool.query(
     `UPDATE payments SET status = $2::payment_status,
-            paid_at = CASE WHEN $2::text = 'PAID' THEN now() END WHERE id = $1`,
+            paid_at = CASE WHEN $2::text = 'PAID' THEN coalesce(paid_at, now()) END WHERE id = $1`,
     [paymentId, to],
   );
 }
@@ -998,6 +998,8 @@ describe('migration round trip (AC-VERIFY-2)', () => {
         ).toBe(true);
       }
 
+      // Newest first: the tax invoices migration (D-99..D-105) sits on top of the billing schema.
+      expect(runCli(empty.url, 'db', 'rollback')).toMatchObject({ status: 0 });
       const rolledBack = runCli(empty.url, 'db', 'rollback');
       expect(rolledBack, rolledBack.output).toMatchObject({ status: 0 });
       const before = await catalogSnapshot(empty.pool);

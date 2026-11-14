@@ -49,6 +49,7 @@ export const paymentRow = (change: Record<string, unknown> = {}): MyPaymentRow =
     outcome: 'none',
     onHold: false,
     payoutBlocked: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
     ...change,
   }) as MyPaymentRow;
 
@@ -69,6 +70,7 @@ export const payment = (change: Record<string, unknown> = {}): PaymentResponse['
     attempt: null,
     onHold: false,
     payoutBlocked: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
     ...change,
   }) as unknown as PaymentResponse['payment'];
 
@@ -91,6 +93,7 @@ export const adminRow = (
     paidAt: null,
     lastReminderAt: null,
     onHold: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
     ...change,
   }) as AdminPaymentsResponse['payments'][number];
 

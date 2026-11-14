@@ -836,11 +836,23 @@ export interface BilledRegistration {
   readonly paymentId: string;
 }
 
-/** A new user registered (CONFIRMED) for `sessionId` with a committed $17.00 FLAT payment. */
+/** What a billed registration's payment looks like (tax-invoices-and-exports: only a PAID payment above $0.00 is numbered). */
+export interface BilledRegistrationOptions {
+  /** Default PENDING. A document needs PAID. */
+  readonly status?: 'PENDING' | 'PAID' | 'OVERDUE';
+  /** Default 17.00; `0.00` is the B7 free charge. */
+  readonly amount?: string;
+  /** The charge-time GST snapshot; default true, as `insertPayment`. It decides the document kind. */
+  readonly gstRegistered?: boolean;
+  readonly paidAt?: Date;
+}
+
+/** A new user registered (CONFIRMED) for `sessionId` with a committed $17.00 FLAT payment (PENDING unless `options` say). */
 export async function insertBilledRegistration(
   pool: pg.Pool,
   teamId: string,
   sessionId: string,
+  options: BilledRegistrationOptions = {},
 ): Promise<BilledRegistration> {
   const userId = await insertUser(pool);
   const registrationId = await insertRegistration(pool, { sessionId, teamId, userId });
@@ -848,9 +860,26 @@ export async function insertBilledRegistration(
     userId,
     teamId,
     registrationId,
-    amount: '17.00',
+    amount: options.amount ?? '17.00',
+    ...(options.status === undefined ? {} : { status: options.status }),
+    ...(options.gstRegistered === undefined ? {} : { gstRegistered: options.gstRegistered }),
+    ...(options.paidAt === undefined ? {} : { paidAt: options.paidAt }),
   });
   return { userId, registrationId, paymentId };
+}
+
+/** Issues the payment's document in its own committed transaction (the single SQL issuer); returns the printed number. */
+export async function issueDocument(
+  pool: pg.Pool,
+  paymentId: string,
+): Promise<{ numberDisplay: string; issued: boolean }> {
+  const { rows } = await pool.query<{ number_display: string; issued: boolean }>(
+    'SELECT number_display, issued FROM issue_payment_document($1)',
+    [paymentId],
+  );
+  const row = rows[0];
+  if (row === undefined) throw new Error(`issue_payment_document returned no row for ${paymentId}`);
+  return { numberDisplay: row.number_display, issued: row.issued };
 }
 
 /**

@@ -28,6 +28,9 @@ describe('coverage gate (AC-VERIFY-9)', () => {
     expect(config).toContain("'apps/api/src/lib/akahu/**/*.ts'");
     expect(config).toContain("'packages/shared/src/billing/**/*.ts'");
     expect(config).toContain("'packages/shared/src/api/billing.ts'");
+    // tax-invoices-and-exports (AC-VERIFY-7): the shared period helpers and the invoice contracts are measured too.
+    expect(config).toContain("'packages/shared/src/tax/**/*.ts'");
+    expect(config).toContain("'packages/shared/src/api/invoices.ts'");
     // The thresholds are aggregate over the measured set, not per file (`perFile` stays off).
     expect(config).not.toMatch(/perFile:\s*true/);
     expect(config).toMatch(

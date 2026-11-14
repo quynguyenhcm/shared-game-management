@@ -8,7 +8,9 @@ import {
 } from '../../lib/billing/labels.ts';
 import { bankingPagePath } from '../../lib/billing/paths.ts';
 import { adminRowAction } from '../../lib/billing/wallet-view.ts';
+import { teamDocumentPath } from '../../lib/invoices/paths.ts';
 import { LINK_CLASS } from '../auth/styles.ts';
+import { DownloadInvoiceLink } from '../invoices/download-invoice-link.tsx';
 import { HoldResolution } from './hold-resolution.tsx';
 import { PaymentStatusTag } from './payment-status-tag.tsx';
 import { ReminderConfirm } from './reminder-confirm.tsx';
@@ -23,11 +25,14 @@ function PaymentRow({
   row,
   now,
   payoutBlocked,
+  invoiceReturnTo,
 }: {
   teamId: string;
   row: Row;
   now: string;
   payoutBlocked: boolean;
+  /** Set only for a team admin: the page an invoice error lands back on. Absent hides the "Invoice" action. */
+  invoiceReturnTo?: string | undefined;
 }) {
   const action = adminRowAction(row, { payoutBlocked, now: new Date(now) });
   return (
@@ -79,6 +84,18 @@ function PaymentRow({
         {action === 'hold' ? (
           <HoldResolution teamId={teamId} paymentId={row.id} playerName={row.player.fullName} />
         ) : null}
+        {invoiceReturnTo !== undefined && row.status === 'PAID' && row.document.available ? (
+          <DownloadInvoiceLink
+            href={teamDocumentPath(teamId, row.id, invoiceReturnTo)}
+            kind="ADMIN"
+            context={{
+              player: row.player.fullName,
+              day: formatDay(row.sessionStartsAt),
+              amount: money(row.amount),
+            }}
+            variant="link"
+          />
+        ) : null}
       </td>
     </tr>
   );
@@ -96,6 +113,7 @@ export function AdminPaymentsTable({
   payoutBlocked,
   now,
   emptyText = 'No payments yet. They appear here after a session ends.',
+  invoiceReturnTo,
 }: {
   teamId: string;
   payments: readonly Row[];
@@ -103,6 +121,11 @@ export function AdminPaymentsTable({
   /** ISO instant of the page render. */
   now: string;
   emptyText?: string;
+  /**
+   * A team admin gets an "Invoice" action on each PAID row above $0.00 (AC-ENTRY-3); this is the page an error lands back on.
+   * Left out for anyone who is not a team admin (a GLOBAL_ADMIN has no invoice access, H9), which hides the action.
+   */
+  invoiceReturnTo?: string | undefined;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -135,6 +158,7 @@ export function AdminPaymentsTable({
                 row={row}
                 now={now}
                 payoutBlocked={payoutBlocked}
+                invoiceReturnTo={invoiceReturnTo}
               />
             ))}
           </tbody>

@@ -1,10 +1,12 @@
-import { copyFile } from 'node:fs/promises';
+import { copyFile, cp } from 'node:fs/promises';
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  // The password blocklist is read at runtime from beside the bundle (modules/auth/password-policy.ts).
+  // Two data files are read at runtime from beside the bundle: the password blocklist (modules/auth/password-policy.ts) and the
+  // invoice fonts, Noto Sans with its OFL licence text (modules/invoices/render-pdf.ts resolves `./fonts/` from the bundle).
   onSuccess: async () => {
     await copyFile('src/modules/auth/common-passwords.txt', 'dist/common-passwords.txt');
+    await cp('src/modules/invoices/fonts', 'dist/fonts', { recursive: true });
   },
   entry: {
     main: 'src/main.ts',

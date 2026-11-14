@@ -37,6 +37,10 @@ export interface AdminPaymentRow {
   readonly paidAt: Date | null;
   readonly lastReminderAt: Date | null;
   readonly onHold: boolean;
+  /** The charge-time GST snapshot: it decides the document kind. */
+  readonly gstRegistered: boolean;
+  /** The frozen printed document number once issued, else null. */
+  readonly documentNumber: string | null;
   /** Exact text of `due_date` for the cursor (a JS Date would drop microseconds and break the keyset). */
   readonly dueCursor: string;
 }
@@ -58,8 +62,11 @@ export async function listTeamPayments(
     .innerJoin('users as u', 'u.id', 'p.user_id')
     .leftJoin('registrations as r', 'r.id', 'p.registration_id')
     .leftJoin('game_sessions as s', 's.id', 'r.session_id')
+    .leftJoin('payment_documents as d', 'd.payment_id', 'p.id')
     .select([
       'p.id',
+      'p.gst_registered',
+      'd.number_display',
       'p.payment_reference',
       'p.user_id',
       'u.full_name',
@@ -104,6 +111,8 @@ export async function listTeamPayments(
     paidAt: row.paid_at,
     lastReminderAt: row.last_reminder_at,
     onHold: row.on_hold,
+    gstRegistered: row.gst_registered,
+    documentNumber: row.number_display,
     dueCursor: row.due_cursor,
   }));
 }

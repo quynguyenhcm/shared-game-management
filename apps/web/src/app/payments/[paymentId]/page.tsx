@@ -12,6 +12,7 @@ import { firstParam, type SearchParams } from '../../../lib/auth/page-params.ts'
 import { requireUser } from '../../../lib/auth/session.ts';
 import { formatDay } from '../../../lib/billing/labels.ts';
 import { paymentPath } from '../../../lib/billing/paths.ts';
+import { DOWNLOAD_ERROR_PARAM } from '../../../lib/invoices/paths.ts';
 import { log } from '../../../lib/log.ts';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -34,7 +35,9 @@ export default async function PaymentPage({
   const { paymentId } = await params;
   if (!z.uuid().safeParse(paymentId).success) notFound();
 
-  const returned = firstParam(await searchParams, 'return');
+  const query = await searchParams;
+  const returned = firstParam(query, 'return');
+  const downloadError = firstParam(query, DOWNLOAD_ERROR_PARAM);
   const here = paymentPath(paymentId);
   await requireUser(here);
   const token = await readCookie('session');
@@ -73,6 +76,7 @@ export default async function PaymentPage({
         search={{ return: returned }}
         idempotencyKey={randomUUID()}
         overdueCount={overdueCount}
+        downloadError={downloadError}
       />
     </TeamShell>
   );

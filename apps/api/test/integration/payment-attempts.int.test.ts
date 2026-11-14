@@ -536,6 +536,8 @@ describe('GET /payments/:paymentId (CR-17, CR-3 return page)', () => {
         attempt: null,
         onHold: false,
         payoutBlocked: false,
+        // A pending payment has no document yet (tax-invoices-and-exports: available only once PAID above $0.00).
+        document: { kind: 'TAX_INVOICE', available: false, number: null },
       },
     });
     expect(jobs.recorded.filter((job) => job.queue === 'akahu-sync')).toEqual([]);

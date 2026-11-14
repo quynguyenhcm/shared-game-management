@@ -40,6 +40,10 @@ export interface PlayerPaymentRow {
     readonly closeReason: string | null;
   } | null;
   readonly onHold: boolean;
+  /** The charge-time GST snapshot: it decides the document kind (a tax invoice or a receipt). */
+  readonly gstRegistered: boolean;
+  /** The frozen printed document number once the document is issued, else null. */
+  readonly documentNumber: string | null;
   /** Exact `due_date` text for the keyset cursor. */
   readonly dueCursor: string;
 }
@@ -50,8 +54,11 @@ function baseQuery(db: Kysely<DB>, payerId: string) {
     .innerJoin('teams as t', 't.id', 'p.team_id')
     .innerJoin('registrations as r', 'r.id', 'p.registration_id')
     .innerJoin('game_sessions as s', 's.id', 'r.session_id')
+    .leftJoin('payment_documents as d', 'd.payment_id', 'p.id')
     .select([
       'p.id',
+      'p.gst_registered',
+      'd.number_display',
       'p.payment_reference',
       'p.team_id',
       't.name as team_name',
@@ -106,6 +113,8 @@ const toRow = (row: BaseRow): PlayerPaymentRow => ({
       ? null
       : { status: row.attempt_status, closeReason: row.attempt_close_reason },
   onHold: row.on_hold,
+  gstRegistered: row.gst_registered,
+  documentNumber: row.number_display,
   dueCursor: row.due_cursor,
 });
 

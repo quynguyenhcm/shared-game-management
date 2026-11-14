@@ -384,7 +384,7 @@ describe('schedules (AC-ASYNC-2)', () => {
     expect(next('2027-04-02T15:00:01Z')).toBe('2027-04-03T16:00:00.000Z');
   });
 
-  it('lists all seven slots, and the recurrence sweep, every placeholder and heartbeat can be triggered manually and observed', async () => {
+  it('lists all eight slots, and the recurrence sweep, every placeholder and heartbeat can be triggered manually and observed', async () => {
     const schedules = await worker.listSchedules();
     expect(
       schedules
@@ -394,6 +394,7 @@ describe('schedules (AC-ASYNC-2)', () => {
       { name: 'akahu-reconcile', cron: '*/15 * * * *', tz: 'Pacific/Auckland' },
       { name: 'auth-cleanup', cron: '0 5 * * *', tz: 'Pacific/Auckland' },
       { name: 'daily-overdue', cron: '0 4 * * *', tz: 'Pacific/Auckland' },
+      { name: 'invoice-reconcile', cron: '*/15 * * * *', tz: 'Pacific/Auckland' },
       { name: 'post-game-billing', cron: '*/5 * * * *', tz: 'Pacific/Auckland' },
       { name: 'recurrence-materialisation', cron: '0 3 * * *', tz: 'Pacific/Auckland' },
       { name: 'registration-ban-reconcile', cron: '45 5 * * *', tz: 'Pacific/Auckland' },
@@ -443,6 +444,16 @@ describe('schedules (AC-ASYNC-2)', () => {
         .find((line) => line.event === 'akahu.reconcile.completed' && line.jobId === reconcileId),
       'akahu-reconcile',
     ).toMatchObject({ checked: expect.any(Number) as number, stoppedEarly: false });
+    // The invoice-reconcile slot has its real sweep (tax-invoices-and-exports Phase 2): it logs how many teams it queued.
+    const invoiceId = await worker.trigger('invoice-reconcile', { source: 'integration-test' });
+    expect(invoiceId, 'invoice-reconcile').toEqual(expect.any(String));
+    await waitForState('invoice-reconcile', invoiceId as string, 'completed');
+    expect(
+      workerLogs
+        .lines()
+        .find((line) => line.event === 'invoice.reconcile.enqueued' && line.jobId === invoiceId),
+      'invoice-reconcile',
+    ).toMatchObject({ teams: expect.any(Number) as number });
     const heartbeat = await worker.trigger('heartbeat', { source: 'integration-test' });
     await waitForState('heartbeat', heartbeat as string, 'completed');
   });

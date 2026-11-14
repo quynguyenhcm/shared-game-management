@@ -119,6 +119,9 @@ export const NO_PAYMENTS = 'No payments yet. Charges appear here after a game.';
 export const NO_UNPAID = 'You have no unpaid payments.';
 export const NO_LEDGER = 'No wallet activity yet.';
 export const PAID_CAPPED_NOTE = 'Showing your latest 10 paid games.';
+
+/** R5: the wallet's paid list pages back so every paid game's invoice is reachable. */
+export const OLDER_PAID_GAMES = 'Show older paid games';
 export const NO_CHARGE_LINE = "There's no charge for this game.";
 
 export const walletFullLine = 'Your wallet is full.';

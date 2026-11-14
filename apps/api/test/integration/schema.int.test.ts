@@ -418,7 +418,7 @@ describe('financial retention (AC-VERIFY-11)', () => {
          FROM pg_constraint
         WHERE contype = 'f' AND conrelid::regclass::text IN
               ('payments', 'payment_line_items', 'credit_transactions', 'player_credits',
-               'team_invoice_counters', 'registrations')`,
+               'team_invoice_counters', 'payment_documents', 'registrations')`,
     );
     expect(rows.length).toBeGreaterThanOrEqual(12);
     expect(rows.filter((row) => row.ondelete !== 'r')).toEqual([]);

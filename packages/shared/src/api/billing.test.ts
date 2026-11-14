@@ -280,6 +280,7 @@ describe('response contracts', () => {
     attempt: null,
     onHold: false,
     payoutBlocked: false,
+    document: { kind: 'TAX_INVOICE', available: false, number: null },
   };
 
   it('parses the payer payment read, the per-team list and the cross-team unpaid list (CR-16, CR-17)', () => {
@@ -304,6 +305,7 @@ describe('response contracts', () => {
       outcome: 'none',
       onHold: false,
       payoutBlocked: true,
+      document: { kind: 'RECEIPT', available: false, number: null },
     };
     expect(MyPaymentsResponse.parse({ payments: [row], nextCursor: 'c1' }).nextCursor).toBe('c1');
     expect(
@@ -315,6 +317,20 @@ describe('response contracts', () => {
     expect(failure(PaymentResponse, { payment: { ...payment, userId: ID } })[0]?.code).toBe(
       'unrecognized_keys',
     );
+    // The document reference is part of every billing DTO and is strict: an unknown kind or a stray key is refused.
+    for (const bad of [
+      { kind: 'CREDIT_NOTE', available: true, number: null },
+      { kind: 'RECEIPT', available: true },
+      { kind: 'RECEIPT', available: true, number: null, email: 'a@b.test' },
+    ]) {
+      expect(
+        failure(PaymentResponse, { payment: { ...payment, document: bad } }).length,
+      ).toBeGreaterThan(0);
+    }
+    expect(
+      failure(MyPaymentsResponse, { payments: [{ ...row, document: undefined }], nextCursor: null })
+        .length,
+    ).toBeGreaterThan(0);
   });
 
   it('the admin list shows names, never an email or a bank detail, and derives lastReminderAt', () => {
@@ -329,6 +345,7 @@ describe('response contracts', () => {
       paidAt: null,
       lastReminderAt: null,
       onHold: false,
+      document: { kind: 'TAX_INVOICE', available: true, number: 'INV-000012' },
     };
     const body = { payments: [item], nextCursor: null, payoutBlocked: false };
     expect(AdminPaymentsResponse.parse(body)).toEqual(body);

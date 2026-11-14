@@ -27,6 +27,7 @@ import type { Database } from '../../lib/db/kysely.ts';
 import type { JobRunner } from '../../lib/jobs/jobs.ts';
 import type { Logger } from '../../lib/logger/logger.ts';
 import type { EmailMessage } from '../../lib/notifications/notifier.ts';
+import { enqueueInvoiceIssuance } from '../../jobs/issue-invoices.ts';
 import { enqueueEmail } from '../../jobs/send-email.ts';
 import { listBillableRegistrations } from '../registrations/billing-handoff.ts';
 import { isPaidSession } from '../team-banking/publish-gate.ts';
@@ -256,6 +257,11 @@ export async function billSession(
         }
       }
     }
+
+    // 5b. Invoices (tax-invoices-and-exports, ADR 0021): billing only ENQUEUES. One `issue-invoices` job per team, inside this
+    // transaction, when a wallet paid a fee (a PREPAID_CREDIT payment is PAID above $0.00). A $0.00 party is PAID too but has no
+    // document, and a PENDING link is not paid, so neither enqueues. Billing never sets an invoice column (ADR 0020 C-INV-1).
+    if (deducted > 0) await enqueueInvoiceIssuance(deps.jobs, { teamId }, { trx });
 
     // 6. Emails, in the same transaction: they exist exactly when this billing commits (P5, AC-ASYNC-4).
     const recipients = await readRecipients(trx, recipientIds);

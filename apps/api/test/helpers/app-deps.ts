@@ -11,6 +11,7 @@ import { keyProviderFromConfig } from '../../src/lib/crypto/keyring.ts';
 import { createFakePaymentsGateway } from '../../src/lib/akahu/fake-adapter.ts';
 import type { PaymentsConfig } from '../../src/lib/akahu/config.ts';
 import type { PaymentsGateway } from '../../src/lib/akahu/gateway.ts';
+import { createBackendCanceller } from '../../src/lib/db/cancel.ts';
 import { createKysely } from '../../src/lib/db/kysely.ts';
 import { createPool } from '../../src/lib/db/pool.ts';
 import type { Logger } from '../../src/lib/logger/logger.ts';
@@ -74,6 +75,8 @@ export function inertAppDeps(logger: Logger, overrides: Partial<AppDeps> = {}): 
     recurrenceHorizonDays: config.recurrence.horizonDays,
     paymentsGateway: testPaymentsGateway(),
     payments: config.payments,
+    incomeExports: config.incomeExports,
+    cancelBackend: createBackendCanceller({ connectionString: config.databaseUrl }),
     ...overrides,
   };
 }

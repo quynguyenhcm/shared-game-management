@@ -29,7 +29,16 @@
  * keys from the cause and sealed (they carry links). Logs are written after COMMIT and carry ids and decisions only.
  */
 import { sql, type Kysely, type Transaction, type Updateable } from 'kysely';
-import { WALLET_CAP, add, eq, lte, parseMoney, toMoneyString, type Money } from '@sgm/shared';
+import {
+  WALLET_CAP,
+  add,
+  eq,
+  isZero,
+  lte,
+  parseMoney,
+  toMoneyString,
+  type Money,
+} from '@sgm/shared';
 import type { GatewayOutcome, PaymentsGateway, ProviderPayment } from '../../lib/akahu/gateway.ts';
 import type { Clock } from '../../lib/clock.ts';
 import type { FieldCrypto } from '../../lib/crypto/crypto.ts';
@@ -38,6 +47,7 @@ import type { DB } from '../../lib/db/types.generated.ts';
 import type { JobRunner, TransactionLike } from '../../lib/jobs/jobs.ts';
 import type { Logger } from '../../lib/logger/logger.ts';
 import type { EmailMessage } from '../../lib/notifications/notifier.ts';
+import { enqueueInvoiceIssuance } from '../../jobs/issue-invoices.ts';
 import { enqueueEmail } from '../../jobs/send-email.ts';
 import { QUEUE_NAMES } from '../../jobs/registry.ts';
 import { applyMovement, ensureWallet, lockWallets } from '../wallet/ledger.ts';
@@ -847,7 +857,7 @@ async function applyToAttempt(
     .executeTakeFirstOrThrow();
   const paymentRow = await trx
     .selectFrom('payments')
-    .select(['id', 'status', 'amount'])
+    .select(['id', 'team_id', 'status', 'amount'])
     .where('id', '=', paymentId)
     .forNoKeyUpdate()
     .executeTakeFirstOrThrow();
@@ -907,12 +917,19 @@ async function applyToAttempt(
   }
   if (decision.kind === 'APPLY' && intent.akahuPaymentId !== null) {
     // I2: the one guarded move to PAID, under the payment row lock.
-    await trx
+    const moved = await trx
       .updateTable('payments')
       .set({ status: 'PAID', paid_at: now, akahu_payment_id: intent.akahuPaymentId })
       .where('id', '=', payment.id)
       .where('status', 'in', ['PENDING', 'OVERDUE'])
-      .execute();
+      .returning('id')
+      .executeTakeFirst();
+    // Invoices (tax-invoices-and-exports, ADR 0021): this branch serves the provider trigger AND `resolveHeldIntent`. Billing only
+    // ENQUEUES `issue-invoices` for the payee team, inside this transaction, and only for the payment that actually became PAID
+    // above $0.00 here; it never sets an invoice column (ADR 0020 C-INV-1).
+    if (moved !== undefined && !isZero(payment.amount)) {
+      await enqueueInvoiceIssuance(deps.jobs, { teamId: paymentRow.team_id }, { trx });
+    }
     // A late SENT on a CLOSED attempt can leave a newer attempt open: it is no longer needed, so cancel it (best effort).
     const superseded = await trx
       .selectFrom('payment_attempts')
