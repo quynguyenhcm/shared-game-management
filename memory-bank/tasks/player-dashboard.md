@@ -364,6 +364,9 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 - Phase 2 | payments-tab.tsx | One unpaid list feeds Overdue and Pending, so its `Show more` shows in both when nextCursor is set; accordion counts reflect loaded rows. Download returnTo is `/dashboard?tab=payments` (page 1) per spec.
 - Phase 2 | payments-tab.tsx / page.tsx | Any payments read failure (unpaid or paid) replaces the whole accordion area with PAYMENTS_LOAD_FAILED. Extra copy WALLETS_LOAD_FAILED when mineTeams fails on Tab 3; Tab 1 shows OPEN_LOAD_FAILED if mineTeams fails with no sessions. Wallet cards show only the walletState line (no closed-top-up notices).
 - Phase 2 | proxy.ts | Phase review (Codex P2): the cookie-less login redirect now carries `cache-control: no-store` (AC-ENTRY-3), for every protected path; test asserts it.
+- Phase 2 | lib/dashboard/view.ts (unpaidMore) | Phase review (PROCEED): on a later unpaid page the `Overdue (n)` / `Pending (n)` counts reflect the loaded page only and earlier rows are off screen (reachable via the tab link or Back); the duplicate `Show more` is slightly confusing. Accepted; polish candidate.
+- Phase 2 | lib/dashboard/view.ts (paid openByDefault) | Phase review (PROCEED): after Paid `Show more` the Paid accordion is closed again (AC-HAPPY-5 says Paid is closed). Accepted; polish candidate: open Paid when `paidCursor` is set.
+- Phase 2 | lib/dashboard/labels.ts / view.ts | Phase review (PROCEED): wallet cards omit closed-top-up notices; invoice route unchanged (safeReturnTo keeps the query, test added); vitest include unchanged (lib/dashboard 100%). Accepted.
 
 ### Phase 1 Result (2026-11-16)
 Tests 4296/4296 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: no actionable defects.
