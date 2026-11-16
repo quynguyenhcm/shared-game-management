@@ -54,4 +54,20 @@ describe('GET /payments/[paymentId]/invoice', () => {
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('lands a failure on the dashboard Payments & Wallet tab when the link says so (player-dashboard AC-ERROR-3)', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        Response.json({ error: { code: 'invoice_pending', message: 'x' } }, { status: 409 }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const returnTo = encodeURIComponent('/dashboard?tab=payments');
+    expect((await call(ID, `?returnTo=${returnTo}`)).headers.get('location')).toBe(
+      'http://localhost:3000/dashboard?tab=payments&download_error=invoice_pending',
+    );
+    expect((await call('not-a-uuid', `?returnTo=${returnTo}`)).headers.get('location')).toBe(
+      'http://localhost:3000/dashboard?tab=payments&download_error=not_found',
+    );
+  });
 });

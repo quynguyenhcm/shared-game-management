@@ -94,6 +94,16 @@ describe('SiteHeader team links (AC-ENTRY-1)', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
+  it('signed in: Dashboard is the first link and is current on /dashboard; other states are unchanged (AC-ENTRY-1)', () => {
+    const html = render({ kind: 'signed_in', fullName: 'Aroha Ngata' }, '/dashboard');
+    expect(html).toMatch(/<a[^>]*href="\/dashboard"[^>]*>Dashboard<\/a>/);
+    expect(html).toMatch(/aria-current="page"[^>]*>Dashboard</);
+    expect(html.indexOf('>Dashboard<')).toBeLessThan(html.indexOf('>Find a team<'));
+    expect(html.indexOf('>Find a team<')).toBeLessThan(html.indexOf('>My teams<'));
+    expect(render({ kind: 'anonymous' })).not.toContain('Dashboard');
+    expect(render({ kind: 'unavailable' })).not.toContain('Dashboard');
+  });
+
   it('unavailable: keeps Find a team (a public page) but not My teams', () => {
     const html = render({ kind: 'unavailable' });
     expect(html).toMatch(/<a[^>]*href="\/teams\/find"[^>]*>Find a team<\/a>/);

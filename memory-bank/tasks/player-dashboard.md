@@ -292,26 +292,26 @@ Confidence by field: route, tab pattern, protection, Tab 3 composition and invoi
 - [x] (NOT NEEDED, Q9: idx_registrations_user exists)  `db/migrations/<utc>_registrations_user_index.sql` — ONLY if the Q9 check shows no usable `registrations(user_id)` access path (forward migration, with Down)
 - [x] `apps/api/test/integration/player-dashboard-api.int.test.ts`
 - [x] extend `vitest.config.ts` — add `apps/api/src/modules/player-dashboard/**` to coverage `include`
-- [ ] extend `apps/web/src/lib/api-client.ts` — `openSessions`, `myRegistrations`, `myPaidPayments`
-- [ ] `apps/web/src/lib/dashboard/paths.ts` — tab URLs, cursor params, `returnTo` for downloads
-- [ ] `apps/web/src/lib/dashboard/labels.ts` — copy deck (all dashboard strings)
-- [ ] `apps/web/src/lib/dashboard/view.ts` — pure view models (tab parse, cards, buttons, tags, totals, wallet states, accordion groups)
-- [ ] `apps/web/src/lib/dashboard/view.test.ts`
-- [ ] `apps/web/src/app/dashboard/page.tsx` — Server Component, `force-dynamic`, `requireUser`, active-tab-only loading
-- [ ] `apps/web/src/components/dashboard/dashboard-tabs.tsx` — tab nav (ManageAreaNav pattern)
-- [ ] `apps/web/src/components/dashboard/open-sessions-tab.tsx`
-- [ ] `apps/web/src/components/dashboard/registrations-tab.tsx`
-- [ ] `apps/web/src/components/dashboard/payments-tab.tsx` — wallet cards + `<details>` accordions
-- [ ] `apps/web/src/components/dashboard/dashboard-components.test.tsx`
-- [ ] extend `apps/web/src/components/billing/payments-list.tsx` — export `PaymentRow` (no behaviour change)
-- [ ] extend `apps/web/src/components/site-header-links.tsx` — `Dashboard` link first (signed_in only)
-- [ ] extend `apps/web/src/proxy.ts` — add `/dashboard` to `PROTECTED`
+- [x] extend `apps/web/src/lib/api-client.ts` — `openSessions`, `myRegistrations`, `myPaidPayments`
+- [x] `apps/web/src/lib/dashboard/paths.ts` — tab URLs, cursor params, `returnTo` for downloads
+- [x] `apps/web/src/lib/dashboard/labels.ts` — copy deck (all dashboard strings)
+- [x] `apps/web/src/lib/dashboard/view.ts` — pure view models (tab parse, cards, buttons, tags, totals, wallet states, accordion groups)
+- [x] `apps/web/src/lib/dashboard/view.test.ts`
+- [x] `apps/web/src/app/dashboard/page.tsx` — Server Component, `force-dynamic`, `requireUser`, active-tab-only loading
+- [x] `apps/web/src/components/dashboard/dashboard-tabs.tsx` — tab nav (ManageAreaNav pattern)
+- [x] `apps/web/src/components/dashboard/open-sessions-tab.tsx`
+- [x] `apps/web/src/components/dashboard/registrations-tab.tsx`
+- [x] `apps/web/src/components/dashboard/payments-tab.tsx` — wallet cards + `<details>` accordions
+- [x] `apps/web/src/components/dashboard/dashboard-components.test.tsx`
+- [x] extend `apps/web/src/components/billing/payments-list.tsx` — export `PaymentRow` (no behaviour change)
+- [x] extend `apps/web/src/components/site-header-links.tsx` — `Dashboard` link first (signed_in only)
+- [x] extend `apps/web/src/proxy.ts` — add `/dashboard` to `PROTECTED`
 - [ ] `apps/web/e2e/player-dashboard.spec.ts`
 - [ ] extend `memory-bank/{techContext,systemPatterns,productBrief}.md`, `docs/getting-started.md` if it lists player pages
 
 ### Phases
 - [x] Phase 1: API read models — shared dashboard schemas; `player-dashboard` module (`GET /me/sessions/open`, `GET /me/registrations`); `status=PAID` on `GET /payments/me`; Q9 index check (migration only if needed); OpenAPI regen + drift; coverage include; integration + boundaries tests. ACs: HAPPY-1 (data), HAPPY-3 (data), HAPPY-6, HAPPY-7, ASYNC-2 (data).
-- [ ] Phase 2: Web dashboard — `/dashboard` page, tab nav, header link, proxy protection, three tabs from pure view models, `PaymentRow` export, per-section error handling, empty states, download-error notice. ACs: ENTRY-1/2/3, HAPPY-1..5, ERROR-1..6, ASYNC-1/2 (render).
+- [x] Phase 2: Web dashboard — `/dashboard` page, tab nav, header link, proxy protection, three tabs from pure view models, `PaymentRow` export, per-section error handling, empty states, download-error notice. ACs: ENTRY-1/2/3, HAPPY-1..5, ERROR-1..6, ASYNC-1/2 (render).
 - [ ] Phase 3: E2E, accessibility and docs — `player-dashboard.spec.ts` on the `sgm-e2e` stack (desktop + 360 px, axe, no-scroll, 44 px), full entry-to-success journey with concrete spec values; memory-bank and docs updates. ACs: HAPPY-8 plus the end-to-end proof of ENTRY-1, HAPPY-2, HAPPY-5, ERROR-3, ERROR-4.
 
 Final phase delivers the complete entry-to-success flow: header `Dashboard` → `/dashboard` → each tab's success state as specified.
@@ -339,14 +339,14 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 ## Execution State
 
 **Build Status**: RUNNING
-**Current Phase**: 1 of 3
-**Current Step**: Phase 1 complete (2026-11-16); next Phase 2
+**Current Phase**: 2 of 3
+**Current Step**: Phase 2 complete (2026-11-16); next Phase 3
 **Auto-Build Mode**: YES
 **Can Resume**: YES
 
 ### Resumption Notes
-**Resume From**: Phase 2
-**Notes**: Phase 1 committed. Guard log: empty (no commit-guard failures).
+**Resume From**: Phase 3
+**Notes**: Phase 2 committed. Guard log: empty (no commit-guard failures).
 
 ### Halt State (populated only on a halt trigger — blank during normal RUNNING)
 
@@ -360,9 +360,16 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 - Phase 1 | tests | No integration test for the unpriced-session row (published sessions cannot be unpriced in DB) nor PREPAID_CREDIT billing type (billing_type immutable after insert); schema allows `unitFee: null`.
 - Phase 1 | test/integration/payment-attempts.int.test.ts:650 | Phase review (PROCEED): the old "status=PAID is 422" assertion became "status=ALL is 422", following the intended widening of `MyPaymentsQuery`. Accepted.
 - Phase 1 | player-dashboard/service.ts (OPEN_SESSIONS_LIMIT = 50) | Phase review (PROCEED): a player with more than 50 open sessions cannot see the rest; Phase 2 must not offer Show more on Currently Opening. Accepted.
+- Phase 2 | registrations-tab.tsx | Past `Show more` follows `?cursor=`; a later page shows only the next Past page (no JS accumulation), as the existing /payments pager does.
+- Phase 2 | payments-tab.tsx | One unpaid list feeds Overdue and Pending, so its `Show more` shows in both when nextCursor is set; accordion counts reflect loaded rows. Download returnTo is `/dashboard?tab=payments` (page 1) per spec.
+- Phase 2 | payments-tab.tsx / page.tsx | Any payments read failure (unpaid or paid) replaces the whole accordion area with PAYMENTS_LOAD_FAILED. Extra copy WALLETS_LOAD_FAILED when mineTeams fails on Tab 3; Tab 1 shows OPEN_LOAD_FAILED if mineTeams fails with no sessions. Wallet cards show only the walletState line (no closed-top-up notices).
+- Phase 2 | proxy.ts | Phase review (Codex P2): the cookie-less login redirect now carries `cache-control: no-store` (AC-ENTRY-3), for every protected path; test asserts it.
 
 ### Phase 1 Result (2026-11-16)
 Tests 4296/4296 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: no actionable defects.
+
+### Phase 2 Result (2026-11-16)
+Tests 4360/4360 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: 1 P2 (no-store on redirect) fixed. Playwright not run (Phase 3).
 
 ### Active Sub-Agents
 (none)

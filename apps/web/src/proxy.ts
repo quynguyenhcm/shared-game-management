@@ -7,7 +7,7 @@ import { loadWebConfig } from './lib/config.ts';
  * Next 16 `proxy.ts` (the renamed `middleware.ts`). It is not an auth boundary: it only redirects a
  * protected path that has no session cookie at all; `requireUser` in the page does the real check.
  */
-const PROTECTED = ['/account', '/teams/new', '/teams/join', '/payments'];
+const PROTECTED = ['/account', '/dashboard', '/teams/new', '/teams/join', '/payments'];
 const NO_STORE_PREFIXES = [
   '/login',
   '/register',
@@ -34,7 +34,7 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 
 /**
  * My teams (exactly `/teams`; Find and the team pages stay public), Create, the invite landing, manage, a player session
- * page, a team wallet and the payment pages (`/payments`, `/payments/<id>`).
+ * page, a team wallet, the payment pages (`/payments`, `/payments/<id>`) and the player dashboard (`/dashboard`, any tab).
  */
 function isProtected(pathname: string): boolean {
   return (
@@ -60,9 +60,12 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   if (isProtected(pathname) && !request.cookies.has(cookieName('session', config.webBaseUrl))) {
-    return NextResponse.redirect(
+    const redirect = NextResponse.redirect(
       new URL(loginUrl({ returnTo: `${pathname}${search}` }), config.webBaseUrl),
     );
+    // The sign-in redirect itself must not be cached either (it carries the per-user returnTo).
+    redirect.headers.set('cache-control', 'no-store');
+    return redirect;
   }
 
   // The browser must never be able to supply the headers the API trusts from the web hop.

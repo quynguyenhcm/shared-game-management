@@ -16,7 +16,13 @@ import { BUTTON_CLASS, LINK_CLASS } from '../auth/styles.ts';
 import { DownloadInvoiceLink } from '../invoices/download-invoice-link.tsx';
 import { PaymentStatusTag } from './payment-status-tag.tsx';
 
-function PaymentRow({ row, returnTo }: { row: MyPaymentRow; returnTo?: string | undefined }) {
+export function PaymentRow({
+  row,
+  returnTo,
+}: {
+  row: MyPaymentRow;
+  returnTo?: string | undefined;
+}) {
   const label = `${row.location}, ${formatDay(row.sessionStartsAt)}`;
   const unpaid = row.status !== 'PAID';
   return (
