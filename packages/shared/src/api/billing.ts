@@ -149,9 +149,12 @@ export const AdminPaymentsQuery = z.strictObject({
 });
 export type AdminPaymentsQuery = z.infer<typeof AdminPaymentsQuery>;
 
-/** `GET /payments/me?status=UNPAID` and `GET /teams/:teamId/payments/me` (CR-16, CR-17). */
+/**
+ * `GET /payments/me?status=UNPAID|PAID` and `GET /teams/:teamId/payments/me` (CR-16, CR-17). `PAID` (player-dashboard) lists the
+ * caller's paid payments across teams on `/payments/me` only; the team route refuses it.
+ */
 export const MyPaymentsQuery = z.strictObject({
-  status: z.enum(['UNPAID']).optional(),
+  status: z.enum(['UNPAID', 'PAID']).optional(),
   cursor: cursor.optional(),
 });
 export type MyPaymentsQuery = z.infer<typeof MyPaymentsQuery>;

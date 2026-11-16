@@ -52,9 +52,9 @@ export const playerPaymentRoutes: FastifyPluginAsync<PlayerPaymentRoutesOptions>
     {
       config: { policy: authenticated() },
       schema: {
-        summary: "List the caller's unpaid payments across teams",
+        summary: "List the caller's unpaid or paid payments across teams",
         description:
-          "The caller's PENDING and OVERDUE payments in every team (held ones included, `onHold: true`), most overdue first, grouped by team in that order; one page of 50 payments (`nextCursor` is opaque; pass it back as `cursor`). `status` may only be `UNPAID` (the default). This is the target of the registration debt block.",
+          "With `status=UNPAID` (the default): the caller's PENDING and OVERDUE payments in every team (held ones included, `onHold: true`), most overdue first, grouped by team in that order; this is the target of the registration debt block. With `status=PAID`: the caller's PAID payments in every team, most recently paid first (`paid_at` then id, both descending), grouped by team in that order, each with its document reference. One page of 50 payments either way (`nextCursor` is opaque; pass it back as `cursor`; a cursor the API refuses is 422).",
         operationId: 'listMyUnpaidPayments',
         querystring: MyPaymentsQuery,
         response: { 200: UnpaidPaymentsResponse, 422: ErrorResponse },
@@ -117,7 +117,7 @@ export const playerPaymentRoutes: FastifyPluginAsync<PlayerPaymentRoutesOptions>
       schema: {
         summary: "List the caller's payments in a team",
         description:
-          "The caller's own payments in this team, newest due first, one page of 50 (`nextCursor` is opaque; pass it back as `cursor`); `status=UNPAID` keeps PENDING and OVERDUE. Each row carries the session, the amount, the status, why it was charged, the latest attempt's `outcome`, `onHold` and `payoutBlocked`. APPROVED members of the team only.",
+          "The caller's own payments in this team, newest due first, one page of 50 (`nextCursor` is opaque; pass it back as `cursor`); `status=UNPAID` keeps PENDING and OVERDUE (`status=PAID` is 422: use `GET /payments/me?status=PAID`). Each row carries the session, the amount, the status, why it was charged, the latest attempt's `outcome`, `onHold` and `payoutBlocked`. APPROVED members of the team only.",
         operationId: 'listMyTeamPayments',
         params: TeamIdParams,
         querystring: MyPaymentsQuery,

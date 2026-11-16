@@ -81,6 +81,9 @@ export default defineConfig({
         'apps/api/src/modules/income-exports/**/*.ts',
         'apps/api/src/lib/tabular/**/*.ts',
         'apps/web/src/lib/**/*.ts',
+        // player-dashboard (AC-HAPPY-7): the read-only cross-team dashboard module and its shared contracts.
+        'apps/api/src/modules/player-dashboard/**/*.ts',
+        'packages/shared/src/api/dashboard.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.int.test.ts'],
       // Thresholds are AGGREGATE over every file matched by `include` (not per file: `perFile` is off), so one file can sit

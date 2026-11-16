@@ -16711,6 +16711,732 @@ paths:
                 required:
                   - error
                 additionalProperties: false
+  /me/sessions/open:
+    get:
+      operationId: listMyOpenSessions
+      summary: List the open sessions of the caller's teams
+      description: The PUBLISHED sessions that have not started, in every team where
+        the caller is APPROVED (a PENDING, REJECTED or BANNED membership
+        contributes nothing), soonest first and ties by session id; one page of
+        50 (`hasMore`). Each row carries the team name, the place, the full
+        address, the start and end instants, the caller's own per-person fee
+        (`unitFee`, and `feeLevel` for BY_SKILL_LEVEL; null while the session is
+        not fully priced), `seatsLeft` and `waitlistLength`, the caller's own
+        status (`me`, null when not registered), and `canRegister` with its
+        `blockedReason`. `overdueCount` is the caller's OVERDUE payments across
+        all teams.
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        sessionId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        teamId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        teamName:
+                          type: string
+                        location:
+                          type: string
+                        address:
+                          type: string
+                        startsAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        endsAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                        pricingStructure:
+                          type: string
+                          enum:
+                            - FLAT
+                            - BY_SEX
+                            - BY_SKILL_LEVEL
+                        unitFee:
+                          anyOf:
+                            - {}
+                            - type: "null"
+                        feeLevel:
+                          anyOf:
+                            - type: string
+                              enum:
+                                - BEGINNER
+                                - INTERMEDIATE
+                                - ADVANCED
+                            - type: "null"
+                        publicCapacity:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        seatsLeft:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        waitlistLength:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        me:
+                          anyOf:
+                            - type: object
+                              properties:
+                                status:
+                                  type: string
+                                  enum:
+                                    - CONFIRMED
+                                    - WAITLISTED
+                                waitlistRank:
+                                  anyOf:
+                                    - type: integer
+                                      minimum: 1
+                                      maximum: 9007199254740991
+                                    - type: "null"
+                              required:
+                                - status
+                                - waitlistRank
+                              additionalProperties: false
+                            - type: "null"
+                        canRegister:
+                          type: boolean
+                        blockedReason:
+                          anyOf:
+                            - type: string
+                              enum:
+                                - overdue_payments
+                                - session_not_open
+                                - party_exceeds_capacity
+                                - already_registered
+                                - late_withdrawal_fee_due
+                            - type: "null"
+                      required:
+                        - sessionId
+                        - teamId
+                        - teamName
+                        - location
+                        - address
+                        - startsAt
+                        - endsAt
+                        - pricingStructure
+                        - unitFee
+                        - feeLevel
+                        - publicCapacity
+                        - seatsLeft
+                        - waitlistLength
+                        - me
+                        - canRegister
+                        - blockedReason
+                      additionalProperties: false
+                  hasMore:
+                    type: boolean
+                  overdueCount:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - sessions
+                  - hasMore
+                  - overdueCount
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+  /me/registrations:
+    get:
+      operationId: listMyRegistrations
+      summary: List the caller's registrations across teams
+      description: "Every registration of the caller (CONFIRMED, WAITLISTED, and
+        WITHDRAWN where a late fee is owed or was billed; a free early
+        withdrawal is never listed), with no membership filter: a removed or
+        banned player still sees their own history. `upcoming` (a PUBLISHED
+        session that has not started, soonest first) is returned on the first
+        page only. `past` (everything else, including a cancelled session's
+        registration) is newest first, 20 per page; `nextCursor` is opaque and
+        is passed back as `cursor` (a cursor the API refuses is 422). Each row
+        carries the place, the address, the registration state, the party size,
+        the payment once billing has produced one (`payment`: amount, status,
+        due date, `onHold`, `payoutBlocked`) and otherwise the party fee
+        estimate (`estimatedTotal`)."
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+          in: query
+          name: cursor
+          required: false
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upcoming:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        registrationId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        sessionId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        teamId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        teamName:
+                          type: string
+                        location:
+                          type: string
+                        address:
+                          type: string
+                        startsAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        endsAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                        sessionStatus:
+                          type: string
+                          enum:
+                            - DRAFT
+                            - PUBLISHED
+                            - COMPLETED
+                            - CANCELLED
+                        status:
+                          type: string
+                          enum:
+                            - CONFIRMED
+                            - WAITLISTED
+                            - WITHDRAWN
+                        waitlistRank:
+                          anyOf:
+                            - type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            - type: "null"
+                        guestCount:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        withdrawalFeeDue:
+                          type: boolean
+                        estimatedTotal:
+                          anyOf:
+                            - {}
+                            - type: "null"
+                        payment:
+                          anyOf:
+                            - type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                amount: {}
+                                status:
+                                  type: string
+                                  enum:
+                                    - PENDING
+                                    - PAID
+                                    - FAILED
+                                    - OVERDUE
+                                billingType:
+                                  type: string
+                                  enum:
+                                    - PER_GAME
+                                    - PREPAID_CREDIT
+                                    - MONTHLY_SUBSCRIPTION
+                                    - QUARTERLY_SUBSCRIPTION
+                                dueDate:
+                                  type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                paidAt:
+                                  anyOf:
+                                    - type: string
+                                      format: date-time
+                                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                    - type: "null"
+                                onHold:
+                                  type: boolean
+                                payoutBlocked:
+                                  type: boolean
+                              required:
+                                - id
+                                - amount
+                                - status
+                                - billingType
+                                - dueDate
+                                - paidAt
+                                - onHold
+                                - payoutBlocked
+                              additionalProperties: false
+                            - type: "null"
+                      required:
+                        - registrationId
+                        - sessionId
+                        - teamId
+                        - teamName
+                        - location
+                        - address
+                        - startsAt
+                        - endsAt
+                        - sessionStatus
+                        - status
+                        - waitlistRank
+                        - guestCount
+                        - withdrawalFeeDue
+                        - estimatedTotal
+                        - payment
+                      additionalProperties: false
+                  past:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        registrationId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        sessionId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        teamId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        teamName:
+                          type: string
+                        location:
+                          type: string
+                        address:
+                          type: string
+                        startsAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                        endsAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                            - type: "null"
+                        sessionStatus:
+                          type: string
+                          enum:
+                            - DRAFT
+                            - PUBLISHED
+                            - COMPLETED
+                            - CANCELLED
+                        status:
+                          type: string
+                          enum:
+                            - CONFIRMED
+                            - WAITLISTED
+                            - WITHDRAWN
+                        waitlistRank:
+                          anyOf:
+                            - type: integer
+                              minimum: 1
+                              maximum: 9007199254740991
+                            - type: "null"
+                        guestCount:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        withdrawalFeeDue:
+                          type: boolean
+                        estimatedTotal:
+                          anyOf:
+                            - {}
+                            - type: "null"
+                        payment:
+                          anyOf:
+                            - type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                amount: {}
+                                status:
+                                  type: string
+                                  enum:
+                                    - PENDING
+                                    - PAID
+                                    - FAILED
+                                    - OVERDUE
+                                billingType:
+                                  type: string
+                                  enum:
+                                    - PER_GAME
+                                    - PREPAID_CREDIT
+                                    - MONTHLY_SUBSCRIPTION
+                                    - QUARTERLY_SUBSCRIPTION
+                                dueDate:
+                                  type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                paidAt:
+                                  anyOf:
+                                    - type: string
+                                      format: date-time
+                                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                                    - type: "null"
+                                onHold:
+                                  type: boolean
+                                payoutBlocked:
+                                  type: boolean
+                              required:
+                                - id
+                                - amount
+                                - status
+                                - billingType
+                                - dueDate
+                                - paidAt
+                                - onHold
+                                - payoutBlocked
+                              additionalProperties: false
+                            - type: "null"
+                      required:
+                        - registrationId
+                        - sessionId
+                        - teamId
+                        - teamName
+                        - location
+                        - address
+                        - startsAt
+                        - endsAt
+                        - sessionStatus
+                        - status
+                        - waitlistRank
+                        - guestCount
+                        - withdrawalFeeDue
+                        - estimatedTotal
+                        - payment
+                      additionalProperties: false
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
+                required:
+                  - upcoming
+                  - past
+                  - nextCursor
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
+        "422":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - validation_failed
+                          - unauthenticated
+                          - session_expired
+                          - forbidden
+                          - cross_origin_request
+                          - not_found
+                          - conflict
+                          - internal_error
+                          - service_unavailable
+                          - email_taken
+                          - invalid_credentials
+                          - too_many_attempts
+                          - too_many_requests
+                          - invalid_or_expired_token
+                          - provider_not_enabled
+                          - provider_unavailable
+                          - oauth_state_invalid
+                          - oauth_cancelled
+                          - oauth_email_missing
+                          - oauth_email_unverified
+                          - oauth_account_exists
+                          - signup_expired
+                          - identity_in_use
+                          - provider_already_connected
+                          - link_session_mismatch
+                          - last_sign_in_method
+                          - invite_invalid
+                          - already_requested
+                          - already_member
+                          - banned_from_team
+                          - team_admin_cannot_be_banned
+                          - last_team_admin
+                          - membership_state_conflict
+                          - payout_not_configured
+                          - banking_in_use
+                          - skill_level_stale
+                          - auto_enroll_stale
+                          - session_stale
+                          - series_stale
+                          - series_ended
+                          - session_started
+                          - session_not_editable
+                          - session_state_conflict
+                          - session_fee_locked
+                          - overdue_payments
+                          - session_not_open
+                          - already_registered
+                          - not_registered
+                          - party_exceeds_capacity
+                          - late_withdrawal_fee_due
+                          - cancellation_terms_changed
+                          - payment_settled
+                          - payment_in_progress
+                          - payment_on_hold
+                          - top_up_in_progress
+                          - payment_provider_unavailable
+                          - payment_provider_refused
+                          - reminder_too_soon
+                          - hold_resolved_by_provider
+                          - invoice_not_available
+                          - invoice_pending
+                          - export_too_large
+                          - export_busy
+                      message:
+                        type: string
+                      fieldErrors:
+                        type: object
+                        propertyNames:
+                          type: string
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: string
+                      email:
+                        type: string
+                    required:
+                      - code
+                      - message
+                    additionalProperties: false
+                required:
+                  - error
+                additionalProperties: false
   /teams/{teamId}/payments:
     get:
       operationId: listTeamPayments
@@ -18812,17 +19538,21 @@ paths:
   /payments/me:
     get:
       operationId: listMyUnpaidPayments
-      summary: List the caller's unpaid payments across teams
-      description: "The caller's PENDING and OVERDUE payments in every team (held ones
-        included, `onHold: true`), most overdue first, grouped by team in that
-        order; one page of 50 payments (`nextCursor` is opaque; pass it back as
-        `cursor`). `status` may only be `UNPAID` (the default). This is the
-        target of the registration debt block."
+      summary: List the caller's unpaid or paid payments across teams
+      description: "With `status=UNPAID` (the default): the caller's PENDING and
+        OVERDUE payments in every team (held ones included, `onHold: true`),
+        most overdue first, grouped by team in that order; this is the target of
+        the registration debt block. With `status=PAID`: the caller's PAID
+        payments in every team, most recently paid first (`paid_at` then id,
+        both descending), grouped by team in that order, each with its document
+        reference. One page of 50 payments either way (`nextCursor` is opaque;
+        pass it back as `cursor`; a cursor the API refuses is 422)."
       parameters:
         - schema:
             type: string
             enum:
               - UNPAID
+              - PAID
           in: query
           name: status
           required: false
@@ -20251,17 +20981,18 @@ paths:
     get:
       operationId: listMyTeamPayments
       summary: List the caller's payments in a team
-      description: The caller's own payments in this team, newest due first, one page
+      description: "The caller's own payments in this team, newest due first, one page
         of 50 (`nextCursor` is opaque; pass it back as `cursor`);
-        `status=UNPAID` keeps PENDING and OVERDUE. Each row carries the session,
-        the amount, the status, why it was charged, the latest attempt's
-        `outcome`, `onHold` and `payoutBlocked`. APPROVED members of the team
-        only.
+        `status=UNPAID` keeps PENDING and OVERDUE (`status=PAID` is 422: use
+        `GET /payments/me?status=PAID`). Each row carries the session, the
+        amount, the status, why it was charged, the latest attempt's `outcome`,
+        `onHold` and `payoutBlocked`. APPROVED members of the team only."
       parameters:
         - schema:
             type: string
             enum:
               - UNPAID
+              - PAID
           in: query
           name: status
           required: false

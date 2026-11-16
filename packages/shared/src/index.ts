@@ -1,5 +1,6 @@
 export * from './api/auth.ts';
 export * from './api/billing.ts';
+export * from './api/dashboard.ts';
 export * from './api/errors.ts';
 export { HealthResponse } from './api/health.ts';
 export * from './api/invoices.ts';

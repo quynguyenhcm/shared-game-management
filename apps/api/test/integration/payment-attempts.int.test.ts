@@ -647,7 +647,113 @@ describe('the payer lists (GET /teams/:teamId/payments/me, GET /payments/me?stat
       'Beta Club': [[held, 'OVERDUE', true]],
     });
     expect(JSON.stringify(body)).not.toContain(paid);
-    expect((await call(h, 'GET', '/payments/me?status=PAID', a.payer.token)).statusCode).toBe(422);
+    expect((await call(h, 'GET', '/payments/me?status=ALL', a.payer.token)).statusCode).toBe(422);
     expect((await call(h, 'GET', '/payments/me', null)).statusCode).toBe(401);
   });
+
+  it('pages 120 PAID payments across two teams 50/50/20 by paid_at desc then id desc, and the unpaid path keeps its own cursor (AC-HAPPY-6)', async () => {
+    const teamA = await insertTeam(database.pool, { name: 'Paid Alpha', payoutConfigured: true });
+    const teamB = await insertTeam(database.pool, { name: 'Paid Beta', payoutConfigured: true });
+    const payer = await httpMember(h, teamA);
+    await database.pool.query(
+      `INSERT INTO team_members (team_id, user_id, role, status, skill_level, approved_at, approved_by)
+       VALUES ($1, $2, 'MEMBER', 'APPROVED', 'BEGINNER', now(), $2)`,
+      [teamB, payer.userId],
+    );
+    const other = await httpMember(h, teamA);
+    const seed = async (index: number, status: 'PAID' | 'PENDING', who: HttpMember) => {
+      const teamId = index % 2 === 0 ? teamA : teamB;
+      const { sessionId } = await insertPublishedSession(database.pool, teamId, {
+        now: new Date(BASE.getTime() - 20 * DAY),
+        flat: '17.00',
+      });
+      const registrationId = await insertRegistration(database.pool, {
+        sessionId,
+        teamId,
+        userId: who.userId,
+      });
+      return insertPayment(database.pool, {
+        userId: who.userId,
+        teamId,
+        registrationId,
+        amount: '17.00',
+        status,
+        dueDate: new Date(BASE.getTime() + index * MINUTE),
+        // Three payments share each paid instant, so the id decides their order.
+        ...(status === 'PAID'
+          ? { paidAt: new Date(BASE.getTime() + Math.floor(index / 3) * MINUTE) }
+          : {}),
+      });
+    };
+    const paid: string[] = [];
+    for (let i = 0; i < 120; i += 1) paid.push(await seed(i, 'PAID', payer));
+    const unpaid: string[] = [];
+    for (let i = 0; i < 60; i += 1) unpaid.push(await seed(1000 + i, 'PENDING', payer));
+    const strangers = await seed(5000, 'PAID', other);
+
+    const { rows } = await database.pool.query<{ id: string }>(
+      `SELECT id FROM payments WHERE user_id = $1 AND status = 'PAID' ORDER BY paid_at DESC, id DESC`,
+      [payer.userId],
+    );
+    const expected = rows.map((row) => row.id);
+    expect(expected).toHaveLength(120);
+
+    const page = async (url: string) => {
+      const response = await call(h, 'GET', url, payer.token);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      return response.json<UnpaidPaymentsResponse>();
+    };
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    const sizes: number[] = [];
+    for (let guard = 0; guard < 5; guard += 1) {
+      const body: UnpaidPaymentsResponse = await page(
+        `/payments/me?status=PAID${cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`,
+      );
+      const ids = body.teams.flatMap((group) => group.payments.map((p) => p.id));
+      sizes.push(ids.length);
+      // Each team group keeps the global order among its own rows.
+      for (const group of body.teams) {
+        const own = group.payments.map((p) => p.id);
+        expect(own).toEqual(expected.filter((id) => own.includes(id)));
+        expect(group.payments.every((p) => p.status === 'PAID')).toBe(true);
+      }
+      expect(body.teams.length).toBeLessThanOrEqual(2);
+      seen.push(...ids);
+      cursor = body.nextCursor;
+      if (cursor === null) break;
+    }
+    expect(sizes).toEqual([50, 50, 20]);
+    expect(seen).toHaveLength(120);
+    expect(new Set(seen).size).toBe(120);
+    expect([...seen].sort()).toEqual([...paid].sort());
+    expect(seen).not.toContain(strangers);
+    // Page boundaries follow the global order: the first page is exactly the newest 50.
+    const first = await page('/payments/me?status=PAID');
+    expect(first.teams.flatMap((g) => g.payments.map((p) => p.id)).sort()).toEqual(
+      expected.slice(0, 50).sort(),
+    );
+
+    // The unpaid list is independent: 60 PENDING page 50 then 10 with a cursor of their own.
+    const unpaidOne = await page('/payments/me?status=UNPAID');
+    expect(unpaidOne.teams.flatMap((g) => g.payments)).toHaveLength(50);
+    expect(unpaidOne.nextCursor).not.toBeNull();
+    const unpaidTwo = await page(
+      `/payments/me?status=UNPAID&cursor=${encodeURIComponent(unpaidOne.nextCursor as string)}`,
+    );
+    const unpaidIds = [...unpaidOne.teams, ...unpaidTwo.teams].flatMap((g) =>
+      g.payments.map((p) => p.id),
+    );
+    expect(unpaidTwo.nextCursor).toBeNull();
+    expect([...unpaidIds].sort()).toEqual([...unpaid].sort());
+
+    // A cursor the API refuses is a 422, on both lists.
+    expect(
+      (await call(h, 'GET', '/payments/me?status=PAID&cursor=garbage', payer.token)).statusCode,
+    ).toBe(422);
+    expect(
+      (await call(h, 'GET', `/teams/${teamA}/payments/me?status=PAID`, payer.token)).statusCode,
+    ).toBe(422);
+  }, 120_000);
 });

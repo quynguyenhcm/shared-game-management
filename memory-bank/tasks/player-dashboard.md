@@ -278,20 +278,20 @@ Confidence by field: route, tab pattern, protection, Tab 3 composition and invoi
 ## Implementation Roadmap
 
 ### New Source Files (pin path + extension)
-- [ ] `packages/shared/src/api/dashboard.ts` — zod schemas + types for `OpenSessionsResponse`, `MyRegistrationsResponse` (+ query schemas)
-- [ ] `packages/shared/src/api/dashboard.test.ts` — schema tests
-- [ ] extend `packages/shared/src/api/billing.ts` — `MyPaymentsQuery.status` gains `'PAID'`
-- [ ] extend `packages/shared/src/index.ts` (or the api barrel) — export dashboard schemas
-- [ ] `apps/api/src/modules/player-dashboard/routes.ts` — `GET /me/sessions/open`, `GET /me/registrations` (auth, no-store)
-- [ ] `apps/api/src/modules/player-dashboard/service.ts` — compose read model with fee/access helpers from `modules/registrations`
-- [ ] `apps/api/src/modules/player-dashboard/repo.ts` — read-only queries (snapshot `readOnly` reads)
-- [ ] `apps/api/src/modules/player-dashboard/boundaries.test.ts` — read-only guard
-- [ ] extend `apps/api/src/modules/billing/player-repo.ts` — `listPayerPaid`
-- [ ] extend `apps/api/src/modules/billing/player.ts` + `player-routes.ts` — `status=PAID`
-- [ ] extend `apps/api/src/app.ts` (`buildApp`) — register the module
-- [ ] `db/migrations/<utc>_registrations_user_index.sql` — ONLY if the Q9 check shows no usable `registrations(user_id)` access path (forward migration, with Down)
-- [ ] `apps/api/test/integration/player-dashboard-api.int.test.ts`
-- [ ] extend `vitest.config.ts` — add `apps/api/src/modules/player-dashboard/**` to coverage `include`
+- [x] `packages/shared/src/api/dashboard.ts` — zod schemas + types for `OpenSessionsResponse`, `MyRegistrationsResponse` (+ query schemas)
+- [x] `packages/shared/src/api/dashboard.test.ts` — schema tests
+- [x] extend `packages/shared/src/api/billing.ts` — `MyPaymentsQuery.status` gains `'PAID'`
+- [x] extend `packages/shared/src/index.ts` (or the api barrel) — export dashboard schemas
+- [x] `apps/api/src/modules/player-dashboard/routes.ts` — `GET /me/sessions/open`, `GET /me/registrations` (auth, no-store)
+- [x] `apps/api/src/modules/player-dashboard/service.ts` — compose read model with fee/access helpers from `modules/registrations`
+- [x] `apps/api/src/modules/player-dashboard/repo.ts` — read-only queries (snapshot `readOnly` reads)
+- [x] `apps/api/src/modules/player-dashboard/boundaries.test.ts` — read-only guard
+- [x] extend `apps/api/src/modules/billing/player-repo.ts` — `listPayerPaid`
+- [x] extend `apps/api/src/modules/billing/player.ts` + `player-routes.ts` — `status=PAID`
+- [x] extend `apps/api/src/app.ts` (`buildApp`) — register the module
+- [x] (NOT NEEDED, Q9: idx_registrations_user exists)  `db/migrations/<utc>_registrations_user_index.sql` — ONLY if the Q9 check shows no usable `registrations(user_id)` access path (forward migration, with Down)
+- [x] `apps/api/test/integration/player-dashboard-api.int.test.ts`
+- [x] extend `vitest.config.ts` — add `apps/api/src/modules/player-dashboard/**` to coverage `include`
 - [ ] extend `apps/web/src/lib/api-client.ts` — `openSessions`, `myRegistrations`, `myPaidPayments`
 - [ ] `apps/web/src/lib/dashboard/paths.ts` — tab URLs, cursor params, `returnTo` for downloads
 - [ ] `apps/web/src/lib/dashboard/labels.ts` — copy deck (all dashboard strings)
@@ -310,7 +310,7 @@ Confidence by field: route, tab pattern, protection, Tab 3 composition and invoi
 - [ ] extend `memory-bank/{techContext,systemPatterns,productBrief}.md`, `docs/getting-started.md` if it lists player pages
 
 ### Phases
-- [ ] Phase 1: API read models — shared dashboard schemas; `player-dashboard` module (`GET /me/sessions/open`, `GET /me/registrations`); `status=PAID` on `GET /payments/me`; Q9 index check (migration only if needed); OpenAPI regen + drift; coverage include; integration + boundaries tests. ACs: HAPPY-1 (data), HAPPY-3 (data), HAPPY-6, HAPPY-7, ASYNC-2 (data).
+- [x] Phase 1: API read models — shared dashboard schemas; `player-dashboard` module (`GET /me/sessions/open`, `GET /me/registrations`); `status=PAID` on `GET /payments/me`; Q9 index check (migration only if needed); OpenAPI regen + drift; coverage include; integration + boundaries tests. ACs: HAPPY-1 (data), HAPPY-3 (data), HAPPY-6, HAPPY-7, ASYNC-2 (data).
 - [ ] Phase 2: Web dashboard — `/dashboard` page, tab nav, header link, proxy protection, three tabs from pure view models, `PaymentRow` export, per-section error handling, empty states, download-error notice. ACs: ENTRY-1/2/3, HAPPY-1..5, ERROR-1..6, ASYNC-1/2 (render).
 - [ ] Phase 3: E2E, accessibility and docs — `player-dashboard.spec.ts` on the `sgm-e2e` stack (desktop + 360 px, axe, no-scroll, 44 px), full entry-to-success journey with concrete spec values; memory-bank and docs updates. ACs: HAPPY-8 plus the end-to-end proof of ENTRY-1, HAPPY-2, HAPPY-5, ERROR-3, ERROR-4.
 
@@ -340,18 +340,27 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 
 **Build Status**: RUNNING
 **Current Phase**: 1 of 3
-**Current Step**: Auto-build started (2026-11-16)
+**Current Step**: Phase 1 complete (2026-11-16); next Phase 2
 **Auto-Build Mode**: YES
 **Can Resume**: YES
 
 ### Resumption Notes
-**Resume From**: Phase 1
-**Notes**: Auto-build run started 2026-11-16; pre-flight plan scan clean.
+**Resume From**: Phase 2
+**Notes**: Phase 1 committed. Guard log: empty (no commit-guard failures).
 
 ### Halt State (populated only on a halt trigger — blank during normal RUNNING)
 
 ### Deviations
 <!-- Per entry: - Phase <N> | <file:line/artifact> | <rationale> -->
+- Phase 1 | Q9 | `registrations` already has `idx_registrations_user (user_id, registered_at DESC)` (20260929001000000_indexes.sql); EXPLAIN ANALYZE on 60k registrations uses it (0.26 ms). No migration added; `types.generated.ts` unchanged.
+- Phase 1 | player-dashboard/repo.ts | Upcoming = PUBLISHED not-yet-started session regardless of registration status; a cancelled session's registration is always Past; WITHDRAWN hidden only when no fee due and no payment.
+- Phase 1 | GET /me/sessions/open | No cursor in spec: capped at 50 with `hasMore`; response also carries `overdueCount`.
+- Phase 1 | billing/player-routes.ts | `status=PAID` on `GET /teams/:teamId/payments/me` returns 422 (only the cross-team `/payments/me` serves PAID).
+- Phase 1 | billing/player.ts | PAID and UNPAID cursors share a format; web must keep them in separate params (`paidCursor`, `unpaidCursor`).
+- Phase 1 | tests | No integration test for the unpriced-session row (published sessions cannot be unpriced in DB) nor PREPAID_CREDIT billing type (billing_type immutable after insert); schema allows `unitFee: null`.
+
+### Phase 1 Result (2026-11-16)
+Tests 4296/4296 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: no actionable defects.
 
 ### Active Sub-Agents
 (none)
