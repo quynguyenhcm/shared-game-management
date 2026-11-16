@@ -342,7 +342,9 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 **Current Phase**: 3 of 3
 **Current Step**: Phase 3 complete (2026-11-16); BUILD_COMPLETE
 **Auto-Build Mode**: YES
-**Can Resume**: YES
+**Can Resume**: NO
+**Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
+**Final Review Verdict**: Ready to merge with fixes (0 Critical, 1 Important: accordion counts derived from loaded page rows (`lib/dashboard/view.ts` paymentAccordions), against learned rule review-process-plan-claims; 6 Minor). Awaiting human ruling.
 
 ### Resumption Notes
 **Resume From**: (none; run /yay:reflect)
@@ -367,6 +369,11 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 - Phase 2 | lib/dashboard/view.ts (unpaidMore) | Phase review (PROCEED): on a later unpaid page the `Overdue (n)` / `Pending (n)` counts reflect the loaded page only and earlier rows are off screen (reachable via the tab link or Back); the duplicate `Show more` is slightly confusing. Accepted; polish candidate.
 - Phase 2 | lib/dashboard/view.ts (paid openByDefault) | Phase review (PROCEED): after Paid `Show more` the Paid accordion is closed again (AC-HAPPY-5 says Paid is closed). Accepted; polish candidate: open Paid when `paidCursor` is set.
 - Phase 2 | lib/dashboard/labels.ts / view.ts | Phase review (PROCEED): wallet cards omit closed-top-up notices; invoice route unchanged (safeReturnTo keeps the query, test added); vitest include unchanged (lib/dashboard 100%). Accepted.
+- Phase 3 | apps/web/e2e/player-dashboard.spec.ts:1052-1066 | Phase review (PROCEED): AC-ERROR-3 proven end to end only for `invoice_not_available`; `invoice_pending` and `service_unavailable` cannot be provoked reliably on the e2e stack and stay unit-tested. Accepted.
+- Phase 3 | apps/web/e2e/player-dashboard.spec.ts:841-874 | Phase review (PROCEED): AC-HAPPY-2 proven end to end for Register, View registration and the debt banner; `Join waitlist` and blocked `View session` are unit-tested only (one overdue payment does not reach DEBT_LIMIT 3). Accepted.
+- Phase 3 | apps/web/e2e/player-dashboard.spec.ts:896 | Phase review (PROCEED): the $0.00 PAID row is a BY_SEX session with a $0.00 female fee (`No charge`, no download). Accepted.
+- Phase 3 | apps/web/e2e/player-dashboard.spec.ts:40-59 | Phase review (PROCEED): Codex P1 fix, the stack guard accepts only localhost 3100/4100/5532; Codex P2 fix, test date frozen per worker. Accepted.
+- Phase 3 | docs/getting-started.md | Phase review (PROCEED): no player pages were listed, so an e2e run recipe was added instead. Accepted.
 
 ### Phase 1 Result (2026-11-16)
 Tests 4296/4296 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: no actionable defects.
