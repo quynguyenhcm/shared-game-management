@@ -552,6 +552,17 @@ WEB_BASE_URL=http://localhost:3100 E2E_API_URL=http://localhost:4100 \
 docker compose -p sgm-e2e down -v     # removes only the e2e project's containers and volumes
 ```
 
+The player dashboard journeys (`apps/web/e2e/player-dashboard.spec.ts`: the `/dashboard` tabs, wallet cards, accordions, PDF download,
+empty states, signed-out redirect, with axe, no horizontal scroll and 44 px checks on desktop and 360 x 740) run the same way. The
+spec defaults to the e2e ports and refuses a web, API or database URL on the development ports (3000, 4000, 5432):
+
+```sh
+WEB_BASE_URL=http://localhost:3100 E2E_API_URL=http://localhost:4100 \
+  E2E_DATABASE_URL=postgres://sgm:sgm@localhost:5532/sgm \
+  E2E_WORKER_CONTAINER=sgm-e2e-worker-1 E2E_API_CONTAINER=sgm-e2e-api-1 \
+  pnpm exec playwright test -c apps/web/playwright.config.ts apps/web/e2e/player-dashboard.spec.ts
+```
+
 Set `E2E_SPECIMEN_DIR=<dir>` to keep the PDF, CSV and XLSX the invoices run downloads. The four PDF variants for the accountant
 are rendered from the real renderer by `SPECIMEN_DIR=<dir> pnpm exec vitest run apps/api/src/modules/invoices/specimens.test.ts`;
 the committed set is in `docs/specimens/`.

@@ -39,7 +39,7 @@
 - Team banking and GST settings: a team admin sets the bank account that receives payouts and whether the team is GST-registered. Paid sessions cannot be published until banking is set up, and, once payouts are live (wallet-and-akahu-billing), a payout account that Akahu rejects blocks new paid publishes until it is fixed. The account name and number are encrypted and write-only after save, and every approved admin of the team, including the one who made the change, is emailed when they change. Akahu verification of the account is a future feature (wallet-and-akahu-billing).
 - NZ GST (15%, 3/23 split), PDF tax invoices, and IRD-ready CSV/Excel exports
 - Tax invoices and receipts (tax-invoices-and-exports): every paid payment above $0.00 gets a numbered, immutable PDF document (a tax invoice for a GST-registered team, a receipt otherwise), issued on behalf of the team and downloadable by the payer and by the team's admins. Team admins export income as CSV or Excel by custom range, GST return period (two-monthly or six-monthly) or NZ financial year from an "Income exports" area. The accountant has not yet confirmed the wording, numbering format or export basis (AC-VERIFY-9 pending); treat them as provisional.
-- Player dashboard (Currently Opening, My Registration, Payments & Wallet) and an admin master report
+- Player dashboard (player-dashboard, built): a signed-in player opens `/dashboard` from a `Dashboard` header link and sees three URL-driven tabs. Currently Opening lists the upcoming published sessions of the teams where they are approved (team, time window, address, their own fee, places left, and a Register, Join waitlist, View registration or View session button that links to the existing session page), with a banner when payments are overdue. My Registration lists every registration with date, payment status, team, address and total fee. Payments & Wallet shows a wallet card per team (balance, the $100 cap, a Top up credit link) and Overdue, Pending and Paid accordions with Pay now links and PDF invoice or receipt downloads. It is read-only: registering, topping up and paying stay on their existing pages, and it makes no claim about whether Akahu is live. The admin master report is still to come.
 
 ## Markets Serviced
 
@@ -113,6 +113,7 @@
 | 2026-10-16 | Claude (team-banking-and-gst, Phase 5) | Added team banking and GST capability, paid-session publish gate, change notification, write-only bank details |
 | 2026-11-05 | Claude (wallet-and-akahu-billing, Phase 6 docs) | Added the wallet, post-game billing, payments and payout-block capabilities and their user flows. Akahu is an integration point with the live adapter pending (Phase 4b); not live |
 | 2026-11-13 | Claude (tax-invoices-and-exports, Phase 5) | Added the tax invoice, receipt and income export capability; accountant sign-off pending |
+| 2026-11-16 | Claude (player-dashboard, Phase 3 docs) | The player dashboard now exists (three tabs over registration, wallet, payment and invoice features); the admin master report remains planned |
 
 ## Last Refreshed
 

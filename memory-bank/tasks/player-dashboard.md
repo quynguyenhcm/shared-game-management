@@ -1,13 +1,13 @@
 ---
 slug: player-dashboard
 feature: player-dashboard
-status: PLANNING_COMPLETE
+status: BUILD_COMPLETE
 ---
 
 # player-dashboard: Player Dashboard
 
 **Complexity**: Level 2
-**Status**: PLANNING_COMPLETE
+**Status**: BUILD_COMPLETE
 **Roadmap**: player-dashboard
 **Branch**: feature/player-dashboard
 **Worktree**: /Users/admin/yay-wt/shared-game-management/feature-player-dashboard
@@ -306,13 +306,13 @@ Confidence by field: route, tab pattern, protection, Tab 3 composition and invoi
 - [x] extend `apps/web/src/components/billing/payments-list.tsx` — export `PaymentRow` (no behaviour change)
 - [x] extend `apps/web/src/components/site-header-links.tsx` — `Dashboard` link first (signed_in only)
 - [x] extend `apps/web/src/proxy.ts` — add `/dashboard` to `PROTECTED`
-- [ ] `apps/web/e2e/player-dashboard.spec.ts`
-- [ ] extend `memory-bank/{techContext,systemPatterns,productBrief}.md`, `docs/getting-started.md` if it lists player pages
+- [x] `apps/web/e2e/player-dashboard.spec.ts`
+- [x] extend `memory-bank/{techContext,systemPatterns,productBrief}.md`, `docs/getting-started.md` if it lists player pages
 
 ### Phases
 - [x] Phase 1: API read models — shared dashboard schemas; `player-dashboard` module (`GET /me/sessions/open`, `GET /me/registrations`); `status=PAID` on `GET /payments/me`; Q9 index check (migration only if needed); OpenAPI regen + drift; coverage include; integration + boundaries tests. ACs: HAPPY-1 (data), HAPPY-3 (data), HAPPY-6, HAPPY-7, ASYNC-2 (data).
 - [x] Phase 2: Web dashboard — `/dashboard` page, tab nav, header link, proxy protection, three tabs from pure view models, `PaymentRow` export, per-section error handling, empty states, download-error notice. ACs: ENTRY-1/2/3, HAPPY-1..5, ERROR-1..6, ASYNC-1/2 (render).
-- [ ] Phase 3: E2E, accessibility and docs — `player-dashboard.spec.ts` on the `sgm-e2e` stack (desktop + 360 px, axe, no-scroll, 44 px), full entry-to-success journey with concrete spec values; memory-bank and docs updates. ACs: HAPPY-8 plus the end-to-end proof of ENTRY-1, HAPPY-2, HAPPY-5, ERROR-3, ERROR-4.
+- [x] Phase 3: E2E, accessibility and docs — `player-dashboard.spec.ts` on the `sgm-e2e` stack (desktop + 360 px, axe, no-scroll, 44 px), full entry-to-success journey with concrete spec values; memory-bank and docs updates. ACs: HAPPY-8 plus the end-to-end proof of ENTRY-1, HAPPY-2, HAPPY-5, ERROR-3, ERROR-4.
 
 Final phase delivers the complete entry-to-success flow: header `Dashboard` → `/dashboard` → each tab's success state as specified.
 
@@ -338,15 +338,15 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 
 ## Execution State
 
-**Build Status**: RUNNING
-**Current Phase**: 2 of 3
-**Current Step**: Phase 2 complete (2026-11-16); next Phase 3
+**Build Status**: COMPLETE
+**Current Phase**: 3 of 3
+**Current Step**: Phase 3 complete (2026-11-16); BUILD_COMPLETE
 **Auto-Build Mode**: YES
 **Can Resume**: YES
 
 ### Resumption Notes
-**Resume From**: Phase 3
-**Notes**: Phase 2 committed. Guard log: empty (no commit-guard failures).
+**Resume From**: (none; run /yay:reflect)
+**Notes**: Phase 3 committed. Guard log: empty.
 
 ### Halt State (populated only on a halt trigger — blank during normal RUNNING)
 
@@ -381,3 +381,6 @@ Tests 4360/4360 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build,
 - Spec Writer Agent: COMPLETE (2026-11-14) — Specification section; taxonomy lint CLEAN (19 ACs)
 - Human spec review: APPROVED with defaults (2026-11-14)
 - Implementation plan: COMPLETE (2026-11-14) — 3 phases
+
+### Phase 3 Result (2026-11-16)
+Playwright on sgm-e2e (fake adapter): desktop 5/5, mobile 5/5. Tests 4359/4360 (only the known invoices-schema migration-order flake, 5/5 in isolation), typecheck, lint, build, openapi drift PASS. Codex review: P1 (e2e stack guard now whitelists localhost 3100/4100/5532) and P2 (test date frozen per worker) fixed. Deviations: AC-ERROR-3 proven end to end for invoice_not_available only (invoice_pending / service_unavailable covered by unit tests); the $0.00 PAID row is a BY_SEX session with a $0.00 female fee (tag No charge, no download).
