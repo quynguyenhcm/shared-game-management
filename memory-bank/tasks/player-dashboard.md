@@ -338,10 +338,20 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 
 ## Execution State
 
-**Build Status**: IDLE
-**Current Phase**: BUILD
-**Current Step**: Planning complete
-**Can Resume**: NO
+**Build Status**: RUNNING
+**Current Phase**: 1 of 3
+**Current Step**: Auto-build started (2026-11-16)
+**Auto-Build Mode**: YES
+**Can Resume**: YES
+
+### Resumption Notes
+**Resume From**: Phase 1
+**Notes**: Auto-build run started 2026-11-16; pre-flight plan scan clean.
+
+### Halt State (populated only on a halt trigger — blank during normal RUNNING)
+
+### Deviations
+<!-- Per entry: - Phase <N> | <file:line/artifact> | <rationale> -->
 
 ### Active Sub-Agents
 (none)
