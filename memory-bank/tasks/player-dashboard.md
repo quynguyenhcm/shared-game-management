@@ -358,6 +358,8 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 - Phase 1 | billing/player-routes.ts | `status=PAID` on `GET /teams/:teamId/payments/me` returns 422 (only the cross-team `/payments/me` serves PAID).
 - Phase 1 | billing/player.ts | PAID and UNPAID cursors share a format; web must keep them in separate params (`paidCursor`, `unpaidCursor`).
 - Phase 1 | tests | No integration test for the unpriced-session row (published sessions cannot be unpriced in DB) nor PREPAID_CREDIT billing type (billing_type immutable after insert); schema allows `unitFee: null`.
+- Phase 1 | test/integration/payment-attempts.int.test.ts:650 | Phase review (PROCEED): the old "status=PAID is 422" assertion became "status=ALL is 422", following the intended widening of `MyPaymentsQuery`. Accepted.
+- Phase 1 | player-dashboard/service.ts (OPEN_SESSIONS_LIMIT = 50) | Phase review (PROCEED): a player with more than 50 open sessions cannot see the rest; Phase 2 must not offer Show more on Currently Opening. Accepted.
 
 ### Phase 1 Result (2026-11-16)
 Tests 4296/4296 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: no actionable defects.
