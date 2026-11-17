@@ -102,6 +102,9 @@ export function SiteHeaderLinks({ state }: { state: HeaderState }) {
     <nav aria-label="Main" className="flex flex-wrap items-center gap-x-4">
       {brand}
       <div className="order-3 flex basis-full flex-wrap items-center gap-x-4 sm:order-2 sm:basis-auto">
+        <a href="/dashboard" aria-current={current('/dashboard')} className={LINK_CLASS}>
+          Dashboard
+        </a>
         {findTeam}
         <a href="/teams" aria-current={current('/teams')} className={LINK_CLASS}>
           My teams

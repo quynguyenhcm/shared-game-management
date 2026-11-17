@@ -70,10 +70,18 @@ describe('apiClient billing reads: exact paths, query strings, bearer', () => {
   });
 
   it('myUnpaidPayments: GET /payments/me?status=UNPAID with an optional cursor', async () => {
-    const fetchMock = stubJson(200, { teams: [], nextCursor: null });
+    const fetchMock = stubJson(200, {
+      teams: [],
+      nextCursor: null,
+      counts: { overdue: 0, pending: 0, paid: 0 },
+    });
     await apiClient.myUnpaidPayments({ cursor: 'c1' }, OPTIONS);
     expect(call(fetchMock).url).toBe('http://localhost:4000/payments/me?status=UNPAID&cursor=c1');
-    const second = stubJson(200, { teams: [], nextCursor: null });
+    const second = stubJson(200, {
+      teams: [],
+      nextCursor: null,
+      counts: { overdue: 0, pending: 0, paid: 0 },
+    });
     await apiClient.myUnpaidPayments({}, OPTIONS);
     expect(call(second).url).toBe('http://localhost:4000/payments/me?status=UNPAID');
   });

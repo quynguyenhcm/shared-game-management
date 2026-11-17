@@ -50,6 +50,8 @@ import { loadInvoiceFonts } from './modules/invoices/render-pdf.ts';
 import { createInvoiceService } from './modules/invoices/service.ts';
 import { walletRoutes } from './modules/wallet/routes.ts';
 import { akahuWebhookRoutes } from './modules/billing/webhook-routes.ts';
+import { playerDashboardRoutes } from './modules/player-dashboard/routes.ts';
+import { createPlayerDashboardService } from './modules/player-dashboard/service.ts';
 import { registrationsRoutes } from './modules/registrations/routes.ts';
 import { createRegistrationsService } from './modules/registrations/service.ts';
 import type { SessionAllocatorPort } from './modules/sessions/allocator-port.ts';
@@ -247,6 +249,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       jobs: deps.jobs,
       webBaseUrl: deps.auth.webBaseUrl,
     }),
+  });
+  // player-dashboard: the caller's cross-team read models (`/me/sessions/open`, `/me/registrations`); read-only.
+  await app.register(playerDashboardRoutes, {
+    service: createPlayerDashboardService({ db: deps.db, clock: deps.clock }),
   });
   // wallet-and-akahu-billing: the team admin's payments list and the manual reminder (`/teams/:teamId/payments...`).
   await app.register(billingRoutes, {

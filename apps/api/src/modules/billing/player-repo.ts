@@ -46,6 +46,8 @@ export interface PlayerPaymentRow {
   readonly documentNumber: string | null;
   /** Exact `due_date` text for the keyset cursor. */
   readonly dueCursor: string;
+  /** Exact `paid_at` text for the PAID list's keyset cursor (null while unpaid). */
+  readonly paidCursor: string | null;
 }
 
 function baseQuery(db: Kysely<DB>, payerId: string) {
@@ -85,6 +87,9 @@ function baseQuery(db: Kysely<DB>, payerId: string) {
         'on_hold',
       ),
       sql<string>`to_char(p.due_date AT TIME ZONE 'UTC', ${KEYSET_TIME_FORMAT})`.as('due_cursor'),
+      sql<string | null>`to_char(p.paid_at AT TIME ZONE 'UTC', ${KEYSET_TIME_FORMAT})`.as(
+        'paid_cursor',
+      ),
     ])
     .where('p.user_id', '=', payerId);
 }
@@ -116,6 +121,7 @@ const toRow = (row: BaseRow): PlayerPaymentRow => ({
   gstRegistered: row.gst_registered,
   documentNumber: row.number_display,
   dueCursor: row.due_cursor,
+  paidCursor: row.paid_cursor,
 });
 
 /** One payment of the payer, or undefined (another person's payment and an unknown id look the same). */
@@ -187,6 +193,51 @@ export async function listPayerUnpaid(
   const rows = await query
     .orderBy('p.due_date', 'asc')
     .orderBy('p.id', 'asc')
+    .limit(PLAYER_PAYMENTS_PAGE_SIZE + 1)
+    .execute();
+  return rows.map(toRow);
+}
+
+/**
+ * The payer's totals by status across every team, over the same rows the lists read (so a total never disagrees with paging
+ * to the end of its list).
+ */
+export async function countPayerPayments(
+  db: Kysely<DB>,
+  payerId: string,
+): Promise<{ overdue: number; pending: number; paid: number }> {
+  const row = await db
+    .selectFrom('payments as p')
+    .innerJoin('teams as t', 't.id', 'p.team_id')
+    .innerJoin('registrations as r', 'r.id', 'p.registration_id')
+    .innerJoin('game_sessions as s', 's.id', 'r.session_id')
+    .where('p.user_id', '=', payerId)
+    .select([
+      sql<number>`count(*) FILTER (WHERE p.status = 'OVERDUE')::int`.as('overdue'),
+      sql<number>`count(*) FILTER (WHERE p.status = 'PENDING')::int`.as('pending'),
+      sql<number>`count(*) FILTER (WHERE p.status = 'PAID')::int`.as('paid'),
+    ])
+    .executeTakeFirstOrThrow();
+  return { overdue: row.overdue, pending: row.pending, paid: row.paid };
+}
+
+/**
+ * The payer's PAID payments across every team, most recently paid first (`paid_at desc, id desc`; page size + 1 rows), so every
+ * paid game's document stays reachable however long ago it was settled.
+ */
+export async function listPayerPaid(
+  db: Kysely<DB>,
+  input: { readonly payerId: string; readonly after: KeysetPosition | undefined },
+): Promise<PlayerPaymentRow[]> {
+  let query = baseQuery(db, input.payerId).where('p.status', '=', 'PAID');
+  if (input.after !== undefined) {
+    query = query.where(
+      sql<boolean>`(p.paid_at, p.id) < (${input.after.at}::timestamptz, ${input.after.id}::uuid)`,
+    );
+  }
+  const rows = await query
+    .orderBy('p.paid_at', 'desc')
+    .orderBy('p.id', 'desc')
     .limit(PLAYER_PAYMENTS_PAGE_SIZE + 1)
     .execute();
   return rows.map(toRow);

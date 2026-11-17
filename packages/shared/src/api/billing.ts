@@ -149,9 +149,12 @@ export const AdminPaymentsQuery = z.strictObject({
 });
 export type AdminPaymentsQuery = z.infer<typeof AdminPaymentsQuery>;
 
-/** `GET /payments/me?status=UNPAID` and `GET /teams/:teamId/payments/me` (CR-16, CR-17). */
+/**
+ * `GET /payments/me?status=UNPAID|PAID` and `GET /teams/:teamId/payments/me` (CR-16, CR-17). `PAID` (player-dashboard) lists the
+ * caller's paid payments across teams on `/payments/me` only; the team route refuses it.
+ */
 export const MyPaymentsQuery = z.strictObject({
-  status: z.enum(['UNPAID']).optional(),
+  status: z.enum(['UNPAID', 'PAID']).optional(),
   cursor: cursor.optional(),
 });
 export type MyPaymentsQuery = z.infer<typeof MyPaymentsQuery>;
@@ -302,7 +305,12 @@ export const MyPaymentsResponse = z.strictObject({
 });
 export type MyPaymentsResponse = z.infer<typeof MyPaymentsResponse>;
 
-/** `GET /payments/me?status=UNPAID` (CR-16): the caller's payable and held payments across teams, grouped by team. */
+const PaymentCount = z.number().int().nonnegative();
+
+/**
+ * `GET /payments/me?status=UNPAID` (CR-16): the caller's payable and held payments across teams, grouped by team; `status=PAID`
+ * gives the paid ones in the same shape. `counts` are the caller's whole totals by status on either list, never the page's rows.
+ */
 export const UnpaidPaymentsResponse = z.strictObject({
   teams: z.array(
     z.strictObject({
@@ -312,6 +320,7 @@ export const UnpaidPaymentsResponse = z.strictObject({
     }),
   ),
   nextCursor: z.string().nullable(),
+  counts: z.strictObject({ overdue: PaymentCount, pending: PaymentCount, paid: PaymentCount }),
 });
 export type UnpaidPaymentsResponse = z.infer<typeof UnpaidPaymentsResponse>;
 

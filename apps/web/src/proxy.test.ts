@@ -15,6 +15,18 @@ describe('proxy.ts (Next 16 file convention; runs before every page)', () => {
     );
   });
 
+  it('protects /dashboard: a cookie-less visit goes to /login with the same tab as returnTo, no-store (AC-ENTRY-3)', () => {
+    const response = proxy(request('/dashboard?tab=payments'));
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/login?returnTo=%2Fdashboard%3Ftab%3Dpayments',
+    );
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const through = proxy(request('/dashboard', { headers: { cookie: 'sgm_session=anything' } }));
+    expect(through.headers.get('location')).toBeNull();
+    expect(through.headers.get('cache-control')).toContain('no-store');
+  });
+
   it('lets a protected path through when a session cookie exists (the real check is requireUser)', () => {
     const response = proxy(request('/account', { headers: { cookie: 'sgm_session=anything' } }));
     expect(response.headers.get('location')).toBeNull();

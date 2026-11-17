@@ -30,6 +30,8 @@ import { findLatestAttempt } from './attempts-repo.ts';
 import {
   PLAYER_PAYMENTS_PAGE_SIZE,
   findPayerPayment,
+  countPayerPayments,
+  listPayerPaid,
   listPayerTeamPayments,
   listPayerUnpaid,
   readPaymentLines,
@@ -45,6 +47,7 @@ export interface PlayerPaymentsService {
     teamId: string,
     query: MyPaymentsQuery,
   ): Promise<MyPaymentsResponse>;
+  /** `GET /payments/me`: UNPAID (the default) or, with `status=PAID`, the caller's paid payments, grouped by team. */
   listUnpaid(payerId: string, query: MyPaymentsQuery): Promise<UnpaidPaymentsResponse>;
   startAttempt(
     payerId: string,
@@ -84,10 +87,15 @@ function toMyRow(row: PlayerPaymentRow): MyPaymentRow {
   };
 }
 
-const nextCursorOf = (rows: readonly PlayerPaymentRow[]): string | null => {
+/** The cursor of the next page: the last shown row's position on the list's own ordering column (`due_date` or `paid_at`). */
+const nextCursorOf = (
+  rows: readonly PlayerPaymentRow[],
+  column: 'dueCursor' | 'paidCursor' = 'dueCursor',
+): string | null => {
   const last = rows[PLAYER_PAYMENTS_PAGE_SIZE - 1];
-  return rows.length > PLAYER_PAYMENTS_PAGE_SIZE && last !== undefined
-    ? encodeKeysetCursor({ at: last.dueCursor, id: last.id })
+  const at = last?.[column];
+  return rows.length > PLAYER_PAYMENTS_PAGE_SIZE && last !== undefined && at != null
+    ? encodeKeysetCursor({ at, id: last.id })
     : null;
 };
 
@@ -162,6 +170,12 @@ export function createPlayerPaymentsService(deps: PlayerPaymentsDeps): PlayerPay
     },
 
     async listTeamPayments(payerId, teamId, query) {
+      // `PAID` is the cross-team list's filter; the team route has no Paid view.
+      if (query.status === 'PAID') {
+        throw new AppError('validation_failed', {
+          fieldErrors: { status: ['Paid payments are listed at /payments/me.'] },
+        });
+      }
       const rows = await listPayerTeamPayments(deps.db, {
         payerId,
         teamId,
@@ -175,11 +189,14 @@ export function createPlayerPaymentsService(deps: PlayerPaymentsDeps): PlayerPay
     },
 
     async listUnpaid(payerId, query) {
-      const rows = await listPayerUnpaid(deps.db, {
-        payerId,
-        after: query.cursor === undefined ? undefined : decodeKeysetCursor(query.cursor),
-      });
-      // Grouped by team in the order each team first appears (the most overdue payment leads).
+      const paid = query.status === 'PAID';
+      const list = paid ? listPayerPaid : listPayerUnpaid;
+      const after = query.cursor === undefined ? undefined : decodeKeysetCursor(query.cursor);
+      const [rows, counts] = await Promise.all([
+        list(deps.db, { payerId, after }),
+        countPayerPayments(deps.db, payerId),
+      ]);
+      // Grouped by team in the order each team first appears (the most overdue, or the most recently paid, payment leads).
       const teams = new Map<string, UnpaidPaymentsResponse['teams'][number]>();
       for (const row of rows.slice(0, PLAYER_PAYMENTS_PAGE_SIZE)) {
         let group = teams.get(row.teamId);
@@ -189,7 +206,11 @@ export function createPlayerPaymentsService(deps: PlayerPaymentsDeps): PlayerPay
         }
         group.payments.push(toMyRow(row));
       }
-      return { teams: [...teams.values()], nextCursor: nextCursorOf(rows) };
+      return {
+        teams: [...teams.values()],
+        nextCursor: nextCursorOf(rows, paid ? 'paidCursor' : 'dueCursor'),
+        counts,
+      };
     },
 
     startAttempt(payerId, paymentId, input, log) {

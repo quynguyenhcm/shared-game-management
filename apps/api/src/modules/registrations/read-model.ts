@@ -31,7 +31,20 @@ type SessionRecord = Selectable<GameSessions>;
 /** A session the caller may see: not a DRAFT and with a start (a cancelled draft never had one). */
 export type VisibleSession = SessionRecord & { readonly starts_at: Date };
 
-const feeColumnsOf = (session: SessionRecord): SessionFeeColumns => ({
+/** The session's fee columns as the shared fee rule reads them (also used by the player dashboard's read models). */
+export const feeColumnsOf = (
+  session: Pick<
+    SessionRecord,
+    | 'pricing_structure'
+    | 'fee_flat'
+    | 'fee_male'
+    | 'fee_female'
+    | 'fee_other'
+    | 'fee_beginner'
+    | 'fee_intermediate'
+    | 'fee_advanced'
+  >,
+): SessionFeeColumns => ({
   pricing: session.pricing_structure,
   flat: session.fee_flat,
   male: session.fee_male,

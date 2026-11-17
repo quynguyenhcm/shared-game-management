@@ -1,9 +1,9 @@
 ---
 version: v1.0.0
-status: planned
+status: completed
 priority: medium
 complexity: 2
-linked_tasks: []
+linked_tasks: [player-dashboard]
 created: 2026-09-29
 ---
 

@@ -77,7 +77,17 @@ export const payment = (change: Record<string, unknown> = {}): PaymentResponse['
 export const unpaidBody = (
   teams: { teamId: string; teamName: string; payments: MyPaymentRow[] }[],
   nextCursor: string | null = null,
-): UnpaidPaymentsResponse => ({ teams, nextCursor });
+  counts?: UnpaidPaymentsResponse['counts'],
+): UnpaidPaymentsResponse => {
+  // By default the fixture's totals are its own rows, as for a payer with a single page.
+  const rows = teams.flatMap((team) => team.payments);
+  const of = (status: MyPaymentRow['status']) => rows.filter((row) => row.status === status).length;
+  return {
+    teams,
+    nextCursor,
+    counts: counts ?? { overdue: of('OVERDUE'), pending: of('PENDING'), paid: of('PAID') },
+  };
+};
 
 export const adminRow = (
   change: Record<string, unknown> = {},

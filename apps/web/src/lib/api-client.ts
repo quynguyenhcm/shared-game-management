@@ -4,10 +4,12 @@ import {
   AttemptResponse,
   AuthSuccessResponse,
   BankingResponse,
+  DashboardRegistrationsResponse,
   type HoldResolutionRequest,
   HoldResolutionResponse,
   IntentErrorResponse,
   MyPaymentsResponse,
+  OpenSessionsResponse,
   PayoutBlockResponse,
   PaymentResponse,
   ReminderResponse,
@@ -903,6 +905,33 @@ export const apiClient = {
       path: `/payments/me${queryString({ status: 'UNPAID', cursor: query.cursor })}`,
       method: 'GET',
       schema: UnpaidPaymentsResponse,
+    }),
+
+  /** The caller's PAID payments across teams, grouped by team (the dashboard's Paid accordion; cursor shared in format with UNPAID). */
+  myPaidPayments: (query: { cursor?: string }, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/payments/me${queryString({ status: 'PAID', cursor: query.cursor })}`,
+      method: 'GET',
+      schema: UnpaidPaymentsResponse,
+    }),
+
+  /** The upcoming PUBLISHED sessions of the caller's approved teams (the dashboard's Currently Opening tab; no cursor, capped by the API). */
+  openSessions: (options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: '/me/sessions/open',
+      method: 'GET',
+      schema: OpenSessionsResponse,
+    }),
+
+  /** Every registration of the caller, Upcoming then Past (`cursor` pages Past), with its payment when billed. */
+  myRegistrations: (query: { cursor?: string }, options: ApiCallOptions = {}) =>
+    apiFetch({
+      ...options,
+      path: `/me/registrations${queryString({ cursor: query.cursor })}`,
+      method: 'GET',
+      schema: DashboardRegistrationsResponse,
     }),
 
   /** The caller's payments in one team (the wallet page's Payments section). */
