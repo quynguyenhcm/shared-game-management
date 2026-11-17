@@ -647,6 +647,13 @@ describe('the payer lists (GET /teams/:teamId/payments/me, GET /payments/me?stat
       'Beta Club': [[held, 'OVERDUE', true]],
     });
     expect(JSON.stringify(body)).not.toContain(paid);
+    // The totals are the caller's own, whichever list was asked for; another player's payment is not counted.
+    expect(body.counts).toEqual({ overdue: 1, pending: 1, paid: 1 });
+    expect(
+      (
+        await call(h, 'GET', '/payments/me?status=PAID', a.payer.token)
+      ).json<UnpaidPaymentsResponse>().counts,
+    ).toEqual({ overdue: 1, pending: 1, paid: 1 });
     expect((await call(h, 'GET', '/payments/me?status=ALL', a.payer.token)).statusCode).toBe(422);
     expect((await call(h, 'GET', '/payments/me', null)).statusCode).toBe(401);
   });
@@ -720,6 +727,8 @@ describe('the payer lists (GET /teams/:teamId/payments/me, GET /payments/me?stat
         expect(group.payments.every((p) => p.status === 'PAID')).toBe(true);
       }
       expect(body.teams.length).toBeLessThanOrEqual(2);
+      // Every page carries the whole totals, never the count of the page's own rows.
+      expect(body.counts).toEqual({ overdue: 0, pending: 60, paid: 120 });
       seen.push(...ids);
       cursor = body.nextCursor;
       if (cursor === null) break;

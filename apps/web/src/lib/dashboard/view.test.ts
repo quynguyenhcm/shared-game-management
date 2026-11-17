@@ -334,7 +334,7 @@ describe('payment accordions (AC-HAPPY-5, AC-HAPPY-6)', () => {
     ]);
   });
 
-  it('Show more follows nextCursor per list and keeps the other list’s cursor in the URL', () => {
+  it('Show more follows nextCursor per list, once per list, and keeps the other list’s cursor in the URL', () => {
     const views = paymentAccordions({
       unpaid: { ...unpaid, nextCursor: 'UNEXT' },
       paid: { ...paid, nextCursor: 'PNEXT' },
@@ -342,11 +342,49 @@ describe('payment accordions (AC-HAPPY-5, AC-HAPPY-6)', () => {
       unpaidCursor: 'UCUR',
     });
     const hrefs = views.map((v) => v.showMoreHref);
-    expect(hrefs[0]).toBe('/dashboard?tab=payments&paidCursor=PCUR&unpaidCursor=UNEXT');
-    expect(hrefs[1]).toBe(hrefs[0]);
+    // The unpaid list is one list in due order: its Show more sits once, under Pending, where the next page continues.
+    expect(hrefs[0]).toBeNull();
+    expect(hrefs[1]).toBe('/dashboard?tab=payments&paidCursor=PCUR&unpaidCursor=UNEXT');
     expect(hrefs[2]).toBe('/dashboard?tab=payments&paidCursor=PNEXT&unpaidCursor=UCUR');
     const last = paymentAccordions({ unpaid, paid });
     expect(last.every((v) => v.showMoreHref === null)).toBe(true);
+  });
+
+  it('puts the unpaid Show more under Overdue when the payer has nothing pending at all', () => {
+    const onlyOverdue = unpaidBody(
+      [{ ...A, payments: [row('00000000-0000-4000-8000-000000000001', { status: 'OVERDUE' })] }],
+      'UNEXT',
+      { overdue: 51, pending: 0, paid: 0 },
+    );
+    const hrefs = paymentAccordions({ unpaid: onlyOverdue, paid: unpaidBody([]) }).map(
+      (v) => v.showMoreHref,
+    );
+    expect(hrefs).toEqual(['/dashboard?tab=payments&unpaidCursor=UNEXT', null, null]);
+  });
+
+  it('titles carry the API totals, not the rows of the loaded page', () => {
+    const counts = { overdue: 7, pending: 63, paid: 120 };
+    const views = paymentAccordions({
+      unpaid: { ...unpaid, nextCursor: 'UNEXT', counts },
+      paid: { ...paid, nextCursor: 'PNEXT', counts },
+    });
+    expect(views.map((v) => v.title)).toEqual(['Overdue (7)', 'Pending (63)', 'Paid (120)']);
+  });
+
+  it('a later unpaid page with no pending rows of its own still opens Pending by its total', () => {
+    const pageTwo = unpaidBody([], null, { overdue: 0, pending: 60, paid: 0 });
+    const [overdue, pending] = paymentAccordions({
+      unpaid: pageTwo,
+      paid: unpaidBody([]),
+      unpaidCursor: 'UCUR',
+    });
+    expect([overdue?.open, pending?.open]).toEqual([false, true]);
+    expect(pending?.title).toBe('Pending (60)');
+  });
+
+  it('keeps Paid open after its own Show more', () => {
+    const views = paymentAccordions({ unpaid, paid, paidCursor: 'PCUR' });
+    expect(views.map((v) => v.open)).toEqual([true, true, true]);
   });
 
   it('decides emptiness of the whole payments area from both reads', () => {

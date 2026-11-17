@@ -269,9 +269,9 @@ export interface PaymentGroupView {
 
 export interface AccordionView {
   id: 'overdue' | 'pending' | 'paid';
-  /** `Overdue (1)`: the count of the rows shown. */
+  /** `Overdue (1)`: the payer's total from the API, whatever page is loaded. */
   title: string;
-  /** Overdue and Pending open by default when they have rows; Paid is closed. */
+  /** Overdue and Pending open by default when their total is not zero; Paid is closed until its own `Show more` is followed. */
   open: boolean;
   empty: string;
   groups: PaymentGroupView[];
@@ -289,13 +289,12 @@ function groupsOf(
     .filter((group) => group.rows.length > 0);
 }
 
-const countOf = (groups: readonly PaymentGroupView[]): number =>
-  groups.reduce((total, group) => total + group.rows.length, 0);
-
 /**
- * The three accordions in order Overdue, Pending, Paid. The unpaid list feeds the first two and is paged by `unpaidCursor`; the
- * paid list is paged by `paidCursor`; each `Show more` keeps the other list's cursor in the URL. Every loaded paid row is shown
- * (an invoice must stay reachable), so `paidLimit` is off.
+ * The three accordions in order Overdue, Pending, Paid. Titles carry the API's totals (`counts`), never the loaded rows. The
+ * unpaid list feeds the first two and is one list in due order paged by `unpaidCursor`, so its `Show more` appears once: under
+ * Pending, where the next page continues, or under Overdue when nothing is pending at all. The paid list is paged by
+ * `paidCursor`; each `Show more` keeps the other list's cursor in the URL. Every loaded paid row is shown (an invoice must stay
+ * reachable), so `paidLimit` is off.
  */
 export function paymentAccordions(input: {
   unpaid: UnpaidPaymentsResponse;
@@ -327,20 +326,47 @@ export function paymentAccordions(input: {
     label: string,
     empty: string,
     groups: PaymentGroupView[],
+    total: number,
     showMoreHref: string | null,
     openByDefault: boolean,
   ): AccordionView => ({
     id,
-    title: accordionTitle(label, countOf(groups)),
-    open: openByDefault && groups.length > 0,
+    title: accordionTitle(label, total),
+    open: openByDefault && total > 0,
     empty,
     groups,
     showMoreHref,
   });
+  const { overdue: overdueTotal, pending: pendingTotal } = unpaid.counts;
+  const unpaidMoreUnderPending = pendingTotal > 0;
   return [
-    build('overdue', 'Overdue', NOTHING_OVERDUE, overdue, unpaidMore, true),
-    build('pending', 'Pending', NOTHING_PENDING, pending, unpaidMore, true),
-    build('paid', 'Paid', NO_PAID_GAMES, paidGroups, paidMore, false),
+    build(
+      'overdue',
+      'Overdue',
+      NOTHING_OVERDUE,
+      overdue,
+      overdueTotal,
+      unpaidMoreUnderPending ? null : unpaidMore,
+      true,
+    ),
+    build(
+      'pending',
+      'Pending',
+      NOTHING_PENDING,
+      pending,
+      pendingTotal,
+      unpaidMoreUnderPending ? unpaidMore : null,
+      true,
+    ),
+    build(
+      'paid',
+      'Paid',
+      NO_PAID_GAMES,
+      paidGroups,
+      paid.counts.paid,
+      paidMore,
+      input.paidCursor !== undefined,
+    ),
   ];
 }
 

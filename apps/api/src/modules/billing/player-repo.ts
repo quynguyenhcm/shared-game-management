@@ -199,6 +199,29 @@ export async function listPayerUnpaid(
 }
 
 /**
+ * The payer's totals by status across every team, over the same rows the lists read (so a total never disagrees with paging
+ * to the end of its list).
+ */
+export async function countPayerPayments(
+  db: Kysely<DB>,
+  payerId: string,
+): Promise<{ overdue: number; pending: number; paid: number }> {
+  const row = await db
+    .selectFrom('payments as p')
+    .innerJoin('teams as t', 't.id', 'p.team_id')
+    .innerJoin('registrations as r', 'r.id', 'p.registration_id')
+    .innerJoin('game_sessions as s', 's.id', 'r.session_id')
+    .where('p.user_id', '=', payerId)
+    .select([
+      sql<number>`count(*) FILTER (WHERE p.status = 'OVERDUE')::int`.as('overdue'),
+      sql<number>`count(*) FILTER (WHERE p.status = 'PENDING')::int`.as('pending'),
+      sql<number>`count(*) FILTER (WHERE p.status = 'PAID')::int`.as('paid'),
+    ])
+    .executeTakeFirstOrThrow();
+  return { overdue: row.overdue, pending: row.pending, paid: row.paid };
+}
+
+/**
  * The payer's PAID payments across every team, most recently paid first (`paid_at desc, id desc`; page size + 1 rows), so every
  * paid game's document stays reachable however long ago it was settled.
  */

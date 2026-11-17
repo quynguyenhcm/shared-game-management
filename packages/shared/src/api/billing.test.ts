@@ -312,8 +312,20 @@ describe('response contracts', () => {
       UnpaidPaymentsResponse.parse({
         teams: [{ teamId: ID, teamName: 'Tuesday Hoops', payments: [row] }],
         nextCursor: null,
+        counts: { overdue: 1, pending: 0, paid: 0 },
       }).teams,
     ).toHaveLength(1);
+    // The totals are required whole counts.
+    expect(failure(UnpaidPaymentsResponse, { teams: [], nextCursor: null })[0]?.path).toEqual([
+      'counts',
+    ]);
+    expect(
+      failure(UnpaidPaymentsResponse, {
+        teams: [],
+        nextCursor: null,
+        counts: { overdue: -1, pending: 0, paid: 0 },
+      }).length,
+    ).toBeGreaterThan(0);
     expect(failure(PaymentResponse, { payment: { ...payment, userId: ID } })[0]?.code).toBe(
       'unrecognized_keys',
     );

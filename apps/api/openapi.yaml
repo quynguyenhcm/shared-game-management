@@ -19692,9 +19692,30 @@ paths:
                     type:
                       - string
                       - "null"
+                  counts:
+                    type: object
+                    properties:
+                      overdue:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      pending:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      paid:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                    required:
+                      - overdue
+                      - pending
+                      - paid
+                    additionalProperties: false
                 required:
                   - teams
                   - nextCursor
+                  - counts
                 additionalProperties: false
         "401":
           description: Default Response

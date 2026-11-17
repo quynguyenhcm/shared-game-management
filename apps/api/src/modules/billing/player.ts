@@ -30,6 +30,7 @@ import { findLatestAttempt } from './attempts-repo.ts';
 import {
   PLAYER_PAYMENTS_PAGE_SIZE,
   findPayerPayment,
+  countPayerPayments,
   listPayerPaid,
   listPayerTeamPayments,
   listPayerUnpaid,
@@ -190,10 +191,11 @@ export function createPlayerPaymentsService(deps: PlayerPaymentsDeps): PlayerPay
     async listUnpaid(payerId, query) {
       const paid = query.status === 'PAID';
       const list = paid ? listPayerPaid : listPayerUnpaid;
-      const rows = await list(deps.db, {
-        payerId,
-        after: query.cursor === undefined ? undefined : decodeKeysetCursor(query.cursor),
-      });
+      const after = query.cursor === undefined ? undefined : decodeKeysetCursor(query.cursor);
+      const [rows, counts] = await Promise.all([
+        list(deps.db, { payerId, after }),
+        countPayerPayments(deps.db, payerId),
+      ]);
       // Grouped by team in the order each team first appears (the most overdue, or the most recently paid, payment leads).
       const teams = new Map<string, UnpaidPaymentsResponse['teams'][number]>();
       for (const row of rows.slice(0, PLAYER_PAYMENTS_PAGE_SIZE)) {
@@ -207,6 +209,7 @@ export function createPlayerPaymentsService(deps: PlayerPaymentsDeps): PlayerPay
       return {
         teams: [...teams.values()],
         nextCursor: nextCursorOf(rows, paid ? 'paidCursor' : 'dueCursor'),
+        counts,
       };
     },
 

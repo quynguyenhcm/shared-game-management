@@ -344,7 +344,7 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 **Auto-Build Mode**: YES
 **Can Resume**: NO
 **Final Review Backend**: AUTO FINAL REVIEW BACKEND: codex — usable
-**Final Review Verdict**: Ready to merge with fixes (0 Critical, 1 Important: accordion counts derived from loaded page rows (`lib/dashboard/view.ts` paymentAccordions), against learned rule review-process-plan-claims; 6 Minor). Awaiting human ruling.
+**Final Review Verdict**: Ready to merge with fixes (0 Critical, 1 Important: accordion counts derived from loaded page rows (`lib/dashboard/view.ts` paymentAccordions), against learned rule review-process-plan-claims; 6 Minor). Human ruling (2026-11-17): fix with option (a), server totals. FIXED (see Post-review fix).
 
 ### Resumption Notes
 **Resume From**: (none; run /yay:reflect)
@@ -374,6 +374,7 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 - Phase 3 | apps/web/e2e/player-dashboard.spec.ts:896 | Phase review (PROCEED): the $0.00 PAID row is a BY_SEX session with a $0.00 female fee (`No charge`, no download). Accepted.
 - Phase 3 | apps/web/e2e/player-dashboard.spec.ts:40-59 | Phase review (PROCEED): Codex P1 fix, the stack guard accepts only localhost 3100/4100/5532; Codex P2 fix, test date frozen per worker. Accepted.
 - Phase 3 | docs/getting-started.md | Phase review (PROCEED): no player pages were listed, so an e2e run recipe was added instead. Accepted.
+- Post-review | packages/shared/src/api/billing.ts, billing/player-repo.ts (countPayerPayments), lib/dashboard/view.ts | Final review Important #1 fixed (human ruling 2026-11-17, option a): `GET /payments/me` now returns `counts {overdue, pending, paid}`, the caller's whole totals on either list; accordion titles use them. Supersedes the Phase 2 count entries above. The unpaid `Show more` now appears once (under Pending, or under Overdue when nothing is pending), and Paid stays open after its own `Show more`. Remaining: a later unpaid page still shows only that page's rows (cursor paging, no accumulation).
 
 ### Phase 1 Result (2026-11-16)
 Tests 4296/4296 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build, openapi drift PASS. Codex review: no actionable defects.
@@ -391,3 +392,6 @@ Tests 4360/4360 (coverage 96.4% stmts / 89.8% branches), typecheck, lint, build,
 
 ### Phase 3 Result (2026-11-16)
 Playwright on sgm-e2e (fake adapter): desktop 5/5, mobile 5/5. Tests 4359/4360 (only the known invoices-schema migration-order flake, 5/5 in isolation), typecheck, lint, build, openapi drift PASS. Codex review: P1 (e2e stack guard now whitelists localhost 3100/4100/5532) and P2 (test date frozen per worker) fixed. Deviations: AC-ERROR-3 proven end to end for invoice_not_available only (invoice_pending / service_unavailable covered by unit tests); the $0.00 PAID row is a BY_SEX session with a $0.00 female fee (tag No charge, no download).
+
+### Post-review fix (2026-11-17)
+Final review Important #1 (server totals). Tests 4364/4364 (coverage 96.42% stmts), typecheck, lint, build, openapi drift PASS; payer-list integration tests assert the totals on every page of 120 PAID and 60 PENDING payments and exclude another player's. Playwright not re-run: its seeded data fits one page, so totals equal the loaded rows and the expected titles are unchanged.

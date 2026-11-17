@@ -305,7 +305,12 @@ export const MyPaymentsResponse = z.strictObject({
 });
 export type MyPaymentsResponse = z.infer<typeof MyPaymentsResponse>;
 
-/** `GET /payments/me?status=UNPAID` (CR-16): the caller's payable and held payments across teams, grouped by team. */
+const PaymentCount = z.number().int().nonnegative();
+
+/**
+ * `GET /payments/me?status=UNPAID` (CR-16): the caller's payable and held payments across teams, grouped by team; `status=PAID`
+ * gives the paid ones in the same shape. `counts` are the caller's whole totals by status on either list, never the page's rows.
+ */
 export const UnpaidPaymentsResponse = z.strictObject({
   teams: z.array(
     z.strictObject({
@@ -315,6 +320,7 @@ export const UnpaidPaymentsResponse = z.strictObject({
     }),
   ),
   nextCursor: z.string().nullable(),
+  counts: z.strictObject({ overdue: PaymentCount, pending: PaymentCount, paid: PaymentCount }),
 });
 export type UnpaidPaymentsResponse = z.infer<typeof UnpaidPaymentsResponse>;
 

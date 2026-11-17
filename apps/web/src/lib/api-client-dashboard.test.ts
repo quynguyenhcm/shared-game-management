@@ -46,10 +46,18 @@ describe('apiClient dashboard reads (player-dashboard)', () => {
   });
 
   it('myPaidPayments: GET /payments/me?status=PAID with an optional cursor', async () => {
-    const fetchMock = stubJson(200, { teams: [], nextCursor: null });
+    const fetchMock = stubJson(200, {
+      teams: [],
+      nextCursor: null,
+      counts: { overdue: 0, pending: 0, paid: 0 },
+    });
     await apiClient.myPaidPayments({ cursor: 'c1' }, OPTIONS);
     expect(url(fetchMock)).toBe('http://localhost:4000/payments/me?status=PAID&cursor=c1');
-    const plain = stubJson(200, { teams: [], nextCursor: null });
+    const plain = stubJson(200, {
+      teams: [],
+      nextCursor: null,
+      counts: { overdue: 0, pending: 0, paid: 0 },
+    });
     await apiClient.myPaidPayments({}, OPTIONS);
     expect(url(plain)).toBe('http://localhost:4000/payments/me?status=PAID');
   });
