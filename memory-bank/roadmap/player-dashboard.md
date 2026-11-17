@@ -1,6 +1,6 @@
 ---
 version: v1.0.0
-status: planned
+status: completed
 priority: medium
 complexity: 2
 linked_tasks: [player-dashboard]

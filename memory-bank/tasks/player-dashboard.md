@@ -1,13 +1,15 @@
 ---
 slug: player-dashboard
 feature: player-dashboard
-status: REFLECTION_COMPLETE
+status: COMPLETE
 ---
 
 # player-dashboard: Player Dashboard
 
 **Complexity**: Level 2
-**Status**: REFLECTION_COMPLETE
+**Status**: COMPLETE
+**Archived**: memory-bank/archive/player-dashboard-archive.md
+**Completed**: 2026-11-17
 **Reflection**: memory-bank/reflection/player-dashboard-reflection.md
 **Roadmap**: player-dashboard
 **Branch**: feature/player-dashboard
@@ -340,7 +342,7 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 ## Execution State
 
 **Build Status**: IDLE
-**Current Phase**: REFLECT → ARCHIVE
+**Current Phase**: COMPLETE
 **Current Step**: Phase 3 complete (2026-11-16); BUILD_COMPLETE
 **Auto-Build Mode**: YES
 **Can Resume**: NO
@@ -348,7 +350,7 @@ Final phase delivers the complete entry-to-success flow: header `Dashboard` → 
 **Final Review Verdict**: Ready to merge with fixes (0 Critical, 1 Important: accordion counts derived from loaded page rows (`lib/dashboard/view.ts` paymentAccordions), against learned rule review-process-plan-claims; 6 Minor). Human ruling (2026-11-17): fix with option (a), server totals. FIXED (see Post-review fix).
 
 ### Resumption Notes
-**Resume From**: (none; run /yay:archive)
+**Resume From**: (none; task COMPLETE)
 **Notes**: Phase 3 committed. Guard log: empty.
 
 ### Halt State (populated only on a halt trigger — blank during normal RUNNING)
